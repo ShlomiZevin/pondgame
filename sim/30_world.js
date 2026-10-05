@@ -52,7 +52,7 @@
       nextSp: 1,
       ticks: 0,
       ages: [], ageCand: null, kinds: [], fashion: null, fashionGen: 0, hue0: 0,
-      organs: [], nextOrgan: 1, designs: [], nextDesign: 1, shelf: [], evShelf: [], history: [], deepAcc: 0, mods: [], events: [], story: [],
+      organs: [], nextOrgan: 1, designs: [], nextDesign: 1, plans: [], nextPlan: 1, shelf: [], evShelf: [], history: [], deepAcc: 0, mods: [], events: [], story: [],
     };
     G.seed(W.seed);
     W.hue0 = G.rand() * 360;                 // every pond's first life has its own colour
@@ -278,13 +278,13 @@
         const lit = G.lightAt(z.x, z.y) - (z.p.light > 0.3 ? z.p.light * W.set.light * 0.6 : 0);
         const likes = z.p.light < -0.3 ? 0.9 - lit : lit - 0.5;
         const tmp = Math.abs(W.set.temp + [0.05, 0.22, -0.08, -0.62][W.season]);
-        z.health = clamp(z.health + (z.alive * likes * 0.03 - Math.max(0, tmp - 0.55) * 0.02) * dt, 0, 2);
-        if (z.p.eats > 0.2) z.health -= 0.004 * dt;      // hunger: a hunter must keep eating
+        if (G.isBad(z)) z.health = Math.min(z.health + 0.006 * dt, 1.3);      // it mends: a few with the answer only scratch it, a pond full of them brings it down
+        else z.health = clamp(z.health + (z.alive * likes * 0.03 - Math.max(0, tmp - 0.55) * 0.02) * dt, 0, 2);
         z.life = z.health > 0.02 ? Math.max(z.life, 30) : 0;
         let eaters = 0; for (let q = 0; q < W.zones.length; q++) if (W.zones[q].p.eats > 0.2 || W.zones[q].p.deadly > 0.2) eaters++;
         const canBud = z.p.eats > 0.2 || z.p.deadly > 0.2 ? eaters < 2 && W.cre.length > 60 : true;
         if (canBud && z.health > 1.5 && z.age > 20 && W.zones.length < 11 && G.rand() < (z.p.eats > 0.2 ? 0.012 : 0.05) * dt) budZone(z);
-      } else if (!(z.p.vault > 0.2)) z.life -= dt;
+      } else if (!(z.p.vault > 0.2) && !G.isBad(z)) z.life -= dt;
       const fade = clamp(z.life / 18, 0, 1), grow = clamp(z.age / 3, 0.2, 1);
       z.k = fade * grow * (living ? clamp(0.35 + z.health * 0.65, 0.3, 1) : 1);
       z.r = z.r0 * (0.55 + 0.45 * grow) * (0.7 + 0.3 * fade) * (1 + (z.p.spread || 0) * clamp(z.age / 40, 0, 1) * 0.5) * (living ? 0.55 + 0.35 * z.health : 1);
@@ -521,8 +521,10 @@
       let cost = ph.upkeep * (c.asleep ? 0.6 : 1) + (o2short > 0 ? 0.22 * o2short * r10 : 0) + thrust * (sprint ? 1.6 : 0.30) * r10 * (1 - 0.2 * ph.flag) + (ph.lamp > 0 ? out[3] * 0.10 * ph.lamp : 0) + (out[4] > 0.5 ? 0.03 : 0);
       // temperature, zones
       const tmp = G.tempAt(c.x, c.y);
-      if (tmp > 0.35) cost += 3.2 * Math.max(0, tmp - 0.35 - ph.res[0] * 0.7);
-      else if (tmp < -0.35) cost += 2.6 * Math.max(0, -tmp - 0.35 - ph.res[1] * 0.7);
+      c.hot = 0; c.chill = 0; c.pois = 0;
+      if (c.startle > 0) c.startle -= dt;
+      if (tmp > 0.35) { c.hot = Math.max(0, tmp - 0.35 - ph.res[0] * 0.7); cost += 3.2 * c.hot; }
+      else if (tmp < -0.35) { c.chill = Math.max(0, -tmp - 0.35 - ph.res[1] * 0.7); cost += 2.6 * c.chill; }
       let zoneHit = 0;
       c.inZone = 0;
       for (let i = 0; i < W.zones.length; i++) {
@@ -538,11 +540,11 @@
           // a bad thing can be worn down by creatures that carry what it is weak to, and they feed on it
           if (p.poison + p.acid + p.eats + p.deadly > 0.25 || p.vault > 0.2) {
             const pow = G.weakPower(c, z.weak);
-            if (pow > 0.08) { const dmg = pow * 0.012 * dt; z.hit += dmg; z.struck = 1; c.strike = 0.5; z._atk = (z._atk | 0) + 1; c.zk = 3; c.zid = z.id; c.zt = W.t; if (z.alive > 0.25) z.health -= dmg; else z.life -= dmg * (p.vault > 0.2 ? 5 : 55); c.E = Math.min(ph.Emax, c.E + dmg * 260); c.intake += dmg * 260; c.P += dmg * 200; }
+            if (pow > 0.08) { const dmg = pow * 0.005 * dt; z.hit += dmg; z.struck = 1; c.strike = 0.5; z._atk = (z._atk | 0) + 1; c.zk = 3; c.zid = z.id; c.zt = W.t; if (z.alive > 0.25) z.health -= dmg; else z.life -= dmg * (p.vault > 0.2 ? 5 : 55); c.E = Math.min(ph.Emax, c.E + dmg * 260); c.intake += dmg * 260; c.P += dmg * 200; }
           }
         }
         if (p.deadly > 0.05 && d2 < z.r * z.r * 0.3 && !(z.full > 0) && cre.length > 20 && G.weakPower(c, z.weak) < 0.45) {
-          if (G.rand() < p.deadly * (1 - 0.9 * g.c[9 + z.sig]) * (1 - ph.defense * 0.4)) {
+          if (G.rand() < p.deadly * (1 - 0.9 * G.tolOf(g, z)) * (1 - ph.defense * 0.4)) {
             z.full = 0.35; z.bite = 1; z.ate++; z.struckDead = 1;
             if (!z.deaths) G.zoneEvent && G.zoneEvent(z, 'It killed its first creature with a touch');
             z.deaths++;
@@ -552,16 +554,16 @@
           }
           c.flash = 1;       // it was touched and lived: that is tolerance at work
         }
-        if (p.eats > 0.05 && d2 < z.r * z.r * 0.36) if (!(z.full > 0)) { const f = p.eats * z.k * 6 * (1 - ph.defense * 0.6) * (1 - 0.85 * g.c[9 + z.sig]); cost += f; zoneHit = Math.max(zoneHit, f); z.hurt += f * dt; if (f > 0.12) { z._hurt = (z._hurt | 0) + 1; c.zk = 1; c.zid = z.id; c.zt = W.t; } z.bite = 1; }
-        if (p.poison > 0.05 && d2 < z.r * z.r) { const f = p.poison * z.k * 4.5 * (1 - ph.res[2] * 0.8) * (1 - 0.85 * g.c[9 + z.sig]); cost += f; zoneHit = Math.max(zoneHit, f); z.hurt += f * dt; if (f > 0.12) { z._hurt = (z._hurt | 0) + 1; c.zk = 1; c.zid = z.id; c.zt = W.t; } }
-        if (p.acid > 0.05 && d2 < z.r * z.r) { const f = p.acid * z.k * 4 * (1 - ph.defense * 0.7) * (1 - 0.85 * g.c[9 + z.sig]); cost += f; zoneHit = Math.max(zoneHit, f); z.hurt += f * dt; if (f > 0.12) { z._hurt = (z._hurt | 0) + 1; c.zk = 1; c.zid = z.id; c.zt = W.t; } }
+        if (p.eats > 0.05 && d2 < z.r * z.r * 0.36) if (!(z.full > 0)) { const f = p.eats * z.k * 6 * (1 - ph.defense * 0.6) * (1 - 0.85 * G.tolOf(g, z)); cost += f; zoneHit = Math.max(zoneHit, f); z.hurt += f * dt; if (f > 0.12) { z._hurt = (z._hurt | 0) + 1; c.zk = 1; c.zid = z.id; c.zt = W.t; } z.bite = 1; }
+        if (p.poison > 0.05 && d2 < z.r * z.r) { const f = p.poison * z.k * 4.5 * (1 - ph.res[2] * 0.8) * (1 - 0.85 * G.tolOf(g, z)); cost += f; c.pois = f; zoneHit = Math.max(zoneHit, f); z.hurt += f * dt; if (f > 0.12) { z._hurt = (z._hurt | 0) + 1; c.zk = 1; c.zid = z.id; c.zt = W.t; } }
+        if (p.acid > 0.05 && d2 < z.r * z.r) { const f = p.acid * z.k * 4 * (1 - ph.defense * 0.7) * (1 - 0.85 * G.tolOf(g, z)); cost += f; zoneHit = Math.max(zoneHit, f); z.hurt += f * dt; if (f > 0.12) { z._hurt = (z._hurt | 0) + 1; c.zk = 1; c.zid = z.id; c.zt = W.t; } }
         if (p.hard > 0.3 && !(p.vault > 0.2 && G.weakPower(c, z.weak) > 0.45)) {
           const rr = z.r * 0.8 + ph.r;
           if (d2 < rr * rr) { const d = Math.sqrt(d2) + 0.01; c.x = z.x + dx / d * rr; c.y = z.y + dy / d * rr; c.vx *= 0.5; c.vy *= 0.5; }
         }
       }
       if (c.dead) continue;
-      if (W.mods.length) { const gp = G.modSum('poison'); if (gp > 0.02) { const f = gp * 2.6 * (1 - ph.res[2] * 0.9); cost += f; zoneHit = Math.max(zoneHit, f); } }
+      if (W.mods.length) { const gp = G.modSum('poison'); if (gp > 0.02) { const f = gp * 2.6 * (1 - ph.res[2] * 0.9); cost += f; c.pois = Math.max(c.pois, f); zoneHit = Math.max(zoneHit, f); } }
       c.zoneHit = zoneHit;
       c.E -= cost * dt;
       // feeding on light: best alone in a bright place (neighbours shade each other)
@@ -813,7 +815,7 @@
 
   /** how attractive a creature is: its own body's charm, and what the judge made of its kind */
   /** the look of a creature, as a hunter or a mate would tell it apart: its kind of body, its coat and its colour */
-  G.shapeOf = function (g) { const f = g.f, set = {}; for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on < 0) set[q.k === 8 ? 'd' + q.t : q.k] = 1; } return (f.sym ? 'star' : f.n >= 6 ? 'long' : f.n >= 3 ? 'mid' : 'short') + ':' + Object.keys(set).sort().join(',') + ':' + f.coat; };
+  G.shapeOf = function (g) { const f = g.f, set = {}; for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on < 0) set[q.k === 8 ? 'd' + q.t : q.k] = 1; } return (f.sym ? 'star' : f.pl ? 'b' + f.pl : f.n >= 6 ? 'long' : f.n >= 3 ? 'mid' : 'short') + ':' + Object.keys(set).sort().join(',') + ':' + f.coat; };
   G.hueOf = function (g) { return Math.floor((((g.f.hue % 360) + 360) % 360) / 60); };      // one of six broad colours
   G.lookOf = function (c) { return G.shapeOf(c.g) + '|' + G.hueOf(c.g); };
   G.charmOf = function (c) {
@@ -879,10 +881,13 @@
     if (G.measurePressures) G.measurePressures();
     if (G.organTick) G.organTick(W.gen);
     if (G.designTick) G.designTick(W.gen);
+    if (G.planTick) G.planTick(W.gen);
     if (G.storyTick) G.storyTick(W.gen);
     if (G.eraTick) G.eraTick(W.gen);
     if (G.fashionTick) G.fashionTick(W.gen);
+    if (G.natureTick) G.natureTick(W.gen);
     if (G.judgeTick) G.judgeTick(W.gen);
+    if (G.paintTick) G.paintTick(W.gen);
     W.hist[W.hist.length - 1].species = W.species.filter(function (s) { return !s.extinct; }).length;
     G.emit('scored', W.hist[W.hist.length - 1]);
   }
@@ -976,6 +981,7 @@
       for (let j = 0; j < f.rules.length; j++) { const k = f.rules[j].k; if (k === 8) { const dk = 'dsg' + f.rules[j].t; if (!seen[dk]) { seen[dk] = 1; inc(dk); } continue; } if (!seen['r' + k]) { seen['r' + k] = 1; inc('grow' + k); } }
       if (f.en >= 1) inc('eye'); if (f.en >= 3) inc('eyes3'); if (f.mk) inc('mouth' + f.mk); if (f.tk && f.n > 1 && !f.sym) inc('tail');
       if (f.n >= 2) inc('seg2'); if (f.n >= 5) inc('seg5'); if (f.n >= 8) inc('seg8'); if (f.n >= 11) inc('seg11');
+      if (f.pl && !f.sym && f.n >= 2) inc('plan' + f.pl);
       if (f.coat) inc('coat' + f.coat); if (f.nk > 0.35 && f.n > 1 && !f.sym) inc('neck'); if (f.hd > 1.45) inc('bighead'); if (f.rules.some(function (q) { return q.on >= 0; })) inc('nested'); if (f.sym) inc('star');
       if (f.shell > 0.25) inc('shell'); if (f.crest > 0.25) inc('crest'); if (f.glow > 0.3) inc('glow'); if (f.venom > 0.3) inc('venom'); if (f.pat) inc('pattern');
       if (ph.lungs) inc('walker'); if (ph.hands) inc('hands'); if (ph.jaws) inc('biter');
@@ -1001,6 +1007,7 @@
       if (W.disc[k]) continue;
       const why = G.why ? G.why(k) : '';
       if (DISC[k]) G.discover(k, DISC[k] + (why ? ' ' + why : ''));
+      else if (k.indexOf('plan') === 0 && G.planOf) { const p = G.planOf(+k.slice(4)); if (p) G.discover(k, 'A whole new build took hold: the ' + p.name + '! ' + p.note + (why ? ' ' + why : '')); }
       else if (k.indexOf('dsg') === 0 && G.designOf) { const d = G.designOf(+k.slice(3)); if (d) G.discover(k, 'A new kind of body part took hold: the ' + d.name + '! ' + d.note + (why ? ' ' + why : '')); }
       else if (k.indexOf('organ') === 0 && G.organOf) { const o = G.organOf(+k.slice(5)); if (o) G.discover(k, 'A new organ took hold: ' + o.name + '! ' + o.note + (why ? ' ' + why : '')); }
     }
@@ -1028,10 +1035,17 @@
     return { eaten: z.made ? Math.min(1, z.fed / z.made) : 0, can: cre.length ? n / cre.length : 0 };
   };
   /** how far the living creatures have evolved tolerance to this thing (0..1) */
+  /** how well a creature lives beside a thing (0..1). A living, hunting thing overlooks what is its own colour; the rest is the old slow hardening. */
+  G.tolOf = function (g, z) {
+    const gene = g.c[9 + z.sig] || 0;
+    if (!(z.alive > 0.25 || z.p.eats > 0.05 || z.p.deadly > 0.05)) return gene;
+    let d = Math.abs(g.f.hue - z.hue) % 360; if (d > 180) d = 360 - d;
+    return Math.min(1, 0.3 * gene + 0.8 * Math.max(0, 1 - d / 42));
+  };
   G.adaptedTo = function (z) {
     const cre = G.W.cre; if (!cre.length) return 0;
     let s = 0;
-    for (let i = 0; i < cre.length; i++) s += cre[i].g.c[9 + z.sig] || 0;
+    for (let i = 0; i < cre.length; i++) s += G.tolOf(cre[i].g, z);
     return s / cre.length;
   };
 
@@ -1056,6 +1070,7 @@
     z.ev.push({ g: W.gen, t: info.from ? 'Budded from ' + info.from : 'Dropped into the pond' });
     W.zones.push(z);
     if (W.zones.length > 14) W.zones.shift();
+    for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i], dx = c.x - x, dy = c.y - y, d = Math.sqrt(dx * dx + dy * dy) + 0.01; if (d < 300) { c.startle = 1.6; c.vx += dx / d * 70; c.vy += dy / d * 70; } }
     G.emit('zone', z);
     return z;
   };

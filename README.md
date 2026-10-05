@@ -81,13 +81,15 @@ use it directly, and `npm run pull-game` copies it into `game/` before a commit.
 | `10_core.js` | The global `G`, the loop, input, the camera. |
 | `20_genome.js` | The genome and `G.derive` (genes → what a body can do), mutation, crossover. |
 | `21_form.js` | **The body.** Growth-rule genes, the rules of development, abilities measured from shape, taste, and the top-down drawing (puppets). |
-| `22_portrait.js` | The front-facing portrait of a creature, from the same genes. Used on every card. |
+| `22_portrait.js` | **How creatures are drawn, in the pond and on every card**: side-view characters grown from the genes (microbe, orb, star, jelly, blob, crab, beast, upright, serpent, fish, or an invented build), every part moving. Each look is kept as a 6-frame loop. |
 | `30_world.js` | The simulation: seasons, food, creatures, things, breeding, selection, species. |
 | `40_words.js` | Typed words, the offline word table, and `G.ai` (the one door to the server, with limits and the cost ledger). |
 | `41_look.js` | How a typed being is turned into a body so it is drawn as a character. |
 | `43_why.js` | The reason shown when a feature takes hold. |
 | `44_pressure.js` | What the pond is up against right now (it tilts which mutations appear). |
 | `45_organs.js`, `45_parts.js` | Organs and new kinds of body part invented for a pond; the collection. |
+| `45_plans.js` | **Builds** invented for a pond: a whole way of carrying a body (a spine line and how the legs are set), by the AI or from the game's own stock of eight. A build is a gene (`f.pl`); at most three live in a pond at a time. |
+| `48_paint.js` | AI paintings of creatures. Switched off (`G.ai.drawn = true`): paintings cannot move. |
 | `46_events.js` | Free-text world events. |
 | `47_story.js`, `48_judge.js`, `49_eras.js` | The narrator, the AI judge of looks, and ages named from what actually dominates. |
 | `50_render.js` | Drawing the pond. |
@@ -126,6 +128,7 @@ that hosts it, and that page calls the server. `public/dev-host.html` is a compl
 | op | server call | what for |
 |---|---|---|
 | `ai.thing` | `POST /api/ai/thing` | A typed word → what it does, how it looks. |
+| `ai.plan` | `POST /api/ai/plan` | A new build (body plan) for a pond. About $0.003 with Haiku. |
 | `ai.event` | `POST /api/ai/event` | A typed sentence → a world event. |
 | `ai.organ`, `ai.design` | `POST /api/ai/organ`, `/design` | A new organ, a new kind of body part. |
 | `ai.judge` | `POST /api/ai/judge` | How striking each kind of creature looks. |
@@ -159,7 +162,8 @@ What has to change, and nothing else should:
 ## Known problems
 
 - **Evolution slows down.** After a while a pond settles and its creatures stay more or less the same. This is the main open problem.
-- **Creatures look better as portraits than in the pond.** The pond shows them from above; the portrait is the charming one.
+- An AI-invented build is only checked for being a usable line; a strange one (head low, tail high) is drawn as given.
+- `POST /api/ai/paint` and `lib/paint.js` (AI paintings) work but the game does not use them. The top-down drawing in `21_form.js` (`F.draw`, `F.rig`) is no longer used in the pond.
 - A whole pond tends to end up wearing the same coat, and kinds in one pond often share their main body part.
 - An hour away takes about a minute for the server to catch up.
 - The old route `POST /api/ai/skin` (AI drawings of species) is no longer used by the game.

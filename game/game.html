@@ -553,6 +553,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       orgCost += (0.03 + 0.065 * tot) * q.s;
     }
     const tail = !f.sym && f.tk && f.n > 1;
+    const plump = clamp(((f.prof[1] + f.prof[2] + f.prof[3]) / 3 - 0.7) / 0.5, 0, 1);      // 0 slim .. 1 round
     const bite = Math.min(2, (f.mk === 2 ? 0.8 + 1.6 * f.ms : f.mk === 1 ? 0.6 : 0) + 0.25 * cn.pincer);
     const ds = r / U * Math.sqrt(Math.PI * U * U / FM.area(f));    // drawn so the body covers what a circle of radius r would
     const ph = {
@@ -574,7 +575,10 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       tag: G.tagOfHue(f.hue),
       nseg: f.n - 1, limbs: cn.legSites, segs: [],
       reach: clamp(ext.all * ds / r, 1, 3.6),
-      dig: dig, res: [Math.min(1, c[6] + FX.heat * 0.6), Math.min(1, c[7] + FX.cold * 0.6 + (f.coat >= 2 ? 0.15 : 0)), Math.min(1, c[8] + FX.poison * 0.6)],
+      dig: dig, res: [
+        clamp(0.3 * c[6] + FX.heat * 0.6 + (f.coat === 0 ? 0.28 : f.coat === 1 ? 0.12 : -0.12) + 0.3 * (1 - plump) + 0.05 * Math.min(4, k[1] + k[6]), 0, 1),
+        clamp(0.3 * c[7] + FX.cold * 0.6 + (f.coat >= 2 ? 0.42 : 0) + 0.3 * plump, 0, 1),
+        clamp(0.35 * c[8] + FX.poison * 0.6 + (f.coat === 1 ? 0.25 : 0) + 0.28 * f.shell + 0.22 * f.venom, 0, 1)],
       photo: Math.min(2, FX.photo),
       hue: f.hue,
     };
@@ -589,7 +593,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     ph.jaws = bite >= 0.8;                       // can eat the big prey of the deep
     ph.lungs = cn.legSites >= 4;                 // two pairs of legs carry it onto the shore
     ph.hands = cn.fingers >= 2;                  // fingers at the front pick the shore's food faster
-    ph.warm = ph.res[1] >= 0.55;                 // cold-proof life does not slow down in winter
+    ph.warm = ph.res[1] >= 0.55;
+    ph.plump = plump;                 // cold-proof life does not slow down in winter
     // charm: how well the body fits what all life finds pleasing, and what THIS pond admires
     ph.charm = clamp(FM.taste(f, G.W ? G.W.fashion : null, cn) * 1.15, 0, 1);
     ph.rc = r * (1 + 0.22 * Math.max(0, Math.max(ext.half, ext.wide) * ds / r - 1));
@@ -842,7 +847,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   F.cell = function (hue) {
     const r = G.rand;
     return { sym: 0, n: 1, len: 1, prof: [1, 1, 1, 1, 1], bend: 0, rules: [], en: 0, es: 0.34, ek: 0, mk: 0, ms: 0.25, tk: 0, ts: 0.6,
-      hue: hue === undefined ? r() * 360 : hue, hue2: (r() < 0.5 ? -1 : 1) * (50 + r() * 110), sat: 62 + r() * 20, lit: 58 + r() * 8, pat: 0, psc: 0.5, crest: 0, shell: 0, glow: 0, venom: 0, hd: 1, nk: 0, coat: 0, seed: Math.floor(r() * 1e6) };
+      hue: hue === undefined ? r() * 360 : hue, hue2: (r() < 0.5 ? -1 : 1) * (50 + r() * 110), sat: 62 + r() * 20, lit: 58 + r() * 8, pat: 0, psc: 0.5, crest: 0, shell: 0, glow: 0, venom: 0, hd: 1, nk: 0, coat: 0, hx: 0.85 + r() * 0.4, hq: 1.7 + r() * 1.2, pl: 0, seed: Math.floor(r() * 1e6) };
   };
   F.clone = function (f) {
     const o = {};
@@ -883,6 +888,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     f.sat = num(f.sat, 52, 88, 70); f.lit = num(f.lit, 52, 72, 62); f.pat = clamp(f.pat | 0, 0, 5); f.psc = num(f.psc, 0.15, 1, 0.5);
     f.crest = num(f.crest, 0, 1, 0); f.shell = num(f.shell, 0, 1, 0); f.glow = num(f.glow, 0, 1, 0); f.venom = num(f.venom, 0, 1, 0); f.seed = (f.seed | 0) || 1;
     f.hd = num(f.hd, 0.7, 1.9, 1); f.nk = num(f.nk, 0, 0.7, 0); f.coat = clamp(f.coat | 0, 0, 3);
+    f.hx = num(f.hx, 0.72, 1.45, 1); f.hq = num(f.hq, 1.5, 4, 2); f.pl = Math.max(0, f.pl | 0);
     delete f._k;
     return f;
   };
@@ -951,9 +957,12 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     }
     // a child of a new colour: rare, but it is how a pond comes to hold several colours
     if (r() < 0.03 * wild) { f.hue += 50 + r() * 260; if (r() < 0.5) f.hue2 = (r() < 0.5 ? -1 : 1) * (40 + r() * 140); note('was born a new colour', true); }
+    // a whole new way of carrying the body: one of the builds this pond has been given
+    { const pls = G.W && G.W.plans ? G.W.plans : []; if (pls.length && !f.sym && f.n >= 2 && r() < 0.008 * wild) { const p = pls[Math.floor(r() * pls.length)]; if (p.id !== f.pl) { f.pl = p.id; note('took on a whole new build: the ' + p.name.toLowerCase(), true); } } else if (f.pl && r() < 0.008 * wild) { f.pl = 0; note('gave up its build for a plainer one', true); } }
     // heads, necks and coats
     if (r() < 0.022 * wild) { const k = Math.floor(r() * 4); if (k !== f.coat) { f.coat = k; note(['lost its coat: bare skin again', 'grew scales', 'grew fur', 'grew feathers'][k], true); } }
     if (f.n > 1 && !f.sym && r() < 0.025 * wild) { const up = r() < 0.65; f.nk = clamp(f.nk + (up ? 0.25 : -0.25), 0, 0.7); note(up ? 'its neck narrowed: a head set apart from the body' : 'its neck thickened', true); }
+    if (r() < 0.02 * wild) { f.hx = 0.72 + r() * 0.73; f.hq = 1.5 + r() * 2.5; note(f.hq > 3 ? 'its head grew square' : f.hq < 1.8 ? 'its head grew pointed' : f.hx > 1.2 ? 'its head grew wide' : f.hx < 0.85 ? 'its head grew tall' : 'its head changed shape', true); }
     if (r() < 0.022 * wild) { const up = r() < 0.6; f.hd = clamp(f.hd + (up ? 0.22 : -0.22), 0.7, 1.9); note(up ? 'its head grew' : 'its head shrank', true); }
     // a kind of part the pond was given gets its trial: now and then a child grows one, in place of an old growth if the body is full.
     // From there it is graded like everything else: by what it does for the body, by its cost, and by whether mates like the look.
@@ -966,10 +975,18 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         note('grew a ' + d.name.toLowerCase(), true);
       }
     }
+    // the body answers the world it is born into (see the pressures): a coat, a build, eyes, a colour
+    const B = press ? press.body : null;
+    if (B) {
+      if (B.coat >= 0 && f.coat !== B.coat && r() < 0.14 * wild) { f.coat = B.coat; note(B.coat === 2 ? 'grew fur against the cold' : B.coat === 1 ? 'grew scales against the poison' : 'shed its coat in the heat', true); }
+      if (B.plump && r() < 0.22 * wild) { const k = 1 + 0.1 * B.plump; f.prof[1] *= k; f.prof[2] *= k; f.prof[3] *= k; note(B.plump > 0 ? 'grew plumper, to hold its warmth' : 'grew slimmer, to shed heat', false); }
+      if (B.eyes && r() < 0.14 * wild) { f.es += 0.06; if (f.en < 2 && r() < 0.5) f.en++; note('its eyes grew, for the dark', false); }
+      if (B.hue >= 0 && r() < 0.22 * wild) { let d = ((B.hue - f.hue + 540) % 360) - 180; if (Math.abs(d) > 6) { f.hue += Math.sign(d) * Math.min(Math.abs(d), 10 + r() * 22); note('its colour drifted towards ' + (B.like || 'what hunts it'), false); } }
+    }
     // what the pond is up against makes the fitting answer a likelier thing to stumble on
     const pp = press ? press.part : null;
     if (pp) {
-      const hit = function (i) { return pp[i] > 0 && r() < 0.03 * wild * Math.min(2.5, pp[i]); };
+      const hit = function (i) { return pp[i] > 0 && r() < 0.055 * wild * Math.min(2.5, pp[i]); };
       if (hit(2) && !has(f, 2) && !has(f, 7) && f.rules.length < MAXR) { const k = r() < 0.6 ? 2 : 7; f.rules.push(newRule(f.n, k)); note('grew ' + KMANY[k], true); }
       if (hit(3) && f.shell < 1) { f.shell = clamp(f.shell + 0.4, 0, 1); note('grew a shell', true); }
       if (hit(6) && f.venom < 1) { f.venom = clamp(f.venom + 0.5, 0, 1); note('grew poison glands', true); }
@@ -985,7 +1002,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const d = function () { if (r() < m * 2) { drift = true; return n(); } return 0; };
     f.len *= 1 + d() * 0.08;
     for (let i = 0; i < 5; i++) f.prof[i] *= 1 + d() * 0.14;
-    f.bend += d() * 0.05; f.hd *= 1 + d() * 0.07; f.nk += d() * 0.04;
+    f.bend += d() * 0.05; f.hd *= 1 + d() * 0.07; f.nk += d() * 0.04; f.hx *= 1 + d() * 0.08; f.hq *= 1 + d() * 0.1;
     f.hue += d() * 12; f.hue2 += d() * 14; f.sat += d() * 5; f.lit += d() * 4;
     f.es += d() * 0.04; f.ek += d() * 0.12; f.ms += d() * 0.05; f.ts += d() * 0.1; f.psc += d() * 0.1;
     for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; q.l *= 1 + d() * 0.12; q.w *= 1 + d() * 0.1; q.g += d() * 0.15; q.c += d() * 0.15; }
@@ -1001,7 +1018,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (r() < 0.5) { g.tk = o.tk; g.ts = o.ts; }
     if (r() < 0.5) { g.pat = o.pat; g.psc = o.psc; }
     if (r() < 0.5) { g.hue = o.hue; g.hue2 = o.hue2; g.sat = o.sat; g.lit = o.lit; }
-    if (r() < 0.5) { g.hd = o.hd; g.nk = o.nk; } if (r() < 0.5) g.coat = o.coat;
+    if (r() < 0.5) { g.hd = o.hd; g.nk = o.nk; g.hx = o.hx; g.hq = o.hq; } if (r() < 0.5) g.pl = o.pl; if (r() < 0.5) g.coat = o.coat;
     if (r() < 0.5) g.crest = o.crest; if (r() < 0.5) g.shell = o.shell; if (r() < 0.5) g.glow = o.glow; if (r() < 0.5) g.venom = o.venom;
     if (o.rules.length && r() < 0.35 && g.rules.length < MAXR) { const q = o.rules[Math.floor(r() * o.rules.length)]; if (!has(g, q.k)) { const c = cpRule(q); c.on = -1; g.rules.push(c); } }
     return F.fix(g);
@@ -1012,6 +1029,9 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const c = { k: [0, 0, 0, 0, 0, 0, 0, 0, 0], dfx: { speed: 0, agility: 0, reach: 0, senses: 0, armour: 0, attack: 0 }, dAdj: '', sites: 0, legSites: 0, reach: 0, pincer: 0, paddle: 0, fingers: 0, kinds: 0, mass: 0 };
     const seen = {}, N = [], RL = [], HEAD = [];      // per growth: how many there are, how far its tip is from the body, and whether it is at the front
     c.nested = 0;
+    const plan = f.pl && G.planOf ? G.planOf(f.pl) : null;
+    c.plan = plan;
+    if (plan) for (const ab in c.dfx) c.dfx[ab] += plan.fx[ab] || 0;
     for (let i = 0; i < f.rules.length; i++) {
       const q = f.rules[i];
       const dsg = dsgOf(q);
@@ -1029,6 +1049,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       if (q.k === 3) c.reach = Math.max(c.reach, RL[i] * (HEAD[i] ? 1.2 : 0.6));
       if (par && !HEAD[i]) c.reach = Math.max(c.reach, RL[i] * 0.55);
     }
+    if (plan && plan.stands && plan.legs.length >= 2) c.legSites = Math.max(c.legSites, 4);
     return c;
   };
   F.abilities = function (f, c) {
@@ -1109,7 +1130,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const BASE = { speed: 0.42, agility: 0.3, reach: 0.5, senses: 0.35, armour: 0.22, attack: 0.3 };
     let top = 'speed'; for (let i = 0; i < 6; i++) if (a[ABIL[i]] - BASE[ABIL[i]] > a[top] - BASE[top]) top = ABIL[i];
     const noun = f.sym ? (f.sym <= 5 ? 'Star' : 'Bloom') : (f.n === 1 && !f.rules.length) ? 'Cell' : (f.n <= 2 && c.sites <= 2 && !f.en) ? 'Blob' : { speed: 'Darter', agility: 'Dancer', reach: 'Grabber', senses: 'Watcher', armour: 'Shellback', attack: 'Hunter' }[top];
-    const kind = (feat ? feat + ' ' : '') + noun;
+    const kind = (feat ? feat + ' ' : '') + (c.plan && !f.sym ? c.plan.noun : noun);
     return { adj: adj, feat: feat, noun: noun, kind: kind, full: adj + ' ' + kind };
   };
   /** the body in short facts, for the inspector, the story and the judge */
@@ -1121,6 +1142,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     t.push(f.en === 0 ? 'no eyes' : f.en === 1 ? 'one ' + (f.es > 0.45 ? 'big ' : '') + 'eye' : f.en + (f.ek > 0.25 ? ' eyes on stalks' : f.es > 0.45 ? ' big eyes' : ' eyes'));
     if (f.mk) t.push(['', 'a beak', 'toothed jaws', 'a sucker mouth', 'whiskers'][f.mk]);
     if (f.tk && !f.sym && f.n > 1) t.push(['', 'a fan tail', 'a forked tail', 'a whip tail', 'a club tail'][f.tk]);
+    if (c.plan && !f.sym) t.unshift('the build of a ' + c.plan.name.toLowerCase() + ' (' + c.plan.note.toLowerCase().replace(/\.$/, '') + ')');
     if (f.nk > 0.35 && f.n > 1 && !f.sym) t.push('a head set on a neck'); if (f.hd > 1.45) t.push('a big head'); if (f.coat) t.push('a coat of ' + COATS[f.coat]);
     if (c.nested) t.push('parts growing on parts');
     if (f.shell > 0.25) t.push('a shell'); if (f.crest > 0.25) t.push('a crest along its back'); if (f.glow > 0.3) t.push('glowing lights'); if (f.venom > 0.3) t.push('poison glands');
@@ -1142,6 +1164,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (a.mk !== b.mk) push(['its mouth became a plain opening', 'grew a beak', 'grew jaws', 'its mouth became a sucker', 'grew whiskers'][b.mk], b.mk > 0);
     if (a.tk !== b.tk) push(['lost its tail', 'grew a fan tail', 'grew a forked tail', 'grew a whip tail', 'grew a club tail'][b.tk], b.tk > 0);
     if (a.pat !== b.pat) push('skin turned ' + ['plain', 'striped', 'spotted', 'pale-bellied', 'ringed', 'saddled'][b.pat], true);
+    if ((a.pl | 0) !== (b.pl | 0)) { const p = b.pl && G.planOf ? G.planOf(b.pl) : null; push(p ? 'took on a whole new build: the ' + p.name.toLowerCase() : 'gave up its build', !!p); }
     if (a.coat !== b.coat) push(b.coat ? 'grew a coat of ' + COATS[b.coat] : 'lost its coat', !!b.coat);
     if ((a.nk > 0.35) !== (b.nk > 0.35)) push(b.nk > 0.35 ? 'its head is now set on a neck' : 'lost its neck', b.nk > 0.35);
     if ((a.hd > 1.45) !== (b.hd > 1.45)) push(b.hd > 1.45 ? 'grew a big head' : 'its head shrank', b.hd > 1.45);
@@ -1165,7 +1188,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const hr = f.hue * Math.PI / 180;
     v.push(Math.cos(hr) * 0.6, Math.sin(hr) * 0.6, f.shell > 0.25 ? 0.6 : 0, f.crest > 0.25 ? 0.5 : 0, f.glow > 0.3 ? 0.6 : 0, f.venom > 0.3 ? 0.6 : 0);
     for (let i = 1; i < 4; i++) v.push(f.coat === i ? 0.7 : 0);
-    v.push(f.nk * 0.9, (f.hd - 1) * 0.8);
+    v.push(f.nk * 0.9, (f.hd - 1) * 0.8, (f.hx - 1) * 0.7, (f.hq - 2) * 0.25, f.pl ? 1.3 : 0, f.pl ? ((f.pl * 37) % 11) / 11 : 0);
     let nest = 0; for (let i = 0; i < f.rules.length; i++) if (f.rules[i].on >= 0) nest++;
     v.push(Math.min(2, nest) * 0.5);
     return v;
@@ -1173,13 +1196,13 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   const r2 = function (x) { return Math.round(x * 100) / 100; };
   F.pack = function (f) {
     return [f.sym, f.n, r2(f.len), f.prof.map(r2), r2(f.bend), f.rules.map(function (q) { return [q.k, q.a, q.b, q.e, r2(q.l), r2(q.w), q.j, r2(q.g), r2(q.c), q.t, r2(q.p), q.on === undefined ? -1 : q.on]; }),
-      f.en, r2(f.es), r2(f.ek), f.mk, r2(f.ms), f.tk, r2(f.ts), Math.round(f.hue), Math.round(f.hue2), Math.round(f.sat), Math.round(f.lit), f.pat, r2(f.psc), r2(f.crest), r2(f.shell), r2(f.glow), r2(f.venom), f.seed, r2(f.hd), r2(f.nk), f.coat];
+      f.en, r2(f.es), r2(f.ek), f.mk, r2(f.ms), f.tk, r2(f.ts), Math.round(f.hue), Math.round(f.hue2), Math.round(f.sat), Math.round(f.lit), f.pat, r2(f.psc), r2(f.crest), r2(f.shell), r2(f.glow), r2(f.venom), f.seed, r2(f.hd), r2(f.nk), f.coat, r2(f.hx), r2(f.hq), f.pl | 0];
   };
   F.unpack = function (a) {
     if (!Array.isArray(a) || a.length < 24) return null;
     return F.fix({ sym: a[0], n: a[1], len: a[2], prof: Array.isArray(a[3]) ? a[3].map(Number) : null, bend: a[4],
       rules: (Array.isArray(a[5]) ? a[5] : []).map(function (q) { return { k: q[0], a: q[1], b: q[2], e: q[3], l: q[4], w: q[5], j: q[6], g: q[7], c: q[8], t: q[9], p: q[10], on: q[11] === undefined ? -1 : q[11] }; }),
-      en: a[6], es: a[7], ek: a[8], mk: a[9], ms: a[10], tk: a[11], ts: a[12], hue: a[13], hue2: a[14], sat: a[15], lit: a[16], pat: a[17], psc: a[18], crest: a[19], shell: a[20], glow: a[21], venom: a[22], seed: a[23], hd: a[24], nk: a[25], coat: a[26] });
+      en: a[6], es: a[7], ek: a[8], mk: a[9], ms: a[10], tk: a[11], ts: a[12], hue: a[13], hue2: a[14], sat: a[15], lit: a[16], pat: a[17], psc: a[18], crest: a[19], shell: a[20], glow: a[21], venom: a[22], seed: a[23], hd: a[24], nk: a[25], coat: a[26], hx: a[27], hq: a[28], pl: a[29] });
   };
   F.key = function (f) { return f._k || (f._k = JSON.stringify(F.pack(f))); };
 
@@ -1549,176 +1572,399 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 
 </script>
 <script data-part="portrait">
-// ── The portrait: the same genes, seen face to face ──
-// In the pond a creature is seen from above, swimming. Its portrait is the character you would keep: standing up,
-// looking at you, drawn from exactly the same genes, so every body has one portrait and no two bodies share one.
-//   segments → how tall it stands        silhouette → how plump          head, neck → its head and how it is carried
-//   eyes, mouth → its face               legs → arms and feet             fins, tentacles, horns, feelers, frills,
-//   spikes, plates, shell, crest, tail, coat, pattern, glow, poison and the pond's own kinds of part → all where you
-//   would expect them on an animal. Colours are its own two, in harmony.
+// ── The character: the same genes, seen as you would meet the animal in the water ──
+// Nothing here is one template. The genes decide the BUILD, and each build is grown from the same genes in its own way:
+//   one cell, no legs            → a MICROBE: a see-through blob with a nucleus; growths show as cilia, spines, a flagellum
+//   arms all round               → an ORB if it is mostly spines, else a STAR
+//   legs, a shell or pincers, a short wide body → a CRAB
+//   four legs or more on a longer body          → a BEAST on all fours (with a shell: a turtle)
+//   two legs                     → it stands UPRIGHT
+//   no legs, a very long body    → a SERPENT
+//   no legs, tentacles, no tail  → a JELLY: a bell that trails its tentacles
+//   no legs, a tail or fins      → a FISH
+//   none of these                → a soft BLOB
+// Within a build, the outline is the silhouette genes; the head is its own shape (size, width, boxy or pointed) on a neck as
+// deep as the neck gene; legs reach the ground from where they grow; fins stand on the back; spikes run along it; tentacles
+// trail; horns and feelers sit on the head; the tail continues the spine; coat, pattern, shell, glow and poison go on top.
 (function () {
   'use strict';
-  const F = G.form, clamp = G.clamp, TAU = 6.2832;
+  const F = G.form, clamp = G.clamp, TAU = 6.2832, GROUND = 104;
+  const lerp = function (a, b, t) { return a + (b - a) * t; };
 
-  /** draw the portrait centred on the origin; it fills about 230 units of height and width. o: { lx, ly, sleep } */
+  /** how a body is built, read off its genes */
+  F.build = function (f, cn) {
+    cn = cn || F.counts(f);
+    const k = cn.k, tent = k[3] > 0, fin = k[1] > 0, tail = f.tk && f.n > 1;
+    if (f.sym) return k[2] + k[7] > k[0] + k[3] + k[1] && k[2] + k[7] > 0 ? 'orb' : 'star';
+    if (f.pl && f.n >= 2 && G.planOf && G.planOf(f.pl)) return 'plan';
+    if (f.n === 1 && cn.legSites < 2) return 'microbe';
+    if (cn.legSites >= 4 && (f.shell > 0.25 || cn.pincer) && f.n <= 5) return 'crab';
+    if (cn.legSites >= 4 && f.n >= 3) return 'beast';
+    if (cn.legSites >= 2) return 'upright';
+    if (f.n >= 7) return 'serpent';
+    if (tent && !fin && !tail) return 'jelly';
+    if (tail || fin) return 'fish';
+    return tent ? 'jelly' : 'blob';
+  };
+  /** does this build walk on the pond floor (it hops and steps), or swim (it glides)? */
+  F.walks = function (b, f) { if (b === 'plan') { const p = G.planOf(f.pl); return !!(p && p.stands); } return b === 'beast' || b === 'upright' || b === 'crab'; };
+
+  /** draw the character; the floor is at y = 104; it fits x ±170, y −190..160. o: { lx, ly, sleep, collect } */
   F.portrait = function (ctx, f, t, o) {
     o = o || {};
-    const col = F._colours(f), INK = F._ink(), cn = F.counts(f), R = f.rules;
-    const ink = function (fill, lw) { ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = lw || 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke(); };
-    const has = function (k) { for (let i = 0; i < R.length; i++) if (R[i].k === k && R[i].on < 0) return R[i]; return null; };
-    const kid = function (q) { const i = R.indexOf(q); for (let j = i + 1; j < R.length; j++) if (R[j].on === i) return R[j]; return null; };
-    const fin = has(1), spike = has(2), tent = has(3), feel = has(4), plate = has(5), frill = has(6), horn = has(7), leg = has(0);
-    const plump = clamp((f.prof[1] + f.prof[2] + f.prof[3]) / 3, 0.6, 1.5);
-    const bob = Math.sin(t * 2.2) * 2.2, breathe = 1 + Math.sin(t * 2.2) * 0.015;
+    // B(speed): how far along a movement of that speed is. In a loop (o.loop) every speed becomes a whole number of beats.
+    const B = function (k) { return o.loop ? t * Math.max(1, Math.round(k / 2.6)) : t * k; };
+    const col = F._colours(f), INK = F._ink(), cn = F.counts(f), R = f.rules, build = F.build(f, cn);
+    const ink = function (fill, lw) { ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = lw || 2.6; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke(); };
+    const body = function (k) { const out = []; for (let i = 0; i < R.length; i++) if (R[i].k === k && R[i].on < 0) out.push(R[i]); return out; };
+    const kidOf = function (q) { const i = R.indexOf(q); for (let j = i + 1; j < R.length; j++) if (R[j].on === i) return R[j]; return null; };
+    const legs = body(0), fins = body(1), spikes = body(2), tents = body(3), feels = body(4), plates = body(5), frills = body(6), horns = body(7);
+    const breathe = 1 + Math.sin(B(2.2)) * 0.015, rr = G.rng(f.seed);
+    const plump = clamp((f.prof[1] + f.prof[2] + f.prof[3]) / 3, 0.55, 1.6);
+    const hsl = function (h, s, l, a) { return 'hsla(' + Math.round(((h % 360) + 360) % 360) + ',' + Math.round(s) + '%,' + Math.round(l) + '%,' + a + ')'; };
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    // every living thing in this water has a soft light of its own colour about it; a glowing one, much more
+    const aura = function (x, y, r) { r = Math.max(20, Math.min(r, 158 - y, y + 188, 168 - Math.abs(x))); const g = ctx.createRadialGradient(x, y, r * 0.15, x, y, r); g.addColorStop(0, hsl(f.hue + (f.glow > 0.3 ? 30 : 0), 90, 72, f.glow > 0.3 ? 0.42 : 0.2)); g.addColorStop(1, hsl(f.hue, 90, 70, 0)); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); };
+    const lights = function (pts) { if (!(f.glow > 0.3)) return; for (let i = 0; i < pts.length; i++) { const p = pts[i], g = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], 9); g.addColorStop(0, 'rgba(255,255,230,0.95)'); g.addColorStop(0.35, hsl(f.hue + f.hue2, 95, 75, 0.7)); g.addColorStop(1, hsl(f.hue + f.hue2, 95, 70, 0)); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p[0], p[1], 9, 0, TAU); ctx.fill(); } };
 
-    // a star keeps its own plan: arms all round, the face in the middle
-    if (f.sym) {
-      const k = f.sym, R0 = 52 + 3 * f.n, arm = 30 + 10 * f.prof[2];
-      if (f.glow > 0.3) aura(ctx, 0, 0, R0 + arm + 30);
-      for (let j = 0; j < k; j++) { const a = j / k * TAU - Math.PI / 2 + Math.sin(t * 1.6 + j) * 0.06; growthsAt(Math.cos(a) * (R0 + arm * 0.6), Math.sin(a) * (R0 + arm * 0.6), a, 0.75, j); }
-      if (f.coat >= 2) coatFringe(function (u) { const a = u * TAU - Math.PI / 2, rr = R0 + arm * (0.5 + 0.5 * Math.cos(k * (a + Math.PI / 2))); return [Math.cos(a) * rr, Math.sin(a) * rr, Math.cos(a), Math.sin(a)]; }, 60);
-      const starPath = function () { ctx.beginPath(); for (let i = 0; i <= 80; i++) { const a = i / 80 * TAU - Math.PI / 2, rr = (R0 + arm * (0.5 + 0.5 * Math.cos(k * (a + Math.PI / 2)))) * breathe; if (i) ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); else ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); } ctx.closePath(); };
-      starPath();
-      skin(-R0, -R0, R0 * 2, R0 * 2, R0 + arm, false, false, starPath);
-      if (f.shell > 0.25) { ctx.beginPath(); ctx.arc(0, 4, R0 * 0.82, 0, TAU); ctx.globalAlpha = 0.35; ctx.fillStyle = col.dark; ctx.fill(); ctx.globalAlpha = 1; }
-      face(0, 2, R0 * 0.78);
+    // ═══ a microbe: one cell, see-through, with a nucleus ═══
+    if (build === 'microbe') {
+      const Rm = 46 * Math.pow(plump, 0.5), cy = GROUND - 26 - Rm, lob = 4 + (f.seed % 3), amp = 0.14 + 0.1 * (rr() - 0.5), ph0 = rr() * TAU, oval = 1 + 0.5 * (f.len - 0.6);
+      const at = function (a) { const q = Rm * (1 + amp * Math.sin(lob * a + ph0 + Math.sin(B(1.3)) * 0.5) + 0.05 * Math.sin(2 * a + B(1))); return [Math.cos(a) * q * oval, cy + Math.sin(a) * q / Math.sqrt(oval)]; };
+      aura(0, cy, Rm * 2.1);
+      if (f.tk) { ctx.strokeStyle = hsl(f.hue + f.hue2, 70, 70, 0.9); ctx.lineWidth = 3.4; ctx.beginPath(); const p = at(Math.PI); ctx.moveTo(p[0], p[1]); for (let i = 1; i <= 14; i++) { const u = i / 14; ctx.lineTo(p[0] - u * 78 * f.ts, p[1] + Math.sin(u * 7 - B(6)) * 11 * u); } ctx.stroke(); }      // a flagellum
+      const hairs = tents.length + feels.length + frills.length + fins.length + legs.length;
+      if (hairs) { ctx.strokeStyle = hsl(f.hue + f.hue2, 70, 78, 0.75); ctx.lineWidth = 1.6; const n = 26 + hairs * 10, len = 9 + 7 * Math.min(2, hairs); for (let i = 0; i < n; i++) { const a = i / n * TAU, p = at(a), w = Math.sin(B(7) + i * 0.8) * 0.3; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] + Math.cos(a + w) * len, p[1] + Math.sin(a + w) * len); ctx.stroke(); } }      // cilia
+      for (let i = 0; i < spikes.length + horns.length; i++) for (let j = 0; j < 7; j++) { const a = j / 7 * TAU + i * 0.45, p = at(a), Ls = 16 * (spikes[i] || horns[i - spikes.length]).l; ctx.beginPath(); ctx.moveTo(p[0] - Math.sin(a) * 5, p[1] + Math.cos(a) * 5); ctx.lineTo(p[0] + Math.cos(a) * Ls, p[1] + Math.sin(a) * Ls); ctx.lineTo(p[0] + Math.sin(a) * 5, p[1] - Math.cos(a) * 5); ctx.closePath(); ink(hsl(f.hue + f.hue2, 60, 82, 0.95), 1.6); }
+      const cell = function () { ctx.beginPath(); for (let i = 0; i <= 72; i++) { const p = at(i / 72 * TAU); if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); } ctx.closePath(); };
+      cell();
+      const g = ctx.createRadialGradient(-Rm * 0.25, cy - Rm * 0.3, 3, 0, cy, Rm * 1.35); g.addColorStop(0, hsl(f.hue, f.sat, 86, 0.9)); g.addColorStop(0.6, hsl(f.hue, f.sat, f.lit + 6, 0.72)); g.addColorStop(1, hsl(f.hue, f.sat, f.lit - 12, 0.85));
+      ctx.fillStyle = g; ctx.fill();
+      ctx.save(); cell(); ctx.clip();
+      for (let i = 0; i < 9; i++) { const a = rr() * TAU, d = Math.sqrt(rr()) * Rm * 0.8; ctx.beginPath(); ctx.arc(Math.cos(a) * d, cy + Math.sin(a) * d * 0.9, 2 + rr() * 5, 0, TAU); ctx.fillStyle = hsl(f.hue + f.hue2, 70, 55 + rr() * 25, 0.55); ctx.fill(); }      // what floats inside it
+      if (f.pat) { ctx.strokeStyle = hsl(f.hue + f.hue2, 80, 60, 0.4); ctx.lineWidth = 3; for (let i = 1; i <= 2; i++) { ctx.beginPath(); ctx.ellipse(0, cy, Rm * 0.3 * i * oval, Rm * 0.3 * i, 0, 0, TAU); ctx.stroke(); } }
+      ctx.restore();
+      cell(); ctx.strokeStyle = hsl(f.hue, Math.min(90, f.sat + 10), f.lit - 24, 0.9); ctx.lineWidth = 3; ctx.stroke(); ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.2; ctx.stroke();
+      // the nucleus; with an eye gene it is an eyespot that looks about
+      const nx = Rm * 0.12, ny = cy + Rm * 0.02, nr = Rm * (0.3 + 0.12 * f.es);
+      if (f.en > 0) eyeAt(nx, ny, nr, true);
+      else { ctx.beginPath(); ctx.arc(nx, ny, nr, 0, TAU); ctx.fillStyle = hsl(f.hue + f.hue2, 55, 30, 0.85); ctx.fill(); ctx.strokeStyle = hsl(f.hue + f.hue2, 70, 70, 0.8); ctx.lineWidth = 2; ctx.stroke(); ctx.beginPath(); ctx.arc(nx - nr * 0.3, ny - nr * 0.3, nr * 0.25, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fill(); }
+      lights([[-Rm * 0.5, cy + Rm * 0.3], [Rm * 0.45, cy - Rm * 0.35]]);
       return;
     }
 
-    const bodyW = 44 * Math.pow(plump, 0.7) * (1 + 0.02 * f.n), bodyH = 62 + Math.min(f.n, 12) * 6.5;
-    const headR = clamp(40 * Math.pow(f.hd, 0.8), 32, 58), neck = f.n > 1 ? f.nk * 26 : 0;
-    const base = 104, by = base - bodyH / 2 - 8, bodyTop = by - bodyH / 2;
-    const hy = bodyTop - neck - headR * 0.55 + bob, hx = 0;
-    const armPair = cn.legSites >= 2 || (tent && !leg), feet = cn.legSites >= 4;
-
-    if (f.glow > 0.3) aura(ctx, 0, (hy + by) / 2, 150);
-    // ── behind the body ──
-    if (f.tk && f.n > 1) tail();
-    for (let i = 0; i < R.length; i++) { const q = R[i], d = q.k === 8 ? F._dsg(q) : null; if (d && d.place === 'back') { F._design(ctx, d, 0, hy - headR * 0.2, -Math.PI / 2 + Math.sin(t * 1.5) * 0.04, 70 * q.l, q.w, col, 1); } }
-    for (let i = 0; i < R.length; i++) { const q = R[i], d = q.k === 8 ? F._dsg(q) : null; if (d && d.place === 'sides' && q.on < 0) for (let sd = -1; sd <= 1; sd += 2) F._design(ctx, d, sd * bodyW * 0.6, by - bodyH * 0.18, (sd > 0 ? -0.5 : Math.PI + 0.5) + sd * Math.sin(t * 3) * (d.motion === 'flap' ? 0.2 : 0.05), 52 * q.l, q.w, col, sd); }
-    if (fin) for (let sd = -1; sd <= 1; sd += 2) { const L = 46 * fin.l, fl = Math.sin(t * 3.4) * 0.14; ctx.save(); ctx.translate(sd * bodyW * 0.7, by - bodyH * 0.12); ctx.rotate(sd * (-0.35 + fl)); ctx.beginPath(); ctx.moveTo(0, -12); ctx.quadraticCurveTo(sd * L * 0.9, -L * 0.75, sd * L * 1.2, -L * 0.2); ctx.quadraticCurveTo(sd * L * 0.8, L * 0.25, 0, 20); ctx.closePath(); ink(col.fin, 2.6); ctx.strokeStyle = 'rgba(7,18,31,.3)'; ctx.lineWidth = 1.5; for (let r = 1; r <= 3; r++) { ctx.beginPath(); ctx.moveTo(0, -8 + r * 6); ctx.lineTo(sd * L * (1.15 - r * 0.12), -L * (0.5 - r * 0.2)); ctx.stroke(); } ctx.restore(); }
-    if (f.shell > 0.25) { ctx.beginPath(); ctx.ellipse(0, by + 4, bodyW * (1.16 + 0.12 * f.shell), bodyH * 0.56, 0, 0, TAU); ink(col.dark, 3); ctx.strokeStyle = INK; ctx.globalAlpha = 0.35; ctx.lineWidth = 2; for (let r = 1; r <= 2; r++) { ctx.beginPath(); ctx.ellipse(0, by + 4, bodyW * (1.16 + 0.12 * f.shell) * (1 - r * 0.2), bodyH * 0.56 * (1 - r * 0.2), 0, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); } ctx.globalAlpha = 1; }
-    if (spike) for (let sd = -1; sd <= 1; sd += 2) for (let j = 0; j < 3; j++) { const a = -0.55 + j * 0.5, L = 15 * spike.l * (1 - j * 0.12), px = sd * Math.cos(a) * bodyW * 0.95, py = by + Math.sin(a) * bodyH * 0.45; ctx.beginPath(); ctx.moveTo(px - sd * 2, py - 7); ctx.lineTo(px + sd * Math.cos(a) * L * 1.5, py + Math.sin(a) * L * 1.2); ctx.lineTo(px - sd * 2, py + 7); ctx.closePath(); ink('#f4f7fb', 2.2); }
-    if (frill) for (let sd = -1; sd <= 1; sd += 2) { const L = 30 * frill.l, cx0 = sd * headR * 0.55, cy0 = hy + headR * 0.55, sp = 0.9 + 0.1 * Math.sin(t * 3); ctx.beginPath(); ctx.moveTo(cx0, cy0); for (let j = 0; j <= 6; j++) { const a = (sd > 0 ? -0.5 : Math.PI + 0.5) + sd * (j / 6 * 1.5 - 0.3) * sp, rr = L * (j % 2 ? 0.85 : 1.08); ctx.lineTo(cx0 + Math.cos(a) * rr, cy0 + Math.sin(a) * rr); } ctx.closePath(); ink(col.frill, 2.4); }
-    if (tent && (leg || !armPair)) hang(tent);
-    else if (tent && armPair && leg) hang(tent);
-    // ── feet ──
-    if (feet) for (let sd = -1; sd <= 1; sd += 2) { ctx.beginPath(); ctx.ellipse(sd * bodyW * 0.48, base - 3, 17, 10, 0, 0, TAU); ink(col.limb, 2.8); if (leg.t === 1 || leg.t === 0) { ctx.strokeStyle = INK; ctx.lineWidth = 1.6; ctx.globalAlpha = 0.5; for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(sd * bodyW * 0.48 + j * 6, base - 6); ctx.lineTo(sd * bodyW * 0.48 + j * 6, base + 3); ctx.stroke(); } ctx.globalAlpha = 1; } }
-    // ── the body ──
-    const bodyPath = function () { ctx.beginPath(); ctx.ellipse(0, by, bodyW * breathe, bodyH / 2, 0, 0, TAU); };
-    if (f.coat >= 2) coatFringe(function (u) { const a = u * TAU; return [Math.cos(a) * bodyW, by + Math.sin(a) * bodyH / 2, Math.cos(a), Math.sin(a)]; }, 46);
-    bodyPath(); skin(-bodyW, by - bodyH / 2, bodyW * 2, bodyH, bodyH * 0.7, true, false, bodyPath);
-    if (plate) { ctx.save(); bodyPath(); ctx.clip(); ctx.fillStyle = col.limb; ctx.globalAlpha = 0.9; ctx.beginPath(); ctx.ellipse(0, by + bodyH * 0.12, bodyW * 0.62, bodyH * 0.36, 0, 0, TAU); ctx.fill(); ctx.globalAlpha = 0.45; ctx.strokeStyle = INK; ctx.lineWidth = 2; for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(-bodyW * 0.55, by + bodyH * (0.12 + j * 0.13)); ctx.quadraticCurveTo(0, by + bodyH * (0.17 + j * 0.13), bodyW * 0.55, by + bodyH * (0.12 + j * 0.13)); ctx.stroke(); } ctx.restore(); }
-    if (f.venom > 0.3) for (let sd = -1; sd <= 1; sd += 2) { ctx.beginPath(); ctx.arc(sd * bodyW * 0.55, by + bodyH * 0.2, 5, 0, TAU); ink('#b6ff3c', 1.8); }
-    if (f.glow > 0.3) for (let sd = -1; sd <= 1; sd += 2) for (let j = 0; j < 2; j++) { ctx.beginPath(); ctx.arc(sd * bodyW * (0.5 - j * 0.14), by - bodyH * 0.08 + j * 16, 4, 0, TAU); ctx.fillStyle = col.glow; ctx.fill(); }
-    // ── arms ──
-    if (armPair) for (let sd = -1; sd <= 1; sd += 2) {
-      const q = leg || tent, L = 30 * q.l + 10, wv = Math.sin(t * 2.6 + (sd > 0 ? 0 : 1.4)) * 0.16, sx = sd * bodyW * 0.86, sy = by - bodyH * 0.14;
-      const a = (sd > 0 ? 0.55 : Math.PI - 0.55) + sd * wv, ex = sx + Math.cos(a) * L, ey = sy + Math.sin(a) * L;
-      for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.limb : INK; ctx.lineWidth = pass ? 12 : 17; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(sx + sd * L * 0.6, sy - 4, ex, ey); ctx.stroke(); }
-      const k2 = leg ? kid(leg) : null, tip = leg ? (k2 && k2.k === 0 && k2.t ? k2.t : leg.t) : 0;
-      if (tip === 2) for (let h = -1; h <= 1; h += 2) { ctx.beginPath(); ctx.moveTo(ex, ey); ctx.quadraticCurveTo(ex + Math.cos(a + h * 1.0) * 14, ey + Math.sin(a + h * 1.0) * 14, ex + Math.cos(a + h * 0.2) * 20, ey + Math.sin(a + h * 0.2) * 20); ctx.quadraticCurveTo(ex + Math.cos(a + h * 0.4) * 8, ey + Math.sin(a + h * 0.4) * 8, ex, ey); ink('#ff8a6b', 2.2); }
-      else if (tip === 3) { ctx.beginPath(); ctx.ellipse(ex + Math.cos(a) * 7, ey + Math.sin(a) * 7, 13, 8, a, 0, TAU); ink(col.fin, 2.4); }
-      else if (tip === 1 || k2) { ctx.beginPath(); ctx.arc(ex, ey, 9, 0, TAU); ink(col.limb, 2.4); for (let h = -1; h <= 1; h++) { ctx.beginPath(); ctx.arc(ex + Math.cos(a + h * 0.7) * 10, ey + Math.sin(a + h * 0.7) * 10, 4, 0, TAU); ink(col.limb, 2); } }
-      else { ctx.beginPath(); ctx.arc(ex, ey, 7.5, 0, TAU); ink(col.limb, 2.4); }
+    // ═══ a star, or a spiny orb: arms all round ═══
+    if (build === 'star' || build === 'orb') {
+      const k = f.sym, orb = build === 'orb', R0 = orb ? 46 + 3 * f.n : 46 + 3 * f.n, arm = orb ? 6 : 28 + 12 * f.prof[2], cy = GROUND - 34 - R0 - arm;
+      aura(0, cy, (R0 + arm) * 1.9);
+      ctx.save(); ctx.translate(0, cy); ctx.rotate(Math.sin(B(0.8)) * 0.08);
+      const at = function (a) { const q = R0 + arm * (0.5 + 0.5 * Math.cos(k * (a + Math.PI / 2))); return [Math.cos(a) * q * breathe, Math.sin(a) * q * breathe]; };
+      const nA = orb ? k * 2 + 4 : k;
+      for (let j = 0; j < nA; j++) { const a = j / nA * TAU - Math.PI / 2 + Math.sin(B(1.6) + j) * 0.05, p = at(a); for (let i = 0; i < R.length && i < 3; i++) grow(R[i], p[0] * 0.94, p[1] * 0.94, a, orb ? 1.1 : 0.85, j + i); }
+      if (f.coat >= 2) for (let i = 0; i < 64; i++) { const a = i / 64 * TAU, p = at(a); fringe(p[0], p[1], Math.cos(a), Math.sin(a), i); }
+      const sp = function () { ctx.beginPath(); for (let i = 0; i <= 90; i++) { const p = at(i / 90 * TAU - Math.PI / 2); if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); } ctx.closePath(); };
+      sp(); skin(-R0 - arm, -R0 - arm, (R0 + arm) * 2, (R0 + arm) * 2, sp, 0);
+      if (f.shell > 0.25) { ctx.beginPath(); ctx.arc(0, 0, R0 * 0.85, 0, TAU); ctx.globalAlpha = 0.3; ctx.fillStyle = col.dark; ctx.fill(); ctx.globalAlpha = 1; }
+      if (orb) { ctx.beginPath(); ctx.moveTo(0, R0 * 0.45); ctx.lineTo(R0 * 0.2, R0 * 0.62); ctx.lineTo(0, R0 * 0.8); ctx.lineTo(-R0 * 0.2, R0 * 0.62); ctx.closePath(); ink(hsl(f.hue + f.hue2, 90, 72, 0.95), 1.6); }      // the jewel at its heart
+      const L2 = []; for (let j = 0; j < k; j++) { const p = at(j / k * TAU - Math.PI / 2); L2.push([p[0] * 0.6, p[1] * 0.6]); } lights(L2);
+      face(0, -R0 * 0.08, R0 * 0.7, 0, true);
+      ctx.restore();
+      return;
     }
-    // ── the head ──
-    if (neck > 3) { for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.body : INK; ctx.lineWidth = pass ? 24 : 30; ctx.beginPath(); ctx.moveTo(0, bodyTop + 10); ctx.lineTo(0, hy + headR * 0.5); ctx.stroke(); } }
-    if (f.crest > 0.25) { ctx.beginPath(); ctx.moveTo(-headR * 0.5, hy - headR * 0.75); for (let j = 0; j <= 6; j++) { const x = -headR * 0.5 + j * headR / 6, up = j % 2 ? 24 * (0.6 + f.crest) : 6; ctx.lineTo(x, hy - headR * 0.8 - up * (1 - Math.abs(j - 3) * 0.14)); } ctx.lineTo(headR * 0.5, hy - headR * 0.75); ctx.closePath(); ink(col.frill, 2.4); }
-    for (let i = 0; i < R.length; i++) { const q = R[i], d = q.k === 8 ? F._dsg(q) : null; if (d && d.place === 'head') for (let sd = -1; sd <= 1; sd += 2) F._design(ctx, d, sd * headR * 0.55, hy - headR * 0.6, (sd > 0 ? -1.0 : Math.PI + 1.0) + sd * Math.sin(t * 2) * 0.04, 44 * q.l, q.w, col, sd); }
-    if (horn) for (let sd = -1; sd <= 1; sd += 2) { const L = 30 * horn.l, bx = sd * headR * 0.55, byh = hy - headR * 0.72; ctx.beginPath(); ctx.moveTo(bx - sd * 9, byh + 6); ctx.quadraticCurveTo(bx + sd * L * 0.2, byh - L * 0.9, bx + sd * L * (0.6 + horn.c * 0.5), byh - L * 1.15); ctx.quadraticCurveTo(bx + sd * L * 0.55, byh - L * 0.4, bx + sd * 10, byh + 8); ctx.closePath(); ink('#ffe9b8', 2.4); }
-    if (feel) for (let sd = -1; sd <= 1; sd += 2) { const L = 34 * feel.l, sw = Math.sin(t * 2.4 + sd) * 5, bx = sd * headR * 0.3, byh = hy - headR * 0.85, ex = bx + sd * L * 0.5 + sw, ey = byh - L; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.limb : INK; ctx.lineWidth = pass ? 3.4 : 7; ctx.beginPath(); ctx.moveTo(bx, byh); ctx.quadraticCurveTo(bx + sd * L * 0.1, byh - L * 0.8, ex, ey); ctx.stroke(); } ctx.beginPath(); ctx.arc(ex, ey, 6.5, 0, TAU); ink(col.glow, 2.2); }
-    const headPath = function () { ctx.beginPath(); ctx.ellipse(hx, hy, headR * 1.1, headR, 0, 0, TAU); };
-    if (f.coat >= 2) coatFringe(function (u) { const a = u * TAU; return [Math.cos(a) * headR * 1.1, hy + Math.sin(a) * headR, Math.cos(a), Math.sin(a)]; }, 40, true);
-    headPath(); skin(-headR * 1.1, hy - headR, headR * 2.2, headR * 2, headR * 1.3, false, true, headPath);
-    face(hx, hy + headR * 0.08, headR);
 
-    // ── helpers ──
-    function aura(c, x, y, r) { const g = c.createRadialGradient(x, y, 10, x, y, r); g.addColorStop(0, 'rgba(255,243,168,0.35)'); g.addColorStop(1, 'rgba(255,243,168,0)'); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
-    // fill the current path with shaded skin, then its markings inside it, then the outline
-    function skin(x, y, w, h, rad, isBody, isHead, again) {
-      const g = ctx.createRadialGradient(x + w * 0.38, y + h * 0.3, 4, x + w * 0.5, y + h * 0.5, rad);
-      g.addColorStop(0, col.light); g.addColorStop(0.55, col.body); g.addColorStop(1, col.dark);
+    // ═══ a jelly or a soft blob: a bell, and what trails from it ═══
+    if (build === 'jelly' || build === 'blob') {
+      const jelly = build === 'jelly', Bw = (54 + 5 * f.n) * Math.pow(plump, 0.6), Bh = (40 + 6 * f.n) * (jelly ? 1 : 1.25), cy = GROUND - (jelly ? 118 : 34) - Bh * 0.5, pulse = 1 + Math.sin(B(2.6)) * 0.05;
+      aura(0, cy + 20, Bw * 2.3);
+      const q0 = tents[0], Lt = q0 ? 44 + 50 * q0.l : 0;
+      if (jelly) for (let j = 0; j < 7; j++) { const x0 = (j - 3) * Bw * 0.26, far = j % 2; ctx.globalAlpha = far ? 0.55 : 0.9; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? hsl(f.hue + f.hue2, f.sat, f.lit + 10, 0.9) : INK; ctx.lineWidth = pass ? (far ? 3 : 4.6) : (far ? 5 : 7); ctx.beginPath(); ctx.moveTo(x0, cy + Bh * 0.3); for (let i = 1; i <= 10; i++) { const u = i / 10; ctx.lineTo(x0 + Math.sin(u * 5 + B(2.4) + j * 1.3) * (6 + 12 * u) - (far ? 6 : 0) * u, cy + Bh * 0.3 + u * Lt * (far ? 1.15 : 0.9)); } ctx.stroke(); } ctx.globalAlpha = 1; }
+      if (frills.length || (jelly && cn.sites > 6)) for (let j = 0; j < 3; j++) { const x0 = (j - 1) * Bw * 0.3; ctx.beginPath(); ctx.moveTo(x0 - 9, cy + Bh * 0.25); for (let i = 1; i <= 8; i++) { const u = i / 8; ctx.lineTo(x0 + (i % 2 ? 11 : -11) * (1 - u * 0.4) + Math.sin(B(2) + j) * 4 * u, cy + Bh * 0.25 + u * (Lt || 60) * 0.55); } ctx.lineTo(x0 + 9, cy + Bh * 0.25); ctx.closePath(); ctx.globalAlpha = 0.85; ink(col.frill, 1.8); ctx.globalAlpha = 1; }      // ruffled arms under the bell
+      for (let i = 0; i < fins.length; i++) for (let sd = -1; sd <= 1; sd += 2) { const Lf = 34 * fins[i].l; ctx.beginPath(); ctx.moveTo(sd * Bw * 0.8, cy); ctx.quadraticCurveTo(sd * (Bw + Lf), cy - Lf * 0.5, sd * (Bw + Lf * 0.9), cy + Lf * 0.3); ctx.quadraticCurveTo(sd * Bw, cy + Lf * 0.5, sd * Bw * 0.7, cy + 14); ctx.closePath(); ink(col.fin, 2.2); }
+      for (let i = 0; i < spikes.length; i++) for (let j = -2; j <= 2; j++) { const a = -Math.PI / 2 + j * 0.42, bx = Math.cos(a) * Bw * 0.95, by = cy + Math.sin(a) * Bh * 0.95, Ls = 15 * spikes[i].l; ctx.beginPath(); ctx.moveTo(bx - 6, by + 3); ctx.lineTo(bx + Math.cos(a) * Ls, by + Math.sin(a) * Ls * 1.3); ctx.lineTo(bx + 6, by + 3); ctx.closePath(); ink('#f4f7fb', 2); }
+      const bell = function () { ctx.beginPath(); ctx.moveTo(-Bw * pulse, cy + Bh * 0.28); ctx.bezierCurveTo(-Bw * 1.12 * pulse, cy - Bh * 0.85, Bw * 1.12 * pulse, cy - Bh * 0.85, Bw * pulse, cy + Bh * 0.28); const sc = jelly ? 7 : 3; for (let i = 0; i < sc; i++) { const x1 = Bw * pulse - (i + 0.5) / sc * 2 * Bw * pulse, x2 = Bw * pulse - (i + 1) / sc * 2 * Bw * pulse; ctx.quadraticCurveTo(x1, cy + Bh * (jelly ? 0.5 : 0.62), x2, cy + Bh * 0.28); } ctx.closePath(); };
+      if (f.coat >= 2) for (let i = 0; i <= 26; i++) { const a = Math.PI + i / 26 * Math.PI; fringe(Math.cos(a) * Bw, cy + Math.sin(a) * Bh * 0.72, Math.cos(a), Math.sin(a), i); }
+      bell(); ctx.globalAlpha = jelly ? 0.82 : 1; skin(-Bw * 1.1, cy - Bh * 0.75, Bw * 2.2, Bh * 1.4, bell, 0); ctx.globalAlpha = 1;
+      if (jelly) { ctx.save(); bell(); ctx.clip(); ctx.beginPath(); ctx.ellipse(0, cy - Bh * 0.02, Bw * 0.55, Bh * 0.36, 0, 0, TAU); ctx.fillStyle = hsl(f.hue + f.hue2, 80, 80, 0.4); ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.4; for (let j = -2; j <= 2; j++) { ctx.beginPath(); ctx.moveTo(j * 5, cy - Bh * 0.6); ctx.quadraticCurveTo(j * Bw * 0.3, cy - Bh * 0.1, j * Bw * 0.42, cy + Bh * 0.28); ctx.stroke(); } ctx.restore(); }
+      if (horns.length) hornsAt(0, cy - Bh * 0.42, Bw * 0.5, horns[0]);
+      if (feels.length) feelersAt(0, cy - Bh * 0.5, Bw * 0.3, feels[0], 0);
+      const L3 = []; for (let j = -3; j <= 3; j++) L3.push([j * Bw * 0.27, cy + Bh * 0.16]); lights(L3);
+      for (let i = 0; i < R.length; i++) { const q = R[i], d = q.k === 8 ? F._dsg(q) : null; if (!d || q.on >= 0) continue; if (d.place === 'back' || d.place === 'head') F._design(ctx, d, 0, cy - Bh * 0.55, -Math.PI / 2, 50 * q.l, q.w, col, 1); else for (let sd = -1; sd <= 1; sd += 2) F._design(ctx, d, sd * Bw * 0.8, cy - 4, sd > 0 ? -0.4 : Math.PI + 0.4, 46 * q.l, q.w, col, sd); }
+      face(0, cy - Bh * 0.02, Math.min(Bw, Bh) * 0.6, 0, false);
+      return;
+    }
+
+    // ═══ a crab: a wide shell on many legs, pincers out in front ═══
+    if (build === 'crab') {
+      const Cw = (58 + 6 * f.n) * Math.pow(plump, 0.5), Ch = 34 + 3 * f.n, cy = GROUND - 30 - Ch * 0.5, lq = legs[0];
+      aura(0, cy, Cw * 1.9);
+      const nL = clamp(Math.round(cn.legSites / 2) - 1, 2, 4);
+      for (let sd = -1; sd <= 1; sd += 2) for (let j = 0; j < nL; j++) { const x0 = sd * Cw * (0.45 + j * 0.16), st = Math.sin(B(6) + j * 1.7 + (sd > 0 ? 0 : 3.14)) * 5, kx = x0 + sd * (20 + j * 4), ky = cy - 6 - j * 2, fx = kx + sd * (10 + j * 3) + st, fy = GROUND - 4; limb2(x0, cy + 6, kx, ky, fx, fy, 7 + 3 * lq.w, col.limb); }
+      // the pincers: big, held out, opening and closing
+      for (let sd = -1; sd <= 1; sd += 2) { const big = 1 + (cn.pincer ? 0.25 : 0) + 0.2 * lq.l, sx = sd * Cw * 0.7, sy = cy - 4, ex = sx + sd * 34 * big, ey = cy - 26 * big, op = 0.25 + 0.2 * Math.sin(B(3) + sd); limb2(sx, sy, sx + sd * 24, sy - 2, ex, ey, 11, col.limb);
+        for (let h = -1; h <= 1; h += 2) { const a = (sd > 0 ? -0.5 : Math.PI + 0.5) + h * op * sd; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.quadraticCurveTo(ex + Math.cos(a + h * 0.7 * sd) * 20 * big, ey + Math.sin(a + h * 0.7 * sd) * 20 * big, ex + Math.cos(a) * 32 * big, ey + Math.sin(a) * 32 * big); ctx.quadraticCurveTo(ex + Math.cos(a) * 14 * big, ey + Math.sin(a) * 14 * big, ex, ey); ink(hsl(f.hue + f.hue2, f.sat, f.lit + 4, 1), 2.2); } }
+      if (f.tk) { ctx.beginPath(); ctx.moveTo(-10, cy + Ch * 0.4); ctx.lineTo(0, cy + Ch * 0.4 + 14 * f.ts); ctx.lineTo(10, cy + Ch * 0.4); ctx.closePath(); ink(col.fin, 2); }
+      for (let i = 0; i < spikes.length; i++) for (let j = -3; j <= 3; j++) { const a = -Math.PI / 2 + j * 0.36, bx = Math.cos(a) * Cw * 0.96, by = cy + Math.sin(a) * Ch * 0.9, Ls = 13 * spikes[i].l; ctx.beginPath(); ctx.moveTo(bx - 5, by + 3); ctx.lineTo(bx + Math.cos(a) * Ls, by + Math.sin(a) * Ls * 1.4); ctx.lineTo(bx + 5, by + 3); ctx.closePath(); ink('#f4f7fb', 2); }
+      for (let i = 0; i < fins.length; i++) for (let sd = -1; sd <= 1; sd += 2) { const Lf = 26 * fins[i].l; ctx.beginPath(); ctx.moveTo(sd * Cw * 0.5, cy - Ch * 0.5); ctx.quadraticCurveTo(sd * Cw * 0.7, cy - Ch - Lf, sd * Cw * 0.95, cy - Ch * 0.5 - Lf * 0.4); ctx.quadraticCurveTo(sd * Cw * 0.8, cy - Ch * 0.3, sd * Cw * 0.6, cy - Ch * 0.2); ctx.closePath(); ink(col.fin, 2); }
+      const shell = function () { ctx.beginPath(); ctx.moveTo(-Cw, cy + 4); ctx.bezierCurveTo(-Cw * 1.05, cy - Ch * 1.25, Cw * 1.05, cy - Ch * 1.25, Cw, cy + 4); ctx.bezierCurveTo(Cw * 0.7, cy + Ch * 0.75, -Cw * 0.7, cy + Ch * 0.75, -Cw, cy + 4); ctx.closePath(); };
+      if (f.coat >= 2) for (let i = 0; i <= 24; i++) { const a = Math.PI + i / 24 * Math.PI; fringe(Math.cos(a) * Cw, cy + Math.sin(a) * Ch * 0.9, Math.cos(a), Math.sin(a), i); }
+      shell(); skin(-Cw, cy - Ch, Cw * 2, Ch * 1.7, shell, 0);
+      ctx.save(); shell(); ctx.clip(); ctx.strokeStyle = INK; ctx.globalAlpha = 0.3; ctx.lineWidth = 2; for (let j = 1; j <= 2; j++) { ctx.beginPath(); ctx.ellipse(0, cy + 4, Cw * (1 - j * 0.24), Ch * (1.05 - j * 0.24), 0, Math.PI, TAU); ctx.stroke(); } for (let j = -2; j <= 2; j++) { ctx.beginPath(); ctx.moveTo(j * Cw * 0.16, cy - Ch * 0.9); ctx.lineTo(j * Cw * 0.36, cy + 4); ctx.stroke(); } ctx.restore();      // the plates of its shell
+      if (horns.length) hornsAt(0, cy - Ch * 0.78, Cw * 0.5, horns[0]);
+      if (feels.length) feelersAt(0, cy - Ch * 0.7, Cw * 0.2, feels[0], 0);
+      for (let i = 0; i < R.length; i++) { const q = R[i], d = q.k === 8 ? F._dsg(q) : null; if (!d || q.on >= 0) continue; if (d.place === 'sides') for (let sd = -1; sd <= 1; sd += 2) F._design(ctx, d, sd * Cw * 0.6, cy - Ch * 0.5, sd > 0 ? -0.9 : Math.PI + 0.9, 44 * q.l, q.w, col, sd); else F._design(ctx, d, 0, cy - Ch * 0.7, -Math.PI / 2, 48 * q.l, q.w, col, 1); }
+      lights([[-Cw * 0.5, cy - Ch * 0.3], [Cw * 0.5, cy - Ch * 0.3], [0, cy - Ch * 0.6]]);
+      // its eyes stand up on stalks
+      const er = clamp(9 + 12 * f.es, 8, 17), ne = Math.max(1, f.en);
+      for (let j = 0; j < Math.min(2, ne); j++) { const ex = (ne === 1 ? 0 : (j ? 1 : -1) * Cw * 0.26), eb = cy - Ch * 0.5, et = cy - Ch * 0.75 - 16 - 14 * f.ek; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.body : INK; ctx.lineWidth = pass ? 6 : 10; ctx.beginPath(); ctx.moveTo(ex, eb); ctx.lineTo(ex, et); ctx.stroke(); } eyeAt(ex, et, er, false); }
+      ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(-9, cy + Ch * 0.12); ctx.quadraticCurveTo(0, cy + Ch * 0.3, 9, cy + Ch * 0.12); ctx.stroke();
+      return;
+    }
+
+    // ═══ everything with a spine: a fish, a serpent, a beast on all fours, something that stands up ═══
+    const plan = build === 'plan' ? G.planOf(f.pl) : null;
+    const upright = build === 'upright', leg0 = legs[0];
+    const legLen = legs.length ? 14 + 16 * Math.min(1.6, leg0.l) : 0;
+    const Hr = clamp(30 * Math.pow(f.hd, 0.85), 22, 50);                    // the head's half-size
+    let Lb = build === 'serpent' ? 150 + 14 * f.n : build === 'beast' ? 80 + 17 * Math.min(f.n, 10) : build === 'fish' ? 66 + 18 * Math.min(f.n, 9) : 42 + 13 * Math.min(f.n, 9);      // the body's length, without the head
+    Lb = Math.min(Lb, upright ? GROUND - legLen + 170 - Hr * 2 : 290 - Hr * 2);
+    const Wb = (build === 'serpent' ? 19 : build === 'beast' ? 30 : build === 'fish' ? 36 : plan ? 30 * plan.girth : 40) * Math.pow(plump, 0.8) * (1 + 0.012 * f.n);
+    const L = Lb + Hr * 2, hs = Hr * 2 / L, M = 36, S = [];
+    const neckW = Math.min(Hr * f.hx, Hr) * (build === 'fish' ? 0.95 : 0.82 - 0.75 * (f.n > 1 ? f.nk : 0));
+    const hover = build === 'fish' ? 54 : build === 'serpent' ? 30 : plan && !plan.stands ? 40 : 0;
+    // a build's spine is a line through its points (x forward, y up from the floor), smoothed and scaled to this body's length
+    let PX = null, PY = null, PD = null, unit = 1;
+    if (plan) {
+      let P = plan.spine.map(function (p) { return [p[0], p[1]]; });
+      for (let it = 0; it < 2; it++) { const Q = [P[0]]; for (let i = 0; i < P.length - 1; i++) { Q.push([P[i][0] * 0.75 + P[i + 1][0] * 0.25, P[i][1] * 0.75 + P[i + 1][1] * 0.25], [P[i][0] * 0.25 + P[i + 1][0] * 0.75, P[i][1] * 0.25 + P[i + 1][1] * 0.75]); } Q.push(P[P.length - 1]); P = Q; }
+      let len = 0, top = 0, x0 = 1e9, x1 = -1e9; PD = [0]; for (let i = 1; i < P.length; i++) { len += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]); PD.push(len); } for (let i = 0; i < P.length; i++) { top = Math.max(top, P[i][1]); x0 = Math.min(x0, P[i][0]); x1 = Math.max(x1, P[i][0]); }
+      unit = Math.min(L / Math.max(0.2, len), (270 - hover - Hr) / Math.max(0.2, top), 290 / Math.max(0.3, x1 - x0));
+      const cx0 = (x0 + x1) / 2; PX = P.map(function (p) { return (p[0] - cx0) * unit; }); PY = P.map(function (p) { return GROUND - hover - 4 - p[1] * unit; }); for (let i = 0; i < PD.length; i++) PD[i] /= len;
+    }
+    for (let i = 0; i <= M; i++) {
+      const u = i / M, d = u * L; let x, y;
+      if (plan) { let j = 1; while (j < PD.length - 1 && PD[j] < u) j++; const q = (u - PD[j - 1]) / Math.max(1e-6, PD[j] - PD[j - 1]); x = lerp(PX[j - 1], PX[j], q); y = lerp(PY[j - 1], PY[j], q) + Math.sin(B(2.2) + u * 3) * 1.5; }
+      else if (upright) { x = Math.sin(u * 3 + B(1.3)) * 2; y = GROUND - legLen - L + d; }
+      else {
+        x = L / 2 - d;
+        const base = GROUND - hover - legLen - Wb * 0.9, lift = build === 'beast' ? (14 + 75 * f.nk) : build === 'serpent' ? 34 : 4;
+        const up = Math.pow(Math.max(0, 1 - u / (hs * 1.9)), 1.5);
+        y = base - lift * up + (build === 'serpent' ? Math.sin(u * 7.2 + 0.6 + B(2)) * 22 * Math.min(1, u * 3) : build === 'fish' ? Math.sin(u * 3.1 + B(2.5)) * 6 * u : Math.sin(u * 3.14) * -5);
+        x += build === 'beast' ? lift * up * 0.3 : 0;
+      }
+      let w;
+      const hw = u < hs ? Hr * f.hx * Math.pow(Math.max(0, 1 - Math.pow(Math.abs(u / hs * 2 - 1), f.hq)), 1 / f.hq) : 0;
+      if (u < hs) w = Math.max(hw, neckW * clamp((u - hs * 0.45) / (hs * 0.55), 0, 1));
+      else { const v = (u - hs) / (1 - hs), pf = profB(v) * Wb, e = 1 - Math.pow(v, 3.2); w = lerp(neckW, pf, clamp(v / 0.18, 0, 1)) * (v > 0.6 ? Math.sqrt(Math.max(0, e)) / Math.sqrt(1 - Math.pow(0.6, 3.2)) : 1); w = Math.max(w, v > 0.95 ? 0 : 4); }
+      S.push({ u: u, x: x, y: y, w: w * (u >= hs ? breathe : 1) });
+    }
+    for (let i = 0; i <= M; i++) { const a = S[Math.max(0, i - 1)], b = S[Math.min(M, i + 1)], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1; S[i].dx = dx / d; S[i].dy = dy / d; S[i].nx = -dy / d; S[i].ny = dx / d; }
+    const backSign = upright || plan ? 1 : (S[M >> 1].ny < 0 ? 1 : -1);        // which side of the spine is the back
+    const station = function (u) { return S[clamp(Math.round(u * M), 0, M)]; };
+    const segU = function (a) { return hs + (1 - hs) * clamp((a + 0.5) / f.n, 0.08, 0.92); };
+    const hi = Math.round(hs * 0.5 * M), H = S[hi];
+    function profB(v) { const x = clamp(v, 0, 0.9999) * 3, i = Math.floor(x); let q = x - i; q = q * q * (3 - 2 * q); return lerp(f.prof[1 + i], f.prof[2 + i], q); }
+    const O = []; for (let i = 0; i <= M; i++) O.push([S[i].x + S[i].nx * S[i].w, S[i].y + S[i].ny * S[i].w]); for (let i = M; i >= 0; i--) O.push([S[i].x - S[i].nx * S[i].w, S[i].y - S[i].ny * S[i].w]);
+    const tracePath = function () { const m = O.length; ctx.beginPath(); ctx.moveTo((O[m - 1][0] + O[0][0]) / 2, (O[m - 1][1] + O[0][1]) / 2); for (let i = 0; i < m; i++) { const p = O[i], q = O[(i + 1) % m]; ctx.quadraticCurveTo(p[0], p[1], (p[0] + q[0]) / 2, (p[1] + q[1]) / 2); } ctx.closePath(); };
+    const mid = station(0.5);
+    aura(mid.x, mid.y, Math.max(L * 0.62, 90));
+
+    // behind the body
+    if (f.tk && f.n > 1) tail();
+    for (let i = 0; i < R.length; i++) { const q = R[i], d = q.k === 8 ? F._dsg(q) : null; if (!d || q.on >= 0) continue;
+      if (d.place === 'back') { const p = station(segU((q.a + q.b) / 2)); if (upright) F._design(ctx, d, H.x, H.y - Hr * 0.2, -Math.PI / 2 + Math.sin(B(1.5)) * 0.04, 66 * q.l, q.w, col, 1); else F._design(ctx, d, p.x, p.y + p.ny * p.w * 0.6 * backSign, Math.atan2(p.ny * backSign, p.nx * backSign) - 0.35, 60 * q.l, q.w, col, 1); }
+      else if (d.place === 'sides') { const p = station(segU(q.a)); if (upright) for (let sd = -1; sd <= 1; sd += 2) F._design(ctx, d, p.x + sd * p.w * 0.6, p.y, (sd > 0 ? -0.5 : Math.PI + 0.5) + sd * Math.sin(B(3)) * (d.motion === 'flap' ? 0.2 : 0.05), 52 * q.l, q.w, col, sd); else F._design(ctx, d, p.x, p.y + p.ny * p.w * 0.5 * backSign, Math.atan2(p.ny * backSign, p.nx * backSign) - 0.75 + Math.sin(B(3)) * (d.motion === 'flap' ? 0.2 : 0.05), 56 * q.l, q.w, col, 1); }
+    }
+    for (let i = 0; i < fins.length; i++) { const q = fins[i], p = station(segU(q.a)), Lf = 44 * q.l, fl = Math.sin(B(3.4) + i) * 0.12;
+      if (upright) for (let sd = -1; sd <= 1; sd += 2) { ctx.save(); ctx.translate(p.x + sd * p.w * 0.7, p.y); ctx.rotate(sd * (-0.35 + fl)); ctx.beginPath(); ctx.moveTo(0, -12); ctx.quadraticCurveTo(sd * Lf * 0.9, -Lf * 0.75, sd * Lf * 1.2, -Lf * 0.2); ctx.quadraticCurveTo(sd * Lf * 0.8, Lf * 0.25, 0, 20); ctx.closePath(); ink(col.fin, 2.2); ribs(sd * Lf, -Lf * 0.4); ctx.restore(); }
+      else {      // a sail of a fin on the back, and a smaller one under the belly
+        ctx.save(); ctx.translate(p.x + p.nx * p.w * 0.85 * backSign, p.y + p.ny * p.w * 0.85 * backSign); ctx.rotate(Math.atan2(p.ny * backSign, p.nx * backSign) + Math.PI / 2 + fl); ctx.beginPath(); ctx.moveTo(22, 4); ctx.quadraticCurveTo(Lf * 0.1, -Lf * 1.3, -Lf * 0.8, -Lf * 0.8); ctx.quadraticCurveTo(-Lf * 0.3, -Lf * 0.2, -20, 4); ctx.closePath(); ink(col.fin, 2.2); ribs(-Lf * 0.5, -Lf * 0.85); ctx.restore();
+        if (build !== 'beast' && !(plan && plan.stands)) { ctx.save(); ctx.translate(p.x - p.nx * p.w * 0.8 * backSign, p.y - p.ny * p.w * 0.8 * backSign); ctx.rotate(Math.atan2(-p.ny * backSign, -p.nx * backSign) - Math.PI / 2 - fl); ctx.beginPath(); ctx.moveTo(14, -3); ctx.quadraticCurveTo(0, Lf * 0.8, -Lf * 0.55, Lf * 0.55); ctx.quadraticCurveTo(-Lf * 0.2, Lf * 0.1, -12, -3); ctx.closePath(); ink(col.fin, 2); ctx.restore(); }
+      }
+    }
+    for (let i = 0; i < spikes.length; i++) { const q = spikes[i]; for (let a = q.a; a <= q.b && a < f.n; a += q.e) { const p = station(segU(a)), Ls = 15 * q.l; for (let sd = (upright ? -1 : 1); sd <= 1; sd += 2) { const s2 = upright ? sd : backSign, bx = p.x + p.nx * p.w * 0.9 * s2, by = p.y + p.ny * p.w * 0.9 * s2; ctx.beginPath(); ctx.moveTo(bx - p.dx * 7, by - p.dy * 7); ctx.lineTo(bx + p.nx * s2 * Ls * 1.5 + p.dx * Ls * 0.3, by + p.ny * s2 * Ls * 1.5 + p.dy * Ls * 0.3); ctx.lineTo(bx + p.dx * 7, by + p.dy * 7); ctx.closePath(); ink('#f4f7fb', 2); } } }
+    if (frills.length) { const q = frills[0], p = S[Math.round(hs * M)], Lf = 30 * q.l; for (let sd = -1; sd <= 1; sd += 2) { const bx = p.x + p.nx * p.w * 0.5 * sd, by = p.y + p.ny * p.w * 0.5 * sd, a0 = Math.atan2(p.ny * sd, p.nx * sd) + (upright ? 0 : 0.5 * sd * backSign), spn = 0.95 + 0.08 * Math.sin(B(3)); ctx.beginPath(); ctx.moveTo(bx, by); for (let j = 0; j <= 6; j++) { const a = a0 + (j / 6 - 0.5) * 1.6 * spn, q2 = Lf * (j % 2 ? 0.85 : 1.1); ctx.lineTo(bx + Math.cos(a) * q2, by + Math.sin(a) * q2); } ctx.closePath(); ink(col.frill, 2.2); } }      // gills that stand out behind the head
+    if (f.shell > 0.25 && upright) { ctx.beginPath(); const c0 = station(hs + (1 - hs) * 0.5); ctx.ellipse(c0.x, c0.y + 4, c0.w * (1.18 + 0.12 * f.shell), Lb * 0.56, 0, 0, TAU); ink(col.dark, 2.6); }
+    if (build === 'beast') for (let i = 0; i < legs.length; i++) for (let a = legs[i].a; a <= legs[i].b && a < f.n; a += legs[i].e) leg(legs[i], station(segU(a)), a, true);
+    if (plan) for (let i = 0; i < plan.legs.length; i++) planLeg(plan.legs[i], i, true);
+    if (tents.length && !upright) for (let i = 0; i < 4; i++) { const p = station(0.55 + i * 0.12), q = tents[0], Lt = 30 * q.l + 12, sw = Math.sin(B(2.4) + i * 1.3) * 8, y0 = p.y - p.ny * p.w * 0.7 * backSign; strokeLimb(p.x, y0, p.x - 14 - sw, y0 + Lt * 0.5, p.x - 30 + sw, y0 + Lt, 6, col.limb); }
+    if (tents.length && upright) for (let j = 0; j < 4; j++) { const q = tents[0], Lt = 32 * q.l + 14, x0 = (j - 1.5) * Wb * 0.42, sw = Math.sin(B(2.4) + j * 1.3) * 9, yb = S[M].y - 8; strokeLimb(x0, yb, x0 - sw, yb + Lt * 0.5, x0 + sw * 0.6, yb + Lt, 7, col.limb); }
+    if (upright) { const q = legs.length > 1 ? legs[legs.length - 1] : leg0; for (let sd = -1; sd <= 1; sd += 2) { const x0 = sd * Math.max(10, station(0.9).w * 0.55 + 4), st = Math.sin(B(5) + (sd > 0 ? 0 : 3.14)) * 3; strokeLimb(x0, S[M].y - 10, x0 + sd * 3, (S[M].y + GROUND) / 2, x0 + sd * 2 + st, GROUND - 6, 11, col.limb); foot(x0 + sd * 2 + st, GROUND - 4, sd, q.t); } }
+
+    // the body
+    if (f.coat >= 2) for (let i = 0; i < O.length; i++) { const j = i <= M ? i : 2 * M + 1 - i, sd = i <= M ? 1 : -1, p = S[j]; if (p.w < 4 || (!upright && j < hs * M * 0.8)) continue; fringe(O[i][0], O[i][1], p.nx * sd, p.ny * sd, i); }
+    tracePath();
+    { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (let i = 0; i < O.length; i++) { x0 = Math.min(x0, O[i][0]); x1 = Math.max(x1, O[i][0]); y0 = Math.min(y0, O[i][1]); y1 = Math.max(y1, O[i][1]); } skin(x0, y0, x1 - x0, y1 - y0, tracePath, 1); }
+    if (f.shell > 0.25 && !upright) { const C = [], i0 = Math.round((hs + 0.05) * M), i1 = M - 3; for (let i = i0; i <= i1; i++) { const p = S[i], e = Math.sin((i - i0) / Math.max(1, i1 - i0) * Math.PI); C.push([p.x + p.nx * (p.w + 10 * e * f.shell) * backSign, p.y + p.ny * (p.w + 10 * e * f.shell) * backSign]); } for (let i = i1; i >= i0; i--) { const p = S[i]; C.push([p.x - p.nx * p.w * 0.15 * backSign, p.y - p.ny * p.w * 0.15 * backSign]); } if (C.length > 5) { ctx.beginPath(); ctx.moveTo(C[0][0], C[0][1]); for (let i = 1; i < C.length; i++) ctx.lineTo(C[i][0], C[i][1]); ctx.closePath(); ink(col.dark, 2.4); ctx.strokeStyle = INK; ctx.globalAlpha = 0.3; ctx.lineWidth = 1.8; for (let i = i0 + 3; i < i1; i += 4) { const p = S[i]; ctx.beginPath(); ctx.moveTo(p.x + p.nx * (p.w + 8) * backSign, p.y + p.ny * (p.w + 8) * backSign); ctx.lineTo(p.x, p.y); ctx.stroke(); } ctx.globalAlpha = 1; } }      // a dome of a shell over its back
+    if (f.crest > 0.25) for (let i = (upright ? 2 : Math.round(hs * M * 0.5)); i <= Math.round(M * (upright ? hs : 0.85)); i += 2) { const p = S[i], up = 9 + 16 * f.crest, bx = upright ? H.x + (i - hi) * 6 : p.x + p.nx * p.w * backSign, by = upright ? H.y - Hr * Math.sqrt(Math.max(0.05, 1 - Math.pow((i - hi) * 6 / (Hr * f.hx), 2))) : p.y + p.ny * p.w * backSign; if (upright && Math.abs((i - hi) * 6) > Hr * f.hx * 0.8) continue; ctx.beginPath(); ctx.moveTo(bx - 6, by + 2); ctx.lineTo(bx + (upright ? 0 : p.nx * backSign * up - p.dx * up * 0.4), by + (upright ? -up : p.ny * backSign * up)); ctx.lineTo(bx + 6, by + 2); ctx.closePath(); ink(col.frill, 1.8); }
+    if (f.venom > 0.3) for (let i = 0; i < 2; i++) { const p = station(0.6 + i * 0.2); ctx.beginPath(); ctx.arc(p.x - p.nx * p.w * 0.5 * backSign, p.y - p.ny * p.w * 0.5 * backSign, 4.5, 0, TAU); ink('#b6ff3c', 1.6); }
+    { const P = []; for (let i = 0; i < 5; i++) { const p = station(hs + (1 - hs) * (0.15 + i * 0.17)); P.push([p.x - p.nx * p.w * 0.25 * backSign, p.y - p.ny * p.w * 0.25 * backSign]); } lights(P); }
+
+    // in front of the body
+    if (build === 'beast') for (let i = 0; i < legs.length; i++) for (let a = legs[i].a; a <= legs[i].b && a < f.n; a += legs[i].e) leg(legs[i], station(segU(a)), a, false);
+    if (plan) for (let i = 0; i < plan.legs.length; i++) planLeg(plan.legs[i], i, false);
+    if (upright && legs.length > 1) arms(legs[0]);
+    if ((build === 'fish' || build === 'serpent') && fins.length) { const p = station(hs + (1 - hs) * 0.22), Lf = 26 * fins[0].l, fl = Math.sin(B(4)) * 0.25; ctx.save(); ctx.translate(p.x, p.y - p.ny * p.w * 0.25 * backSign); ctx.rotate(2.5 + fl); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(Lf * 0.6, -Lf * 0.5, Lf * 1.1, 0); ctx.quadraticCurveTo(Lf * 0.6, Lf * 0.4, 0, 0); ctx.closePath(); ink(col.fin, 2); ctx.restore(); }      // the fin on its flank
+    if (horns.length) hornsAt(H.x + (upright ? 0 : -4), H.y - Hr * 0.72, upright ? Hr * f.hx * 0.55 : 10, horns[0]);
+    if (feels.length) feelersAt(H.x + (upright ? 0 : 8), H.y - Hr * 0.85, Hr * 0.3, feels[0], upright ? 0 : 1);
+    for (let i = 0; i < R.length; i++) { const q = R[i], d = q.k === 8 ? F._dsg(q) : null; if (d && d.place === 'head' && q.on < 0) for (let sd = -1; sd <= 1; sd += 2) F._design(ctx, d, H.x + sd * Hr * 0.5, H.y - Hr * 0.6, (sd > 0 ? -1.0 : Math.PI + 1.0) + sd * Math.sin(B(2)) * 0.04, 44 * q.l, q.w, col, sd); }
+    face(H.x + (upright ? 0 : Hr * 0.1), H.y + (upright ? Hr * 0.06 : -Hr * 0.05), Hr * Math.min(1, f.hx), upright ? 0 : 1, false);
+    return;
+
+    // ── helpers (shared by every build) ──
+    function ribs(x, y) { ctx.strokeStyle = 'rgba(7,18,31,.28)'; ctx.lineWidth = 1.4; for (let r = 1; r <= 3; r++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(x * (0.5 + r * 0.17), y * (1.3 - r * 0.3)); ctx.stroke(); } }
+    function strokeLimb(x0, y0, cx, cy2, x1, y1, w, fill) { for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? fill : INK; ctx.lineWidth = pass ? w : w + 4.4; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(cx, cy2, x1, y1); ctx.stroke(); } }
+    function limb2(x0, y0, kx, ky, x1, y1, w, fill) { for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? fill : INK; ctx.lineWidth = pass ? w : w + 4.4; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(kx, ky); ctx.lineTo(x1, y1); ctx.stroke(); } }
+    function foot(x, y, sd, tip) {
+      if (tip === 2) { for (let h = -1; h <= 1; h += 2) { ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + sd * 10, y + h * 10, x + sd * 18, y + h * 3); ctx.quadraticCurveTo(x + sd * 9, y + h * 4, x, y); ink('#ff8a6b', 2); } return; }
+      ctx.beginPath(); ctx.ellipse(x + sd * 5, y, tip === 3 ? 16 : 12, tip === 3 ? 6 : 7, 0, 0, TAU); ink(tip === 3 ? col.fin : col.limb, 2.2);
+      if (tip === 1) { ctx.strokeStyle = INK; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.6; for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(x + sd * (6 + j * 5), y - 4); ctx.lineTo(x + sd * (8 + j * 5), y + 4); ctx.stroke(); } ctx.globalAlpha = 1; }
+    }
+    // a leg of an invented build: hip on the belly, a knee and a foot where the build puts them; a foot that stands is on the floor
+    function planLeg(g2, i, far) {
+      const p = station(hs + (1 - hs) * g2.u), hip = GROUND - 5 - (p.y - p.ny * p.w * 0.55), lu = g2.air || !plan.stands ? 30 + 14 * (leg0 ? Math.min(1.6, leg0.l) : 1) : clamp(hip, 22, 150), st = Math.sin(B(5) + i * 2.2 + (far ? 3.14 : 0)) * (g2.air ? 3 : 6);
+      const hx0 = p.x - p.nx * p.w * 0.55 + (far ? 8 : -3), hy0 = p.y - p.ny * p.w * 0.55, kx = hx0 + g2.knee[0] * lu + st * 0.3, ky = hy0 - g2.knee[1] * lu;
+      const fx = kx + g2.foot[0] * lu + st, fy = g2.air || !plan.stands ? ky - g2.foot[1] * lu : GROUND - 5, w = (8 + 5 * (leg0 ? leg0.w : 0.5)) * g2.thick;
+      if (far) ctx.globalAlpha = 0.72;
+      limb2(hx0, hy0, kx, ky, fx, fy, w, far ? col.dark : col.limb); foot(fx, fy + 1, 1, leg0 ? leg0.t : 0);
+      ctx.globalAlpha = 1;
+    }
+    function leg(q, p, a, far) {
+      const st = Math.sin(B(5) + a * 2.2 + (far ? 3.14 : 0)) * 6, x0 = p.x + (far ? 7 : -4), y0 = p.y - p.ny * p.w * 0.6 * backSign, w = (9 + 6 * q.w) * (p.w > 16 ? 1 : 0.8);
+      if (far) ctx.globalAlpha = 0.72;
+      strokeLimb(x0, y0, x0 + 5 - st * 0.4, (y0 + GROUND) / 2, x0 + st, GROUND - 5, w, far ? col.dark : col.limb); foot(x0 + st, GROUND - 4, 1, q.t);
+      ctx.globalAlpha = 1;
+    }
+    function arms(q) {
+      const p = station(hs + (1 - hs) * 0.3);
+      for (let sd = -1; sd <= 1; sd += 2) {
+        const La = 26 * q.l + 12, wv = Math.sin(B(2.6) + (sd > 0 ? 0 : 1.4)) * 0.16, sx = p.x + sd * p.w * 0.85, sy = p.y, a = (sd > 0 ? 0.55 : Math.PI - 0.55) + sd * wv, ex = sx + Math.cos(a) * La, ey = sy + Math.sin(a) * La;
+        strokeLimb(sx, sy, sx + sd * La * 0.6, sy - 4, ex, ey, 12, col.limb);
+        const k2 = kidOf(q), tip = k2 && k2.k === 0 && k2.t ? k2.t : q.t;
+        if (tip === 2) for (let h = -1; h <= 1; h += 2) { ctx.beginPath(); ctx.moveTo(ex, ey); ctx.quadraticCurveTo(ex + Math.cos(a + h) * 14, ey + Math.sin(a + h) * 14, ex + Math.cos(a + h * 0.2) * 20, ey + Math.sin(a + h * 0.2) * 20); ctx.quadraticCurveTo(ex + Math.cos(a + h * 0.4) * 8, ey + Math.sin(a + h * 0.4) * 8, ex, ey); ink('#ff8a6b', 2.2); }
+        else if (tip === 3) { ctx.beginPath(); ctx.ellipse(ex + Math.cos(a) * 7, ey + Math.sin(a) * 7, 13, 8, a, 0, TAU); ink(col.fin, 2.2); }
+        else if (tip === 1 || k2) { ctx.beginPath(); ctx.arc(ex, ey, 9, 0, TAU); ink(col.limb, 2.2); for (let h = -1; h <= 1; h++) { ctx.beginPath(); ctx.arc(ex + Math.cos(a + h * 0.7) * 10, ey + Math.sin(a + h * 0.7) * 10, 4, 0, TAU); ink(col.limb, 1.8); } }
+        else { ctx.beginPath(); ctx.arc(ex, ey, 7.5, 0, TAU); ink(col.limb, 2.2); }
+      }
+    }
+    function hornsAt(x, y, half, q) { const Lh = 30 * q.l; for (let sd = -1; sd <= 1; sd += 2) { const bx = x + sd * half; ctx.beginPath(); ctx.moveTo(bx - sd * 9, y + 6); ctx.quadraticCurveTo(bx + sd * Lh * 0.2, y - Lh * 0.9, bx + sd * Lh * (0.6 + q.c * 0.5), y - Lh * 1.15); ctx.quadraticCurveTo(bx + sd * Lh * 0.55, y - Lh * 0.4, bx + sd * 10, y + 8); ctx.closePath(); ink('#ffe9b8', 2.2); } }
+    function feelersAt(x, y, half, q, fwd) { const Lf = 34 * q.l; for (let sd = -1; sd <= 1; sd += 2) { const sw = Math.sin(B(2.4) + sd) * 5, bx = x + sd * half, ex = bx + sd * Lf * 0.5 + sw + fwd * Lf * 0.5, ey = y - Lf; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.limb : INK; ctx.lineWidth = pass ? 3.2 : 6.4; ctx.beginPath(); ctx.moveTo(bx, y); ctx.quadraticCurveTo(bx + sd * Lf * 0.1, y - Lf * 0.8, ex, ey); ctx.stroke(); } const g = ctx.createRadialGradient(ex, ey, 0, ex, ey, 11); g.addColorStop(0, 'rgba(255,255,235,1)'); g.addColorStop(0.5, 'rgba(255,243,168,0.7)'); g.addColorStop(1, 'rgba(255,243,168,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ex, ey, 11, 0, TAU); ctx.fill(); } }
+    function tail() {
+      const s = 34 * f.ts, wag = Math.sin(B(3)) * 0.2, p = S[M - 1];
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate((upright ? 0.35 : Math.atan2(p.dy, p.dx)) + wag); if (upright) ctx.translate(p.w * 0.4 + 6, -8); ctx.beginPath();
+      if (f.tk === 1) { ctx.moveTo(-4, 0); ctx.quadraticCurveTo(s * 0.6, -s * 1.15, s * 1.45, -s * 0.85); ctx.quadraticCurveTo(s * 0.95, 0, s * 1.45, s * 0.85); ctx.quadraticCurveTo(s * 0.6, s * 1.15, -4, 0); }
+      else if (f.tk === 2) { ctx.moveTo(-4, 0); ctx.quadraticCurveTo(s * 0.6, -s * 0.2, s * 1.5, -s * 1.05); ctx.quadraticCurveTo(s * 1.0, 0, s * 1.5, s * 1.05); ctx.quadraticCurveTo(s * 0.6, s * 0.2, -4, 0); }
+      else if (f.tk === 3) { ctx.moveTo(0, -7); ctx.quadraticCurveTo(s * 1.2, -s * 0.2, s * 2.0, -s * 1.1); ctx.quadraticCurveTo(s * 1.3, s * 0.3, 0, 7); }
+      else { ctx.moveTo(0, -6); ctx.lineTo(s * 0.9, -6); ctx.arc(s * 1.2, 0, s * 0.42, -2.3, 2.3); ctx.lineTo(0, 6); }
+      ctx.closePath(); ink(f.tk === 4 ? col.dark : col.fin, 2.4);
+      if (f.tk <= 2) { ctx.strokeStyle = 'rgba(7,18,31,.25)'; ctx.lineWidth = 1.3; for (let j = -2; j <= 2; j++) { ctx.beginPath(); ctx.moveTo(4, j * 2); ctx.lineTo(s * 1.25, j * s * 0.36); ctx.stroke(); } }
+      ctx.restore();
+    }
+    function fringe(x, y, nx, ny, i) {
+      if (f.coat === 2) { const ln = 7 + (i % 3) * 2.5; ctx.strokeStyle = col.dark; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - nx * 3, y - ny * 3); ctx.lineTo(x + nx * ln, y + ny * ln + ln * 0.35); ctx.stroke(); }
+      else if (i % 2 === 0) { const tx = -ny, ty = nx; ctx.beginPath(); ctx.moveTo(x - tx * 6, y - ty * 6); ctx.quadraticCurveTo(x + nx * 10 - tx * 6, y + ny * 10 - ty * 6, x + nx * 15, y + ny * 15 + 5); ctx.quadraticCurveTo(x + nx * 8 + tx * 6, y + ny * 8 + ty * 6, x + tx * 6, y + ty * 6); ctx.closePath(); ink(i % 4 ? col.fin : col.frill, 1.6); }
+    }
+    // fill the current path with lit skin, then its markings inside it, then the outline (again() re-traces the path)
+    function skin(x, y, w, h, again, spine) {
+      const g = ctx.createLinearGradient(0, y, 0, y + h);
+      g.addColorStop(0, col.light); g.addColorStop(0.45, col.body); g.addColorStop(1, col.dark);
       ctx.fillStyle = g; ctx.fill();
       ctx.save(); ctx.clip();
       ctx.fillStyle = col.mark; ctx.strokeStyle = col.mark;
-      const step = 12 + f.psc * 16, rr = G.rng(f.seed + (isHead ? 7 : 0));
-      if (f.pat === 1) { ctx.globalAlpha = 0.8; for (let yy = y + step * (isHead ? 0.2 : 0.6); yy < y + h * (isHead ? 0.4 : 1); yy += step) { ctx.beginPath(); ctx.moveTo(x - 4, yy); ctx.quadraticCurveTo(x + w / 2, yy + 9, x + w + 4, yy); ctx.lineTo(x + w + 4, yy + step * 0.42); ctx.quadraticCurveTo(x + w / 2, yy + 9 + step * 0.42, x - 4, yy + step * 0.42); ctx.closePath(); ctx.fill(); } }
-      else if (f.pat === 2) { ctx.globalAlpha = 0.8; for (let i = 0; i < (isHead ? 6 : 12); i++) { ctx.beginPath(); ctx.arc(x + rr() * w, y + rr() * h * (isHead ? 0.38 : 1), 3 + f.psc * 7 * (0.5 + rr()), 0, TAU); ctx.fill(); } }
-      else if (f.pat === 4 && !isHead) { ctx.globalAlpha = 0.7; ctx.lineWidth = 4 + f.psc * 4; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(x + w / 2, y + h * (0.3 + i * 0.22), w * 0.2, 0, TAU); ctx.stroke(); } }
-      else if (f.pat === 5 && !isHead) { ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h * 0.1, w * 0.6, h * (0.2 + f.psc * 0.15), 0, 0, TAU); ctx.fill(); }
-      if ((isBody && (f.pat === 3 || f.coat === 1)) || (f.sym && f.pat === 3)) { ctx.globalAlpha = 0.6; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h * 0.62, w * 0.33, h * 0.33, 0, 0, TAU); ctx.fill(); }
-      if (f.coat === 1 && !isHead) { ctx.globalAlpha = 0.4; ctx.strokeStyle = INK; ctx.lineWidth = 1.6; let row = 0; for (let yy = y + 4; yy < y + h; yy += 9, row++) for (let xx = x + (row % 2) * 7; xx < x + w; xx += 14) { ctx.beginPath(); ctx.arc(xx, yy, 7, 0.2, 2.94); ctx.stroke(); } }
-      if (isBody && f.n > 2) { ctx.globalAlpha = 0.16; ctx.strokeStyle = INK; ctx.lineWidth = 2; for (let i = 1; i < Math.min(f.n, 6); i++) { const yy = y + h * i / Math.min(f.n, 6); ctx.beginPath(); ctx.moveTo(x, yy); ctx.quadraticCurveTo(x + w / 2, yy + 8, x + w, yy); ctx.stroke(); } }
-      ctx.globalAlpha = 0.35; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x + w * 0.32, y + h * 0.2, w * 0.18, h * 0.09, -0.4, 0, TAU); ctx.fill();
+      const step = 12 + f.psc * 16, along = spine && !upright;      // markings follow the body: across an upright one, along one that lies flat
+      if (f.pat === 1) { ctx.globalAlpha = 0.8; if (along) for (let a = 0.5; a < f.n * 2 + 2; a++) { const p = station(hs + (1 - hs) * a / (f.n * 2 + 2)); ctx.beginPath(); ctx.moveTo(p.x + p.nx * p.w * 1.1 * backSign - 4, p.y + p.ny * p.w * 1.1 * backSign); ctx.quadraticCurveTo(p.x - 9, p.y, p.x - p.nx * p.w * 0.2 * backSign - 3, p.y - p.ny * p.w * 0.2 * backSign); ctx.lineTo(p.x - p.nx * p.w * 0.2 * backSign + 4, p.y - p.ny * p.w * 0.2 * backSign); ctx.quadraticCurveTo(p.x, p.y, p.x + p.nx * p.w * 1.1 * backSign + 4, p.y + p.ny * p.w * 1.1 * backSign); ctx.closePath(); ctx.fill(); } else for (let yy = y + (spine ? Hr * 2.1 : step * 0.5); yy < y + h; yy += step) { ctx.beginPath(); ctx.moveTo(x - 4, yy); ctx.quadraticCurveTo(x + w / 2, yy + 9, x + w + 4, yy); ctx.lineTo(x + w + 4, yy + step * 0.42); ctx.quadraticCurveTo(x + w / 2, yy + 9 + step * 0.42, x - 4, yy + step * 0.42); ctx.closePath(); ctx.fill(); } }
+      else if (f.pat === 2) { ctx.globalAlpha = 0.8; for (let i = 0; i < 18; i++) { ctx.beginPath(); ctx.arc(x + rr() * w, y + rr() * h * (along ? 0.6 : 1), 3 + f.psc * 7 * (0.5 + rr()), 0, TAU); ctx.fill(); } }
+      else if (f.pat === 4) { ctx.globalAlpha = 0.75; ctx.lineWidth = 3.4 + f.psc * 3; for (let i = 0; i < 3; i++) { const p = spine ? station(hs + (1 - hs) * (0.22 + i * 0.24)) : { x: x + w * (0.3 + i * 0.2), y: y + h * 0.5, w: h * 0.4 }; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(6, p.w * 0.5), 0, TAU); ctx.stroke(); ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2, p.w * 0.18), 0, TAU); ctx.fill(); } }      // eye-spots
+      else if (f.pat === 5) { ctx.globalAlpha = 0.85; const p = spine ? station(hs + (1 - hs) * 0.45) : { x: x + w / 2, y: y + h / 2, w: h * 0.4, nx: 0, ny: -1 }; ctx.beginPath(); if (along) ctx.ellipse(p.x + p.nx * p.w * 0.7 * backSign, p.y + p.ny * p.w * 0.7 * backSign, L * (0.16 + f.psc * 0.12), p.w * 0.85, 0, 0, TAU); else ctx.ellipse(p.x, spine ? p.y : y + h * 0.15, spine ? p.w * 1.6 : w * 0.6, spine ? Lb * (0.14 + f.psc * 0.12) : h * 0.3, 0, 0, TAU); ctx.fill(); }
+      if (f.pat === 3 || f.coat === 1) { ctx.globalAlpha = 0.5; ctx.fillStyle = '#fff'; ctx.beginPath(); if (along) { const p = station(hs + (1 - hs) * 0.45); ctx.ellipse(p.x, p.y - p.ny * p.w * 0.7 * backSign, Lb * 0.4, p.w * 0.55, 0, 0, TAU); } else ctx.ellipse(x + w / 2, y + h * (spine ? 0.68 : 0.7), w * 0.3, h * (spine ? 0.24 : 0.25), 0, 0, TAU); ctx.fill(); }      // a pale belly
+      if (f.coat === 1) { ctx.globalAlpha = 0.34; ctx.strokeStyle = INK; ctx.lineWidth = 1.5; let row = 0; for (let yy = y + 4; yy < y + h; yy += 9, row++) for (let xx = x + (row % 2) * 7; xx < x + w; xx += 14) { if (spine && Math.hypot(xx - H.x, yy - H.y) < Hr * 1.05) continue; ctx.beginPath(); ctx.arc(xx, yy, 7, 0.2, 2.94); ctx.stroke(); } }
+      if (spine) for (let i = 0; i < plates.length; i++) { const q = plates[i]; ctx.globalAlpha = 0.9; ctx.fillStyle = col.limb; for (let a = q.a; a <= q.b && a < f.n; a += q.e) { const p = station(segU(a)); ctx.beginPath(); ctx.ellipse(p.x, p.y, along ? (1 - hs) * L / f.n * 0.42 : p.w * 1.05, along ? p.w * 1.05 : (1 - hs) * L / f.n * 0.42, 0, 0, TAU); ctx.fill(); ctx.globalAlpha = 0.45; ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke(); ctx.globalAlpha = 0.9; } }
+      if (spine && f.n > 2) { ctx.globalAlpha = 0.12; ctx.strokeStyle = INK; ctx.lineWidth = 2; for (let a = 1; a < Math.min(f.n, 9); a++) { const p = station(hs + (1 - hs) * a / Math.min(f.n, 9)); ctx.beginPath(); ctx.moveTo(p.x + p.nx * p.w, p.y + p.ny * p.w); ctx.quadraticCurveTo(p.x + p.dx * 6, p.y + p.dy * 6, p.x - p.nx * p.w, p.y - p.ny * p.w); ctx.stroke(); } }
+      // light falls from above: a sheen along the top, the wet shine of something that lives in water
+      const sh = ctx.createLinearGradient(0, y, 0, y + h * 0.5); sh.addColorStop(0, 'rgba(255,255,255,0.36)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.globalAlpha = 1; ctx.fillStyle = sh; ctx.fillRect(x - 4, y - 4, w + 8, h * 0.5 + 4);
       ctx.restore();
-      again();                                   // the outline goes on last, over the markings
-      ctx.strokeStyle = INK; ctx.lineWidth = 3.2; ctx.stroke();
+      again(); ctx.strokeStyle = INK; ctx.lineWidth = 2.8; ctx.stroke();
     }
-    // fur is a soft fringe behind the outline; feathers are little leaves
-    function coatFringe(at, n, skipTop) {
-      for (let i = 0; i < n; i++) {
-        const p = at(i / n); if (skipTop && p[3] > 0.3 && Math.abs(p[2]) < 0.75) continue;
-        if (f.coat === 2) { const ln = 7 + (i % 3) * 2.5; ctx.strokeStyle = col.dark; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(p[0] - p[2] * 3, p[1] - p[3] * 3); ctx.lineTo(p[0] + p[2] * ln, p[1] + p[3] * ln + ln * 0.4); ctx.stroke(); }
-        else if (i % 2 === 0) { const tx = -p[3], ty = p[2]; ctx.beginPath(); ctx.moveTo(p[0] - tx * 6, p[1] - ty * 6); ctx.quadraticCurveTo(p[0] + p[2] * 10 - tx * 6, p[1] + p[3] * 10 - ty * 6, p[0] + p[2] * 15, p[1] + p[3] * 15 + 5); ctx.quadraticCurveTo(p[0] + p[2] * 8 + tx * 6, p[1] + p[3] * 8 + ty * 6, p[0] + tx * 6, p[1] + ty * 6); ctx.closePath(); ink(i % 4 ? col.fin : col.frill, 1.8); }
-      }
+    // whatever the arms of a star or orb carry
+    function grow(q, x, y, a, sc, j) {
+      const Lg = 26 * q.l * sc, ex = x + Math.cos(a) * Lg, ey = y + Math.sin(a) * Lg;
+      if (q.k === 8) { const d = F._dsg(q); if (d) F._design(ctx, d, x, y, a, 40 * q.l * sc, q.w, col, 1); return; }
+      if (q.k === 5 || q.on >= 0) return;
+      if (q.k === 2 || q.k === 7) { ctx.beginPath(); ctx.moveTo(x - Math.sin(a) * 7, y + Math.cos(a) * 7); ctx.lineTo(ex + Math.cos(a) * 8, ey + Math.sin(a) * 8); ctx.lineTo(x + Math.sin(a) * 7, y - Math.cos(a) * 7); ctx.closePath(); ink(q.k === 2 ? hsl(f.hue + f.hue2, 55, 84, 1) : '#ffe9b8', 2); return; }
+      if (q.k === 1 || q.k === 6) { ctx.beginPath(); ctx.moveTo(x - Math.sin(a) * 9, y + Math.cos(a) * 9); ctx.quadraticCurveTo(x + Math.cos(a) * Lg * 1.2 - Math.sin(a) * 14, y + Math.sin(a) * Lg * 1.2 + Math.cos(a) * 14, ex + Math.cos(a) * 6, ey + Math.sin(a) * 6); ctx.quadraticCurveTo(x + Math.cos(a) * Lg * 1.2 + Math.sin(a) * 14, y + Math.sin(a) * Lg * 1.2 - Math.cos(a) * 14, x + Math.sin(a) * 9, y - Math.cos(a) * 9); ctx.closePath(); ink(q.k === 1 ? col.fin : col.frill, 2); return; }
+      const sw = Math.sin(B(2.5) + j) * 7;
+      strokeLimb(x, y, x + Math.cos(a) * Lg * 0.5 - Math.sin(a) * sw, y + Math.sin(a) * Lg * 0.5 + Math.cos(a) * sw, ex, ey, 7, col.limb);
+      if (q.k === 4) { ctx.beginPath(); ctx.arc(ex, ey, 5.5, 0, TAU); ink(col.glow, 1.8); } else if (q.k === 0) { ctx.beginPath(); ctx.arc(ex, ey, 6.5, 0, TAU); ink(col.limb, 2); }
     }
-    function tail() {
-      const s = 34 * f.ts, wag = Math.sin(t * 3) * 0.18, x0 = bodyW * 0.7, y0 = by + bodyH * 0.3;
-      ctx.save(); ctx.translate(x0, y0); ctx.rotate(-0.35 + wag); ctx.beginPath();
-      if (f.tk === 1) { ctx.moveTo(0, 0); ctx.quadraticCurveTo(s * 0.7, -s * 1.0, s * 1.3, -s * 0.6); ctx.quadraticCurveTo(s, 0, s * 1.3, s * 0.6); ctx.quadraticCurveTo(s * 0.7, s * 1.0, 0, 0); }
-      else if (f.tk === 2) { ctx.moveTo(0, 0); ctx.quadraticCurveTo(s * 0.6, -s * 0.2, s * 1.4, -s * 0.9); ctx.lineTo(s * 0.8, 0); ctx.lineTo(s * 1.4, s * 0.9); ctx.quadraticCurveTo(s * 0.6, s * 0.2, 0, 0); }
-      else if (f.tk === 3) { ctx.moveTo(0, -7); ctx.quadraticCurveTo(s * 1.2, -s * 0.2, s * 1.9, -s * 1.1); ctx.quadraticCurveTo(s * 1.3, s * 0.3, 0, 7); }
-      else { ctx.moveTo(0, -6); ctx.lineTo(s * 0.9, -6); ctx.arc(s * 1.2, 0, s * 0.42, -2.3, 2.3); ctx.lineTo(0, 6); }
-      ctx.closePath(); ink(f.tk === 4 ? col.dark : col.fin, 2.8); ctx.restore();
+    // one eye. For the kept picture only the white is painted and its place noted: the pupil is drawn live, on top.
+    function eyeAt(ex, ey, r, ring) {
+      const lid = o.sleep ? 1 : ((B(0.31) + (f.seed % 13)) % 3.7 < 0.1 ? 1 : 0);
+      const lx = o.lx === undefined ? Math.sin(B(0.7)) * 0.5 : o.lx, ly = o.ly === undefined ? 0.15 + Math.cos(B(0.9)) * 0.25 : o.ly;
+      if (o.collect) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4); o.collect.push([ex, ey, r]); return; }
+      if (lid) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(col.dark, 2.4); ctx.beginPath(); ctx.moveTo(ex - r * 0.7, ey); ctx.quadraticCurveTo(ex, ey + r * 0.6, ex + r * 0.7, ey); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); return; }
+      ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4);
+      ctx.beginPath(); ctx.arc(ex + lx * r * 0.28, ey + ly * r * 0.28, r * 0.62, 0, TAU); ctx.fillStyle = INK; ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex + lx * r * 0.28 - r * 0.22, ey + ly * r * 0.28 - r * 0.26, r * 0.26, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(ex + lx * r * 0.28 + r * 0.22, ey + ly * r * 0.28 + r * 0.2, r * 0.11, 0, TAU); ctx.fill();
     }
-    // tentacles hang below, swaying
-    function hang(q) {
-      const n = 4, L = 34 * q.l + 14;
-      for (let j = 0; j < n; j++) { const x0 = (j - (n - 1) / 2) * bodyW * 0.42, sw = Math.sin(t * 2.4 + j * 1.3) * 9; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.limb : INK; ctx.lineWidth = pass ? 7 : 12; ctx.beginPath(); ctx.moveTo(x0, base - 22); ctx.bezierCurveTo(x0 - sw, base, x0 + sw, base + L * 0.5, x0 + sw * 0.6, base + L * 0.8 - 14); ctx.stroke(); } }
-    }
-    // whatever a star's arms carry
-    function growthsAt(x, y, a, sc, j) {
-      for (let i = 0; i < R.length && i < 3; i++) {
-        const q = R[i], L = 26 * q.l * sc, ex = x + Math.cos(a) * L, ey = y + Math.sin(a) * L;
-        if (q.k === 8) { const d = F._dsg(q); if (d) F._design(ctx, d, x, y, a, 40 * q.l * sc, q.w, col, 1); continue; }
-        if (q.k === 5) continue;
-        if (q.k === 2 || q.k === 7) { ctx.beginPath(); ctx.moveTo(x - Math.sin(a) * 7, y + Math.cos(a) * 7); ctx.lineTo(ex + Math.cos(a) * 6, ey + Math.sin(a) * 6); ctx.lineTo(x + Math.sin(a) * 7, y - Math.cos(a) * 7); ctx.closePath(); ink(q.k === 2 ? '#f4f7fb' : '#ffe9b8', 2.2); continue; }
-        const sw = Math.sin(t * 2.5 + j + i) * 7;
-        for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.limb : INK; ctx.lineWidth = pass ? 8 : 13; ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + Math.cos(a) * L * 0.5 - Math.sin(a) * sw, y + Math.sin(a) * L * 0.5 + Math.cos(a) * sw, ex, ey); ctx.stroke(); }
-        if (q.k === 4) { ctx.beginPath(); ctx.arc(ex, ey, 6, 0, TAU); ink(col.glow, 2); } else if (q.k === 0) { ctx.beginPath(); ctx.arc(ex, ey, 7, 0, TAU); ink(col.limb, 2.2); }
-      }
-    }
-    // the face: eyes that look at you, a blush, a mouth of its own kind
-    function face(x, y, hr) {
-      const ne = f.en, er = clamp(hr * (0.2 + f.es * 0.42), hr * 0.2, hr * 0.44), gap = hr * 0.5;
-      const lid = o.sleep ? 1 : ((t * 0.31 + (f.seed % 13)) % 3.7 < 0.1 ? 1 : 0);
-      const lx = o.lx === undefined ? Math.sin(t * 0.7) * 0.5 : o.lx, ly = o.ly === undefined ? 0.15 + Math.cos(t * 0.9) * 0.25 : o.ly;
-      const one = function (ex, ey, r, stalk) {
-        if (stalk) { const sy2 = ey - stalk; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.body : INK; ctx.lineWidth = pass ? 6 : 11; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex, sy2); ctx.stroke(); } ey = sy2; }
-        if (lid) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(col.dark, 2.6); ctx.beginPath(); ctx.moveTo(ex - r * 0.7, ey); ctx.quadraticCurveTo(ex, ey + r * 0.6, ex + r * 0.7, ey); ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.stroke(); return; }
-        ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink('#fff', 2.8);
-        ctx.beginPath(); ctx.arc(ex + lx * r * 0.28, ey + ly * r * 0.28, r * 0.62, 0, TAU); ctx.fillStyle = INK; ctx.fill();
-        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex + lx * r * 0.28 - r * 0.22, ey + ly * r * 0.28 - r * 0.26, r * 0.26, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(ex + lx * r * 0.28 + r * 0.22, ey + ly * r * 0.28 + r * 0.2, r * 0.11, 0, TAU); ctx.fill();
-      };
-      const st = f.ek > 0.25 && !f.sym ? hr * (0.6 + f.ek * 0.5) : 0, ey0 = y - hr * 0.12 - (st ? hr * 0.55 : 0);
-      if (ne === 1) one(x, ey0 + (st ? hr * 0.55 : 0), er * 1.35, 0);
-      else if (ne >= 2) { one(x - gap, ey0 + (st ? hr * 0.55 : 0), er, st); one(x + gap, ey0 + (st ? hr * 0.55 : 0), er, st); }
-      if (ne === 3 || ne === 5) one(x, y - hr * 0.62, er * 0.42, 0);
-      if (ne >= 4) { one(x - gap * 0.62, y - hr * 0.6, er * 0.4, 0); one(x + gap * 0.62, y - hr * 0.6, er * 0.4, 0); }
-      // a blush
-      ctx.globalAlpha = 0.45; ctx.fillStyle = '#ff7fa8'; for (let sd = -1; sd <= 1; sd += 2) { ctx.beginPath(); ctx.ellipse(x + sd * hr * 0.72, y + hr * 0.3, hr * 0.17, hr * 0.11, 0, 0, TAU); ctx.fill(); } ctx.globalAlpha = 1;
-      // the mouth
-      const my = y + hr * 0.46, m = hr * (0.16 + f.ms * 0.3);
-      ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.fillStyle = INK;
-      if (f.mk === 1) { ctx.beginPath(); ctx.moveTo(x - m * 0.8, my - m * 0.3); ctx.lineTo(x, my + m * 0.9); ctx.lineTo(x + m * 0.8, my - m * 0.3); ctx.quadraticCurveTo(x, my - m * 0.7, x - m * 0.8, my - m * 0.3); ctx.closePath(); ink('#f6b34a', 2.6); }
-      else if (f.mk === 2) { ctx.beginPath(); ctx.moveTo(x - m * 1.3, my - m * 0.2); ctx.quadraticCurveTo(x, my + m * 1.3, x + m * 1.3, my - m * 0.2); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; for (let j = -1; j <= 1; j += 2) { ctx.beginPath(); ctx.moveTo(x + j * m * 0.75, my - m * 0.16); ctx.lineTo(x + j * m * 0.55, my + m * 0.45); ctx.lineTo(x + j * m * 0.35, my - m * 0.16); ctx.fill(); } }
-      else if (f.mk === 3) { ctx.beginPath(); ctx.arc(x, my, m * 0.7, 0, TAU); ink('#ff9fc4', 2.6); ctx.beginPath(); ctx.arc(x, my, m * 0.3, 0, TAU); ctx.fillStyle = INK; ctx.fill(); }
-      else { ctx.beginPath(); ctx.moveTo(x - m, my - m * 0.2); ctx.quadraticCurveTo(x, my + m * 0.8, x + m, my - m * 0.2); ctx.stroke(); if (f.mk === 4) { ctx.lineWidth = 1.8; for (let sd = -1; sd <= 1; sd += 2) for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(x + sd * m * 1.2, my); ctx.lineTo(x + sd * (m * 1.2 + hr * 0.5), my + j * hr * 0.14); ctx.stroke(); } } }
-      if (f.venom > 0.3) { ctx.beginPath(); ctx.ellipse(x + m * 0.9, my + m * 0.9, 3, 5, 0, 0, TAU); ink('#b6ff3c', 1.6); }
+    // the face. side 0: it looks straight at you. side 1: its head points to the right; you see the eye on this side
+    function face(x, y, hr, side, isStar) {
+      const ne = f.en, er = clamp(hr * (0.24 + f.es * 0.44), 7, hr * 0.5), gap = hr * 0.5;
+      const st = f.ek > 0.25 && !isStar && !side ? hr * (0.5 + f.ek * 0.5) : 0, cx = x + (side ? hr * 0.22 : 0), ey0 = y - hr * 0.14;
+      const stalk = function (ex, ey) { if (!st) return ey; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.body : INK; ctx.lineWidth = pass ? 6 : 10; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex, ey - st); ctx.stroke(); } return ey - st; };
+      if (side) { if (ne >= 1) eyeAt(cx, ey0, er * 1.15, false); if (ne >= 3) eyeAt(cx - hr * 0.5, ey0 - hr * 0.35, er * 0.45, false); }
+      else if (ne === 1) eyeAt(cx, ey0, er * 1.3, false);
+      else if (ne >= 2) { eyeAt(cx - gap, stalk(cx - gap, ey0), er, false); eyeAt(cx + gap, stalk(cx + gap, ey0), er, false); if (ne === 3) eyeAt(cx, y - hr * 0.64, er * 0.42, false); }
+      ctx.globalAlpha = 0.4; ctx.fillStyle = '#ff7fa8'; for (let sd = (side ? 1 : -1); sd <= 1; sd += 2) { ctx.beginPath(); ctx.ellipse(cx + sd * hr * (side ? 0.05 : 0.72), y + hr * 0.4, hr * 0.17, hr * 0.11, 0, 0, TAU); ctx.fill(); } ctx.globalAlpha = 1;
+      const mx = cx + (side ? hr * 0.5 : 0), my = y + hr * (side ? 0.42 : 0.5), m = hr * (0.16 + f.ms * 0.3);
+      ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.fillStyle = INK;
+      if (f.mk === 1) { ctx.beginPath(); if (side) { ctx.moveTo(mx - m * 0.2, my - m * 0.8); ctx.lineTo(mx + m * 1.9, my - m * 0.1); ctx.lineTo(mx - m * 0.2, my + m * 0.6); } else { ctx.moveTo(mx - m * 0.8, my - m * 0.3); ctx.lineTo(mx, my + m * 0.9); ctx.lineTo(mx + m * 0.8, my - m * 0.3); ctx.quadraticCurveTo(mx, my - m * 0.7, mx - m * 0.8, my - m * 0.3); } ctx.closePath(); ink('#f6b34a', 2.2); }
+      else if (f.mk === 2) { ctx.beginPath(); if (side) { ctx.moveTo(mx - m * 1.6, my - m * 0.1); ctx.quadraticCurveTo(mx - m * 0.2, my + m * 1.1, mx + m * 1.1, my - m * 0.3); } else { ctx.moveTo(mx - m * 1.3, my - m * 0.2); ctx.quadraticCurveTo(mx, my + m * 1.3, mx + m * 1.3, my - m * 0.2); } ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; for (let j = -1; j <= 1; j += 2) { const tx = mx + j * m * (side ? 0.45 : 0.6) - (side ? m * 0.25 : 0); ctx.beginPath(); ctx.moveTo(tx - m * 0.2, my - m * 0.12); ctx.lineTo(tx, my + m * 0.45); ctx.lineTo(tx + m * 0.2, my - m * 0.12); ctx.fill(); } }
+      else if (f.mk === 3) { ctx.beginPath(); ctx.arc(mx, my, m * 0.7, 0, TAU); ink('#ff9fc4', 2.2); ctx.beginPath(); ctx.arc(mx, my, m * 0.3, 0, TAU); ctx.fillStyle = INK; ctx.fill(); }
+      else { ctx.beginPath(); ctx.moveTo(mx - m, my - m * 0.2); ctx.quadraticCurveTo(mx, my + m * 0.8, mx + m, my - m * 0.2); ctx.stroke(); if (f.mk === 4) { ctx.lineWidth = 1.6; for (let sd = (side ? 1 : -1); sd <= 1; sd += 2) for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(mx + sd * m * 1.2, my); ctx.lineTo(mx + sd * (m * 1.2 + hr * 0.6), my + j * hr * 0.16); ctx.stroke(); } } }
     }
   };
+
+  // ── the character, kept as a short loop of moving frames: so a whole pond of them moves, every part, and stays cheap ──
+  const PW = 170, PT = 190, PB = 160, PPX = 0.46, K = 6;        // the box a character is drawn in, pixels per unit, and frames in its loop
+  const kept = {}; let keptN = 0, madeAt = -1, made = 0;
+  function frame(f, i) {
+    const cv = document.createElement('canvas'); cv.width = Math.ceil(PW * 2 * PPX); cv.height = Math.ceil((PT + PB) * PPX);
+    const ctx = cv.getContext('2d'), eyes = [];
+    ctx.scale(PPX, PPX); ctx.translate(PW, PT);
+    F.portrait(ctx, f, i / K * TAU, { collect: eyes, loop: true });
+    return { cv: cv, eyes: eyes };
+  }
+  F.pSprite = function (f) {
+    const key = F.key(f);
+    let s = kept[key];
+    if (s) { s.used = G.rt || 0; return s; }
+    if (keptN > 150) { const now = G.rt || 0; for (const k in kept) if (now - kept[k].used > 3) { delete kept[k]; keptN--; } if (keptN > 230) { for (const k in kept) delete kept[k]; keptN = 0; } }
+    s = kept[key] = { fr: [frame(f, 0)], ink: '', dark: '', build: F.build(f), used: G.rt || 0 }; keptN++;
+    s.ink = F._ink(); s.dark = F._colours(f).dark;
+    return s;
+  };
+  /** the kept character at the origin at this point of its loop (phase 0..1), then its eyes, alive. mood: { lx, ly, lid 0..1, wide } */
+  F.pDraw = function (ctx, f, mood, phase) {
+    const s = F.pSprite(f);
+    let i = Math.floor((((phase || 0) % 1) + 1) % 1 * K) % K;
+    if (!s.fr[i]) {
+      // a few new frames a tick at most, so a pond full of newborns never stalls; until its frame exists, the nearest one is shown
+      if (madeAt !== G.rt) { madeAt = G.rt; made = 0; }
+      if (made < 3) { made++; s.fr[i] = frame(f, i); } else { let j = i; while (j > 0 && !s.fr[j]) j--; i = j; }
+    }
+    const fr = s.fr[i];
+    ctx.drawImage(fr.cv, -PW, -PT, PW * 2, PT + PB);
+    const lx = mood.lx || 0, ly = mood.ly || 0, pup = mood.wide ? 0.42 : 0.62;
+    for (let q = 0; q < fr.eyes.length; q++) {
+      const e = fr.eyes[q], r = e[2];
+      if (mood.lid >= 1) { ctx.beginPath(); ctx.arc(e[0], e[1], r, 0, TAU); ctx.fillStyle = s.dark; ctx.fill(); ctx.strokeStyle = s.ink; ctx.lineWidth = 2.4; ctx.stroke(); ctx.beginPath(); ctx.moveTo(e[0] - r * 0.7, e[1]); ctx.quadraticCurveTo(e[0], e[1] + r * 0.6, e[0] + r * 0.7, e[1]); ctx.stroke(); continue; }
+      ctx.beginPath(); ctx.arc(e[0] + lx * r * 0.28, e[1] + ly * r * 0.28, r * pup, 0, TAU); ctx.fillStyle = s.ink; ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(e[0] + lx * r * 0.28 - r * 0.22, e[1] + ly * r * 0.28 - r * 0.26, r * 0.24, 0, TAU); ctx.fill();
+      if (mood.lid > 0) { ctx.save(); ctx.beginPath(); ctx.arc(e[0], e[1], r * 1.02, 0, TAU); ctx.clip(); ctx.fillStyle = s.dark; ctx.fillRect(e[0] - r * 1.1, e[1] - r * 1.1, r * 2.2, r * 2.2 * mood.lid * 0.75); ctx.restore(); }      // heavy lids: tired, or sick
+    }
+    return s;
+  };
+  const old = F.clearCache; F.clearCache = function () { if (old) old(); for (const k in kept) delete kept[k]; keptN = 0; };
 })();
 
 </script>
@@ -1777,7 +2023,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       nextSp: 1,
       ticks: 0,
       ages: [], ageCand: null, kinds: [], fashion: null, fashionGen: 0, hue0: 0,
-      organs: [], nextOrgan: 1, designs: [], nextDesign: 1, shelf: [], evShelf: [], history: [], deepAcc: 0, mods: [], events: [], story: [],
+      organs: [], nextOrgan: 1, designs: [], nextDesign: 1, plans: [], nextPlan: 1, shelf: [], evShelf: [], history: [], deepAcc: 0, mods: [], events: [], story: [],
     };
     G.seed(W.seed);
     W.hue0 = G.rand() * 360;                 // every pond's first life has its own colour
@@ -2003,13 +2249,13 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         const lit = G.lightAt(z.x, z.y) - (z.p.light > 0.3 ? z.p.light * W.set.light * 0.6 : 0);
         const likes = z.p.light < -0.3 ? 0.9 - lit : lit - 0.5;
         const tmp = Math.abs(W.set.temp + [0.05, 0.22, -0.08, -0.62][W.season]);
-        z.health = clamp(z.health + (z.alive * likes * 0.03 - Math.max(0, tmp - 0.55) * 0.02) * dt, 0, 2);
-        if (z.p.eats > 0.2) z.health -= 0.004 * dt;      // hunger: a hunter must keep eating
+        if (G.isBad(z)) z.health = Math.min(z.health + 0.006 * dt, 1.3);      // it mends: a few with the answer only scratch it, a pond full of them brings it down
+        else z.health = clamp(z.health + (z.alive * likes * 0.03 - Math.max(0, tmp - 0.55) * 0.02) * dt, 0, 2);
         z.life = z.health > 0.02 ? Math.max(z.life, 30) : 0;
         let eaters = 0; for (let q = 0; q < W.zones.length; q++) if (W.zones[q].p.eats > 0.2 || W.zones[q].p.deadly > 0.2) eaters++;
         const canBud = z.p.eats > 0.2 || z.p.deadly > 0.2 ? eaters < 2 && W.cre.length > 60 : true;
         if (canBud && z.health > 1.5 && z.age > 20 && W.zones.length < 11 && G.rand() < (z.p.eats > 0.2 ? 0.012 : 0.05) * dt) budZone(z);
-      } else if (!(z.p.vault > 0.2)) z.life -= dt;
+      } else if (!(z.p.vault > 0.2) && !G.isBad(z)) z.life -= dt;
       const fade = clamp(z.life / 18, 0, 1), grow = clamp(z.age / 3, 0.2, 1);
       z.k = fade * grow * (living ? clamp(0.35 + z.health * 0.65, 0.3, 1) : 1);
       z.r = z.r0 * (0.55 + 0.45 * grow) * (0.7 + 0.3 * fade) * (1 + (z.p.spread || 0) * clamp(z.age / 40, 0, 1) * 0.5) * (living ? 0.55 + 0.35 * z.health : 1);
@@ -2246,8 +2492,10 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       let cost = ph.upkeep * (c.asleep ? 0.6 : 1) + (o2short > 0 ? 0.22 * o2short * r10 : 0) + thrust * (sprint ? 1.6 : 0.30) * r10 * (1 - 0.2 * ph.flag) + (ph.lamp > 0 ? out[3] * 0.10 * ph.lamp : 0) + (out[4] > 0.5 ? 0.03 : 0);
       // temperature, zones
       const tmp = G.tempAt(c.x, c.y);
-      if (tmp > 0.35) cost += 3.2 * Math.max(0, tmp - 0.35 - ph.res[0] * 0.7);
-      else if (tmp < -0.35) cost += 2.6 * Math.max(0, -tmp - 0.35 - ph.res[1] * 0.7);
+      c.hot = 0; c.chill = 0; c.pois = 0;
+      if (c.startle > 0) c.startle -= dt;
+      if (tmp > 0.35) { c.hot = Math.max(0, tmp - 0.35 - ph.res[0] * 0.7); cost += 3.2 * c.hot; }
+      else if (tmp < -0.35) { c.chill = Math.max(0, -tmp - 0.35 - ph.res[1] * 0.7); cost += 2.6 * c.chill; }
       let zoneHit = 0;
       c.inZone = 0;
       for (let i = 0; i < W.zones.length; i++) {
@@ -2263,11 +2511,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
           // a bad thing can be worn down by creatures that carry what it is weak to, and they feed on it
           if (p.poison + p.acid + p.eats + p.deadly > 0.25 || p.vault > 0.2) {
             const pow = G.weakPower(c, z.weak);
-            if (pow > 0.08) { const dmg = pow * 0.012 * dt; z.hit += dmg; z.struck = 1; c.strike = 0.5; z._atk = (z._atk | 0) + 1; c.zk = 3; c.zid = z.id; c.zt = W.t; if (z.alive > 0.25) z.health -= dmg; else z.life -= dmg * (p.vault > 0.2 ? 5 : 55); c.E = Math.min(ph.Emax, c.E + dmg * 260); c.intake += dmg * 260; c.P += dmg * 200; }
+            if (pow > 0.08) { const dmg = pow * 0.005 * dt; z.hit += dmg; z.struck = 1; c.strike = 0.5; z._atk = (z._atk | 0) + 1; c.zk = 3; c.zid = z.id; c.zt = W.t; if (z.alive > 0.25) z.health -= dmg; else z.life -= dmg * (p.vault > 0.2 ? 5 : 55); c.E = Math.min(ph.Emax, c.E + dmg * 260); c.intake += dmg * 260; c.P += dmg * 200; }
           }
         }
         if (p.deadly > 0.05 && d2 < z.r * z.r * 0.3 && !(z.full > 0) && cre.length > 20 && G.weakPower(c, z.weak) < 0.45) {
-          if (G.rand() < p.deadly * (1 - 0.9 * g.c[9 + z.sig]) * (1 - ph.defense * 0.4)) {
+          if (G.rand() < p.deadly * (1 - 0.9 * G.tolOf(g, z)) * (1 - ph.defense * 0.4)) {
             z.full = 0.35; z.bite = 1; z.ate++; z.struckDead = 1;
             if (!z.deaths) G.zoneEvent && G.zoneEvent(z, 'It killed its first creature with a touch');
             z.deaths++;
@@ -2277,16 +2525,16 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
           }
           c.flash = 1;       // it was touched and lived: that is tolerance at work
         }
-        if (p.eats > 0.05 && d2 < z.r * z.r * 0.36) if (!(z.full > 0)) { const f = p.eats * z.k * 6 * (1 - ph.defense * 0.6) * (1 - 0.85 * g.c[9 + z.sig]); cost += f; zoneHit = Math.max(zoneHit, f); z.hurt += f * dt; if (f > 0.12) { z._hurt = (z._hurt | 0) + 1; c.zk = 1; c.zid = z.id; c.zt = W.t; } z.bite = 1; }
-        if (p.poison > 0.05 && d2 < z.r * z.r) { const f = p.poison * z.k * 4.5 * (1 - ph.res[2] * 0.8) * (1 - 0.85 * g.c[9 + z.sig]); cost += f; zoneHit = Math.max(zoneHit, f); z.hurt += f * dt; if (f > 0.12) { z._hurt = (z._hurt | 0) + 1; c.zk = 1; c.zid = z.id; c.zt = W.t; } }
-        if (p.acid > 0.05 && d2 < z.r * z.r) { const f = p.acid * z.k * 4 * (1 - ph.defense * 0.7) * (1 - 0.85 * g.c[9 + z.sig]); cost += f; zoneHit = Math.max(zoneHit, f); z.hurt += f * dt; if (f > 0.12) { z._hurt = (z._hurt | 0) + 1; c.zk = 1; c.zid = z.id; c.zt = W.t; } }
+        if (p.eats > 0.05 && d2 < z.r * z.r * 0.36) if (!(z.full > 0)) { const f = p.eats * z.k * 6 * (1 - ph.defense * 0.6) * (1 - 0.85 * G.tolOf(g, z)); cost += f; zoneHit = Math.max(zoneHit, f); z.hurt += f * dt; if (f > 0.12) { z._hurt = (z._hurt | 0) + 1; c.zk = 1; c.zid = z.id; c.zt = W.t; } z.bite = 1; }
+        if (p.poison > 0.05 && d2 < z.r * z.r) { const f = p.poison * z.k * 4.5 * (1 - ph.res[2] * 0.8) * (1 - 0.85 * G.tolOf(g, z)); cost += f; c.pois = f; zoneHit = Math.max(zoneHit, f); z.hurt += f * dt; if (f > 0.12) { z._hurt = (z._hurt | 0) + 1; c.zk = 1; c.zid = z.id; c.zt = W.t; } }
+        if (p.acid > 0.05 && d2 < z.r * z.r) { const f = p.acid * z.k * 4 * (1 - ph.defense * 0.7) * (1 - 0.85 * G.tolOf(g, z)); cost += f; zoneHit = Math.max(zoneHit, f); z.hurt += f * dt; if (f > 0.12) { z._hurt = (z._hurt | 0) + 1; c.zk = 1; c.zid = z.id; c.zt = W.t; } }
         if (p.hard > 0.3 && !(p.vault > 0.2 && G.weakPower(c, z.weak) > 0.45)) {
           const rr = z.r * 0.8 + ph.r;
           if (d2 < rr * rr) { const d = Math.sqrt(d2) + 0.01; c.x = z.x + dx / d * rr; c.y = z.y + dy / d * rr; c.vx *= 0.5; c.vy *= 0.5; }
         }
       }
       if (c.dead) continue;
-      if (W.mods.length) { const gp = G.modSum('poison'); if (gp > 0.02) { const f = gp * 2.6 * (1 - ph.res[2] * 0.9); cost += f; zoneHit = Math.max(zoneHit, f); } }
+      if (W.mods.length) { const gp = G.modSum('poison'); if (gp > 0.02) { const f = gp * 2.6 * (1 - ph.res[2] * 0.9); cost += f; c.pois = Math.max(c.pois, f); zoneHit = Math.max(zoneHit, f); } }
       c.zoneHit = zoneHit;
       c.E -= cost * dt;
       // feeding on light: best alone in a bright place (neighbours shade each other)
@@ -2538,7 +2786,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 
   /** how attractive a creature is: its own body's charm, and what the judge made of its kind */
   /** the look of a creature, as a hunter or a mate would tell it apart: its kind of body, its coat and its colour */
-  G.shapeOf = function (g) { const f = g.f, set = {}; for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on < 0) set[q.k === 8 ? 'd' + q.t : q.k] = 1; } return (f.sym ? 'star' : f.n >= 6 ? 'long' : f.n >= 3 ? 'mid' : 'short') + ':' + Object.keys(set).sort().join(',') + ':' + f.coat; };
+  G.shapeOf = function (g) { const f = g.f, set = {}; for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on < 0) set[q.k === 8 ? 'd' + q.t : q.k] = 1; } return (f.sym ? 'star' : f.pl ? 'b' + f.pl : f.n >= 6 ? 'long' : f.n >= 3 ? 'mid' : 'short') + ':' + Object.keys(set).sort().join(',') + ':' + f.coat; };
   G.hueOf = function (g) { return Math.floor((((g.f.hue % 360) + 360) % 360) / 60); };      // one of six broad colours
   G.lookOf = function (c) { return G.shapeOf(c.g) + '|' + G.hueOf(c.g); };
   G.charmOf = function (c) {
@@ -2604,10 +2852,13 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (G.measurePressures) G.measurePressures();
     if (G.organTick) G.organTick(W.gen);
     if (G.designTick) G.designTick(W.gen);
+    if (G.planTick) G.planTick(W.gen);
     if (G.storyTick) G.storyTick(W.gen);
     if (G.eraTick) G.eraTick(W.gen);
     if (G.fashionTick) G.fashionTick(W.gen);
+    if (G.natureTick) G.natureTick(W.gen);
     if (G.judgeTick) G.judgeTick(W.gen);
+    if (G.paintTick) G.paintTick(W.gen);
     W.hist[W.hist.length - 1].species = W.species.filter(function (s) { return !s.extinct; }).length;
     G.emit('scored', W.hist[W.hist.length - 1]);
   }
@@ -2701,6 +2952,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       for (let j = 0; j < f.rules.length; j++) { const k = f.rules[j].k; if (k === 8) { const dk = 'dsg' + f.rules[j].t; if (!seen[dk]) { seen[dk] = 1; inc(dk); } continue; } if (!seen['r' + k]) { seen['r' + k] = 1; inc('grow' + k); } }
       if (f.en >= 1) inc('eye'); if (f.en >= 3) inc('eyes3'); if (f.mk) inc('mouth' + f.mk); if (f.tk && f.n > 1 && !f.sym) inc('tail');
       if (f.n >= 2) inc('seg2'); if (f.n >= 5) inc('seg5'); if (f.n >= 8) inc('seg8'); if (f.n >= 11) inc('seg11');
+      if (f.pl && !f.sym && f.n >= 2) inc('plan' + f.pl);
       if (f.coat) inc('coat' + f.coat); if (f.nk > 0.35 && f.n > 1 && !f.sym) inc('neck'); if (f.hd > 1.45) inc('bighead'); if (f.rules.some(function (q) { return q.on >= 0; })) inc('nested'); if (f.sym) inc('star');
       if (f.shell > 0.25) inc('shell'); if (f.crest > 0.25) inc('crest'); if (f.glow > 0.3) inc('glow'); if (f.venom > 0.3) inc('venom'); if (f.pat) inc('pattern');
       if (ph.lungs) inc('walker'); if (ph.hands) inc('hands'); if (ph.jaws) inc('biter');
@@ -2726,6 +2978,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       if (W.disc[k]) continue;
       const why = G.why ? G.why(k) : '';
       if (DISC[k]) G.discover(k, DISC[k] + (why ? ' ' + why : ''));
+      else if (k.indexOf('plan') === 0 && G.planOf) { const p = G.planOf(+k.slice(4)); if (p) G.discover(k, 'A whole new build took hold: the ' + p.name + '! ' + p.note + (why ? ' ' + why : '')); }
       else if (k.indexOf('dsg') === 0 && G.designOf) { const d = G.designOf(+k.slice(3)); if (d) G.discover(k, 'A new kind of body part took hold: the ' + d.name + '! ' + d.note + (why ? ' ' + why : '')); }
       else if (k.indexOf('organ') === 0 && G.organOf) { const o = G.organOf(+k.slice(5)); if (o) G.discover(k, 'A new organ took hold: ' + o.name + '! ' + o.note + (why ? ' ' + why : '')); }
     }
@@ -2753,10 +3006,17 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     return { eaten: z.made ? Math.min(1, z.fed / z.made) : 0, can: cre.length ? n / cre.length : 0 };
   };
   /** how far the living creatures have evolved tolerance to this thing (0..1) */
+  /** how well a creature lives beside a thing (0..1). A living, hunting thing overlooks what is its own colour; the rest is the old slow hardening. */
+  G.tolOf = function (g, z) {
+    const gene = g.c[9 + z.sig] || 0;
+    if (!(z.alive > 0.25 || z.p.eats > 0.05 || z.p.deadly > 0.05)) return gene;
+    let d = Math.abs(g.f.hue - z.hue) % 360; if (d > 180) d = 360 - d;
+    return Math.min(1, 0.3 * gene + 0.8 * Math.max(0, 1 - d / 42));
+  };
   G.adaptedTo = function (z) {
     const cre = G.W.cre; if (!cre.length) return 0;
     let s = 0;
-    for (let i = 0; i < cre.length; i++) s += cre[i].g.c[9 + z.sig] || 0;
+    for (let i = 0; i < cre.length; i++) s += G.tolOf(cre[i].g, z);
     return s / cre.length;
   };
 
@@ -2781,6 +3041,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     z.ev.push({ g: W.gen, t: info.from ? 'Budded from ' + info.from : 'Dropped into the pond' });
     W.zones.push(z);
     if (W.zones.length > 14) W.zones.shift();
+    for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i], dx = c.x - x, dy = c.y - y, d = Math.sqrt(dx * dx + dy * dy) + 0.01; if (d < 300) { c.startle = 1.6; c.vx += dx / d * 70; c.vy += dy / d * 70; } }
     G.emit('zone', z);
     return z;
   };
@@ -3225,6 +3486,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       if (task === 'event') return Promise.resolve(G.offlineEvent(input));
       if (task === 'story') return Promise.resolve(G.offlineStory(input));
       if (task === 'design') return Promise.resolve(G.offlineDesign());
+      if (task === 'plan') return Promise.resolve(G.offlinePlan());
       if (task === 'judge') return Promise.resolve(null);      // without a server the pond goes by its own taste
       return Promise.reject(new Error('unknown task ' + task));
     },
@@ -3235,6 +3497,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         if (task === 'mutation-ideas') return G.host.call('ai.ideas', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('ideas', r.source, r.usd); return r.ideas; });
         if (task === 'event') return G.host.call('ai.event', { text: input, model: G.ai.model || undefined }, 45000).then(function (r) { G.ai.tally('event', r.source, r.usd); return r.event; });
         if (task === 'story') return G.host.call('ai.story', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('story', r.source, r.usd); return r.story; });
+        if (task === 'plan') return G.host.call('ai.plan', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('plan', r.source, r.usd); return r.plan; });
         if (task === 'design') return G.host.call('ai.design', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('design', r.source, r.usd); return r.design; });
         if (task === 'judge') return G.host.call('ai.judge', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('judge', r.source, r.usd); return r.judge; });
         if (task === 'organ') return G.host.call('ai.organ', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('organ', r.source, r.usd); return r.organ; });
@@ -3247,13 +3510,14 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   };
   G.ai = {
     provider: 'offline',
+    drawn: true,         // creatures are drawn by the game, every part moving (the AI-painting path exists but is off)
     cache: {},
     models: [],          // what the server offers: [{ id, label }]
     model: '',           // the player's choice ('' = the server's default)
     // automatic calls (organs, the story, mutation ideas) are limited by wall-clock time and a session budget,
     // so the cost is the same whether the pond runs at 1x or 64x, for a minute or a day
-    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 60000, design: 50000 },
-    caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 24, design: 16 },
+    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 60000, design: 50000, paint: 22000, plan: 60000 },
+    caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 24, design: 16, paint: 16, plan: 12 },
     used: {}, lastAt: {},
     // what this session has asked the server for: { kind: { asked, fresh } }. "fresh" = a model really ran;
     // the rest came from the server's library of earlier decisions and cost nothing.
@@ -3264,7 +3528,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     // every answer that came from a server is written down: what it was for, whether a model really ran, and what it cost
     ledger: [],          // this session, newest last: { at, kind, paid, usd }
     life: {},            // this pond since it began (kept in its save): { kind: { asked, fresh, usd } }
-    LABEL: { thing: 'Things you typed', event: 'World events you typed', organ: 'New organs', story: 'Story chapters', ideas: 'Mutation ideas', judge: 'The judge of looks', design: 'New kinds of body part', sound: 'Sounds (Leonardo)' },
+    LABEL: { thing: 'Things you typed', event: 'World events you typed', organ: 'New organs', story: 'Story chapters', ideas: 'Mutation ideas', judge: 'The judge of looks', design: 'New kinds of body part', plan: 'New builds (whole body plans)', paint: 'Painted creatures (Leonardo)', sound: 'Sounds (Leonardo)' },
     tally: function (kind, source, usd) {
       const c = G.ai.count[kind] || (G.ai.count[kind] = { asked: 0, fresh: 0, usd: 0 });
       c.asked++;
@@ -3371,7 +3635,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     }
     const p = props || {};
     return G.form.fix({ sym: look.sym, n: n, len: 1, prof: [0.9 * look.plump, 1.2 * look.plump, 1.1 * look.plump, 0.85 * look.plump, 0.5], bend: 0, rules: rules, en: look.eyes, es: 0.48, ek: 0, mk: look.mouth, ms: 0.4, tk: look.tail, ts: 0.9,
-      hue: hue, hue2: look.hue2 >= 0 ? ((look.hue2 - hue + 540) % 360) - 180 : 150, sat: 74, lit: 62, pat: look.pat, psc: 0.5, crest: 0, shell: (p.hard || 0) > 0.4 ? 0.8 : 0, glow: look.glow ? 1 : 0, venom: (p.poison || 0) > 0.3 ? 1 : 0, hd: look.big ? 1.5 : 1.1, nk: 0.2, coat: look.coat, seed: (seed | 0) || 7 });
+      hue: hue, hue2: look.hue2 >= 0 ? ((look.hue2 - hue + 540) % 360) - 180 : 150, sat: 74, lit: 62, pat: look.pat, psc: 0.5, crest: 0, shell: (p.hard || 0) > 0.4 ? 0.8 : 0, glow: look.glow ? 1 : 0, venom: (p.poison || 0) > 0.3 ? 1 : 0, hd: look.big ? 1.5 : 1.1, nk: 0.2, hx: 1, hq: 2, pl: 0, coat: look.coat, seed: (seed | 0) || 7 });
   };
   /** the form of a thing in the pond, if it is a being (worked out once) */
   G.zoneForm = function (z) {
@@ -3425,6 +3689,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (HAS[key]) return HAS[key];
     if (key.indexOf('grow') === 0) { const k = +key.slice(4); return function (c) { return c.g.f.rules.some(function (q) { return q.k === k; }); }; }
     if (key.indexOf('mouth') === 0) { const k = +key.slice(5); return function (c) { return c.g.f.mk === k; }; }
+    if (key.indexOf('plan') === 0) { const id = +key.slice(4); return function (c) { return c.g.f.pl === id && !c.g.f.sym; }; }
     if (key.indexOf('dsg') === 0) { const id = +key.slice(3); return function (c) { return c.g.f.rules.some(function (q) { return q.k === 8 && q.t === id; }); }; }
     if (key.indexOf('organ') === 0) { const id = +key.slice(5); return function (c) { return c.g.p.some(function (p) { return p.k === id; }); }; }
     return null;
@@ -3541,6 +3806,14 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     }
     if (W.lastStats && W.lastStats.protShort > W.cre.length * 0.3) { P.c[0] += 1.5; P.part[0] += 1; P.list.push('protein is short: elaborate bodies cannot build children on algae alone (scraps and meat are rich)'); }
     if (W.cre.length && W.food.length < 40) { fx('eat', 1.5); fx('sense', 1.5); P.part[4] += 1; P.list.push('food is scarce'); }
+    // the visible answers: a coat, a build, eyes, a colour
+    const B = P.body = { coat: -1, plump: 0, eyes: 0, hue: -1 };
+    if (temp < -0.25) { B.coat = 2; B.plump = 1; } else if (temp > 0.25) { B.coat = 0; B.plump = -1; }
+    if (W.mods.length && G.modSum('poison') > 0.1 && B.coat < 0) B.coat = 1;
+    if (light < 0.7) B.eyes = 1;
+    let worst = null, wv = 0;
+    for (let i = 0; i < W.zones.length; i++) { const z = W.zones[i], p = z.p, harm = (p.eats || 0) + (p.deadly || 0) * 1.5 + (z.alive > 0.25 ? p.poison * 0.5 : 0); if (harm > wv && (z.alive > 0.25 || p.eats > 0.05 || p.deadly > 0.05)) { wv = harm; worst = z; } if (p.poison > 0.3 && B.coat < 0) B.coat = 1; if (p.heat > 0.4 && B.coat < 0) { B.coat = 0; B.plump = -1; } if (p.heat < -0.4 && B.coat < 0) { B.coat = 2; B.plump = 1; } if (p.light < -0.3) B.eyes = 1; }
+    if (worst && wv > 0.2) { B.hue = worst.hue; B.like = worst.word; P.list.push('looking like ' + worst.word + ' is the way to be overlooked by it'); }
     W.press = P;
     return P;
   };
@@ -3727,11 +4000,32 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       if (!k) { k = JSON.parse(JSON.stringify(d)); k.id = 100000 + G.keptDesigns.reduce(function (m, x) { return Math.max(m, x.id - 99999); }, 0); G.keptDesigns.push(k); }
       q.t = k.id;
     }
+    if (g.f.pl && g.f.pl < 100000) {         // and the build it follows
+      const p = G.planOf(g.f.pl);
+      if (!p) g.f.pl = 0;
+      else { const sig = p.name + JSON.stringify(p.spine); let k = G.keptPlans.filter(function (x) { return x.name + JSON.stringify(x.spine) === sig; })[0]; if (!k) { k = JSON.parse(JSON.stringify(p)); k.id = 100000 + G.keptPlans.reduce(function (m, x) { return Math.max(m, x.id - 99999); }, 0); G.keptPlans.push(k); if (G.keptPlans.length > 16) G.keptPlans.shift(); } g.f.pl = k.id; }
+    }
     G.form.fix(g.f);
     const item = { name: (sp ? sp.name : 'Creature') + ' #' + c.id, kind: G.form.kind(g.f).full, age: G.ageNow ? G.ageNow().name : '', gen: G.W.gen, g: G.packGenome(g) };
     G.collection.push(item); if (G.collection.length > MAXKEEP) G.collection.shift();
     G.emit('kept', item);
     return item;
+  };
+  /** breed a kept creature with one living in this pond: six children of the two, born beside the one in the pond */
+  G.breedKept = function (item, c) {
+    const W = G.W, g0 = G.unpackGenome(item.g);
+    if (!g0 || !W || !c || c.dead) return 0;
+    for (let i = 0; i < g0.f.rules.length; i++) { const q = g0.f.rules[i]; if (q.k === 8 && q.t >= 100000 && !W.designs.some(function (x) { return x.id === q.t; })) { const d = G.designOf(q.t); if (d && W.designs.length < 12) W.designs.push(JSON.parse(JSON.stringify(d))); } }
+    let n = 0;
+    for (let i = 0; i < 6; i++) {
+      const res = G.mutate(i % 2 ? G.crossover(g0, c.g) : G.crossover(c.g, g0), 0.5, null);
+      const kid = G.makeCreature(res.g, c, null, res.muts);
+      kid.sp = c.sp; kid.E = kid.ph.Emax * 0.6; kid.P = kid.ph.Emax * 0.4;
+      W.births.push({ at: W.st + 0.1 + G.rand() * 1.2, c: kid, x: c.x + G.randn() * 50, y: c.y + G.randn() * 40, from: c }); n++;
+    }
+    W.discLog.push({ key: 'bred' + W.gen + c.id, text: 'You bred ' + item.name + ' with a creature of this pond: six children of the two were born.', gen: W.gen });
+    G.emit('bred', item, c);
+    return n;
   };
   /** set a kept creature free in this pond: a small family of it, each a little different, to breed with what lives here */
   G.release = function (item) {
@@ -3856,6 +4150,118 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       have: W.designs.map(function (d) { return d.name; }).concat(['leg', 'fin', 'spike', 'tentacle', 'feeler', 'armour plate', 'frill', 'horn']),
     };
     G.ai.ask('design', info).then(function (d) { busy = false; if (G.W !== W) return; if (!d || !G.addDesign(d)) { const o = G.offlineDesign(); if (o) G.addDesign(o); } }, function () { busy = false; });
+  };
+})();
+
+</script>
+<script data-part="plans">
+// ── New builds, invented for this pond ──
+// A build is how a body is carried: where its spine runs (a frog crouches, a seahorse stands curled, a scorpion arches its
+// tail over its back) and how its legs are set. It is the one thing the genes could not reach by themselves, so the pond is
+// given builds the way it is given new kinds of part: by the AI when there is a server, from its own stock when there is not.
+// A build is then a gene like any other: a mutation may switch a body to it; the silhouette, head, growths, coat and
+// colours stay the body's own; what the build gives and costs is measured; selection decides whether it stays.
+//
+// A build:  spine  3..7 points [x, y] from head to tail. x: forward is positive. y: height above the floor. The body's length
+//                  is laid along this line.
+//           legs   up to 4, each { u (0 at the shoulders .. 1 at the hips), knee [dx, dy], foot [dx, dy], thick, air }:
+//                  knee from the hip, foot from the knee, in leg lengths, y up. `air`: it does not reach the floor (an arm).
+//           stands does it stand on the floor (true) or float in the water (false)
+//           girth  how thick the body is for its length (0.6 slender .. 1.5 stout)
+//           fx     what it gives and costs: speed, agility, reach, senses, armour, attack
+(function () {
+  'use strict';
+  const clamp = G.clamp;
+  const ABIL = ['speed', 'agility', 'reach', 'senses', 'armour', 'attack'];
+  const MAX = 3;          // few at a time, so the pond's own bodies keep their share; a build nobody follows makes room for the next
+  G.keptPlans = [];          // builds that came along with kept creatures (ids from 100000 up)
+
+  G.planOf = function (id) {
+    const L = G.W ? G.W.plans : null;
+    if (L) for (let i = 0; i < L.length; i++) if (L[i].id === id) return L[i];
+    for (let i = 0; i < G.keptPlans.length; i++) if (G.keptPlans[i].id === id) return G.keptPlans[i];
+    return null;
+  };
+
+  G.cleanPlan = function (raw) {
+    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.spine)) return null;
+    const n = function (v, a, b, d) { v = +v; return isFinite(v) ? clamp(v, a, b) : d; };
+    const spine = [];
+    for (let i = 0; i < raw.spine.length && spine.length < 8; i++) { const p = raw.spine[i]; if (Array.isArray(p) && isFinite(+p[0]) && isFinite(+p[1])) spine.push([n(p[0], -1, 1, 0), n(p[1], 0, 1.4, 0.3)]); }
+    if (spine.length < 3) return null;
+    let len = 0; for (let i = 1; i < spine.length; i++) len += Math.hypot(spine[i][0] - spine[i - 1][0], spine[i][1] - spine[i - 1][1]);
+    if (len < 0.35) return null;                                    // a dot is not a body
+    const legs = [];
+    if (Array.isArray(raw.legs)) for (let i = 0; i < raw.legs.length && legs.length < 4; i++) { const q = raw.legs[i]; if (!q || !Array.isArray(q.knee) || !Array.isArray(q.foot)) continue; legs.push({ u: n(q.u, 0, 1, 0.5), knee: [n(q.knee[0], -1.2, 1.2, 0), n(q.knee[1], -1.2, 1.2, -0.5)], foot: [n(q.foot[0], -1.2, 1.2, 0), n(q.foot[1], -1.4, 1.2, -0.5)], thick: n(q.thick, 0.4, 1.8, 1), air: q.air ? 1 : 0 }); }
+    const f = raw.fx && typeof raw.fx === 'object' ? raw.fx : {}, fx = {};
+    let pos = 0, neg = 0;
+    for (let i = 0; i < 6; i++) { let v = +f[ABIL[i]]; if (!isFinite(v)) v = 0; v = clamp(v, -0.3, 0.45); fx[ABIL[i]] = v; if (v > 0) pos += v; else neg -= v; }
+    if (pos > 0.7) for (let i = 0; i < 6; i++) if (fx[ABIL[i]] > 0) fx[ABIL[i]] *= 0.7 / pos;
+    if (neg < 0.08) { let worst = 0; for (let i = 1; i < 6; i++) if (fx[ABIL[i]] < fx[ABIL[worst]]) worst = i; fx[ABIL[worst]] = -0.12; neg = 0; for (let i = 0; i < 6; i++) if (fx[ABIL[i]] < 0) neg -= fx[ABIL[i]]; }      // nothing is free
+    pos = 0; for (let i = 0; i < 6; i++) if (fx[ABIL[i]] > 0) pos += fx[ABIL[i]];
+    if (pos > neg + 0.06) for (let i = 0; i < 6; i++) if (fx[ABIL[i]] > 0) fx[ABIL[i]] *= (neg + 0.06) / pos;
+    const name = String(raw.name || 'New build').replace(/[<>"]/g, '').trim().slice(0, 22) || 'New build';
+    return { name: name, noun: (String(raw.noun || '').replace(/[^A-Za-z\-]/g, '').slice(0, 14) || name.split(' ').pop()).replace(/^./, function (c) { return c.toUpperCase(); }),
+      note: String(raw.note || '').replace(/[<>]/g, '').slice(0, 110), spine: spine, legs: legs, stands: raw.stands !== false, girth: n(raw.girth, 0.6, 1.5, 1), fx: fx, by: String(raw.by || raw.model || '').slice(0, 60) };
+  };
+
+  G.addPlan = function (def, quiet) {
+    const W = G.W, p = G.cleanPlan(def);
+    if (!p) return null;
+    if (W.plans.some(function (x) { return x.name.toLowerCase() === p.name.toLowerCase(); })) return null;
+    if (W.plans.length >= MAX) {
+      const used = {}; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].g.f.pl) used[W.cre[i].g.f.pl] = 1;
+      let at = -1; for (let i = 0; i < W.plans.length; i++) if (!used[W.plans[i].id]) { at = i; break; }
+      if (at < 0) return null;
+      W.plans.splice(at, 1);                                        // forget the oldest build nobody follows
+    }
+    p.id = W.nextPlan++; p.gen = def.gen || W.gen;
+    W.plans.push(p);
+    if (!quiet) G.emit('plan-new', p);
+    return p;
+  };
+
+  // ── the pond's own stock (no server needed) ──
+  const OWN = [
+    { name: 'Hopper', noun: 'Hopper', note: 'It crouches on big folded hind legs and leaps.', spine: [[0.3, 0.3], [0.12, 0.3], [-0.1, 0.2], [-0.26, 0.09]], legs: [{ u: 0.12, knee: [0.05, -0.5], foot: [0.2, -0.5], thick: 0.8 }, { u: 0.8, knee: [0.9, 0.7], foot: [-0.5, -0.9], thick: 1.6 }], stands: true, girth: 1.25, fx: { agility: 0.3, speed: 0.12, armour: -0.12 } },
+    { name: 'Curler', noun: 'Curler', note: 'It hangs upright in the water, its tail curled under it.', spine: [[0.14, 0.95], [0.06, 0.8], [-0.02, 0.55], [0.04, 0.3], [0.13, 0.15], [0.05, 0.04], [-0.06, 0.12]], legs: [], stands: false, girth: 0.85, fx: { agility: 0.2, senses: 0.2, speed: -0.2 } },
+    { name: 'Stinger', noun: 'Stinger', note: 'Low on many legs, its tail arched high over its back.', spine: [[0.5, 0.2], [0.1, 0.2], [-0.3, 0.2], [-0.46, 0.34], [-0.46, 0.56], [-0.36, 0.68]], legs: [{ u: 0.08, knee: [0.5, 0.5], foot: [0.4, -0.5], thick: 0.7 }, { u: 0.22, knee: [0.1, 0.6], foot: [0.1, -0.5], thick: 0.7 }, { u: 0.38, knee: [-0.4, 0.5], foot: [-0.3, -0.5], thick: 0.7 }], stands: true, girth: 0.9, fx: { attack: 0.4, speed: -0.15 } },
+    { name: 'Slider', noun: 'Slider', note: 'No legs at all: it glides on its belly, head held up.', spine: [[0.4, 0.34], [0.26, 0.2], [0.02, 0.12], [-0.36, 0.1]], legs: [], stands: true, girth: 1.3, fx: { armour: 0.35, speed: -0.25 } },
+    { name: 'Strider', noun: 'Strider', note: 'Upright on two long thin legs, head carried high and forward.', spine: [[0.2, 0.94], [0.13, 0.74], [0.0, 0.56], [-0.2, 0.5], [-0.38, 0.54]], legs: [{ u: 0.5, knee: [-0.06, -0.5], foot: [0.12, -0.5], thick: 0.65 }], stands: true, girth: 0.95, fx: { speed: 0.25, senses: 0.15, armour: -0.15 } },
+    { name: 'Reacher', noun: 'Reacher', note: 'A very long neck lifts its head far above its body.', spine: [[0.3, 1.02], [0.26, 0.76], [0.2, 0.5], [0.0, 0.42], [-0.3, 0.42]], legs: [{ u: 0.5, knee: [0, -0.5], foot: [0, -0.5], thick: 0.9 }, { u: 0.92, knee: [0, -0.5], foot: [0, -0.5], thick: 0.9 }], stands: true, girth: 0.8, fx: { reach: 0.45, agility: -0.2 } },
+    { name: 'Bounder', noun: 'Bounder', note: 'It sits back on a heavy tail and springs off great hind legs.', spine: [[0.1, 0.86], [0.05, 0.62], [-0.08, 0.36], [-0.3, 0.16], [-0.5, 0.1]], legs: [{ u: 0.2, knee: [0.14, -0.1], foot: [0.1, -0.18], thick: 0.5, air: true }, { u: 0.62, knee: [0.26, 0.04], foot: [-0.04, -0.8], thick: 1.5 }], stands: true, girth: 1.1, fx: { speed: 0.3, agility: 0.18, reach: -0.12 } },
+    { name: 'Lurker', noun: 'Lurker', note: 'It rears up and holds two folded arms ready to strike.', spine: [[0.25, 0.82], [0.2, 0.62], [0.05, 0.44], [-0.3, 0.36]], legs: [{ u: 0.12, knee: [0.28, 0.22], foot: [0.16, -0.32], thick: 0.85, air: true }, { u: 0.55, knee: [0.06, 0.2], foot: [0.1, -0.5], thick: 0.6 }, { u: 0.8, knee: [-0.04, 0.2], foot: [-0.08, -0.5], thick: 0.6 }], stands: true, girth: 0.75, fx: { attack: 0.35, reach: 0.2, speed: -0.2 } },
+  ];
+  G.offlinePlan = function () {
+    const r = G.rand, W = G.W, have = W ? W.plans.map(function (p) { return p.name; }) : [];
+    let pick = null;
+    for (let t = 0; t < 8 && !pick; t++) { const c = OWN[Math.floor(r() * OWN.length)]; if (have.indexOf(c.name) < 0) pick = c; }
+    if (!pick) return null;
+    // the same idea never comes out the same twice
+    const sx = 0.88 + r() * 0.24, sy = 0.85 + r() * 0.3, fx = {};
+    for (const k in pick.fx) fx[k] = pick.fx[k] * (0.75 + r() * 0.5);
+    return { name: pick.name, noun: pick.noun, note: pick.note, spine: pick.spine.map(function (p) { return [p[0] * sx, p[1] * sy]; }), legs: pick.legs.map(function (q) { return { u: q.u, knee: q.knee.slice(), foot: q.foot.slice(), thick: q.thick * (0.85 + r() * 0.3), air: q.air }; }), stands: pick.stands, girth: pick.girth * (0.85 + r() * 0.3), fx: fx, by: '' };
+  };
+
+  /** a plain animal that follows this build, to show it */
+  G.planDemo = function (p, hue) {
+    const f = G.form.cell(hue === undefined ? 190 : hue);
+    f.n = 5; f.prof = [0.8, 1.1, 1, 0.8, 0.45]; f.en = 2; f.es = 0.5; f.tk = 1; f.mk = 1; f.hue2 = 120; f.pl = p.id;
+    f.rules = p.legs.length ? [{ k: 0, a: 1, b: 3, e: 2, l: 1, w: 0.5, j: 2, g: 0.2, c: 0, t: 0, p: 0.5, on: -1 }] : [];
+    return G.form.fix(f);
+  };
+
+  // now and then the pond is given one new build to try
+  let busy = false;
+  G.planTick = function (gen) {
+    const W = G.W;
+    if (!W || W.title || gen < 20 || gen % 11 !== 5) return;
+    const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
+    if (!live) { const p = G.offlinePlan(); if (p) G.addPlan(p); return; }
+    if (busy || !G.ai.allow('plan')) { if (!busy && W.plans.length < 2) { const p = G.offlinePlan(); if (p) G.addPlan(p); } return; }
+    busy = true;
+    const info = { pressures: W.press ? W.press.list.slice(0, 6) : [], water: G.envText ? G.envText(W) : '', commonBodies: (W.kinds || []).slice(0, 3).map(function (k) { return k[0]; }), have: W.plans.map(function (p) { return p.name; }) };
+    G.ai.ask('plan', info).then(function (p) { busy = false; if (G.W !== W) return; if (!p || !G.addPlan(p)) { const o = G.offlinePlan(); if (o) G.addPlan(o); } }, function () { busy = false; });
   };
 })();
 
@@ -3985,6 +4391,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 
   // ── the game's own reading of a sentence (no server needed) ──
   const RULES = [
+    [/mud|murk|swamp|stagnant|fog|silt/, { name: 'Murky water', note: 'The water thickens. Light dies quickly and breath comes hard.', hue: 60, shake: 0.2, duration: 30, light: -0.2, water: { oxygen: -0.6, murk: 0.8 } }],
+    [/clear water|crystal|fresh/, { name: 'Fresh water', note: 'The water clears and fills with air. Bigger bodies can breathe.', hue: 190, shake: 0.1, fx: 'bubbles', duration: 30, water: { oxygen: 0.8, murk: -0.6 } }],
     [/ice age|freez|frozen|blizzard|snow|winter|cold|frost/, { name: 'A great cold', note: 'The water turns bitter cold. Only the cold-proof are comfortable.', temp: -0.8, light: -0.2, food: 0.5, duration: 80, hue: 205, shake: 0.2 }],
     [/heat|hot|boil|drought|desert|sun burn|scorch|fire|lava|volcan/, { name: 'A great heat', note: 'The water warms and the algae thin out.', temp: 0.8, food: 0.5, duration: 70, hue: 15, shake: 0.4 }],
     [/dark|eclipse|night|shadow|black/, { name: 'The long dark', note: 'The light fades. Light-eaters go hungry; the deep hardly notices.', light: -0.8, food: 0.6, duration: 70, hue: 250, shake: 0.1 }],
@@ -4002,6 +4410,27 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     [/poison|pollut|toxic|acid|oil|sewage|trash|venom|contaminat/, { name: 'Poisoned water', note: 'The whole pond turns foul. Only the poison-proof are comfortable.', poison: 0.65, food: 0.8, duration: 110, hue: 95, shake: 0.3, fx: 'spores' }],
     [/rain|food|manna|snack|candy|sugar|cake|pizza/, { name: 'A rain of food', note: 'It falls everywhere at once.', feed: { count: 180, tag: 0 }, food: 1.6, duration: 30, hue: 45, shake: 0.1 }],
   ];
+  // ── nature's own surprises: nobody asked for them ──
+  const NATURE = ['a cold snap', 'a heat wave', 'the long dark', 'a golden season of plenty', 'a great storm', 'strange days of mutation', 'murky water', 'fresh clear water', 'a sickness', 'a rain of food'];
+  G.natureTick = function (gen) {
+    const W = G.W;
+    if (!W || W.title || gen < 18) return;
+    // has the pond stopped changing? the same commonest shape for a long time makes it restless
+    const top = W.kinds && W.kinds.length ? W.kinds[0][0] : '';
+    if (top !== W.staleKind) { W.staleKind = top; W.staleGen = gen; }
+    const stale = gen - (W.staleGen || gen), since = gen - (W.natureGen || 0);
+    if (since < 14) return;
+    if (G.rand() < 0.045 + (stale > 25 ? 0.12 : 0) + (since > 45 ? 0.2 : 0)) {
+      const ev = G.offlineEvent(NATURE[Math.floor(G.rand() * NATURE.length)]);
+      if (!ev) return;
+      ev.kill.share = Math.min(ev.kill.share, 0.25);                // nature shakes the pond; it does not empty it
+      ev.note = (ev.note ? ev.note + ' ' : '') + 'Nobody caused it: it is the pond\'s own weather.';
+      ev.nature = true;
+      W.natureGen = gen;
+      if (stale > 25) { ev.mutate = Math.max(ev.mutate, 2.2); ev.duration = Math.max(ev.duration, 70); W.staleGen = gen; }
+      G.runEvent(ev);
+    }
+  };
   G.offlineEvent = function (text) {
     const low = String(text || '').toLowerCase();
     // which gift or fashion is meant, if the words name one
@@ -4162,6 +4591,97 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       }
     }, function () { busy = false; });
   };
+})();
+
+</script>
+<script data-part="paint">
+// ── Painted by the AI: what each kind of creature looks like ──
+// The genes decide what a creature IS: its build, what grows on it, its coat, its colours, what its world has done to it.
+// The AI then PAINTS that kind, once, from those facts. Nobody can predict the painting; the same facts never have to be
+// paid for twice (the server keeps every painting in its library, for every player). Until a kind is painted, and whenever
+// there is no server, the game draws it itself from the same genes.
+// It is asked by the clock and within a budget, never once per generation; each painting's cost is counted with the rest.
+(function () {
+  'use strict';
+  const F = G.form;
+  G.paints = {};            // look → { cv, w, h } when ready, or { asked } / { miss: time }
+  let busy = false;
+
+  /** the look of a body, as far as a painting can tell bodies apart: its build, what grows on it, its coat, pattern and colours */
+  G.paintSig = function (g) {
+    const f = g.f, set = {};
+    for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.k === 8) { const d = G.designOf ? G.designOf(q.t) : null; if (d) set[d.name.toLowerCase().replace(/[^a-z]/g, '')] = 1; } else set[F.KINDS[q.k] + (q.k === 0 && q.t ? q.t : '')] = 1; }
+    const hb = function (h) { return Math.floor((((h % 360) + 360) % 360) / 30); };
+    return [F.build(f), f.n >= 7 ? 'L' : f.n >= 4 ? 'M' : 'S', Object.keys(set).sort().join('-'), 'c' + f.coat, 'p' + f.pat, 'h' + hb(f.hue), 'k' + Math.floor(hb(f.hue + f.hue2) / 2), 'e' + f.en, 'm' + f.mk, 't' + (f.sym || f.n < 2 ? 0 : f.tk),
+      (f.shell > 0.25 ? 's' : '') + (f.glow > 0.3 ? 'g' : '') + (f.venom > 0.3 ? 'v' : '') + (f.crest > 0.25 ? 'r' : '') + (f.nk > 0.35 ? 'n' : '') + (f.hd > 1.45 ? 'b' : '') + (f.hq > 3 ? 'q' : f.hq < 1.8 ? 'o' : '')].join('.');
+  };
+  /** the painting for this genome, if there is one ready */
+  G.paintFor = function (g) { const p = G.paints[g._ps || (g._ps = G.paintSig(g))]; return p && p.cv ? p : null; };
+  /** the painting a living creature wears: its own look if that has been painted, else the one of its kind */
+  G.paintOf = function (c, sp) {
+    const own = G.paintFor(c.g);
+    if (own) return own;
+    if (sp && sp.rep) { const p = G.paintFor(sp.rep); if (p) return p; }
+    return null;
+  };
+
+  // a painting arrives on black. The black that reaches the edge of the picture is its background and is removed;
+  // dark colours inside the creature are kept. Then it is cropped to the creature.
+  function lift(img) {
+    const N = 300, cv = document.createElement('canvas'); cv.width = cv.height = N;
+    const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0, N, N);
+    const im = ctx.getImageData(0, 0, N, N), d = im.data, bg = new Uint8Array(N * N), st = [];
+    const dark = function (i) { return Math.max(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) < 30; };
+    for (let i = 0; i < N; i++) { st.push(i, (N - 1) * N + i, i * N, i * N + N - 1); }
+    while (st.length) { const i = st.pop(); if (bg[i] || !dark(i)) continue; bg[i] = 1; const x = i % N; if (x > 0) st.push(i - 1); if (x < N - 1) st.push(i + 1); if (i >= N) st.push(i - N); if (i < N * (N - 1)) st.push(i + N); }
+    let x0 = N, x1 = 0, y0 = N, y1 = 0;
+    for (let i = 0; i < N * N; i++) {
+      if (bg[i]) { d[i * 4 + 3] = 0; continue; }
+      const x = i % N, y = (i / N) | 0, edge = (x > 0 && bg[i - 1]) || (x < N - 1 && bg[i + 1]) || (y > 0 && bg[i - N]) || (y < N - 1 && bg[i + N]);
+      if (edge) d[i * 4 + 3] = Math.min(255, Math.max(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) * 3);      // a soft rim, no hard black fringe
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+    if (x1 - x0 < 20 || y1 - y0 < 20) return null;
+    ctx.putImageData(im, 0, 0);
+    const out = document.createElement('canvas'); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
+    out.getContext('2d').drawImage(cv, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+    return { cv: out, w: out.width, h: out.height };
+  }
+
+  function ask(sig, info, free) {
+    busy = true;
+    G.paints[sig] = { asked: true };
+    G.host.call('ai.paint', Object.assign({ sig: sig, libraryOnly: !!free, model: undefined }, info), 150000).then(function (r) {
+      busy = false;
+      if (!r || !r.paint || typeof r.paint.b64 !== 'string' || !/^image\/(png|jpeg)$/.test(r.paint.mime) || r.paint.b64.length > 1400000) { G.paints[sig] = { miss: Date.now() }; return; }
+      G.ai.tally('paint', r.source, r.usd);
+      const img = new Image();
+      img.onload = function () { let p = null; try { p = lift(img); } catch (e) { console.error(e); } G.paints[sig] = p || { miss: Date.now() }; if (p) G.emit('painted', sig, info, r.source); };
+      img.onerror = function () { G.paints[sig] = { miss: Date.now() }; };
+      img.src = 'data:' + r.paint.mime + ';base64,' + r.paint.b64;
+    }, function () { busy = false; G.paints[sig] = { miss: Date.now() }; });
+  }
+  /** what the painter is told about a body: only facts the genes hold, and what its world is like */
+  G.paintInfo = function (g, name) {
+    const f = g.f, facts = F.facts(f), W = G.W;
+    return { name: String(name || '').slice(0, 40), build: F.build(f), kind: F.kind(f).full, facts: facts.slice(0, -1), colours: facts[facts.length - 1], world: W && W.press ? W.press.list.slice(0, 3) : [] };
+  };
+  /** make sure this look gets its painting: free from the library if it is there, else painted when the budget allows */
+  G.wantPaint = function (g, name) {
+    if (busy || G.ai.drawn || !(G.host && G.host.ready && G.host.caps.ai && G.ai.paintOn && G.ai.provider === 'server')) return false;
+    const sig = g._ps || (g._ps = G.paintSig(g)), st = G.paints[sig];
+    if (st && (st.cv || st.asked || (st.miss && Date.now() - st.miss < 90000))) return false;
+    ask(sig, G.paintInfo(g, name), !(G.ai.hasFuel() && G.ai.allow('paint')));
+    return true;
+  };
+  // once a generation: the biggest established kind that has no painting yet
+  G.paintTick = function (gen) {
+    const W = G.W;
+    if (!W || W.title || G.mode !== 'play' || G.catching) return;
+    const live = W.species.filter(function (s) { return !s.extinct && s.n >= 6 && s.rep && gen - s.born >= 2; }).sort(function (a, b) { return b.n - a.n; });
+    for (let i = 0; i < live.length && i < 8; i++) if (G.wantPaint(live[i].rep, live[i].name)) return;
+  };
+  G.on('new-pond', function () { busy = false; });
 })();
 
 </script>
@@ -4762,6 +5282,67 @@ function drawAddedThings() {
 
 // ── layer 7: creatures ──
 // c: a creature, or anything shaped like one (g, ph, ang, id, glow, look...). a = interpolation, t = time.
+G.R.SIDE = 70;        // how many portrait units make one body radius: sets how big a character stands in the pond
+// In the pond a creature is its character: it stands, hops as it swims, leans into its speed, turns to face where it is going,
+// and its face shows how it is doing. c: a creature; x, y: where its feet are.
+// A painting is one picture, so it is moved the only way one picture can be: by bending it, in the way its build moves.
+//   what swims: a ripple runs from head to tail, strongest at the tail, so the body and tail fin beat
+//   bells, blobs, orbs, stars: it pulses, and what hangs below sways
+//   what walks: the body bobs, and the legs under it step one after another
+// x0..x0+w, y0..y0+h is where the whole picture goes. sp: how hard it is moving (0..1).
+function drawPaintMoving(ctx, p, build, x0, y0, w, h, t, id, sp, still) {
+  const cv = p.cv, pw = p.w, ph = p.h;
+  if (still) { ctx.drawImage(cv, x0, y0, w, h); return; }
+  if (build === 'fish' || build === 'serpent' || build === 'microbe') {
+    const N = 16, amp = h * (build === 'serpent' ? 0.1 : 0.075) * (0.3 + 0.7 * sp), f = 5 + 5 * sp;
+    for (let i = 0; i < N; i++) { const s0 = Math.round(i * pw / N), s1 = Math.round((i + 1) * pw / N), u = (i + 0.5) / N, off = Math.sin(t * f + (1 - u) * 3.4 + id) * amp * Math.pow(1 - u, 1.4); ctx.drawImage(cv, s0, 0, s1 - s0, ph, x0 + s0 / pw * w, y0 + off, (s1 - s0) / pw * w + 0.6, h); }
+  } else if (build === 'jelly' || build === 'blob' || build === 'orb' || build === 'star') {
+    const N = 14, soft = build === 'jelly' ? 1.6 : build === 'blob' ? 1 : 0.5;
+    for (let j = 0; j < N; j++) { const s0 = Math.round(j * ph / N), s1 = Math.round((j + 1) * ph / N), v = (j + 0.5) / N, sx = 1 + 0.05 * soft * Math.sin(t * 3 - v * 3 + id), xo = Math.sin(t * 2.2 + v * 4 + id) * w * 0.045 * soft * v * v; ctx.drawImage(cv, 0, s0, pw, s1 - s0, x0 + w / 2 - w * sx / 2 + xo, y0 + s0 / ph * h, w * sx, (s1 - s0) / ph * h + 0.6); }
+  } else {
+    const cut = Math.round(ph * 0.62), N = 9, f = 7 + 6 * sp, lift = h * 0.06 * (0.25 + sp);
+    for (let i = 0; i < N; i++) { const s0 = Math.round(i * pw / N), s1 = Math.round((i + 1) * pw / N), up = Math.max(0, Math.sin(t * f + i * 2.1 + id)) * lift; ctx.drawImage(cv, s0, cut, s1 - s0, ph - cut, x0 + s0 / pw * w, y0 + cut / ph * h - up, (s1 - s0) / pw * w + 0.6, (ph - cut) / ph * h); }      // the legs, stepping
+    ctx.drawImage(cv, 0, 0, pw, cut + 1, x0, y0 + Math.sin(t * f * 0.5 + id) * h * 0.012, w, (cut + 1) / ph * h);
+  }
+}
+function drawCharacter(ctx, c, x, y, scale, t, opt) {
+  const ph = c.ph, g = c.g, f = g.f, r = ph.r * scale * R.VIS, id = c.id || 1;
+  const alpha = opt.alpha === undefined ? 1 : opt.alpha; if (alpha <= 0.02) return;
+  const pop = c.birthT > 0 ? 1 - c.birthT * c.birthT : 1, sp = Math.min(1, (c.squash || 0) / 1.1), weak = c.E !== undefined && c.E < ph.Emax * 0.15;
+  const vx = Math.cos(c.ang || 0);
+  c.fc = c.fc === undefined ? (vx >= 0 ? 1 : -1) : c.fc + ((vx > 0.2 ? 1 : vx < -0.2 ? -1 : c.fc > 0 ? 1 : -1) - c.fc) * 0.18;      // turning round takes a moment
+  const spc = c.sp ? spOf(G.W, c.sp) : null, paint = G.ai.drawn ? null : (G.paintOf ? G.paintOf(c, spc) : null);
+  const walks = G.form.walks(c.g.f._b || (c.g.f._b = G.form.build(c.g.f)), c.g.f);
+  const still = c.asleep, hopT = t * (4.5 + 5 * sp) + id, hop = still ? 0 : walks ? Math.abs(Math.sin(hopT)) * r * (0.06 + 0.3 * sp) : (0.5 + 0.5 * Math.sin(t * 1.7 + id)) * r * 0.5;
+  const land = still ? 1 : walks ? 1 - Math.abs(Math.sin(hopT)) : 0;          // 1 at the moment a walker touches down: it squashes there
+  const shiver = c.chill > 0.05 ? Math.sin(t * 38 + id) * r * 0.035 : 0;
+  const s = r / R.SIDE * (0.3 + 0.7 * pop) * (weak ? 0.92 : 1);
+  ctx.save(); ctx.translate(x + shiver, y); ctx.globalAlpha = alpha * (weak ? 0.8 : 1);
+  // its shadow on the pond floor: smaller when it is up in a hop
+  ctx.fillStyle = 'rgba(4,12,20,0.3)'; ctx.beginPath(); ctx.ellipse(0, r * 0.1, r * (0.85 - 0.25 * hop / (r * 0.4 + 1)), r * 0.24, 0, 0, 6.2832); ctx.fill();
+  if (ph.lamp > 0.3 || c.eatFlash > 0.2) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= (0.25 * Math.min(1, ph.lamp) * (0.5 + 0.5 * (c.glow || 0)) + 0.25 * Math.max(0, c.eatFlash || 0)) * (opt.crowd || 1); const hs = r * 3; ctx.drawImage(haloSprite(ph.hue), -hs, -hs - r * 1.2, hs * 2, hs * 2); ctx.restore(); }
+  ctx.translate(0, -hop);
+  const sq = still ? 0.06 : 0.1 * Math.pow(land, 3) * (0.4 + sp), turn = Math.max(0.5, Math.abs(c.fc)) * (c.fc >= 0 ? 1 : -1);
+  ctx.scale(turn * (1 + sq), 1 - sq);
+  ctx.rotate(still ? (walks ? 0.9 : 0.25) : walks ? 0.04 + 0.16 * sp + Math.sin(hopT * 0.5) * 0.03 : G.clamp(Math.sin(c.ang || 0) * 0.45, -0.45, 0.45) * (0.3 + 0.7 * sp) + Math.sin(t * 2.3 + id) * 0.04);      // a walker leans into its speed; a swimmer points where it is going; asleep, it droops
+  ctx.scale(s, s); ctx.translate(0, -104);                                       // its feet are at 104 in portrait units
+  // where it looks: at what it is after, else it glances about
+  let lx = Math.cos(t * 0.7 + id) * 0.6, ly = 0.15 + Math.sin(t * 0.9 + id * 1.3) * 0.4;
+  if (c.look) { const ll = Math.hypot(c.lookX, c.lookY) || 1; lx = c.lookX / ll * (c.fc >= 0 ? 1 : -1); ly = c.lookY / ll; }
+  const scared = (c.startle > 0) || (!!c.inp && Math.max(Math.abs(c.inp[5]), Math.abs(c.inp[6])) > 0.45);
+  const blink = (t * 0.31 + (f.seed % 13) + id * 0.7) % 3.7 < 0.1;
+  const lid = still || blink ? 1 : c.pois > 0.3 || c.gasp > 0.3 || weak ? 0.55 : c.tired > 0.75 ? 0.4 : 0;
+  if (paint) { const k = 250 / Math.max(paint.w, paint.h), bottom = walks ? 108 : 86; drawPaintMoving(ctx, paint, c.g.f._b, -paint.w * k / 2, bottom - paint.h * k, paint.w * k, paint.h * k, t, id, sp, still); }      // the AI's painting of its kind, moving the way its build moves
+  else if (opt.live) G.form.portrait(ctx, f, t + id * 0.37, { lx: lx, ly: ly, sleep: still });
+  else G.form.pDraw(ctx, f, { lx: lx, ly: ly, lid: lid, wide: scared }, still ? id * 0.37 : t * (0.42 + 0.5 * sp) + id * 0.37);
+  ctx.restore();
+  // what it is going through, said with one small sign over its head
+  if (G.speed <= 8 && alpha > 0.5 && !opt.noSigns) {
+    const hy = y - hop - r * 254 / R.SIDE * 0.92, sign = scared ? '!' : c.pois > 0.3 ? 'x_x' : c.chill > 0.05 ? '*brr*' : c.hot > 0.05 ? '~phew~' : c.gasp > 0.7 && id % 4 === 0 ? 'o O' : still ? 'z z' : '';
+    if (sign) { ctx.save(); ctx.font = '700 ' + Math.round(Math.max(9, r * (sign.length > 2 ? 0.36 : 0.55))) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,18,31,0.8)'; ctx.fillStyle = scared ? PAL.gold : c.pois > 0.3 ? PAL.algae : c.chill > 0.05 ? PAL.frost : c.hot > 0.05 ? PAL.rose : PAL.frost; const by2 = hy - 4 * Math.sin(t * 3 + id); ctx.strokeText(sign, x + r * 0.5, by2); ctx.fillText(sign, x + r * 0.5, by2); ctx.restore(); }
+  }
+  if (c.flash > 0 && c.mutAge > 0) { ctx.save(); ctx.strokeStyle = G.rgba(PAL.rose, Math.min(1, c.flash)); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(x, y - r * 1.5, r * 1.3, r * 2.1, 0, 0, 6.2832); ctx.stroke(); ctx.restore(); }
+}
 function drawCreatureBody(ctx, c, x, y, scale, t, opt) {
   opt = opt || {};
   const ph = c.ph, g = c.g, r = ph.r * scale * R.VIS;
@@ -4823,7 +5404,10 @@ function drawCreatureBody(ctx, c, x, y, scale, t, opt) {
 G.drawCreatureBody = drawCreatureBody;
 // draw a creature so that all of it (parts included) fits in a circle of boxR pixels
 G.drawFit = function (ctx, pv, x, y, boxR, t) {
-  // on every card a creature is shown as its portrait: the same genes, face to face
+  // on every card a creature is shown as its character: the AI's painting of that look if there is one, else the game's own drawing
+  const pt = G.paintFor && !G.ai.drawn ? G.paintFor(pv.g) : null;
+  if (pt) { const k = boxR * 1.9 / Math.max(pt.w, pt.h); ctx.drawImage(pt.cv, x - pt.w * k / 2, y - pt.h * k / 2, pt.w * k, pt.h * k); if (G.wantPaint) G.wantPaint(pv.g, ''); return; }
+  if (G.wantPaint && G.mode === 'play') G.wantPaint(pv.g, '');
   const sc = boxR / 150;
   ctx.save(); ctx.translate(x, y + boxR * 0.06); ctx.scale(sc, sc);
   G.form.portrait(ctx, pv.g.f, (t === undefined ? G.rt : t) + (pv.id || 0) * 0.37, { sleep: !!pv.asleep });
@@ -4840,7 +5424,7 @@ function drawCreatures() {
   const W = G.W; if (!W) return;
   const ctx = G.ctx, t = G.rt, a = G.alpha === undefined ? 1 : G.alpha;
   beginWorld(ctx);
-  const cre = W.cre;
+  const cre = W.cre.slice().sort(function (p, q) { return p.y - q.y; });      // back to front: the nearer ones stand in front
   const season = W.season;
   const showBars = season === 2 || (season === 3 && W.st < 3.5);
   const crowd = clamp01(130 / (cre.length + 1));
@@ -4878,10 +5462,10 @@ function drawCreatures() {
     // zone damage tint
     c.crowd = crowd;
     // what is on the screen is drawn alive, part by part; if the frame gets heavy, the furthest down the list wear a still picture
-    const ext = c.ph.r * c.ph.reach * R.VIS + 10;
+    const ext = c.ph.r * R.VIS * 4.6 + 10;
     if (x + ext < vx0 || x - ext > vx1 || y + ext < vy0 || y - ext > vy1) continue;
-    drawCreatureBody(ctx, c, x, y, 1, t, { alpha: alpha, crowd: crowd, live: false, rig: c === R.sel || liveLeft-- > 0 });
-    if (c.asleep && G.speed <= 4) { ctx.fillStyle = G.rgba(PAL.frost, 0.55 + 0.3 * Math.sin(t * 2 + c.id)); ctx.font = '700 ' + Math.round(9 + c.ph.r * 0.5) + 'px system-ui'; ctx.fillText('z', x + c.ph.r * 0.9, y - c.ph.r * 1.1 - 3 * Math.sin(t * 1.5 + c.id)); }
+    drawCharacter(ctx, c, x, y, 1, t, { alpha: alpha, crowd: crowd, live: c === R.sel });
+    if (false) { ctx.fillStyle = G.rgba(PAL.frost, 0.55 + 0.3 * Math.sin(t * 2 + c.id)); ctx.font = '700 ' + Math.round(9 + c.ph.r * 0.5) + 'px system-ui'; ctx.fillText('z', x + c.ph.r * 0.9, y - c.ph.r * 1.1 - 3 * Math.sin(t * 1.5 + c.id)); }
     if (c.strike > 0) {
       c.strike -= 0.03;
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = G.rgba(PAL.gold, Math.max(0, c.strike)); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, c.ph.r * 1.5, 0, 6.2832); ctx.stroke(); ctx.restore();
@@ -4902,7 +5486,7 @@ function drawCreatures() {
     for (let i = 0; i < cre.length; i++) {
       const c = cre[i];
       const f = clamp01(c.E / c.ph.Emax);
-      const w = Math.max(14, c.ph.r * 2.2), x = c.rx - w / 2, y = c.ry - c.ph.r * Math.max(1, c.ph.reach * 0.85) - 11;
+      const w = Math.max(14, c.ph.r * 2.2), x = c.rx - w / 2, y = c.ry - c.ph.r * R.VIS * 3.75 - 8;
       ctx.fillStyle = G.rgba(PAL.deep, 0.65); roundRect(ctx, x - 1, y - 1, w + 2, 6, 3); ctx.fill();
       ctx.fillStyle = f > 0.6 ? PAL.algae : f > 0.3 ? PAL.gold : PAL.rose;
       roundRect(ctx, x, y, Math.max(2, w * f), 4, 2); ctx.fill();
@@ -5544,14 +6128,17 @@ G.addSystem({
     G.R.flash = 1; G.R.flashCol = G.PAL.gold; G.R.shake = 0.4;
     G.sfx('discovery');
   });
+  G.on('plan-new', function (p) { if (G.mode !== 'play') return; const t = 'A whole new build is now possible in this pond: the ' + p.name + '. ' + p.note; G.log('disc', 'A new build', t); if (G.speed <= 16) G.banner('A body nobody has seen', t, 7500); });
   G.on('design-new', function (d) { if (G.mode !== 'play') return; const t = 'A new kind of body part is now possible in this pond: the ' + d.name + '. ' + d.note + (d.by ? '' : ''); G.log('disc', 'A new kind of part', t); if (G.speed <= 16) G.banner('Something never seen before', t, 7000); });
   G.on('new-pond', function () { if (G.form.clearCache) G.form.clearCache(); });
+  G.on('bred', function (it, c) { if (G.mode !== 'play') return; G.log('disc', 'Bred', it.name + ' and #' + c.id + ' had six children.'); G.banner('A new family', 'Six children of ' + it.name + ' and a creature of this pond were born. Watch what they become.', 5200); G.focusOn(c.x, c.y, 1.8); });
   G.on('released', function (it, x, y) { if (G.mode !== 'play') return; G.log('disc', 'Released', it.name + ' (' + it.kind + ') now lives in this pond.'); G.focusOn(x, y, 1.8); });
   G.on('sickness', function (kind, n, crowd) { if (G.mode !== 'play') return; const t = 'There are so many ' + kind.toLowerCase() + 's (' + Math.round(crowd * 100) + '% of the pond) that a sickness spreads among them. ' + n + ' will not see spring; the rarer kinds are hardly touched.'; G.log('sel', 'A sickness of the many', t); if (G.speed <= 16) G.banner('Too many of one kind', t, 6500); });
+  G.on('painted', function (sig, info, source) { if (G.mode !== 'play') return; G.log('sp', 'Painted', (info.name || 'A kind') + ', a ' + String(info.kind || '').toLowerCase() + ', has been painted' + (source === 'library' ? ' (from the library, free).' : '.')); });
   G.on('fashion', function (t) { if (G.mode !== 'play') return; G.log('sp', 'Taste has shifted', t + '. Those who have it will find mates more easily.'); UI.eraSig = ''; });
   G.on('judged', function (s) { if (G.mode !== 'play') return; G.log('sp', 'The judge on the ' + s.name, (s.judge.why || 'no comment') + ' (looks: ' + Math.round(s.judge.score * 10) + '/10)'); });
   G.on('zone-killed', function (z) { if (G.mode !== 'play') return; const t = 'The pond killed ' + z.word + '! Creatures with ' + G.WEAK[z.weak].text + ' wore it down.'; G.log('disc', 'Victory', t); G.banner('Life fought back', t, 6000); });
-  G.on('event', function (ev) { if (G.mode !== 'play') return; if (ev.got) ev.note = (ev.note ? ev.note + ' ' : '') + ev.got + ' creatures grew ' + ev.gift.trait + '.'; G.log('sel', ev.name, ev.note); G.banner('It happened', ev.name + (ev.note ? ': ' + ev.note : ''), 5200); });
+  G.on('event', function (ev) { if (G.mode !== 'play') return; if (ev.got) ev.note = (ev.note ? ev.note + ' ' : '') + ev.got + ' creatures grew ' + ev.gift.trait + '.'; G.log('sel', (ev.nature ? 'Nature: ' : '') + ev.name, ev.note); G.banner('It happened', ev.name + (ev.note ? ': ' + ev.note : ''), 5200); });
   G.on('story', function (s) { if (G.mode !== 'play') return; G.log('disc', s.title, s.text); if (G.speed <= 16) G.banner('The story so far · ' + s.title, s.text, 9000); });
   G.on('organ-new', function (o) { if (G.mode === 'play') G.log('disc', 'New organ', o.name + (G.ai.labelOf(o.by) ? ' (imagined by ' + G.ai.labelOf(o.by) + ')' : '') + ': ' + o.note); });
   G.on('zone-bud', function (child, z) { if (G.mode === 'play') G.log('sp', z.word + ' spread', 'A new patch grew nearby, a little different.'); });
@@ -5724,9 +6311,10 @@ G.addSystem({
       '<div class="irows"><div id="iE"></div><div id="iAge"></div><div id="iPar" style="grid-column:span 2"></div><div class="meter"><i id="iEb"></i></div></div>' +
       '<div class="ilabel">Brain</div><canvas id="ibrain" width="560" height="184"></canvas><div class="imut" id="imut"></div>' +
       '<div class="ilabel">Fitness</div><div id="ifit" style="font-size:11.5px;line-height:1.4"></div>' +
-      '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond.">★ KEEP</button><button class="btn sm" id="itree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide">' + ICON.book + 'SPECIES</button></div>';
+      '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond.">★ KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection.">♥ BREED</button><button class="btn sm" id="itree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide">' + ICON.book + 'SPECIES</button></div>';
     $('iclose').onclick = function () { G.select(null); };
     $('itree').onclick = function () { G.sfx('click'); G.openTree(); };
+    $('ibreed').onclick = function () { const c = G.R.sel; if (!c) return; G.sfx('click'); if (!G.collection.length) { G.banner('Nothing to breed it with yet', 'First ★ KEEP a creature you like (from this pond or another). Then choose it here to breed the two.', 5200); return; } UI.breedWith = c.id; UI.guideTab = 'coll'; G.openGuide(); };
     $('ikeep').onclick = function () { const c = G.R.sel; if (!c) return; const it = G.keep(c); if (it) { G.sfx('discovery'); G.banner('Kept in your collection', it.name + ', a ' + it.kind.toLowerCase() + '. Find it in the Book of Life under COLLECTION; you can release it into any pond.', 5200); } };
     $('iguide').onclick = function () { G.sfx('click'); UI.guideTab = 'live'; G.openGuide(); };
     G.on('select', function (c) {
@@ -6188,7 +6776,8 @@ G.addSystem({
       } else if (tab === 'organ') {
         const L = (W.organs || []).slice().reverse();
         const DS = (W.designs || []).slice().reverse();
-        if (!L.length && !DS.length) { body.innerHTML = '<div class="empty">New organs and new kinds of body part are invented for this pond every few generations. Evolution decides which ones catch on.</div>'; return; }
+        const PS = (W.plans || []).slice().reverse();
+        if (!L.length && !DS.length && !PS.length) { body.innerHTML = '<div class="empty">New organs and new kinds of body part are invented for this pond every few generations. Evolution decides which ones catch on.</div>'; return; }
         const cards = el('div', 'cards', '', body);
         L.forEach(function (o) {
           let n = 0; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].g.p.some(function (p) { return p.k === 100 + o.id; })) n++;
@@ -6196,6 +6785,18 @@ G.addSystem({
           if (o.digest >= 0) fx.push('a new diet');
           el('div', 'card' + (n ? '' : ' dead'), (o.svg ? '<img alt="" width="64" height="64" style="flex:none;background:rgba(7,18,31,.5);border-radius:12px;padding:6px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(o.svg) + '">' : '') + '<div><b>' + esc(o.name) + '</b><p>' + esc(o.note) + '</p><small>' + esc(fx.join(' · ')) + '</small><small>Invented in gen ' + o.gen + (G.ai.labelOf(o.by) ? ' by ' + esc(G.ai.labelOf(o.by)) : '') + ' · carried by <b>' + n + '</b> creatures</small></div>', cards);
         });
+        // the builds this pond was given: whole ways of carrying a body
+        if (PS.length) {
+          el('h3', '', 'BUILDS', body).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:16px 0 8px;color:var(--gold)';
+          const pc = el('div', 'cards', '', body);
+          PS.forEach(function (p, i) {
+            let n = 0, live = null; for (let k = 0; k < W.cre.length; k++) { const ff = W.cre[k].g.f; if (ff.pl === p.id && !ff.sym && ff.n >= 2) { n++; live = live || ff; } }
+            const fx = Object.keys(p.fx).filter(function (k) { return Math.abs(p.fx[k]) > 0.04; }).map(function (k) { return k + ' ' + (p.fx[k] > 0 ? '+' : '−') + Math.abs(p.fx[k]).toFixed(2); });
+            const card = el('div', 'card' + (n ? '' : ' dead'), '<canvas width="192" height="192" style="flex:none;width:96px;height:96px;background:rgba(7,18,31,.5);border-radius:12px"></canvas><div><b>' + esc(p.name) + '</b><p>' + esc(p.note) + '</p><small>' + esc(fx.join(' · ')) + ' · ' + (n ? n + ' alive follow it' : 'nobody follows it yet') + (G.ai.labelOf(p.by) ? ' · imagined by ' + esc(G.ai.labelOf(p.by)) : '') + '</small></div>', pc);
+            const cx = card.querySelector('canvas').getContext('2d'), f = live || G.planDemo(p, (W.hue0 + i * 70) % 360);
+            cx.translate(96, 106); cx.scale(0.5, 0.5); G.form.portrait(cx, f, 1.2, {});
+          });
+        }
         // the kinds of body part this pond was given, each shown on a plain animal
         if (DS.length) {
           el('h3', '', 'KINDS OF BODY PART', body).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:16px 0 8px;color:var(--gold)';
@@ -6219,6 +6820,8 @@ G.addSystem({
           const tx = el('div', '', '', card);
           tx.innerHTML = '<b>' + esc(it.name) + '</b><p>' + esc(it.kind) + '</p><small>' + esc(G.form.facts(g.f).slice(0, 4).join(', ')) + '</small><small>Kept in generation ' + it.gen + (it.age ? ' · ' + esc(it.age) : '') + '</small>';
           const row = el('div', '', '', tx); row.style.cssText = 'display:flex;gap:6px;margin-top:6px;flex-wrap:wrap';
+          const mateC = UI.breedWith ? G.W.cre.filter(function (q) { return q.id === UI.breedWith && !q.dead; })[0] : null;
+          if (mateC) { const h = el('button', 'btn sm pulse', '♥ BREED WITH #' + mateC.id, row); h.onclick = function () { closeModal(); G.sfx('discovery'); UI.breedWith = 0; G.breedKept(it, mateC); }; }
           const b = el('button', 'btn sm', 'RELEASE HERE', row);
           b.onclick = function () { closeModal(); G.sfx('click'); G.release(it); };
           const x = el('button', 'btn sm', 'LET GO', row);
@@ -6962,7 +7565,7 @@ G.addSystem({
     if (!W || W.title) return null;
     const out = {
       v: 1, at: Date.now(), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
-      set: W.set, disc: W.disc, nextSp: W.nextSp, ai: G.ai && G.ai.model ? G.ai.model : '', spend: G.ai ? G.ai.life : {},
+      set: W.set, disc: W.disc, nextSp: W.nextSp, ai: G.ai && G.ai.model ? G.ai.model : '', drawn: G.ai && G.ai.drawn ? 1 : 0, spend: G.ai ? G.ai.life : {},
       hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species]; }),
       discLog: W.discLog.slice(-40),
       hints: Object.keys(G.hints),
@@ -6970,7 +7573,7 @@ G.addSystem({
       organs: (W.organs || []).map(function (o) { return { id: o.id, name: o.name, note: o.note, svg: o.svg && o.svg.length < 1500 ? o.svg : '', fx: o.fx, digest: o.digest, hue: Math.round(o.hue), by: o.by, gen: o.gen }; }),
       nextOrgan: W.nextOrgan || 1,
       designs: (W.designs || []).map(function (d) { return { id: d.id, name: d.name, adj: d.adj, note: d.note, place: d.place, motion: d.motion, colour: d.colour, pts: d.pts, smooth: d.smooth, ribs: d.ribs, dots: d.dots, fx: d.fx, by: d.by, gen: d.gen }; }), nextDesign: W.nextDesign || 1,
-      col: G.collection, colD: G.keptDesigns,
+      col: G.collection, colD: G.keptDesigns, colP: G.keptPlans, plans: W.plans || [], nextPlan: W.nextPlan || 1,
       env: W.env, ages: (W.ages || []).slice(-24), hue0: Math.round(W.hue0 || 0), fashion: W.fashion, fashionGen: W.fashionGen | 0,
       story: (W.story || []).slice(-12), events: (W.events || []).slice(-12),
       history: (W.history || []).slice(-90), evShelf: (W.evShelf || []).slice(-10).map(function (e) { const c = JSON.parse(JSON.stringify(e)); if (c.thing) c.thing.svg = ''; return c; }),
@@ -7054,6 +7657,11 @@ G.addSystem({
     }
     W.nextSp = Math.floor(num(d.nextSp, 1, 1e6, 1));
     if (d.env && typeof d.env === 'object') W.env = { mix: Array.isArray(d.env.mix) && d.env.mix.length === 6 ? d.env.mix.map(function (v) { return num(v, 0.2, 2, 1); }) : [1, 1, 1, 1, 1, 1], o2: num(d.env.o2, 0.4, 1.5, 1), murk: num(d.env.murk, 0, 1, 0.5), rich: num(d.env.rich, 0.5, 1.6, 1), warm: num(d.env.warm, -0.4, 0.4, 0), green: num(d.env.green, 0.4, 0.95, 0.82), deep: Math.floor(num(d.env.deep, 3, 5, 3)), hue: num(d.env.hue, 0, 360, 190) };
+    G.keptPlans = [];
+    if (Array.isArray(d.colP)) d.colP.slice(0, 16).forEach(function (q) { const o = G.cleanPlan(q); if (!o) return; o.id = Math.floor(num(q.id, 100000, 999999, 100000)); G.keptPlans.push(o); });
+    W.plans = [];
+    if (Array.isArray(d.plans)) d.plans.slice(0, 8).forEach(function (q) { const o = G.cleanPlan(q); if (!o) return; o.id = Math.floor(num(q.id, 1, 1e6, 1)); o.gen = num(q.gen, 0, 1e6, 0); if (!W.plans.some(function (x) { return x.id === o.id; })) W.plans.push(o); });
+    W.nextPlan = Math.max(Math.floor(num(d.nextPlan, 1, 1e6, 1)), W.plans.reduce(function (m, o) { return Math.max(m, o.id + 1); }, 1));
     // what the player has kept comes first of all: its kinds of part are needed to rebuild anything that carries them
     G.keptDesigns = [];
     if (Array.isArray(d.colD)) d.colD.slice(0, 24).forEach(function (q) { const o = G.cleanDesign(q); if (!o) return; o.id = Math.floor(num(q.id, 100000, 999999, 100000)); if (!G.keptDesigns.some(function (x) { return x.id === o.id; })) G.keptDesigns.push(o); });
@@ -7181,6 +7789,7 @@ G.addSystem({
           G.ai.models = r.models.filter(function (m) { return m && typeof m.id === 'string'; }).slice(0, 12).map(function (m) { return { id: m.id.slice(0, 60), label: String(m.label || m.id).slice(0, 40) }; });
           if (!G.ai.labelOf(G.ai.model)) G.ai.model = typeof r.default === 'string' && G.ai.labelOf(r.default) ? r.default : '';
           G.ai.sound = !!r.sound;
+          G.ai.paintOn = !!r.paint;
         }).catch(function () { /* an older host: one model, no choice */ });
       }
       return;

@@ -36,7 +36,7 @@
   F.cell = function (hue) {
     const r = G.rand;
     return { sym: 0, n: 1, len: 1, prof: [1, 1, 1, 1, 1], bend: 0, rules: [], en: 0, es: 0.34, ek: 0, mk: 0, ms: 0.25, tk: 0, ts: 0.6,
-      hue: hue === undefined ? r() * 360 : hue, hue2: (r() < 0.5 ? -1 : 1) * (50 + r() * 110), sat: 62 + r() * 20, lit: 58 + r() * 8, pat: 0, psc: 0.5, crest: 0, shell: 0, glow: 0, venom: 0, hd: 1, nk: 0, coat: 0, seed: Math.floor(r() * 1e6) };
+      hue: hue === undefined ? r() * 360 : hue, hue2: (r() < 0.5 ? -1 : 1) * (50 + r() * 110), sat: 62 + r() * 20, lit: 58 + r() * 8, pat: 0, psc: 0.5, crest: 0, shell: 0, glow: 0, venom: 0, hd: 1, nk: 0, coat: 0, hx: 0.85 + r() * 0.4, hq: 1.7 + r() * 1.2, pl: 0, seed: Math.floor(r() * 1e6) };
   };
   F.clone = function (f) {
     const o = {};
@@ -77,6 +77,7 @@
     f.sat = num(f.sat, 52, 88, 70); f.lit = num(f.lit, 52, 72, 62); f.pat = clamp(f.pat | 0, 0, 5); f.psc = num(f.psc, 0.15, 1, 0.5);
     f.crest = num(f.crest, 0, 1, 0); f.shell = num(f.shell, 0, 1, 0); f.glow = num(f.glow, 0, 1, 0); f.venom = num(f.venom, 0, 1, 0); f.seed = (f.seed | 0) || 1;
     f.hd = num(f.hd, 0.7, 1.9, 1); f.nk = num(f.nk, 0, 0.7, 0); f.coat = clamp(f.coat | 0, 0, 3);
+    f.hx = num(f.hx, 0.72, 1.45, 1); f.hq = num(f.hq, 1.5, 4, 2); f.pl = Math.max(0, f.pl | 0);
     delete f._k;
     return f;
   };
@@ -145,9 +146,12 @@
     }
     // a child of a new colour: rare, but it is how a pond comes to hold several colours
     if (r() < 0.03 * wild) { f.hue += 50 + r() * 260; if (r() < 0.5) f.hue2 = (r() < 0.5 ? -1 : 1) * (40 + r() * 140); note('was born a new colour', true); }
+    // a whole new way of carrying the body: one of the builds this pond has been given
+    { const pls = G.W && G.W.plans ? G.W.plans : []; if (pls.length && !f.sym && f.n >= 2 && r() < 0.008 * wild) { const p = pls[Math.floor(r() * pls.length)]; if (p.id !== f.pl) { f.pl = p.id; note('took on a whole new build: the ' + p.name.toLowerCase(), true); } } else if (f.pl && r() < 0.008 * wild) { f.pl = 0; note('gave up its build for a plainer one', true); } }
     // heads, necks and coats
     if (r() < 0.022 * wild) { const k = Math.floor(r() * 4); if (k !== f.coat) { f.coat = k; note(['lost its coat: bare skin again', 'grew scales', 'grew fur', 'grew feathers'][k], true); } }
     if (f.n > 1 && !f.sym && r() < 0.025 * wild) { const up = r() < 0.65; f.nk = clamp(f.nk + (up ? 0.25 : -0.25), 0, 0.7); note(up ? 'its neck narrowed: a head set apart from the body' : 'its neck thickened', true); }
+    if (r() < 0.02 * wild) { f.hx = 0.72 + r() * 0.73; f.hq = 1.5 + r() * 2.5; note(f.hq > 3 ? 'its head grew square' : f.hq < 1.8 ? 'its head grew pointed' : f.hx > 1.2 ? 'its head grew wide' : f.hx < 0.85 ? 'its head grew tall' : 'its head changed shape', true); }
     if (r() < 0.022 * wild) { const up = r() < 0.6; f.hd = clamp(f.hd + (up ? 0.22 : -0.22), 0.7, 1.9); note(up ? 'its head grew' : 'its head shrank', true); }
     // a kind of part the pond was given gets its trial: now and then a child grows one, in place of an old growth if the body is full.
     // From there it is graded like everything else: by what it does for the body, by its cost, and by whether mates like the look.
@@ -160,10 +164,18 @@
         note('grew a ' + d.name.toLowerCase(), true);
       }
     }
+    // the body answers the world it is born into (see the pressures): a coat, a build, eyes, a colour
+    const B = press ? press.body : null;
+    if (B) {
+      if (B.coat >= 0 && f.coat !== B.coat && r() < 0.14 * wild) { f.coat = B.coat; note(B.coat === 2 ? 'grew fur against the cold' : B.coat === 1 ? 'grew scales against the poison' : 'shed its coat in the heat', true); }
+      if (B.plump && r() < 0.22 * wild) { const k = 1 + 0.1 * B.plump; f.prof[1] *= k; f.prof[2] *= k; f.prof[3] *= k; note(B.plump > 0 ? 'grew plumper, to hold its warmth' : 'grew slimmer, to shed heat', false); }
+      if (B.eyes && r() < 0.14 * wild) { f.es += 0.06; if (f.en < 2 && r() < 0.5) f.en++; note('its eyes grew, for the dark', false); }
+      if (B.hue >= 0 && r() < 0.22 * wild) { let d = ((B.hue - f.hue + 540) % 360) - 180; if (Math.abs(d) > 6) { f.hue += Math.sign(d) * Math.min(Math.abs(d), 10 + r() * 22); note('its colour drifted towards ' + (B.like || 'what hunts it'), false); } }
+    }
     // what the pond is up against makes the fitting answer a likelier thing to stumble on
     const pp = press ? press.part : null;
     if (pp) {
-      const hit = function (i) { return pp[i] > 0 && r() < 0.03 * wild * Math.min(2.5, pp[i]); };
+      const hit = function (i) { return pp[i] > 0 && r() < 0.055 * wild * Math.min(2.5, pp[i]); };
       if (hit(2) && !has(f, 2) && !has(f, 7) && f.rules.length < MAXR) { const k = r() < 0.6 ? 2 : 7; f.rules.push(newRule(f.n, k)); note('grew ' + KMANY[k], true); }
       if (hit(3) && f.shell < 1) { f.shell = clamp(f.shell + 0.4, 0, 1); note('grew a shell', true); }
       if (hit(6) && f.venom < 1) { f.venom = clamp(f.venom + 0.5, 0, 1); note('grew poison glands', true); }
@@ -179,7 +191,7 @@
     const d = function () { if (r() < m * 2) { drift = true; return n(); } return 0; };
     f.len *= 1 + d() * 0.08;
     for (let i = 0; i < 5; i++) f.prof[i] *= 1 + d() * 0.14;
-    f.bend += d() * 0.05; f.hd *= 1 + d() * 0.07; f.nk += d() * 0.04;
+    f.bend += d() * 0.05; f.hd *= 1 + d() * 0.07; f.nk += d() * 0.04; f.hx *= 1 + d() * 0.08; f.hq *= 1 + d() * 0.1;
     f.hue += d() * 12; f.hue2 += d() * 14; f.sat += d() * 5; f.lit += d() * 4;
     f.es += d() * 0.04; f.ek += d() * 0.12; f.ms += d() * 0.05; f.ts += d() * 0.1; f.psc += d() * 0.1;
     for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; q.l *= 1 + d() * 0.12; q.w *= 1 + d() * 0.1; q.g += d() * 0.15; q.c += d() * 0.15; }
@@ -195,7 +207,7 @@
     if (r() < 0.5) { g.tk = o.tk; g.ts = o.ts; }
     if (r() < 0.5) { g.pat = o.pat; g.psc = o.psc; }
     if (r() < 0.5) { g.hue = o.hue; g.hue2 = o.hue2; g.sat = o.sat; g.lit = o.lit; }
-    if (r() < 0.5) { g.hd = o.hd; g.nk = o.nk; } if (r() < 0.5) g.coat = o.coat;
+    if (r() < 0.5) { g.hd = o.hd; g.nk = o.nk; g.hx = o.hx; g.hq = o.hq; } if (r() < 0.5) g.pl = o.pl; if (r() < 0.5) g.coat = o.coat;
     if (r() < 0.5) g.crest = o.crest; if (r() < 0.5) g.shell = o.shell; if (r() < 0.5) g.glow = o.glow; if (r() < 0.5) g.venom = o.venom;
     if (o.rules.length && r() < 0.35 && g.rules.length < MAXR) { const q = o.rules[Math.floor(r() * o.rules.length)]; if (!has(g, q.k)) { const c = cpRule(q); c.on = -1; g.rules.push(c); } }
     return F.fix(g);
@@ -206,6 +218,9 @@
     const c = { k: [0, 0, 0, 0, 0, 0, 0, 0, 0], dfx: { speed: 0, agility: 0, reach: 0, senses: 0, armour: 0, attack: 0 }, dAdj: '', sites: 0, legSites: 0, reach: 0, pincer: 0, paddle: 0, fingers: 0, kinds: 0, mass: 0 };
     const seen = {}, N = [], RL = [], HEAD = [];      // per growth: how many there are, how far its tip is from the body, and whether it is at the front
     c.nested = 0;
+    const plan = f.pl && G.planOf ? G.planOf(f.pl) : null;
+    c.plan = plan;
+    if (plan) for (const ab in c.dfx) c.dfx[ab] += plan.fx[ab] || 0;
     for (let i = 0; i < f.rules.length; i++) {
       const q = f.rules[i];
       const dsg = dsgOf(q);
@@ -223,6 +238,7 @@
       if (q.k === 3) c.reach = Math.max(c.reach, RL[i] * (HEAD[i] ? 1.2 : 0.6));
       if (par && !HEAD[i]) c.reach = Math.max(c.reach, RL[i] * 0.55);
     }
+    if (plan && plan.stands && plan.legs.length >= 2) c.legSites = Math.max(c.legSites, 4);
     return c;
   };
   F.abilities = function (f, c) {
@@ -303,7 +319,7 @@
     const BASE = { speed: 0.42, agility: 0.3, reach: 0.5, senses: 0.35, armour: 0.22, attack: 0.3 };
     let top = 'speed'; for (let i = 0; i < 6; i++) if (a[ABIL[i]] - BASE[ABIL[i]] > a[top] - BASE[top]) top = ABIL[i];
     const noun = f.sym ? (f.sym <= 5 ? 'Star' : 'Bloom') : (f.n === 1 && !f.rules.length) ? 'Cell' : (f.n <= 2 && c.sites <= 2 && !f.en) ? 'Blob' : { speed: 'Darter', agility: 'Dancer', reach: 'Grabber', senses: 'Watcher', armour: 'Shellback', attack: 'Hunter' }[top];
-    const kind = (feat ? feat + ' ' : '') + noun;
+    const kind = (feat ? feat + ' ' : '') + (c.plan && !f.sym ? c.plan.noun : noun);
     return { adj: adj, feat: feat, noun: noun, kind: kind, full: adj + ' ' + kind };
   };
   /** the body in short facts, for the inspector, the story and the judge */
@@ -315,6 +331,7 @@
     t.push(f.en === 0 ? 'no eyes' : f.en === 1 ? 'one ' + (f.es > 0.45 ? 'big ' : '') + 'eye' : f.en + (f.ek > 0.25 ? ' eyes on stalks' : f.es > 0.45 ? ' big eyes' : ' eyes'));
     if (f.mk) t.push(['', 'a beak', 'toothed jaws', 'a sucker mouth', 'whiskers'][f.mk]);
     if (f.tk && !f.sym && f.n > 1) t.push(['', 'a fan tail', 'a forked tail', 'a whip tail', 'a club tail'][f.tk]);
+    if (c.plan && !f.sym) t.unshift('the build of a ' + c.plan.name.toLowerCase() + ' (' + c.plan.note.toLowerCase().replace(/\.$/, '') + ')');
     if (f.nk > 0.35 && f.n > 1 && !f.sym) t.push('a head set on a neck'); if (f.hd > 1.45) t.push('a big head'); if (f.coat) t.push('a coat of ' + COATS[f.coat]);
     if (c.nested) t.push('parts growing on parts');
     if (f.shell > 0.25) t.push('a shell'); if (f.crest > 0.25) t.push('a crest along its back'); if (f.glow > 0.3) t.push('glowing lights'); if (f.venom > 0.3) t.push('poison glands');
@@ -336,6 +353,7 @@
     if (a.mk !== b.mk) push(['its mouth became a plain opening', 'grew a beak', 'grew jaws', 'its mouth became a sucker', 'grew whiskers'][b.mk], b.mk > 0);
     if (a.tk !== b.tk) push(['lost its tail', 'grew a fan tail', 'grew a forked tail', 'grew a whip tail', 'grew a club tail'][b.tk], b.tk > 0);
     if (a.pat !== b.pat) push('skin turned ' + ['plain', 'striped', 'spotted', 'pale-bellied', 'ringed', 'saddled'][b.pat], true);
+    if ((a.pl | 0) !== (b.pl | 0)) { const p = b.pl && G.planOf ? G.planOf(b.pl) : null; push(p ? 'took on a whole new build: the ' + p.name.toLowerCase() : 'gave up its build', !!p); }
     if (a.coat !== b.coat) push(b.coat ? 'grew a coat of ' + COATS[b.coat] : 'lost its coat', !!b.coat);
     if ((a.nk > 0.35) !== (b.nk > 0.35)) push(b.nk > 0.35 ? 'its head is now set on a neck' : 'lost its neck', b.nk > 0.35);
     if ((a.hd > 1.45) !== (b.hd > 1.45)) push(b.hd > 1.45 ? 'grew a big head' : 'its head shrank', b.hd > 1.45);
@@ -359,7 +377,7 @@
     const hr = f.hue * Math.PI / 180;
     v.push(Math.cos(hr) * 0.6, Math.sin(hr) * 0.6, f.shell > 0.25 ? 0.6 : 0, f.crest > 0.25 ? 0.5 : 0, f.glow > 0.3 ? 0.6 : 0, f.venom > 0.3 ? 0.6 : 0);
     for (let i = 1; i < 4; i++) v.push(f.coat === i ? 0.7 : 0);
-    v.push(f.nk * 0.9, (f.hd - 1) * 0.8);
+    v.push(f.nk * 0.9, (f.hd - 1) * 0.8, (f.hx - 1) * 0.7, (f.hq - 2) * 0.25, f.pl ? 1.3 : 0, f.pl ? ((f.pl * 37) % 11) / 11 : 0);
     let nest = 0; for (let i = 0; i < f.rules.length; i++) if (f.rules[i].on >= 0) nest++;
     v.push(Math.min(2, nest) * 0.5);
     return v;
@@ -367,13 +385,13 @@
   const r2 = function (x) { return Math.round(x * 100) / 100; };
   F.pack = function (f) {
     return [f.sym, f.n, r2(f.len), f.prof.map(r2), r2(f.bend), f.rules.map(function (q) { return [q.k, q.a, q.b, q.e, r2(q.l), r2(q.w), q.j, r2(q.g), r2(q.c), q.t, r2(q.p), q.on === undefined ? -1 : q.on]; }),
-      f.en, r2(f.es), r2(f.ek), f.mk, r2(f.ms), f.tk, r2(f.ts), Math.round(f.hue), Math.round(f.hue2), Math.round(f.sat), Math.round(f.lit), f.pat, r2(f.psc), r2(f.crest), r2(f.shell), r2(f.glow), r2(f.venom), f.seed, r2(f.hd), r2(f.nk), f.coat];
+      f.en, r2(f.es), r2(f.ek), f.mk, r2(f.ms), f.tk, r2(f.ts), Math.round(f.hue), Math.round(f.hue2), Math.round(f.sat), Math.round(f.lit), f.pat, r2(f.psc), r2(f.crest), r2(f.shell), r2(f.glow), r2(f.venom), f.seed, r2(f.hd), r2(f.nk), f.coat, r2(f.hx), r2(f.hq), f.pl | 0];
   };
   F.unpack = function (a) {
     if (!Array.isArray(a) || a.length < 24) return null;
     return F.fix({ sym: a[0], n: a[1], len: a[2], prof: Array.isArray(a[3]) ? a[3].map(Number) : null, bend: a[4],
       rules: (Array.isArray(a[5]) ? a[5] : []).map(function (q) { return { k: q[0], a: q[1], b: q[2], e: q[3], l: q[4], w: q[5], j: q[6], g: q[7], c: q[8], t: q[9], p: q[10], on: q[11] === undefined ? -1 : q[11] }; }),
-      en: a[6], es: a[7], ek: a[8], mk: a[9], ms: a[10], tk: a[11], ts: a[12], hue: a[13], hue2: a[14], sat: a[15], lit: a[16], pat: a[17], psc: a[18], crest: a[19], shell: a[20], glow: a[21], venom: a[22], seed: a[23], hd: a[24], nk: a[25], coat: a[26] });
+      en: a[6], es: a[7], ek: a[8], mk: a[9], ms: a[10], tk: a[11], ts: a[12], hue: a[13], hue2: a[14], sat: a[15], lit: a[16], pat: a[17], psc: a[18], crest: a[19], shell: a[20], glow: a[21], venom: a[22], seed: a[23], hd: a[24], nk: a[25], coat: a[26], hx: a[27], hq: a[28], pl: a[29] });
   };
   F.key = function (f) { return f._k || (f._k = JSON.stringify(F.pack(f))); };
 

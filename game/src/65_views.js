@@ -72,7 +72,8 @@
       } else if (tab === 'organ') {
         const L = (W.organs || []).slice().reverse();
         const DS = (W.designs || []).slice().reverse();
-        if (!L.length && !DS.length) { body.innerHTML = '<div class="empty">New organs and new kinds of body part are invented for this pond every few generations. Evolution decides which ones catch on.</div>'; return; }
+        const PS = (W.plans || []).slice().reverse();
+        if (!L.length && !DS.length && !PS.length) { body.innerHTML = '<div class="empty">New organs and new kinds of body part are invented for this pond every few generations. Evolution decides which ones catch on.</div>'; return; }
         const cards = el('div', 'cards', '', body);
         L.forEach(function (o) {
           let n = 0; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].g.p.some(function (p) { return p.k === 100 + o.id; })) n++;
@@ -80,6 +81,18 @@
           if (o.digest >= 0) fx.push('a new diet');
           el('div', 'card' + (n ? '' : ' dead'), (o.svg ? '<img alt="" width="64" height="64" style="flex:none;background:rgba(7,18,31,.5);border-radius:12px;padding:6px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(o.svg) + '">' : '') + '<div><b>' + esc(o.name) + '</b><p>' + esc(o.note) + '</p><small>' + esc(fx.join(' · ')) + '</small><small>Invented in gen ' + o.gen + (G.ai.labelOf(o.by) ? ' by ' + esc(G.ai.labelOf(o.by)) : '') + ' · carried by <b>' + n + '</b> creatures</small></div>', cards);
         });
+        // the builds this pond was given: whole ways of carrying a body
+        if (PS.length) {
+          el('h3', '', 'BUILDS', body).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:16px 0 8px;color:var(--gold)';
+          const pc = el('div', 'cards', '', body);
+          PS.forEach(function (p, i) {
+            let n = 0, live = null; for (let k = 0; k < W.cre.length; k++) { const ff = W.cre[k].g.f; if (ff.pl === p.id && !ff.sym && ff.n >= 2) { n++; live = live || ff; } }
+            const fx = Object.keys(p.fx).filter(function (k) { return Math.abs(p.fx[k]) > 0.04; }).map(function (k) { return k + ' ' + (p.fx[k] > 0 ? '+' : '−') + Math.abs(p.fx[k]).toFixed(2); });
+            const card = el('div', 'card' + (n ? '' : ' dead'), '<canvas width="192" height="192" style="flex:none;width:96px;height:96px;background:rgba(7,18,31,.5);border-radius:12px"></canvas><div><b>' + esc(p.name) + '</b><p>' + esc(p.note) + '</p><small>' + esc(fx.join(' · ')) + ' · ' + (n ? n + ' alive follow it' : 'nobody follows it yet') + (G.ai.labelOf(p.by) ? ' · imagined by ' + esc(G.ai.labelOf(p.by)) : '') + '</small></div>', pc);
+            const cx = card.querySelector('canvas').getContext('2d'), f = live || G.planDemo(p, (W.hue0 + i * 70) % 360);
+            cx.translate(96, 106); cx.scale(0.5, 0.5); G.form.portrait(cx, f, 1.2, {});
+          });
+        }
         // the kinds of body part this pond was given, each shown on a plain animal
         if (DS.length) {
           el('h3', '', 'KINDS OF BODY PART', body).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:16px 0 8px;color:var(--gold)';
@@ -103,6 +116,8 @@
           const tx = el('div', '', '', card);
           tx.innerHTML = '<b>' + esc(it.name) + '</b><p>' + esc(it.kind) + '</p><small>' + esc(G.form.facts(g.f).slice(0, 4).join(', ')) + '</small><small>Kept in generation ' + it.gen + (it.age ? ' · ' + esc(it.age) : '') + '</small>';
           const row = el('div', '', '', tx); row.style.cssText = 'display:flex;gap:6px;margin-top:6px;flex-wrap:wrap';
+          const mateC = UI.breedWith ? G.W.cre.filter(function (q) { return q.id === UI.breedWith && !q.dead; })[0] : null;
+          if (mateC) { const h = el('button', 'btn sm pulse', '♥ BREED WITH #' + mateC.id, row); h.onclick = function () { closeModal(); G.sfx('discovery'); UI.breedWith = 0; G.breedKept(it, mateC); }; }
           const b = el('button', 'btn sm', 'RELEASE HERE', row);
           b.onclick = function () { closeModal(); G.sfx('click'); G.release(it); };
           const x = el('button', 'btn sm', 'LET GO', row);

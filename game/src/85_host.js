@@ -34,6 +34,7 @@
           G.ai.models = r.models.filter(function (m) { return m && typeof m.id === 'string'; }).slice(0, 12).map(function (m) { return { id: m.id.slice(0, 60), label: String(m.label || m.id).slice(0, 40) }; });
           if (!G.ai.labelOf(G.ai.model)) G.ai.model = typeof r.default === 'string' && G.ai.labelOf(r.default) ? r.default : '';
           G.ai.sound = !!r.sound;
+          G.ai.paintOn = !!r.paint;
         }).catch(function () { /* an older host: one model, no choice */ });
       }
       return;

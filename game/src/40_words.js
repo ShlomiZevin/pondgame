@@ -298,6 +298,7 @@
       if (task === 'event') return Promise.resolve(G.offlineEvent(input));
       if (task === 'story') return Promise.resolve(G.offlineStory(input));
       if (task === 'design') return Promise.resolve(G.offlineDesign());
+      if (task === 'plan') return Promise.resolve(G.offlinePlan());
       if (task === 'judge') return Promise.resolve(null);      // without a server the pond goes by its own taste
       return Promise.reject(new Error('unknown task ' + task));
     },
@@ -308,6 +309,7 @@
         if (task === 'mutation-ideas') return G.host.call('ai.ideas', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('ideas', r.source, r.usd); return r.ideas; });
         if (task === 'event') return G.host.call('ai.event', { text: input, model: G.ai.model || undefined }, 45000).then(function (r) { G.ai.tally('event', r.source, r.usd); return r.event; });
         if (task === 'story') return G.host.call('ai.story', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('story', r.source, r.usd); return r.story; });
+        if (task === 'plan') return G.host.call('ai.plan', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('plan', r.source, r.usd); return r.plan; });
         if (task === 'design') return G.host.call('ai.design', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('design', r.source, r.usd); return r.design; });
         if (task === 'judge') return G.host.call('ai.judge', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('judge', r.source, r.usd); return r.judge; });
         if (task === 'organ') return G.host.call('ai.organ', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('organ', r.source, r.usd); return r.organ; });
@@ -320,13 +322,14 @@
   };
   G.ai = {
     provider: 'offline',
+    drawn: true,         // creatures are drawn by the game, every part moving (the AI-painting path exists but is off)
     cache: {},
     models: [],          // what the server offers: [{ id, label }]
     model: '',           // the player's choice ('' = the server's default)
     // automatic calls (organs, the story, mutation ideas) are limited by wall-clock time and a session budget,
     // so the cost is the same whether the pond runs at 1x or 64x, for a minute or a day
-    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 60000, design: 50000 },
-    caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 24, design: 16 },
+    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 60000, design: 50000, paint: 22000, plan: 60000 },
+    caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 24, design: 16, paint: 16, plan: 12 },
     used: {}, lastAt: {},
     // what this session has asked the server for: { kind: { asked, fresh } }. "fresh" = a model really ran;
     // the rest came from the server's library of earlier decisions and cost nothing.
@@ -337,7 +340,7 @@
     // every answer that came from a server is written down: what it was for, whether a model really ran, and what it cost
     ledger: [],          // this session, newest last: { at, kind, paid, usd }
     life: {},            // this pond since it began (kept in its save): { kind: { asked, fresh, usd } }
-    LABEL: { thing: 'Things you typed', event: 'World events you typed', organ: 'New organs', story: 'Story chapters', ideas: 'Mutation ideas', judge: 'The judge of looks', design: 'New kinds of body part', sound: 'Sounds (Leonardo)' },
+    LABEL: { thing: 'Things you typed', event: 'World events you typed', organ: 'New organs', story: 'Story chapters', ideas: 'Mutation ideas', judge: 'The judge of looks', design: 'New kinds of body part', plan: 'New builds (whole body plans)', paint: 'Painted creatures (Leonardo)', sound: 'Sounds (Leonardo)' },
     tally: function (kind, source, usd) {
       const c = G.ai.count[kind] || (G.ai.count[kind] = { asked: 0, fresh: 0, usd: 0 });
       c.asked++;

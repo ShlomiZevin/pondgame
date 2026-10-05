@@ -10,7 +10,7 @@
     if (!W || W.title) return null;
     const out = {
       v: 1, at: Date.now(), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
-      set: W.set, disc: W.disc, nextSp: W.nextSp, ai: G.ai && G.ai.model ? G.ai.model : '', spend: G.ai ? G.ai.life : {},
+      set: W.set, disc: W.disc, nextSp: W.nextSp, ai: G.ai && G.ai.model ? G.ai.model : '', drawn: G.ai && G.ai.drawn ? 1 : 0, spend: G.ai ? G.ai.life : {},
       hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species]; }),
       discLog: W.discLog.slice(-40),
       hints: Object.keys(G.hints),
@@ -18,7 +18,7 @@
       organs: (W.organs || []).map(function (o) { return { id: o.id, name: o.name, note: o.note, svg: o.svg && o.svg.length < 1500 ? o.svg : '', fx: o.fx, digest: o.digest, hue: Math.round(o.hue), by: o.by, gen: o.gen }; }),
       nextOrgan: W.nextOrgan || 1,
       designs: (W.designs || []).map(function (d) { return { id: d.id, name: d.name, adj: d.adj, note: d.note, place: d.place, motion: d.motion, colour: d.colour, pts: d.pts, smooth: d.smooth, ribs: d.ribs, dots: d.dots, fx: d.fx, by: d.by, gen: d.gen }; }), nextDesign: W.nextDesign || 1,
-      col: G.collection, colD: G.keptDesigns,
+      col: G.collection, colD: G.keptDesigns, colP: G.keptPlans, plans: W.plans || [], nextPlan: W.nextPlan || 1,
       env: W.env, ages: (W.ages || []).slice(-24), hue0: Math.round(W.hue0 || 0), fashion: W.fashion, fashionGen: W.fashionGen | 0,
       story: (W.story || []).slice(-12), events: (W.events || []).slice(-12),
       history: (W.history || []).slice(-90), evShelf: (W.evShelf || []).slice(-10).map(function (e) { const c = JSON.parse(JSON.stringify(e)); if (c.thing) c.thing.svg = ''; return c; }),
@@ -102,6 +102,11 @@
     }
     W.nextSp = Math.floor(num(d.nextSp, 1, 1e6, 1));
     if (d.env && typeof d.env === 'object') W.env = { mix: Array.isArray(d.env.mix) && d.env.mix.length === 6 ? d.env.mix.map(function (v) { return num(v, 0.2, 2, 1); }) : [1, 1, 1, 1, 1, 1], o2: num(d.env.o2, 0.4, 1.5, 1), murk: num(d.env.murk, 0, 1, 0.5), rich: num(d.env.rich, 0.5, 1.6, 1), warm: num(d.env.warm, -0.4, 0.4, 0), green: num(d.env.green, 0.4, 0.95, 0.82), deep: Math.floor(num(d.env.deep, 3, 5, 3)), hue: num(d.env.hue, 0, 360, 190) };
+    G.keptPlans = [];
+    if (Array.isArray(d.colP)) d.colP.slice(0, 16).forEach(function (q) { const o = G.cleanPlan(q); if (!o) return; o.id = Math.floor(num(q.id, 100000, 999999, 100000)); G.keptPlans.push(o); });
+    W.plans = [];
+    if (Array.isArray(d.plans)) d.plans.slice(0, 8).forEach(function (q) { const o = G.cleanPlan(q); if (!o) return; o.id = Math.floor(num(q.id, 1, 1e6, 1)); o.gen = num(q.gen, 0, 1e6, 0); if (!W.plans.some(function (x) { return x.id === o.id; })) W.plans.push(o); });
+    W.nextPlan = Math.max(Math.floor(num(d.nextPlan, 1, 1e6, 1)), W.plans.reduce(function (m, o) { return Math.max(m, o.id + 1); }, 1));
     // what the player has kept comes first of all: its kinds of part are needed to rebuild anything that carries them
     G.keptDesigns = [];
     if (Array.isArray(d.colD)) d.colD.slice(0, 24).forEach(function (q) { const o = G.cleanDesign(q); if (!o) return; o.id = Math.floor(num(q.id, 100000, 999999, 100000)); if (!G.keptDesigns.some(function (x) { return x.id === o.id; })) G.keptDesigns.push(o); });

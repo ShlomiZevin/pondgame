@@ -122,6 +122,7 @@
       orgCost += (0.03 + 0.065 * tot) * q.s;
     }
     const tail = !f.sym && f.tk && f.n > 1;
+    const plump = clamp(((f.prof[1] + f.prof[2] + f.prof[3]) / 3 - 0.7) / 0.5, 0, 1);      // 0 slim .. 1 round
     const bite = Math.min(2, (f.mk === 2 ? 0.8 + 1.6 * f.ms : f.mk === 1 ? 0.6 : 0) + 0.25 * cn.pincer);
     const ds = r / U * Math.sqrt(Math.PI * U * U / FM.area(f));    // drawn so the body covers what a circle of radius r would
     const ph = {
@@ -143,7 +144,10 @@
       tag: G.tagOfHue(f.hue),
       nseg: f.n - 1, limbs: cn.legSites, segs: [],
       reach: clamp(ext.all * ds / r, 1, 3.6),
-      dig: dig, res: [Math.min(1, c[6] + FX.heat * 0.6), Math.min(1, c[7] + FX.cold * 0.6 + (f.coat >= 2 ? 0.15 : 0)), Math.min(1, c[8] + FX.poison * 0.6)],
+      dig: dig, res: [
+        clamp(0.3 * c[6] + FX.heat * 0.6 + (f.coat === 0 ? 0.28 : f.coat === 1 ? 0.12 : -0.12) + 0.3 * (1 - plump) + 0.05 * Math.min(4, k[1] + k[6]), 0, 1),
+        clamp(0.3 * c[7] + FX.cold * 0.6 + (f.coat >= 2 ? 0.42 : 0) + 0.3 * plump, 0, 1),
+        clamp(0.35 * c[8] + FX.poison * 0.6 + (f.coat === 1 ? 0.25 : 0) + 0.28 * f.shell + 0.22 * f.venom, 0, 1)],
       photo: Math.min(2, FX.photo),
       hue: f.hue,
     };
@@ -158,7 +162,8 @@
     ph.jaws = bite >= 0.8;                       // can eat the big prey of the deep
     ph.lungs = cn.legSites >= 4;                 // two pairs of legs carry it onto the shore
     ph.hands = cn.fingers >= 2;                  // fingers at the front pick the shore's food faster
-    ph.warm = ph.res[1] >= 0.55;                 // cold-proof life does not slow down in winter
+    ph.warm = ph.res[1] >= 0.55;
+    ph.plump = plump;                 // cold-proof life does not slow down in winter
     // charm: how well the body fits what all life finds pleasing, and what THIS pond admires
     ph.charm = clamp(FM.taste(f, G.W ? G.W.fashion : null, cn) * 1.15, 0, 1);
     ph.rc = r * (1 + 0.22 * Math.max(0, Math.max(ext.half, ext.wide) * ds / r - 1));

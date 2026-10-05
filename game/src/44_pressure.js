@@ -66,6 +66,14 @@
     }
     if (W.lastStats && W.lastStats.protShort > W.cre.length * 0.3) { P.c[0] += 1.5; P.part[0] += 1; P.list.push('protein is short: elaborate bodies cannot build children on algae alone (scraps and meat are rich)'); }
     if (W.cre.length && W.food.length < 40) { fx('eat', 1.5); fx('sense', 1.5); P.part[4] += 1; P.list.push('food is scarce'); }
+    // the visible answers: a coat, a build, eyes, a colour
+    const B = P.body = { coat: -1, plump: 0, eyes: 0, hue: -1 };
+    if (temp < -0.25) { B.coat = 2; B.plump = 1; } else if (temp > 0.25) { B.coat = 0; B.plump = -1; }
+    if (W.mods.length && G.modSum('poison') > 0.1 && B.coat < 0) B.coat = 1;
+    if (light < 0.7) B.eyes = 1;
+    let worst = null, wv = 0;
+    for (let i = 0; i < W.zones.length; i++) { const z = W.zones[i], p = z.p, harm = (p.eats || 0) + (p.deadly || 0) * 1.5 + (z.alive > 0.25 ? p.poison * 0.5 : 0); if (harm > wv && (z.alive > 0.25 || p.eats > 0.05 || p.deadly > 0.05)) { wv = harm; worst = z; } if (p.poison > 0.3 && B.coat < 0) B.coat = 1; if (p.heat > 0.4 && B.coat < 0) { B.coat = 0; B.plump = -1; } if (p.heat < -0.4 && B.coat < 0) { B.coat = 2; B.plump = 1; } if (p.light < -0.3) B.eyes = 1; }
+    if (worst && wv > 0.2) { B.hue = worst.hue; B.like = worst.word; P.list.push('looking like ' + worst.word + ' is the way to be overlooked by it'); }
     W.press = P;
     return P;
   };

@@ -3,11 +3,13 @@
 //   POST /api/ai/thing   { word }            → { thing }       what a typed word is made of
 //   POST /api/ai/ideas   { gen, species }    → { ideas }       mutation ideas for the living species
 //   POST /api/ai/organ   { the pond now }    → { organ }       a new body part invented for this pond
+//   POST /api/ai/plan    { pressures, have... } → { plan }     a new BUILD: how a whole body is carried (its spine and legs)
 //   POST /api/ai/design  { pressures, have... } → { design }   a new KIND of body part: a shape, how it moves, what it gives
 //   POST /api/ai/judge   { admired, creatures } → { judge }    how striking each kind looks; part of its charm
 //   POST /api/ai/skin    { traits, colour }  → { skin }        how a species looks, drawn from its real traits
 //   POST /api/ai/event   { text }            → { event }       free text → something that happens
 //   POST /api/ai/story   { measured facts }  → { story }       what changed and why, in plain words
+//   POST /api/ai/paint   { sig, build, facts, colours, world } → { paint }  a painting of a kind of creature (only with LEONARDO_API_KEY)
 //   POST /api/ai/sound   { word, note }      → { sound }       a sound for a thing (only with LEONARDO_API_KEY)
 //   GET  /api/pond                           → { save, report } the player's pond, advanced to now
 //   PUT  /api/pond       { save }            → { ok }          store the player's pond
@@ -27,6 +29,7 @@ const { createAi, modelsFromEnv, getUsage, attachBooks } = require('./lib/ai');
 const { createPonds } = require('./lib/pond');
 const { createOffline } = require('./lib/offline');
 const { createSounds } = require('./lib/sound');
+const { createPainter } = require('./lib/paint');
 
 // A local key file, never committed: primordia-server/.env.local  (KEY=value lines). The real environment always wins.
 function loadEnv() {
@@ -69,6 +72,8 @@ function createApp(opts = {}) {
   const ai = createAi({ store, models, defaultModel: opts.defaultModel || process.env.PRIMORDIA_MODEL, offline, rand: opts.rand });
   const logErr = (err) => console.error('model failed:', err.message);
   const sounds = opts.sounds || createSounds({ store, apiKey: opts.leonardoKey });
+  const painter = opts.painter || createPainter({ store, apiKey: opts.leonardoKey });
+  const paintLimiter = createLimiter(Number(process.env.PRIMORDIA_PAINTS_PER_HOUR) || 30);
   const soundLimiter = createLimiter(opts.soundsPerHour || Number(process.env.PRIMORDIA_SOUNDS_PER_HOUR) || 20);
   const ponds = createPonds({ store, now: opts.now });
   const whoIs = opts.whoIs || defaultWhoIs;
@@ -135,8 +140,13 @@ function createApp(opts = {}) {
     const who = whoIs(req);
     if (url.pathname.startsWith('/api/') && !who) return send(res, 401, { error: 'signin_required' });
 
-    if (route === 'GET /api/ai/models') return send(res, 200, { models: ai.models(), default: ai.defaultModel, sound: sounds.enabled() });
+    if (route === 'GET /api/ai/models') return send(res, 200, { models: ai.models(), default: ai.defaultModel, sound: sounds.enabled(), paint: painter.enabled() });
     // a sound for a thing: made once per word (Leonardo), then served from the store
+    if (route === 'POST /api/ai/paint') {
+      const body = await readJson(req, 4000);
+      const r = await painter.forLook(body, { canGenerate: () => paintLimiter.take(who), onError: (e) => console.error('paint failed:', e.message) });
+      return send(res, r.error ? (r.error === 'not_painted' || r.error === 'no_painter' ? 404 : r.error === 'empty' ? 400 : 503) : 200, r);
+    }
     if (route === 'POST /api/ai/sound') {
       const body = await readJson(req, 2000);
       const word = String(body.word || '').trim().slice(0, 40);
@@ -168,6 +178,10 @@ function createApp(opts = {}) {
     if (route === 'POST /api/ai/design') {
       const body = await readJson(req, 4000);
       return send(res, 200, await ai.design(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr }));
+    }
+    if (route === 'POST /api/ai/plan') {
+      const body = await readJson(req, 4000);
+      return send(res, 200, await ai.plan(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr }));
     }
     if (route === 'POST /api/ai/judge') {
       const body = await readJson(req, 4000);

@@ -361,14 +361,17 @@
     G.R.flash = 1; G.R.flashCol = G.PAL.gold; G.R.shake = 0.4;
     G.sfx('discovery');
   });
+  G.on('plan-new', function (p) { if (G.mode !== 'play') return; const t = 'A whole new build is now possible in this pond: the ' + p.name + '. ' + p.note; G.log('disc', 'A new build', t); if (G.speed <= 16) G.banner('A body nobody has seen', t, 7500); });
   G.on('design-new', function (d) { if (G.mode !== 'play') return; const t = 'A new kind of body part is now possible in this pond: the ' + d.name + '. ' + d.note + (d.by ? '' : ''); G.log('disc', 'A new kind of part', t); if (G.speed <= 16) G.banner('Something never seen before', t, 7000); });
   G.on('new-pond', function () { if (G.form.clearCache) G.form.clearCache(); });
+  G.on('bred', function (it, c) { if (G.mode !== 'play') return; G.log('disc', 'Bred', it.name + ' and #' + c.id + ' had six children.'); G.banner('A new family', 'Six children of ' + it.name + ' and a creature of this pond were born. Watch what they become.', 5200); G.focusOn(c.x, c.y, 1.8); });
   G.on('released', function (it, x, y) { if (G.mode !== 'play') return; G.log('disc', 'Released', it.name + ' (' + it.kind + ') now lives in this pond.'); G.focusOn(x, y, 1.8); });
   G.on('sickness', function (kind, n, crowd) { if (G.mode !== 'play') return; const t = 'There are so many ' + kind.toLowerCase() + 's (' + Math.round(crowd * 100) + '% of the pond) that a sickness spreads among them. ' + n + ' will not see spring; the rarer kinds are hardly touched.'; G.log('sel', 'A sickness of the many', t); if (G.speed <= 16) G.banner('Too many of one kind', t, 6500); });
+  G.on('painted', function (sig, info, source) { if (G.mode !== 'play') return; G.log('sp', 'Painted', (info.name || 'A kind') + ', a ' + String(info.kind || '').toLowerCase() + ', has been painted' + (source === 'library' ? ' (from the library, free).' : '.')); });
   G.on('fashion', function (t) { if (G.mode !== 'play') return; G.log('sp', 'Taste has shifted', t + '. Those who have it will find mates more easily.'); UI.eraSig = ''; });
   G.on('judged', function (s) { if (G.mode !== 'play') return; G.log('sp', 'The judge on the ' + s.name, (s.judge.why || 'no comment') + ' (looks: ' + Math.round(s.judge.score * 10) + '/10)'); });
   G.on('zone-killed', function (z) { if (G.mode !== 'play') return; const t = 'The pond killed ' + z.word + '! Creatures with ' + G.WEAK[z.weak].text + ' wore it down.'; G.log('disc', 'Victory', t); G.banner('Life fought back', t, 6000); });
-  G.on('event', function (ev) { if (G.mode !== 'play') return; if (ev.got) ev.note = (ev.note ? ev.note + ' ' : '') + ev.got + ' creatures grew ' + ev.gift.trait + '.'; G.log('sel', ev.name, ev.note); G.banner('It happened', ev.name + (ev.note ? ': ' + ev.note : ''), 5200); });
+  G.on('event', function (ev) { if (G.mode !== 'play') return; if (ev.got) ev.note = (ev.note ? ev.note + ' ' : '') + ev.got + ' creatures grew ' + ev.gift.trait + '.'; G.log('sel', (ev.nature ? 'Nature: ' : '') + ev.name, ev.note); G.banner('It happened', ev.name + (ev.note ? ': ' + ev.note : ''), 5200); });
   G.on('story', function (s) { if (G.mode !== 'play') return; G.log('disc', s.title, s.text); if (G.speed <= 16) G.banner('The story so far · ' + s.title, s.text, 9000); });
   G.on('organ-new', function (o) { if (G.mode === 'play') G.log('disc', 'New organ', o.name + (G.ai.labelOf(o.by) ? ' (imagined by ' + G.ai.labelOf(o.by) + ')' : '') + ': ' + o.note); });
   G.on('zone-bud', function (child, z) { if (G.mode === 'play') G.log('sp', z.word + ' spread', 'A new patch grew nearby, a little different.'); });
@@ -541,9 +544,10 @@
       '<div class="irows"><div id="iE"></div><div id="iAge"></div><div id="iPar" style="grid-column:span 2"></div><div class="meter"><i id="iEb"></i></div></div>' +
       '<div class="ilabel">Brain</div><canvas id="ibrain" width="560" height="184"></canvas><div class="imut" id="imut"></div>' +
       '<div class="ilabel">Fitness</div><div id="ifit" style="font-size:11.5px;line-height:1.4"></div>' +
-      '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond.">★ KEEP</button><button class="btn sm" id="itree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide">' + ICON.book + 'SPECIES</button></div>';
+      '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond.">★ KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection.">♥ BREED</button><button class="btn sm" id="itree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide">' + ICON.book + 'SPECIES</button></div>';
     $('iclose').onclick = function () { G.select(null); };
     $('itree').onclick = function () { G.sfx('click'); G.openTree(); };
+    $('ibreed').onclick = function () { const c = G.R.sel; if (!c) return; G.sfx('click'); if (!G.collection.length) { G.banner('Nothing to breed it with yet', 'First ★ KEEP a creature you like (from this pond or another). Then choose it here to breed the two.', 5200); return; } UI.breedWith = c.id; UI.guideTab = 'coll'; G.openGuide(); };
     $('ikeep').onclick = function () { const c = G.R.sel; if (!c) return; const it = G.keep(c); if (it) { G.sfx('discovery'); G.banner('Kept in your collection', it.name + ', a ' + it.kind.toLowerCase() + '. Find it in the Book of Life under COLLECTION; you can release it into any pond.', 5200); } };
     $('iguide').onclick = function () { G.sfx('click'); UI.guideTab = 'live'; G.openGuide(); };
     G.on('select', function (c) {

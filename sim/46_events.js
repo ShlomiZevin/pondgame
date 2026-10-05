@@ -122,6 +122,8 @@
 
   // ── the game's own reading of a sentence (no server needed) ──
   const RULES = [
+    [/mud|murk|swamp|stagnant|fog|silt/, { name: 'Murky water', note: 'The water thickens. Light dies quickly and breath comes hard.', hue: 60, shake: 0.2, duration: 30, light: -0.2, water: { oxygen: -0.6, murk: 0.8 } }],
+    [/clear water|crystal|fresh/, { name: 'Fresh water', note: 'The water clears and fills with air. Bigger bodies can breathe.', hue: 190, shake: 0.1, fx: 'bubbles', duration: 30, water: { oxygen: 0.8, murk: -0.6 } }],
     [/ice age|freez|frozen|blizzard|snow|winter|cold|frost/, { name: 'A great cold', note: 'The water turns bitter cold. Only the cold-proof are comfortable.', temp: -0.8, light: -0.2, food: 0.5, duration: 80, hue: 205, shake: 0.2 }],
     [/heat|hot|boil|drought|desert|sun burn|scorch|fire|lava|volcan/, { name: 'A great heat', note: 'The water warms and the algae thin out.', temp: 0.8, food: 0.5, duration: 70, hue: 15, shake: 0.4 }],
     [/dark|eclipse|night|shadow|black/, { name: 'The long dark', note: 'The light fades. Light-eaters go hungry; the deep hardly notices.', light: -0.8, food: 0.6, duration: 70, hue: 250, shake: 0.1 }],
@@ -139,6 +141,27 @@
     [/poison|pollut|toxic|acid|oil|sewage|trash|venom|contaminat/, { name: 'Poisoned water', note: 'The whole pond turns foul. Only the poison-proof are comfortable.', poison: 0.65, food: 0.8, duration: 110, hue: 95, shake: 0.3, fx: 'spores' }],
     [/rain|food|manna|snack|candy|sugar|cake|pizza/, { name: 'A rain of food', note: 'It falls everywhere at once.', feed: { count: 180, tag: 0 }, food: 1.6, duration: 30, hue: 45, shake: 0.1 }],
   ];
+  // ── nature's own surprises: nobody asked for them ──
+  const NATURE = ['a cold snap', 'a heat wave', 'the long dark', 'a golden season of plenty', 'a great storm', 'strange days of mutation', 'murky water', 'fresh clear water', 'a sickness', 'a rain of food'];
+  G.natureTick = function (gen) {
+    const W = G.W;
+    if (!W || W.title || gen < 18) return;
+    // has the pond stopped changing? the same commonest shape for a long time makes it restless
+    const top = W.kinds && W.kinds.length ? W.kinds[0][0] : '';
+    if (top !== W.staleKind) { W.staleKind = top; W.staleGen = gen; }
+    const stale = gen - (W.staleGen || gen), since = gen - (W.natureGen || 0);
+    if (since < 14) return;
+    if (G.rand() < 0.045 + (stale > 25 ? 0.12 : 0) + (since > 45 ? 0.2 : 0)) {
+      const ev = G.offlineEvent(NATURE[Math.floor(G.rand() * NATURE.length)]);
+      if (!ev) return;
+      ev.kill.share = Math.min(ev.kill.share, 0.25);                // nature shakes the pond; it does not empty it
+      ev.note = (ev.note ? ev.note + ' ' : '') + 'Nobody caused it: it is the pond\'s own weather.';
+      ev.nature = true;
+      W.natureGen = gen;
+      if (stale > 25) { ev.mutate = Math.max(ev.mutate, 2.2); ev.duration = Math.max(ev.duration, 70); W.staleGen = gen; }
+      G.runEvent(ev);
+    }
+  };
   G.offlineEvent = function (text) {
     const low = String(text || '').toLowerCase();
     // which gift or fashion is meant, if the words name one

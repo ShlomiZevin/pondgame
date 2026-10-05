@@ -44,7 +44,7 @@
     }
     const p = props || {};
     return G.form.fix({ sym: look.sym, n: n, len: 1, prof: [0.9 * look.plump, 1.2 * look.plump, 1.1 * look.plump, 0.85 * look.plump, 0.5], bend: 0, rules: rules, en: look.eyes, es: 0.48, ek: 0, mk: look.mouth, ms: 0.4, tk: look.tail, ts: 0.9,
-      hue: hue, hue2: look.hue2 >= 0 ? ((look.hue2 - hue + 540) % 360) - 180 : 150, sat: 74, lit: 62, pat: look.pat, psc: 0.5, crest: 0, shell: (p.hard || 0) > 0.4 ? 0.8 : 0, glow: look.glow ? 1 : 0, venom: (p.poison || 0) > 0.3 ? 1 : 0, hd: look.big ? 1.5 : 1.1, nk: 0.2, coat: look.coat, seed: (seed | 0) || 7 });
+      hue: hue, hue2: look.hue2 >= 0 ? ((look.hue2 - hue + 540) % 360) - 180 : 150, sat: 74, lit: 62, pat: look.pat, psc: 0.5, crest: 0, shell: (p.hard || 0) > 0.4 ? 0.8 : 0, glow: look.glow ? 1 : 0, venom: (p.poison || 0) > 0.3 ? 1 : 0, hd: look.big ? 1.5 : 1.1, nk: 0.2, hx: 1, hq: 2, pl: 0, coat: look.coat, seed: (seed | 0) || 7 });
   };
   /** the form of a thing in the pond, if it is a being (worked out once) */
   G.zoneForm = function (z) {

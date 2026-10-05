@@ -34,11 +34,32 @@
       if (!k) { k = JSON.parse(JSON.stringify(d)); k.id = 100000 + G.keptDesigns.reduce(function (m, x) { return Math.max(m, x.id - 99999); }, 0); G.keptDesigns.push(k); }
       q.t = k.id;
     }
+    if (g.f.pl && g.f.pl < 100000) {         // and the build it follows
+      const p = G.planOf(g.f.pl);
+      if (!p) g.f.pl = 0;
+      else { const sig = p.name + JSON.stringify(p.spine); let k = G.keptPlans.filter(function (x) { return x.name + JSON.stringify(x.spine) === sig; })[0]; if (!k) { k = JSON.parse(JSON.stringify(p)); k.id = 100000 + G.keptPlans.reduce(function (m, x) { return Math.max(m, x.id - 99999); }, 0); G.keptPlans.push(k); if (G.keptPlans.length > 16) G.keptPlans.shift(); } g.f.pl = k.id; }
+    }
     G.form.fix(g.f);
     const item = { name: (sp ? sp.name : 'Creature') + ' #' + c.id, kind: G.form.kind(g.f).full, age: G.ageNow ? G.ageNow().name : '', gen: G.W.gen, g: G.packGenome(g) };
     G.collection.push(item); if (G.collection.length > MAXKEEP) G.collection.shift();
     G.emit('kept', item);
     return item;
+  };
+  /** breed a kept creature with one living in this pond: six children of the two, born beside the one in the pond */
+  G.breedKept = function (item, c) {
+    const W = G.W, g0 = G.unpackGenome(item.g);
+    if (!g0 || !W || !c || c.dead) return 0;
+    for (let i = 0; i < g0.f.rules.length; i++) { const q = g0.f.rules[i]; if (q.k === 8 && q.t >= 100000 && !W.designs.some(function (x) { return x.id === q.t; })) { const d = G.designOf(q.t); if (d && W.designs.length < 12) W.designs.push(JSON.parse(JSON.stringify(d))); } }
+    let n = 0;
+    for (let i = 0; i < 6; i++) {
+      const res = G.mutate(i % 2 ? G.crossover(g0, c.g) : G.crossover(c.g, g0), 0.5, null);
+      const kid = G.makeCreature(res.g, c, null, res.muts);
+      kid.sp = c.sp; kid.E = kid.ph.Emax * 0.6; kid.P = kid.ph.Emax * 0.4;
+      W.births.push({ at: W.st + 0.1 + G.rand() * 1.2, c: kid, x: c.x + G.randn() * 50, y: c.y + G.randn() * 40, from: c }); n++;
+    }
+    W.discLog.push({ key: 'bred' + W.gen + c.id, text: 'You bred ' + item.name + ' with a creature of this pond: six children of the two were born.', gen: W.gen });
+    G.emit('bred', item, c);
+    return n;
   };
   /** set a kept creature free in this pond: a small family of it, each a little different, to breed with what lives here */
   G.release = function (item) {

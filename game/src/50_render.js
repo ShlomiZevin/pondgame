@@ -517,6 +517,67 @@ function drawAddedThings() {
 
 // ── layer 7: creatures ──
 // c: a creature, or anything shaped like one (g, ph, ang, id, glow, look...). a = interpolation, t = time.
+G.R.SIDE = 70;        // how many portrait units make one body radius: sets how big a character stands in the pond
+// In the pond a creature is its character: it stands, hops as it swims, leans into its speed, turns to face where it is going,
+// and its face shows how it is doing. c: a creature; x, y: where its feet are.
+// A painting is one picture, so it is moved the only way one picture can be: by bending it, in the way its build moves.
+//   what swims: a ripple runs from head to tail, strongest at the tail, so the body and tail fin beat
+//   bells, blobs, orbs, stars: it pulses, and what hangs below sways
+//   what walks: the body bobs, and the legs under it step one after another
+// x0..x0+w, y0..y0+h is where the whole picture goes. sp: how hard it is moving (0..1).
+function drawPaintMoving(ctx, p, build, x0, y0, w, h, t, id, sp, still) {
+  const cv = p.cv, pw = p.w, ph = p.h;
+  if (still) { ctx.drawImage(cv, x0, y0, w, h); return; }
+  if (build === 'fish' || build === 'serpent' || build === 'microbe') {
+    const N = 16, amp = h * (build === 'serpent' ? 0.1 : 0.075) * (0.3 + 0.7 * sp), f = 5 + 5 * sp;
+    for (let i = 0; i < N; i++) { const s0 = Math.round(i * pw / N), s1 = Math.round((i + 1) * pw / N), u = (i + 0.5) / N, off = Math.sin(t * f + (1 - u) * 3.4 + id) * amp * Math.pow(1 - u, 1.4); ctx.drawImage(cv, s0, 0, s1 - s0, ph, x0 + s0 / pw * w, y0 + off, (s1 - s0) / pw * w + 0.6, h); }
+  } else if (build === 'jelly' || build === 'blob' || build === 'orb' || build === 'star') {
+    const N = 14, soft = build === 'jelly' ? 1.6 : build === 'blob' ? 1 : 0.5;
+    for (let j = 0; j < N; j++) { const s0 = Math.round(j * ph / N), s1 = Math.round((j + 1) * ph / N), v = (j + 0.5) / N, sx = 1 + 0.05 * soft * Math.sin(t * 3 - v * 3 + id), xo = Math.sin(t * 2.2 + v * 4 + id) * w * 0.045 * soft * v * v; ctx.drawImage(cv, 0, s0, pw, s1 - s0, x0 + w / 2 - w * sx / 2 + xo, y0 + s0 / ph * h, w * sx, (s1 - s0) / ph * h + 0.6); }
+  } else {
+    const cut = Math.round(ph * 0.62), N = 9, f = 7 + 6 * sp, lift = h * 0.06 * (0.25 + sp);
+    for (let i = 0; i < N; i++) { const s0 = Math.round(i * pw / N), s1 = Math.round((i + 1) * pw / N), up = Math.max(0, Math.sin(t * f + i * 2.1 + id)) * lift; ctx.drawImage(cv, s0, cut, s1 - s0, ph - cut, x0 + s0 / pw * w, y0 + cut / ph * h - up, (s1 - s0) / pw * w + 0.6, (ph - cut) / ph * h); }      // the legs, stepping
+    ctx.drawImage(cv, 0, 0, pw, cut + 1, x0, y0 + Math.sin(t * f * 0.5 + id) * h * 0.012, w, (cut + 1) / ph * h);
+  }
+}
+function drawCharacter(ctx, c, x, y, scale, t, opt) {
+  const ph = c.ph, g = c.g, f = g.f, r = ph.r * scale * R.VIS, id = c.id || 1;
+  const alpha = opt.alpha === undefined ? 1 : opt.alpha; if (alpha <= 0.02) return;
+  const pop = c.birthT > 0 ? 1 - c.birthT * c.birthT : 1, sp = Math.min(1, (c.squash || 0) / 1.1), weak = c.E !== undefined && c.E < ph.Emax * 0.15;
+  const vx = Math.cos(c.ang || 0);
+  c.fc = c.fc === undefined ? (vx >= 0 ? 1 : -1) : c.fc + ((vx > 0.2 ? 1 : vx < -0.2 ? -1 : c.fc > 0 ? 1 : -1) - c.fc) * 0.18;      // turning round takes a moment
+  const spc = c.sp ? spOf(G.W, c.sp) : null, paint = G.ai.drawn ? null : (G.paintOf ? G.paintOf(c, spc) : null);
+  const walks = G.form.walks(c.g.f._b || (c.g.f._b = G.form.build(c.g.f)), c.g.f);
+  const still = c.asleep, hopT = t * (4.5 + 5 * sp) + id, hop = still ? 0 : walks ? Math.abs(Math.sin(hopT)) * r * (0.06 + 0.3 * sp) : (0.5 + 0.5 * Math.sin(t * 1.7 + id)) * r * 0.5;
+  const land = still ? 1 : walks ? 1 - Math.abs(Math.sin(hopT)) : 0;          // 1 at the moment a walker touches down: it squashes there
+  const shiver = c.chill > 0.05 ? Math.sin(t * 38 + id) * r * 0.035 : 0;
+  const s = r / R.SIDE * (0.3 + 0.7 * pop) * (weak ? 0.92 : 1);
+  ctx.save(); ctx.translate(x + shiver, y); ctx.globalAlpha = alpha * (weak ? 0.8 : 1);
+  // its shadow on the pond floor: smaller when it is up in a hop
+  ctx.fillStyle = 'rgba(4,12,20,0.3)'; ctx.beginPath(); ctx.ellipse(0, r * 0.1, r * (0.85 - 0.25 * hop / (r * 0.4 + 1)), r * 0.24, 0, 0, 6.2832); ctx.fill();
+  if (ph.lamp > 0.3 || c.eatFlash > 0.2) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= (0.25 * Math.min(1, ph.lamp) * (0.5 + 0.5 * (c.glow || 0)) + 0.25 * Math.max(0, c.eatFlash || 0)) * (opt.crowd || 1); const hs = r * 3; ctx.drawImage(haloSprite(ph.hue), -hs, -hs - r * 1.2, hs * 2, hs * 2); ctx.restore(); }
+  ctx.translate(0, -hop);
+  const sq = still ? 0.06 : 0.1 * Math.pow(land, 3) * (0.4 + sp), turn = Math.max(0.5, Math.abs(c.fc)) * (c.fc >= 0 ? 1 : -1);
+  ctx.scale(turn * (1 + sq), 1 - sq);
+  ctx.rotate(still ? (walks ? 0.9 : 0.25) : walks ? 0.04 + 0.16 * sp + Math.sin(hopT * 0.5) * 0.03 : G.clamp(Math.sin(c.ang || 0) * 0.45, -0.45, 0.45) * (0.3 + 0.7 * sp) + Math.sin(t * 2.3 + id) * 0.04);      // a walker leans into its speed; a swimmer points where it is going; asleep, it droops
+  ctx.scale(s, s); ctx.translate(0, -104);                                       // its feet are at 104 in portrait units
+  // where it looks: at what it is after, else it glances about
+  let lx = Math.cos(t * 0.7 + id) * 0.6, ly = 0.15 + Math.sin(t * 0.9 + id * 1.3) * 0.4;
+  if (c.look) { const ll = Math.hypot(c.lookX, c.lookY) || 1; lx = c.lookX / ll * (c.fc >= 0 ? 1 : -1); ly = c.lookY / ll; }
+  const scared = (c.startle > 0) || (!!c.inp && Math.max(Math.abs(c.inp[5]), Math.abs(c.inp[6])) > 0.45);
+  const blink = (t * 0.31 + (f.seed % 13) + id * 0.7) % 3.7 < 0.1;
+  const lid = still || blink ? 1 : c.pois > 0.3 || c.gasp > 0.3 || weak ? 0.55 : c.tired > 0.75 ? 0.4 : 0;
+  if (paint) { const k = 250 / Math.max(paint.w, paint.h), bottom = walks ? 108 : 86; drawPaintMoving(ctx, paint, c.g.f._b, -paint.w * k / 2, bottom - paint.h * k, paint.w * k, paint.h * k, t, id, sp, still); }      // the AI's painting of its kind, moving the way its build moves
+  else if (opt.live) G.form.portrait(ctx, f, t + id * 0.37, { lx: lx, ly: ly, sleep: still });
+  else G.form.pDraw(ctx, f, { lx: lx, ly: ly, lid: lid, wide: scared }, still ? id * 0.37 : t * (0.42 + 0.5 * sp) + id * 0.37);
+  ctx.restore();
+  // what it is going through, said with one small sign over its head
+  if (G.speed <= 8 && alpha > 0.5 && !opt.noSigns) {
+    const hy = y - hop - r * 254 / R.SIDE * 0.92, sign = scared ? '!' : c.pois > 0.3 ? 'x_x' : c.chill > 0.05 ? '*brr*' : c.hot > 0.05 ? '~phew~' : c.gasp > 0.7 && id % 4 === 0 ? 'o O' : still ? 'z z' : '';
+    if (sign) { ctx.save(); ctx.font = '700 ' + Math.round(Math.max(9, r * (sign.length > 2 ? 0.36 : 0.55))) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,18,31,0.8)'; ctx.fillStyle = scared ? PAL.gold : c.pois > 0.3 ? PAL.algae : c.chill > 0.05 ? PAL.frost : c.hot > 0.05 ? PAL.rose : PAL.frost; const by2 = hy - 4 * Math.sin(t * 3 + id); ctx.strokeText(sign, x + r * 0.5, by2); ctx.fillText(sign, x + r * 0.5, by2); ctx.restore(); }
+  }
+  if (c.flash > 0 && c.mutAge > 0) { ctx.save(); ctx.strokeStyle = G.rgba(PAL.rose, Math.min(1, c.flash)); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(x, y - r * 1.5, r * 1.3, r * 2.1, 0, 0, 6.2832); ctx.stroke(); ctx.restore(); }
+}
 function drawCreatureBody(ctx, c, x, y, scale, t, opt) {
   opt = opt || {};
   const ph = c.ph, g = c.g, r = ph.r * scale * R.VIS;
@@ -578,7 +639,10 @@ function drawCreatureBody(ctx, c, x, y, scale, t, opt) {
 G.drawCreatureBody = drawCreatureBody;
 // draw a creature so that all of it (parts included) fits in a circle of boxR pixels
 G.drawFit = function (ctx, pv, x, y, boxR, t) {
-  // on every card a creature is shown as its portrait: the same genes, face to face
+  // on every card a creature is shown as its character: the AI's painting of that look if there is one, else the game's own drawing
+  const pt = G.paintFor && !G.ai.drawn ? G.paintFor(pv.g) : null;
+  if (pt) { const k = boxR * 1.9 / Math.max(pt.w, pt.h); ctx.drawImage(pt.cv, x - pt.w * k / 2, y - pt.h * k / 2, pt.w * k, pt.h * k); if (G.wantPaint) G.wantPaint(pv.g, ''); return; }
+  if (G.wantPaint && G.mode === 'play') G.wantPaint(pv.g, '');
   const sc = boxR / 150;
   ctx.save(); ctx.translate(x, y + boxR * 0.06); ctx.scale(sc, sc);
   G.form.portrait(ctx, pv.g.f, (t === undefined ? G.rt : t) + (pv.id || 0) * 0.37, { sleep: !!pv.asleep });
@@ -595,7 +659,7 @@ function drawCreatures() {
   const W = G.W; if (!W) return;
   const ctx = G.ctx, t = G.rt, a = G.alpha === undefined ? 1 : G.alpha;
   beginWorld(ctx);
-  const cre = W.cre;
+  const cre = W.cre.slice().sort(function (p, q) { return p.y - q.y; });      // back to front: the nearer ones stand in front
   const season = W.season;
   const showBars = season === 2 || (season === 3 && W.st < 3.5);
   const crowd = clamp01(130 / (cre.length + 1));
@@ -633,10 +697,10 @@ function drawCreatures() {
     // zone damage tint
     c.crowd = crowd;
     // what is on the screen is drawn alive, part by part; if the frame gets heavy, the furthest down the list wear a still picture
-    const ext = c.ph.r * c.ph.reach * R.VIS + 10;
+    const ext = c.ph.r * R.VIS * 4.6 + 10;
     if (x + ext < vx0 || x - ext > vx1 || y + ext < vy0 || y - ext > vy1) continue;
-    drawCreatureBody(ctx, c, x, y, 1, t, { alpha: alpha, crowd: crowd, live: false, rig: c === R.sel || liveLeft-- > 0 });
-    if (c.asleep && G.speed <= 4) { ctx.fillStyle = G.rgba(PAL.frost, 0.55 + 0.3 * Math.sin(t * 2 + c.id)); ctx.font = '700 ' + Math.round(9 + c.ph.r * 0.5) + 'px system-ui'; ctx.fillText('z', x + c.ph.r * 0.9, y - c.ph.r * 1.1 - 3 * Math.sin(t * 1.5 + c.id)); }
+    drawCharacter(ctx, c, x, y, 1, t, { alpha: alpha, crowd: crowd, live: c === R.sel });
+    if (false) { ctx.fillStyle = G.rgba(PAL.frost, 0.55 + 0.3 * Math.sin(t * 2 + c.id)); ctx.font = '700 ' + Math.round(9 + c.ph.r * 0.5) + 'px system-ui'; ctx.fillText('z', x + c.ph.r * 0.9, y - c.ph.r * 1.1 - 3 * Math.sin(t * 1.5 + c.id)); }
     if (c.strike > 0) {
       c.strike -= 0.03;
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = G.rgba(PAL.gold, Math.max(0, c.strike)); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, c.ph.r * 1.5, 0, 6.2832); ctx.stroke(); ctx.restore();
@@ -657,7 +721,7 @@ function drawCreatures() {
     for (let i = 0; i < cre.length; i++) {
       const c = cre[i];
       const f = clamp01(c.E / c.ph.Emax);
-      const w = Math.max(14, c.ph.r * 2.2), x = c.rx - w / 2, y = c.ry - c.ph.r * Math.max(1, c.ph.reach * 0.85) - 11;
+      const w = Math.max(14, c.ph.r * 2.2), x = c.rx - w / 2, y = c.ry - c.ph.r * R.VIS * 3.75 - 8;
       ctx.fillStyle = G.rgba(PAL.deep, 0.65); roundRect(ctx, x - 1, y - 1, w + 2, 6, 3); ctx.fill();
       ctx.fillStyle = f > 0.6 ? PAL.algae : f > 0.3 ? PAL.gold : PAL.rose;
       roundRect(ctx, x, y, Math.max(2, w * f), 4, 2); ctx.fill();
