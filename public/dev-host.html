@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Primordia — dev host</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #07121f; overflow: hidden; font: 12px system-ui, sans-serif; color: #cfe8ff; }
+  iframe { border: 0; width: 100vw; height: 100vh; display: block; }
+  #bar { position: fixed; right: 8px; bottom: 8px; max-width: 46vw; background: rgba(7,18,31,.86); border: 1px solid rgba(207,232,255,.25); border-radius: 8px; padding: 6px 9px; line-height: 1.4; pointer-events: none; z-index: 5; }
+  #bar b { color: #f6d365; }
+</style>
+</head>
+<body>
+<iframe id="g" src="/dev/game" sandbox="allow-scripts allow-pointer-lock" allow="fullscreen"></iframe>
+<div id="bar" style="display:none"><b>dev host</b> · user <span id="who"></span> · <span id="last">waiting for the game…</span></div>
+<script>
+// This page plays the part of the Plaxzy page: the game (sandboxed, no network) asks, this page calls the server.
+// Protocol: see README.md. A real host does exactly this, with its own sign-in.
+const params = new URLSearchParams(location.search);
+const USER = params.get('user') || 'dev-user';
+const CAPS = { ai: params.get('ai') !== '0', pond: params.get('pond') !== '0' };
+const FUEL = params.get('fuel') === null ? undefined : Number(params.get('fuel'));      // ?fuel=20 gives the pond 20 AI answers (as Plax would)
+document.getElementById('who').textContent = USER;
+if (params.get('debug') === '1') document.getElementById('bar').style.display = '';
+const frame = document.getElementById('g');
+const last = document.getElementById('last');
+window.__calls = [];
+
+const ROUTES = {
+  'ai.thing': ['POST', '/api/ai/thing'],
+  'ai.ideas': ['POST', '/api/ai/ideas'],
+  'ai.models': ['GET', '/api/ai/models'],
+  'ai.usage': ['GET', '/api/usage'],
+  'ai.organ': ['POST', '/api/ai/organ'],
+  'ai.event': ['POST', '/api/ai/event'],
+  'ai.story': ['POST', '/api/ai/story'],
+  'ai.sound': ['POST', '/api/ai/sound'],
+  'ai.skin': ['POST', '/api/ai/skin'],
+  'ai.judge': ['POST', '/api/ai/judge'],
+  'ai.design': ['POST', '/api/ai/design'],
+  'pond.get': ['GET', '/api/pond'],
+  'pond.put': ['PUT', '/api/pond'],
+  'pond.del': ['DELETE', '/api/pond'],
+};
+
+// the game may have said hello before this page was listening, so say it first as well
+frame.addEventListener('load', () => setTimeout(() => frame.contentWindow.postMessage({ __primordia: 1, op: 'host', caps: CAPS, fuel: FUEL }, '*'), 400));
+window.addEventListener('message', async (e) => {
+  const d = e.data;
+  if (e.source !== frame.contentWindow || !d || d.__primordia !== 1) return;
+  const reply = (m) => frame.contentWindow.postMessage(Object.assign({ __primordia: 1 }, m), '*');
+  if (d.op === 'fuel.spent') { last.textContent = 'fuel spent on ' + d.kind + ', ' + d.left + ' left'; return; }
+  if (d.op === 'hello') { reply({ op: 'host', caps: CAPS, fuel: FUEL }); last.textContent = 'hello → host ready'; return; }
+  const r = ROUTES[d.op];
+  if (!r || (d.op.startsWith('ai.') && !CAPS.ai) || (d.op.startsWith('pond.') && !CAPS.pond)) { reply({ id: d.id, ok: false, error: 'unsupported' }); return; }
+  try {
+    const init = { method: r[0], headers: { 'x-user': USER } };
+    if (r[0] !== 'GET' && r[0] !== 'DELETE') { init.headers['content-type'] = 'application/json'; init.body = JSON.stringify(d.payload || {}); }
+    const res = await fetch(r[1], init);
+    const data = await res.json().catch(() => ({}));
+    window.__calls.push({ op: d.op, status: res.status });
+    last.textContent = d.op + ' → ' + res.status + (data.error ? ' (' + data.error + ')' : '');
+    reply({ id: d.id, ok: res.ok, data, error: res.ok ? undefined : data.error || 'failed' });
+  } catch (err) {
+    window.__calls.push({ op: d.op, status: 0 });
+    last.textContent = d.op + ' failed';
+    reply({ id: d.id, ok: false, error: 'network' });
+  }
+});
+</script>
+</body>
+</html>

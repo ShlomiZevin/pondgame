@@ -1,0 +1,21 @@
+{
+  "name": "primordia",
+  "version": "0.1.0",
+  "description": "Primordia: a pond where life evolves by a real genetic algorithm. The game (one HTML file) and its small server (AI, costs, ponds that live while you are away).",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "start": "node server.js",
+    "build": "node game/tools/build.js",
+    "pull-game": "node scripts/pull-game.js",
+    "sync": "node scripts/sync-sim.js",
+    "test": "node --test test/server.test.js test/sound.test.js",
+    "e2e": "node scripts/e2e.js",
+    "real": "node scripts/real-check.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

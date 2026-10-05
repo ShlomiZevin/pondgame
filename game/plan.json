@@ -1,0 +1,94 @@
+{
+  "title": "Primordia",
+  "tagline": "Be nature. Watch life invent itself.",
+  "pitch": "A glowing pond of tiny identical blobs. You add things, change the weather and watch evolution turn them into creatures nobody designed. Every pond ends up somewhere different.",
+  "what_you_get": [
+    "A living pond where life really evolves: eat, split, mutate, survive, with no scripted outcome",
+    "The genetic algorithm in plain sight: every season is one generation (Spring breed and mutate, Summer live, Autumn score, Winter select)",
+    "Type anything into the pond and watch it change who lives",
+    "A self-writing field guide, family trees and fossils of species that came and went"
+  ],
+  "complexity": 9,
+  "complexity_reason": "Open-ended genome (parts plus evolving neural-net brain), a real ecology simulation with hundreds of creatures, a season-driven GA visualisation, a meaning table for typed words, a field guide with procedural drawings and names, fossils, save state and an AI-ready interface.",
+  "fits_tier": true,
+  "orientation": "landscape",
+  "dimension": "2d",
+  "core_loop": "Watch a season run (about 35 s, fast-forward available), see who is born, scored and culled, then nudge the pond (add a word, change heat or light, drop a disaster) and see how the next generations answer.",
+  "player_goal": "none - there is no score or win. You are nature: you shape the world and watch what evolves.",
+  "controls": {
+    "desktop": "Mouse: click the pond to place what you add; click a creature to inspect it. Keyboard: Space pause, 1/2/3/4 speed, T type a word, F field guide, G family tree.",
+    "touch": "Tap the pond to place; tap a creature to inspect; bottom toolbar buttons: ADD, WORLD, SPEED, GUIDE, TREE.",
+    "one_button": false,
+    "scheme": [
+      { "verb": "Add a thing", "keys": "T then type a word, Enter, then click the pond", "touch": "ADD", "does": "Type any word (volcano, honey, soap...) and drop it into the pond; it becomes food, poison, heat, light or something stranger." },
+      { "verb": "Weather", "keys": "Click the WORLD panel sliders", "touch": "WORLD", "does": "Change temperature, light, food bloom and how wild mutations are." },
+      { "verb": "Disaster", "keys": "Click a disaster button (meteor, flood, bloom, drought)", "touch": "WORLD > disaster", "does": "Shake the pond with one big event." },
+      { "verb": "Inspect", "keys": "Click a creature", "touch": "Tap a creature", "does": "Shows its genome strip, parents, which genes mutated, energy and fitness." },
+      { "verb": "Speed", "keys": "Space / 1 2 3 4", "touch": "SPEED", "does": "Pause, normal, 4x, 16x, 64x." },
+      { "verb": "Field guide", "keys": "F", "touch": "GUIDE", "does": "Opens the species book: names, drawings, what each does, fossils." },
+      { "verb": "Family tree", "keys": "G", "touch": "TREE", "does": "Shows ancestry of the inspected creature or the living species over time." },
+      { "verb": "New pond", "keys": "N", "touch": "NEW", "does": "Starts a fresh random pond, or seeds one from a fossil." }
+    ]
+  },
+  "entities": [
+    { "name": "Blob (creature)", "role": "player", "behaviour": "Every creature has energy. Burns a base cost per second plus a cost per part and per brain connection. Eats what its mouth and chemistry can digest. Splits in Spring if it survived Winter, with offspring count proportional to stored energy (fitness). Moves by a brain: inputs are food direction, danger direction, heat, light, energy, a few body senses; outputs are thrust, turn, eat, flee. Start: 1 membrane cell, a mouth, no brain wiring except 'move toward food gradient' weak seed.", "look": "Soft glowing translucent circles with a darker nucleus; parts (fins, spikes, eyes, armor plates, lamps) drawn from circles, triangles and arcs and tinted by genes; big cute eyes appear once an eye gene exists." },
+    { "name": "Food (algae drops)", "role": "collectible", "behaviour": "Spawns in light-dependent patches, regrows in bloom cycles, drifts slowly. Energy value 10-30. Carries chemistry tags (colour) that determine who can digest it.", "look": "Small glowing green and gold dots." },
+    { "name": "Added thing", "role": "prop", "behaviour": "Placed by the player. Defined by a property bundle (nutrition, poison, heat, light, stickiness, acidity, hardness) from the word table or a hash of the word; decays or spreads over time; its properties act on nearby creatures and food.", "look": "A soft glowing blob or sprite tinted by its properties, with its word as a label." },
+    { "name": "Hazard zone", "role": "obstacle", "behaviour": "Heat, cold, poison or darkness regions from weather and added things. Cost energy or kill if the creature lacks resistance.", "look": "Translucent colour washes with drifting particles." }
+  ],
+  "mechanics": [
+    { "name": "Seasons = generations", "detail": "A season cycle of 4 phases is one generation: Spring (reproduction, crossover, mutation), Summer (the test: life), Autumn (fitness = stored energy scored, bars shown), Winter (selection: creatures below a threshold or random cold deaths fade; population cap enforced by culling the lowest fitness). Phase lengths 6/16/4/6 s at 1x. A top step bar highlights the current phase; each phase has a one-line caption; every birth, mutation and death is visibly marked.", "essential": true },
+    { "name": "Genome and mutation", "detail": "Genome is a list of genes: body parts (mouth, fin, armor, spike, eye, lamp, gland, flagella, cilia), numeric traits (size, speed, colour), chemistry genes (digest tag A-F, resist heat/cold/poison), and brain weights (small network, up to 12 inputs, 8 hidden, 6 outputs, connections added/removed by mutation). Offspring copies the parent with mutation rate m per gene (adjustable): value nudge, add part, remove part, rewire, duplicate gene. If two compatible survivors touch in Spring, crossover mixes their genes (one-point on the gene list). Every part and connection costs energy per second.", "essential": true },
+    { "name": "Real fitness", "detail": "Fitness is not hard-coded: it is energy stored at Autumn plus offspring survival. Average fitness, population, diversity (distinct species count) and a genes-per-creature graph are plotted per generation so the algorithm's progress is visible.", "essential": true },
+    { "name": "Ecology", "detail": "Creatures can eat other creatures if their mouth and size permit; creature bodies are food with chemistry tags. Predation, schooling, hiding, parasitism and cooperation (cells stick together) emerge from the brain and costs. Capabilities are discovered by evolution and the game logs the first time each appears: first eye, first predator, first colony, first light signal.", "essential": true },
+    { "name": "Evolution Panel and inspector", "detail": "Persistent panel: season step bar, generation number, population, average fitness graph, diversity, mutation log. Click a creature: genome strip of coloured parts, parent line, mutated genes highlighted, energy and fitness, age and offspring count. Family tree view for lineage.", "essential": true },
+    { "name": "Add anything", "detail": "ask('thing', word) returns {properties, colour, shape, name, note}. Offline backend: a table of about 2000 common words mapped to property bundles, else deterministic hash of the word. Interface designed so a server backend can later return JSON plus sanitized SVG. Values clamped, effects scaled to the pond.", "essential": true },
+    { "name": "AI interface", "detail": "A single ask(task, input, schema) function with an offline provider and a stub for a server provider (async, cached, never blocks the sim). Mutation ideas come from a pool refilled by the provider; empty pool falls back to procedural mutation.", "essential": false },
+    { "name": "Field guide and fossils", "detail": "Species are clustered from genome similarity. Each gets a procedural name, a drawing from its parts and a templated description from real traits (diet, speed, defences, senses). Extinct species become fossils which can seed a new pond.", "essential": false },
+    { "name": "Time and world controls", "detail": "Pause, 1x, 4x, 16x, 64x. Sliders: temperature, light, food bloom, mutation wildness. Disasters: meteor, flood, bloom, drought, plague.", "essential": true }
+  ],
+  "progression": "No difficulty ramp. The world itself changes as life evolves: early generations (1-20) are slow drifting; by 30-80 first senses and chasing appear in most ponds; later ecologies diversify. Starting population 40 blobs, cap 220 (scales with screen), season 35 s at 1x, mutation rate default 8% per gene.",
+  "win_lose": "none - this is a sandbox with no win or lose. If every creature dies, the pond is a fossil record and the player may restart or seed from a fossil.",
+  "art": {
+    "style": "Glowing microscope: soft translucent shapes with additive glow, gentle blur and particles",
+    "mood": "Calm, beautiful, a little funny when creatures wobble and bonk",
+    "palette": ["#07121f", "#0f3b4a", "#33d6a6", "#f6d365", "#ff7eb6", "#a78bfa"],
+    "background": "Deep teal-to-navy gradient; a slow-drifting caustic light layer; faint drifting dust particles at two depths; soft vignette; the season tints the water (spring pink-green, summer bright teal, autumn amber, winter pale blue)."
+  },
+  "presentation": {
+    "title_screen": "The camera looking into a calm glowing pond with a few blobs drifting; the word PRIMORDIA in soft glowing letters at centre, a small tagline beneath, a pulsing BEGIN button and a hint that says 'you are nature'.",
+    "hud": "Top: a four-segment season bar with petal, sun, leaf and snowflake icons that light up in turn, plus a caption line. Right: collapsible Evolution Panel with generation, population, fitness graph and mutation log, drawn like a glass microscope slide. Bottom: rounded glass toolbar with ADD, WORLD, SPEED, GUIDE, TREE.",
+    "typography": "system-ui / 'Trebuchet MS', rounded weights, light letter-spacing, soft glow text-shadow on headings; monospace only for gene strips.",
+    "buttons": "Glass pills with a faint inner glow and a thin luminous edge; they squish slightly and ring a soft bubble on press.",
+    "end_screen": "No game over. If extinct: a quiet 'The pond is still' overlay with the fossil list and buttons NEW POND and SEED FROM FOSSIL."
+  },
+  "audio": {
+    "feel": "Soft underwater plops, bubbles and chimes; gentle squeaks from creatures; calm and dreamy.",
+    "music": "Dreamy floaty ambient loop during play, quieter when paused.",
+    "music_track": "music/drifting",
+    "sounds": [
+      "ambient water | a soft underwater bed | loop/underwater",
+      "birth | a tiny pop | toon/pop",
+      "mutation | a sparkle | magic/sparkle",
+      "death in winter | a soft bubble | water/bubbles",
+      "season change | a gentle chime | arcade/tone",
+      "add a thing | a drip into the pond | water/drip",
+      "first capability discovered | a rising chime | magic/heal",
+      "creature cute squeak | a squeak | animal/creature_cute",
+      "predator appears | a low monster murmur | animal/creature_monster",
+      "UI click | a soft click | ui/click",
+      "disaster meteor | a low explosion | fight/explosion",
+      "extinction | a sad tuba | music/happy_and_sad_tuba_fanfare"
+    ]
+  },
+  "juice": [
+    "Births pop out with a ring and tiny sparkles; mutated children flash the changed gene colour",
+    "Winter deaths fade into drifting motes that feed the pond",
+    "Season change washes the whole water colour",
+    "Creatures squash and stretch when they thrust and flash when they eat",
+    "The best creature of each generation gets a soft crown glow in Autumn"
+  ],
+  "build_notes": "Write the simulation with a spatial grid so hundreds of creatures stay fast; run phases by sim time so fast-forward is just more steps per frame (cap steps). Selection must emerge from energy, not from a hidden score. Every part and brain connection must cost energy or the pond collapses. Keep the GA step bar and Evolution Panel readable on a phone; collapse the panel by default on narrow screens. Use a seeded RNG that is reseeded from time on New Pond so every pond differs. Keep ask() provider-swappable; the offline provider needs the word table. Sanitise any future SVG. Use Plaxzy.save for seed, field guide, fossils and world settings. Never block the sim on any async call.",
+  "saves": "The current pond (creature genomes, world settings, season and generation), the field guide with discovered species, and the fossil record.",
+  "language": "English"
+}

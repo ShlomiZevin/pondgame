@@ -1,0 +1,15 @@
+# secrets: API keys live only here
+.env.local
+.env
+
+# what the server stores while it runs: players' ponds, the library of AI answers, the cost books
+data/
+
+node_modules/
+
+# screenshots made by the scripts in scripts/
+scripts/*.png
+*.log
+
+# screenshots made by tests
+test/*.png

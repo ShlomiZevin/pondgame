@@ -1,0 +1,42 @@
+{
+  "direction": "A living drop of pond water under a microscope: deep teal-navy depth, translucent jelly bodies lit from within, additive glow and slow caustic light. Everything is soft-edged and breathing; the season tints the whole water.",
+  "palette": [
+    {"name":"deep","hex":"#07121f","use":"Water depth, vignette, panel glass base"},
+    {"name":"teal","hex":"#0f3b4a","use":"Mid water, caustic base, panel fill"},
+    {"name":"algae","hex":"#33d6a6","use":"Food, healthy energy bars, spring accent"},
+    {"name":"gold","hex":"#f6d365","use":"Food variety, crown glow, autumn tint, highlights"},
+    {"name":"rose","hex":"#ff7eb6","use":"Mutation flashes, births, danger warmth"},
+    {"name":"violet","hex":"#a78bfa","use":"Brain/genome accents, added things, winter hint"},
+    {"name":"frost","hex":"#cfe8ff","use":"Winter tint, text, thin edges"}
+  ],
+  "layers": ["drawWaterDepth","drawCaustics","drawDustFar","drawHazardWashes","drawFood","drawAddedThings","drawCreatures","drawEffects","drawDustNear","drawSeasonTint","drawVignette"],
+  "world": [
+    {"id":"water","drawFn":"drawWaterDepth","look":"Vertical gradient from teal to deep navy, slightly lighter in the middle.","colors":["deep","teal"]},
+    {"id":"caustics","drawFn":"drawCaustics","look":"Slow drifting soft light ripples: a few large blurred bright polygons moving with sine offsets, additive at low alpha.","colors":["frost","algae"]},
+    {"id":"dustFar","drawFn":"drawDustFar","look":"Tiny faint specks drifting slowly at the back.","colors":["frost"]},
+    {"id":"hazards","drawFn":"drawHazardWashes","look":"Translucent radial colour washes (heat = rose-gold, cold = frost, poison = violet, dark = deep) with drifting particles.","colors":["rose","gold","frost","violet","deep"]},
+    {"id":"seasonTint","drawFn":"drawSeasonTint","look":"Full-screen wash: spring pink-green, summer bright teal, autumn amber, winter pale blue, cross-fading.","colors":["rose","algae","gold","frost"]},
+    {"id":"vignette","drawFn":"drawVignette","look":"Dark rounded vignette like a microscope lens edge.","colors":["deep"]}
+  ],
+  "entities": [
+    {"id":"creature","drawFn":"drawCreatures","look":"A soft translucent jelly circle with an inner darker nucleus and a glowing rim; parts drawn from simple shapes around it. Silhouette changes with genes so species look distinct at a glance.","parts":["membrane circle","nucleus","fin triangles","spike triangles","armor arcs","eye (white circle, dark pupil, small highlight)","lamp glow dot","flagella wavy line","cilia fringe"],"colors":["algae","gold","rose","violet","frost"],"motion":"Gently pulses with breathing scale; squashes along the thrust direction when moving; eyes look toward the nearest food or danger; flagella and cilia wave.","states":[{"when":"eating","shows":"Brief bright flash and a tiny scale bounce."},{"when":"born","shows":"Pops from the parent with an expanding ring and sparkles."},{"when":"mutated child","shows":"Rose flash on the changed part for about a second."},{"when":"low energy","shows":"Dims and shrinks slightly."},{"when":"best of generation (Autumn)","shows":"Soft gold crown glow."},{"when":"dying (Winter)","shows":"Fades into drifting motes."},{"when":"selected","shows":"Thin frost ring and a pulsing outline."}]},
+    {"id":"food","drawFn":"drawFood","look":"Tiny glowing dots, algae-green or gold, with a soft halo.","parts":["core dot","halo"],"colors":["algae","gold"],"motion":"Drifts slowly and twinkles.","states":[{"when":"eaten","shows":"A small puff of light."}]},
+    {"id":"addedThing","drawFn":"drawAddedThings","look":"A glowing orb tinted by its main property, with a dashed shimmering rim and its word in small text beneath.","parts":["orb","rim","label"],"colors":["violet","rose","gold","algae"],"motion":"Pulses slowly and sheds particles as it spreads.","states":[{"when":"placed","shows":"Ripple rings expand."},{"when":"fading","shows":"Shrinks and dims."}]}
+  ],
+  "feedback": [
+    {"event":"birth","effect":"Ring pop and 4 sparkles at the child's position."},
+    {"event":"mutation","effect":"Rose flash on the changed gene and a line in the mutation log."},
+    {"event":"winter death","effect":"Creature dissolves into 5 motes that drift and become food."},
+    {"event":"season change","effect":"Water tint cross-fades, step bar icon lights and a soft chime plays."},
+    {"event":"first discovery","effect":"A banner slides in from the top with a soft glow: 'First eye!'."},
+    {"event":"add a thing","effect":"Ripple rings and drifting particles at the drop point."},
+    {"event":"disaster","effect":"Screen shake and a colour flash scaled to the event."},
+    {"event":"extinction","effect":"Water slowly dims and goes still."}
+  ],
+  "hud": [
+    {"element":"Season bar","corner":"top-left","look":"A glass strip of four segments with petal, sun, leaf and snowflake icons; the current one glows and a caption line sits beneath."},
+    {"element":"Evolution Panel","corner":"top-right","look":"A glass microscope-slide panel: generation, population, average fitness line graph, diversity number and a scrolling mutation log; collapsible."},
+    {"element":"Toolbar","corner":"bottom-left","look":"Rounded glass pill buttons ADD, WORLD, SPEED, GUIDE, TREE, NEW, mute; inner glow, press squish."},
+    {"element":"Inspector","corner":"bottom-right","look":"A glass card with the chosen creature's genome strip of coloured beads, parents and fitness bars."}
+  ]
+}

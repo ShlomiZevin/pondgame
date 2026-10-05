@@ -1,0 +1,14 @@
+USER'S WORDS
+Simple, fun game simulating a genetic algorithm. Cute, funny, calm and beautiful. The user should get a sense of generations and the genetic-algorithm steps: random population; choose the best, breed and mutate; again.
+The fitness function must be real and get better through the GA. Creatures evolve. Start from an amoeba; real genetic evolution; 100% unpredictable, different every play, completely new creatures and worlds. No goal. The player is nature. Two things uncapped: what you add to the pond, and what each generation grows/mutates. The GA must be very clear and present in the game. Server AI may be used later for small things (site owner); build locally first, fully working.
+
+DECISIONS (Claude)
+- Title: Primordia. 2D top-down glowing microscope pond.
+- One season = one generation (~35s, fast-forward): Spring reproduce+crossover+mutate, Summer test (life), Autumn score fitness (energy bars), Winter select (low fitness fade).
+- Permanent Evolution Panel: step bar, generation, population, avg-fitness graph, diversity, mutation log. Tap creature -> genome strip, parents, highlighted mutations, fitness. Family tree.
+- Genome: open-ended recipe of parts + tiny neural-net brain + chemistry genes. Mutations add/remove parts, rewire brain. Every part costs energy. Capabilities discovered log ("First eye!").
+- Start: soup of identical membrane blobs that eat and split.
+- Player = nature, no goal/score: add anything by typing a word (properties: nutrition, heat, poison, light, stickiness...), weather/disasters, time control, observation.
+- Field guide with procedural species names/descriptions; fossils; extinction = story.
+- AI: single ask(task,input,schema) interface; offline backend (word table + hash fallback + procedural mutations) now; later server backend returning JSON + sanitized SVG, engine clamps and charges costs.
+- Save with Plaxzy.save: seed, field guide, fossils.
