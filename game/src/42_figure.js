@@ -41,6 +41,8 @@
     });
   }
 
+  /** the whole drawing of a thing by its name, once it has arrived (for menus and cards) */
+  G.figurePic = function (name) { const f = ready[String(name || '').toLowerCase()]; return f ? f.svg : ''; };
   /** the drawing of this thing, if it is a being and its drawing has arrived; asks for it the first time */
   G.figureOf = function (z) {
     if (z._fig !== undefined) return z._fig;

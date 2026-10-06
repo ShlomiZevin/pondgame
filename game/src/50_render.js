@@ -420,7 +420,7 @@ function drawAddedThings() {
       ctx.save(); ctx.globalAlpha = Math.min(1, 0.4 + z.k); ctx.translate(z.x, z.y - z.r * 0.08 + 104 * sc / 1.15); ctx.scale(sc, sc);
       G.drawFigure(ctx, fig, z, G.rt + z.id); ctx.restore();
     } else if (z._figAsked && z._fig === undefined && G.speed <= 8) {      // its picture is on the way: say so, since what stands there now is only a stand-in
-      ctx.save(); ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(246,211,101,' + (0.6 + 0.3 * Math.sin(G.rt * 4)) + ')'; ctx.fillText('its picture is being drawn…', z.x, z.y - Math.max(84, z.r * 1.15) * 1.25); ctx.restore();
+      ctx.save(); ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(246,211,101,' + (0.6 + 0.3 * Math.sin(G.rt * 4)) + ')'; ctx.fillText('the AI is drawing what you typed: this is a stand-in', z.x, z.y - Math.max(84, z.r * 1.15) * 1.25); ctx.restore();
     }
     if (false) {
       const st = null;

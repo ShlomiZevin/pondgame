@@ -226,7 +226,8 @@
       const lab = el('div', 'ilabel', 'Yours: drop again', pop); lab.style.marginTop = '0'; pop.insertBefore(lab, $('wordIn'));
       const row = el('div', 'chips shelf', '', pop); row.style.cssText = 'margin:4px 0 12px'; pop.insertBefore(row, $('wordIn'));
       shelf.forEach(function (t) {
-        const c = el('button', 'chip', (t.svg ? '<img alt="" width="20" height="20" style="vertical-align:middle;margin-right:5px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(t.svg) + '">' : '') + escapeHtml(t.name), row);
+        const fp = G.figurePic ? G.figurePic(t.name) : '', pic = fp || t.svg;
+        const c = el('button', 'chip', (pic ? '<img alt="" width="' + (fp ? 30 : 20) + '" height="' + (fp ? 36 : 20) + '" style="vertical-align:middle;margin:' + (fp ? '-6px 6px -6px -4px' : '0 5px 0 0') + '" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pic) + '">' : '') + escapeHtml(t.name), row);
         c.onclick = function () { G.sfx('click'); G.beginPlacing(JSON.parse(JSON.stringify(t))); closePop(); };
       });
     }
