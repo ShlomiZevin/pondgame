@@ -21,8 +21,9 @@
   };
   G.marvelCard = function (m) {
     const does = G.marvelDoes(m);
-    return '<div class="mk">★ MARVEL · RARE</div><div class="mn">' + (m.emblem ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(m.emblem) + '">' : '') + esc(m.name) + '</div><div class="mw">' + esc(m.wonder) + '</div>' +
-      (does.length ? '<ul>' + does.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>' : '') + (m.why ? '<div class="my">' + esc(m.why) + '</div>' : '');
+    const pic = G.marvelPic ? G.marvelPic(m, 46) : '';
+    return '<div class="mh">' + pic + '<div class="mt"><div class="mk">★ MARVEL · RARE</div><span class="mn">' + esc(m.name) + '</span></div></div><div class="mw">' + esc(m.wonder) + '</div>' +
+      ((does.length || m.why) ? '<details><summary>What it does</summary>' + (does.length ? '<ul>' + does.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>' : '') + (m.why ? '<div class="my">' + esc(m.why) + '</div>' : '') + '</details>' : '');
   };
   function ui() {
     if (box) return box;
@@ -104,7 +105,7 @@
         '<div class="rnow"><b>' + cap(STEP[st.do] || st.do).slice(0, -1) + (st.do === 'build' ? ' ' + Math.round(d.progress * 100) + '%' : '') + '</b> · ' + dn + ' of them · about ' + Math.max(1, Math.ceil(d.steps.slice(d.i).reduce(function (a, q) { return a + q.secs; }, 0) - d.t)) + ' s to go</div></span></div>'; }
     for (let i = 0; i < order.length; i++) if (!seen['m' + order[i]]) { seen['m' + order[i]] = 1; fresh = true; }
     for (let i = 0; i < order.length && !P; i++) { const q = by[order[i]], m = q.d; if (!seen['m' + m.id]) { seen['m' + m.id] = 1; fresh = true; }
-      h += '<div class="rrow" data-go="m' + m.id + '"><span class="ric">' + (m.emblem ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(m.emblem) + '">' : '★') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(m.name) + '</b><span class="rtag">' + q.n + (q.n === 1 ? ' carries it' : ' carry it') + '</span>' + (m.words && m.words.length ? '<span class="rtag">talks</span>' : '') + '</span><div class="rsub">' + esc(m.wonder) + '</div>' + (open === 'm' + m.id ? '<div class="rmore">' + (G.marvelDoes(m).length ? '<ul>' + G.marvelDoes(m).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') + (m.why ? '<div style="margin-top:5px;font-style:italic;opacity:.8">' + esc(m.why) + '</div>' : '') + '</div>' : '') + '</span></div>'; }
+      h += '<div class="rrow" data-go="m' + m.id + '"><span class="ric">' + ((G.marvelPic && G.marvelPic(m, 34)) || '★') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(m.name) + '</b><span class="rtag">' + q.n + (q.n === 1 ? ' carries it' : ' carry it') + '</span>' + (m.words && m.words.length ? '<span class="rtag">talks</span>' : '') + '</span><div class="rsub">' + esc(m.wonder) + '</div>' + (open === 'm' + m.id ? '<div class="rmore">' + (G.marvelDoes(m).length ? '<ul>' + G.marvelDoes(m).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') + (m.why ? '<div style="margin-top:5px;font-style:italic;opacity:.8">' + esc(m.why) + '</div>' : '') + '</div>' : '') + '</span></div>'; }
     if (Wk.length && P) h += '<div class="rh">They built</div>';
     for (let i = Wk.length - 1; i >= 0 && P; i--) { const w = Wk[i], pic = w.fig && G.figurePic && G.figurePic(w.name), fl = (W.fields || []).filter(function (f) { return f.id === w.field; })[0];
       h += '<div class="rrow" data-go="w' + i + '"><span class="ric">' + (w.fig && G.figurePic && G.figurePic(w.name) ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(G.figurePic(w.name)) + '">' : '▲') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(w.name) + '</b>' + chip(w.by, w.hue) + '</span><div class="rsub">' + esc(cap(w.looks)) + '</div>' + (open === 'w' + i ? '<div class="rmore">' + (pic ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pic) + '">' : '<div style="opacity:.7">Its picture is still being drawn.</div>') + '<div class="rl" style="margin-top:0">' + (w.what ? '<i>HOW</i><span>' + names('They set out to ' + String(w.what).replace(/\.$/, '') + '.') + '</span><i>WHY</i><span>' + names(cap(w.why)) + '</span>' : '') + '<i>DOES</i><span>' + esc(fl && G.fieldWords ? (G.fieldWords(fl) || 'It simply stands there.') : 'It simply stands there.') + (fl ? ' It does not harm its builders.' : '') + '</span><i>LASTS</i><span>' + Math.max(0, Math.round(w.until - W.t)) + ' more seconds of pond time' + (w.gen ? ' · built in generation ' + w.gen : '') + '</span></div></div>' : '') + '</span></div>'; }
@@ -118,4 +119,5 @@
   }
   setInterval(function () { try { draw(); } catch (e) { console.error(e); } }, 800);
   G.on('new-pond', function () { seen = {}; sig = ''; });
+  G.on('marvel-icon', function () { sig = ''; });
 })();

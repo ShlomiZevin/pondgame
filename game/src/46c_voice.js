@@ -2,13 +2,13 @@
 // When a marvel speaks, its line appears over its head, and here it is also HEARD, for nothing: the words are turned into a short
 // babble made on the spot (a tiny voice synth: syllables follow the word, a vowel colours each one, the pitch follows the creature's size,
 // the tone follows the voice the marvel was given), kept as a sound and played through Plaxzy Sound, so mute and volume work as for
-// everything else. A real spoken line from a speech model costs about thirteen cents, which is far too dear for a creature that talks all
-// day, so it is OFF (G.VOICE_REAL) and, if ever switched on, limited to one or two short lines a session.
+// everything else. A real spoken line from a speech model is the dear part (about thirteen cents a line), so it is RARE and SHORT: only a very short
+// line, at most once every five minutes of play, and then only some of the time; a line once made is kept and costs nothing again.
 (function () {
   'use strict';
   if (typeof window === 'undefined') return;
-  G.VOICE_REAL = false;
-  if (G.ai) { G.ai.gaps.voice = 90000; G.ai.caps.voice = 2; G.ai.LABEL.voice = 'Creatures speaking aloud (Leonardo, off)'; }
+  G.VOICE_REAL = true;
+  if (G.ai) { G.ai.gaps.voice = 300000; G.ai.caps.voice = 12; G.ai.LABEL.voice = 'Creatures speaking aloud (Leonardo: rare and short)'; }
   const made = {};           // key → 'ready' | 'none' | 'asked'
   let lastPlay = 0;
   const now = function () { return typeof performance !== 'undefined' ? performance.now() : Date.now(); };
@@ -47,9 +47,9 @@
     }
     lastPlay = t0;
     try { PXS.play(key, { volume: 0.5, pan: pan }); } catch (e) { console.error(e); }
-    if (G.VOICE_REAL && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.sound !== false && String(word).length <= 18) realLine(c, word, mv, key);
+    if (G.VOICE_REAL && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.sound !== false && String(word).length <= 12 && Math.random() < 0.35) realLine(c, word, mv, key);
   });
-  // the real thing: only if G.VOICE_REAL is switched on, and then at most two short lines a session (see G.ai.caps.voice)
+  // the real thing: rare and short (see above); G.ai.gaps.voice keeps it to one new line every five minutes at most
   function realLine(c, word, mv, babbleKey) {
     const tone = (mv.voice && mv.voice.tone) || 'bright', speed = (mv.voice && mv.voice.speed) || 1.25, key = 'say:' + tone + ':' + String(word).toLowerCase();
     if (made[key] === 'ready') { try { PXS.play(key, { speed: speed, rate: speed, volume: 0.9 }); } catch (e) { console.error(e); } return; }
@@ -59,7 +59,7 @@
       G.ai.tally('voice', r && (r.source === 'leonardo' ? 'leonardo' : r.source), r && r.usd);
       if (!r || !r.sound || !/^audio\/(mpeg|wav|ogg|mp4)$/.test(r.sound.mime) || typeof r.sound.b64 !== 'string' || r.sound.b64.length > 600000) { made[key] = 'none'; return; }
       const def = {}; def[key] = 'data:' + r.sound.mime + ';base64,' + r.sound.b64;
-      try { PXS.define(def); made[key] = 'ready'; } catch (e) { made[key] = 'none'; console.error(e); }
+      try { PXS.define(def); made[key] = 'ready'; if (c.say && !c.dead && c.say.w === word) PXS.play(key, { speed: speed, rate: speed, volume: 0.9 }); } catch (e) { made[key] = 'none'; console.error(e); }
     }, function () { made[key] = 'none'; });
   }
 })();

@@ -3,6 +3,7 @@
 //   POST /api/ai/thing   { word }            → { thing }       what a typed word is made of
 //   POST /api/ai/ideas   { gen, species }    → { ideas }       mutation ideas for the living species
 //   POST /api/ai/organ   { the pond now }    → { organ }       a new body part invented for this pond
+//   POST /api/ai/icon    { name, wonder, hue } → { icon }       a transparent icon for a marvel (kept for good per name; only with LEONARDO_API_KEY)
 //   POST /api/ai/marvel  { pond, creature }  → { marvel }      a super-rare gift for one lucky creature (name, wonder, a special, effects)
 //   POST /api/deed       { pond } → { deed }               a plan a kind of creature takes into its head (build, march, council...), acted out by the game
 //   POST /api/wish       { op: 'get' | 'check' | 'done', ... } → the pond's wish (kept per player), marks for a sheet of creatures, the next wish
@@ -34,6 +35,7 @@ const { createAi, modelsFromEnv, getUsage, attachBooks } = require('./lib/ai');
 const { createWish } = require('./lib/wish');
 const { createDeeds } = require('./lib/deed');
 const { createPonds } = require('./lib/pond');
+const { createIcons } = require('./lib/icon');
 const { createOffline } = require('./lib/offline');
 const { createSounds } = require('./lib/sound');
 const { createPainter } = require('./lib/paint');
@@ -83,6 +85,8 @@ function createApp(opts = {}) {
   const sounds = opts.sounds || createSounds({ store, apiKey: opts.leonardoKey });
   const painter = opts.painter || createPainter({ store, apiKey: opts.leonardoKey });
   const paintLimiter = createLimiter(Number(process.env.PRIMORDIA_PAINTS_PER_HOUR) || 30);
+  const icons = opts.icons || createIcons({ store, apiKey: opts.leonardoKey });
+  const iconLimiter = createLimiter(Number(process.env.PRIMORDIA_ICONS_PER_HOUR) || 12);
   const soundLimiter = createLimiter(opts.soundsPerHour || Number(process.env.PRIMORDIA_SOUNDS_PER_HOUR) || 20);
   const ponds = createPonds({ store, now: opts.now });
   const whoIs = opts.whoIs || defaultWhoIs;
@@ -149,8 +153,13 @@ function createApp(opts = {}) {
     const who = whoIs(req);
     if (url.pathname.startsWith('/api/') && !who) return send(res, 401, { error: 'signin_required' });
 
-    if (route === 'GET /api/ai/models') return send(res, 200, { models: ai.models(), default: ai.defaultModel, sound: sounds.enabled(), paint: painter.enabled() });
+    if (route === 'GET /api/ai/models') return send(res, 200, { models: ai.models(), default: ai.defaultModel, sound: sounds.enabled(), paint: painter.enabled(), icon: icons.enabled() });
     // a sound for a thing: made once per word (Leonardo), then served from the store
+    if (route === 'POST /api/ai/icon') {      // a transparent icon for a marvel (kept for good per name; only with LEONARDO_API_KEY)
+      const body = await readJson(req, 2000);
+      const r = await icons.forMarvel(body, { canGenerate: () => iconLimiter.take(who), onError: (e) => console.error('icon failed:', e.message) });
+      return send(res, r.error ? (r.error === 'no_icon_yet' || r.error === 'no_painter' ? 404 : r.error === 'empty' ? 400 : 503) : 200, r);
+    }
     if (route === 'POST /api/ai/paint') {
       const body = await readJson(req, 4000);
       const r = await painter.forLook(body, { canGenerate: () => paintLimiter.take(who), onError: (e) => console.error('paint failed:', e.message) });

@@ -28,7 +28,7 @@
 
   // the sign the AI drew for a marvel, as a picture (made once)
   const EM = {};
-  G.marvelEmblem = function (mv) { if (!mv || !mv.emblem || typeof Image === 'undefined') return null; const k = mv.id + ':' + mv.name; let e = EM[k]; if (e === undefined) { e = EM[k] = null; const im = new Image(); im.onload = function () { EM[k] = im; }; im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(mv.emblem); } return e; };
+  G.marvelEmblem = function (mv) { const ic = G.marvelIconImg ? G.marvelIconImg(mv) : null; if (ic) return ic; if (!mv || !mv.emblem || typeof Image === 'undefined') return null; const k = mv.id + ':' + mv.name; let e = EM[k]; if (e === undefined) { e = EM[k] = null; const im = new Image(); im.onload = function () { EM[k] = im; }; im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(mv.emblem); } return e; };
   /** drawn after the creature itself: (x, y) is where it stands, r its radius on screen */
   G.drawMarvel = function (ctx, c, x, y, r, t, alpha) {
     const mv = c.ph.mv; if (!mv) return;

@@ -5413,10 +5413,12 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     return null;
   };
 
+  /** a sentence cut where a sentence or a word ends, never in the middle of one */
+  G.cutText = function (s, n) { s = String(s || '').replace(/[<>]/g, '').trim(); if (s.length <= n) return s; const c = s.slice(0, n), p = Math.max(c.lastIndexOf('. '), c.lastIndexOf('! '), c.lastIndexOf('? ')); if (p > n * 0.5) return c.slice(0, p + 1); const sp = c.lastIndexOf(' '); return (sp > n * 0.5 ? c.slice(0, sp) : c).replace(/[,;:-]+$/, '') + '…'; };
   /** whatever was imagined becomes a fair marvel: a name, a story, a sign, a few effects from the fixed vocabulary, at most one special gift */
   G.cleanMarvel = function (raw) {
     if (!raw || typeof raw !== 'object') return null;
-    const name = String(raw.name || '').replace(/[<>"]/g, '').trim().slice(0, 26), wonder = String(raw.wonder || '').replace(/[<>]/g, '').trim().slice(0, 140);
+    const name = String(raw.name || '').replace(/[<>"]/g, '').trim().slice(0, 26), wonder = G.cutText(raw.wonder, 170);
     if (!name || !wonder) return null;
     const sp = SPECIALS.indexOf(raw.sp || raw.special) >= 0 ? (raw.sp || raw.special) : '';
     const f = raw.fx && typeof raw.fx === 'object' ? raw.fx : {}, fx = {}; let sum = 0;
@@ -5427,7 +5429,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const v = raw.voice && typeof raw.voice === 'object' ? raw.voice : {}, emblem = typeof raw.emblem === 'string' && raw.emblem.length < 6200 && /^<svg[\s>]/.test(raw.emblem) && !/<script|javascript:|onload|href/i.test(raw.emblem) ? raw.emblem : '';
     if (sum < 0.1 && !sp && !powers.length && !words.length) fx.glow = 0.4;
     return { name: name, wonder: wonder, sp: sp, glyph: GLYPHS.indexOf(raw.glyph) >= 0 ? raw.glyph : 'star', hue: (((+raw.hue || 50) % 360) + 360) % 360, fx: fx, powers: powers, words: words.length ? words : sp === 'voice' ? WORDS : [],
-      voice: { tone: VOICES.indexOf(v.tone) >= 0 ? v.tone : 'bright', speed: isFinite(+v.speed) ? clamp(+v.speed, 0.7, 1.7) : 1.25 }, emblem: emblem, why: String(raw.why || '').replace(/[<>]/g, '').slice(0, 100), by: String(raw.by || raw.model || '').slice(0, 60) };
+      voice: { tone: VOICES.indexOf(v.tone) >= 0 ? v.tone : 'bright', speed: isFinite(+v.speed) ? clamp(+v.speed, 0.7, 1.7) : 1.25 }, emblem: emblem, why: G.cutText(raw.why, 170), iconText: String(raw.icon || raw.iconText || '').replace(/[<>"]/g, '').trim().slice(0, 100), by: String(raw.by || raw.model || '').slice(0, 60) };
   };
   /** an invented marvel becomes part of this pond (so its creatures can pass it on); returns its id */
   G.addMarvelDef = function (raw) {
@@ -5590,13 +5592,13 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 // When a marvel speaks, its line appears over its head, and here it is also HEARD, for nothing: the words are turned into a short
 // babble made on the spot (a tiny voice synth: syllables follow the word, a vowel colours each one, the pitch follows the creature's size,
 // the tone follows the voice the marvel was given), kept as a sound and played through Plaxzy Sound, so mute and volume work as for
-// everything else. A real spoken line from a speech model costs about thirteen cents, which is far too dear for a creature that talks all
-// day, so it is OFF (G.VOICE_REAL) and, if ever switched on, limited to one or two short lines a session.
+// everything else. A real spoken line from a speech model is the dear part (about thirteen cents a line), so it is RARE and SHORT: only a very short
+// line, at most once every five minutes of play, and then only some of the time; a line once made is kept and costs nothing again.
 (function () {
   'use strict';
   if (typeof window === 'undefined') return;
-  G.VOICE_REAL = false;
-  if (G.ai) { G.ai.gaps.voice = 90000; G.ai.caps.voice = 2; G.ai.LABEL.voice = 'Creatures speaking aloud (Leonardo, off)'; }
+  G.VOICE_REAL = true;
+  if (G.ai) { G.ai.gaps.voice = 300000; G.ai.caps.voice = 12; G.ai.LABEL.voice = 'Creatures speaking aloud (Leonardo: rare and short)'; }
   const made = {};           // key → 'ready' | 'none' | 'asked'
   let lastPlay = 0;
   const now = function () { return typeof performance !== 'undefined' ? performance.now() : Date.now(); };
@@ -5635,9 +5637,9 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     }
     lastPlay = t0;
     try { PXS.play(key, { volume: 0.5, pan: pan }); } catch (e) { console.error(e); }
-    if (G.VOICE_REAL && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.sound !== false && String(word).length <= 18) realLine(c, word, mv, key);
+    if (G.VOICE_REAL && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.sound !== false && String(word).length <= 12 && Math.random() < 0.35) realLine(c, word, mv, key);
   });
-  // the real thing: only if G.VOICE_REAL is switched on, and then at most two short lines a session (see G.ai.caps.voice)
+  // the real thing: rare and short (see above); G.ai.gaps.voice keeps it to one new line every five minutes at most
   function realLine(c, word, mv, babbleKey) {
     const tone = (mv.voice && mv.voice.tone) || 'bright', speed = (mv.voice && mv.voice.speed) || 1.25, key = 'say:' + tone + ':' + String(word).toLowerCase();
     if (made[key] === 'ready') { try { PXS.play(key, { speed: speed, rate: speed, volume: 0.9 }); } catch (e) { console.error(e); } return; }
@@ -5647,9 +5649,81 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       G.ai.tally('voice', r && (r.source === 'leonardo' ? 'leonardo' : r.source), r && r.usd);
       if (!r || !r.sound || !/^audio\/(mpeg|wav|ogg|mp4)$/.test(r.sound.mime) || typeof r.sound.b64 !== 'string' || r.sound.b64.length > 600000) { made[key] = 'none'; return; }
       const def = {}; def[key] = 'data:' + r.sound.mime + ';base64,' + r.sound.b64;
-      try { PXS.define(def); made[key] = 'ready'; } catch (e) { made[key] = 'none'; console.error(e); }
+      try { PXS.define(def); made[key] = 'ready'; if (c.say && !c.dead && c.say.w === word) PXS.play(key, { speed: speed, rate: speed, volume: 0.9 }); } catch (e) { made[key] = 'none'; console.error(e); }
     }, function () { made[key] = 'none'; });
   }
+})();
+
+</script>
+<script data-part="46d_marvelicons">
+// ── A picture for each marvel ──
+// The server makes each marvel a transparent icon with an image model (Leonardo) and keeps it for good, one per marvel name, so the same name is
+// never paid for twice. Here it is fetched once, shrunk to a small picture and kept in memory, and used wherever the marvel is shown: floating beside
+// its creature, on its card, in the rare box. First the server's library is asked (free); only if the icon does not exist yet is one made, and that
+// is a rare, small cost (about two cents) for something rare. Where there is no icon (no image model, or not yet), the drawn sign stands in.
+(function () {
+  'use strict';
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  if (G.ai) { G.ai.gaps.icon = 4000; G.ai.caps.icon = 40; G.ai.LABEL.icon = 'Marvel icons (Leonardo, once per marvel)'; }
+  const C = {};          // marvel name → { st: 'asked' | 'ready' | 'none', url, img }
+  const key = function (m) { return String(m && m.name || '').toLowerCase(); };
+  const live = function () { return G.mode === 'play' && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai && G.ai.provider === 'server' && G.ai.hasFuel(); };
+  function take(m, r, e) {
+    if (!r || !r.icon || typeof r.icon.b64 !== 'string' || !/^image\/png$/.test(r.icon.mime) || r.icon.b64.length > 900000) { e.st = 'none'; return false; }
+    G.ai.tally('icon', r.source, r.usd);
+    const im = new Image();
+    im.onload = function () {
+      const S = 160, cv = document.createElement('canvas'); cv.width = cv.height = S; const x = cv.getContext('2d'), k = Math.min(S / im.width, S / im.height);
+      x.drawImage(im, (S - im.width * k) / 2, (S - im.height * k) / 2, im.width * k, im.height * k);
+      e.url = cv.toDataURL('image/png'); e.img = cv; e.st = 'ready'; G.emit('marvel-icon', m);
+    };
+    im.onerror = function () { e.st = 'none'; };
+    im.src = 'data:image/png;base64,' + r.icon.b64;
+    return true;
+  }
+  function ask(m) {
+    const k = key(m); if (!k) return null;
+    let e = C[k];
+    if (e && (e.st !== 'none' || Date.now() - e.at < 120000)) return e;
+    if (!live()) { if (!e) e = C[k] = { st: 'none', at: Date.now() }; else e.at = Date.now(); return e; }
+    e = C[k] = { st: 'asked', at: Date.now() };
+    const info = { name: m.name, wonder: m.wonder, icon: m.iconText || '', hue: Math.round(m.hue || 0) };
+    // the library first: free. Only if there is no icon yet is one made (and then only while the session's allowance for icons lasts).
+    G.host.call('ai.icon', Object.assign({ libraryOnly: true }, info), 30000).then(function (r) {
+      if (take(m, r, e)) return;
+      if (!G.ai.allow('icon')) { e.st = 'none'; return; }
+      G.host.call('ai.icon', info, 150000).then(function (r2) { if (!take(m, r2, e)) e.st = 'none'; }, function () { e.st = 'none'; });
+    }, function () {
+      if (!G.ai.allow('icon')) { e.st = 'none'; return; }
+      G.host.call('ai.icon', info, 150000).then(function (r2) { if (!take(m, r2, e)) e.st = 'none'; }, function () { e.st = 'none'; });
+    });
+    return e;
+  }
+  /** the loaded icon as a canvas (for drawing in the pond), or null while there is none */
+  G.marvelIconImg = function (m) { const e = ask(m); return e && e.st === 'ready' ? e.img : null; };
+  /** the icon as a picture address (for the card and the rare box), or '' */
+  G.marvelIconUrl = function (m) { const e = ask(m); return e && e.st === 'ready' ? e.url : ''; };
+  /** the little picture for a marvel as HTML: its icon if it has one, else the sign the AI drew, else nothing */
+  G.marvelPic = function (m, px) {
+    const u = G.marvelIconUrl(m);
+    if (u) return '<img class="mic" alt="" width="' + px + '" height="' + px + '" src="' + u + '">';
+    if (m && m.emblem) return '<img class="mic" alt="" width="' + px + '" height="' + px + '" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(m.emblem) + '">';
+    return '';
+  };
+  // an icon is wanted the moment a marvel is born
+  G.on('marvel', function (c, def) { if (G.mode === 'play') ask(def); });
+  // and the card's and the box's pictures are drawn again when it arrives
+  G.on('marvel-icon', function () { const mb = document.getElementById('imarvel'); if (mb) mb._k = ''; });
+  // the compact, readable look of the marvel panel on a creature's card
+  const st = document.createElement('style');
+  st.textContent = '#inspector #imarvel{margin:8px 0 8px;padding:10px 11px 9px;border-radius:13px;background:rgba(14,26,40,.97);border:1.5px solid rgba(246,211,101,.75);box-shadow:0 0 0 1px rgba(0,0,0,.35)}' +
+    '#imarvel .mh{display:flex;align-items:center;gap:10px}#imarvel .mh .mic{flex:none;width:46px;height:46px;object-fit:contain;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5))}#imarvel .mt{min-width:0}' +
+    '#imarvel .mk{font:800 9.5px system-ui,sans-serif;letter-spacing:.2em;color:#f6d365;margin:0}#imarvel .mn{display:block;font:800 16px/1.2 system-ui,sans-serif;color:#fff;margin:2px 0 0}' +
+    '#imarvel .mw{font:600 13px/1.45 system-ui,sans-serif;color:#f1f6ff;margin:8px 0 0}' +
+    '#imarvel details{margin:7px 0 0;border-top:1px solid rgba(246,211,101,.25);padding-top:6px}#imarvel summary{cursor:pointer;font:700 11.5px system-ui,sans-serif;color:#f6d365;list-style:none}#imarvel summary::-webkit-details-marker{display:none}#imarvel summary:before{content:"\\25B8  "}#imarvel details[open] summary:before{content:"\\25BE  "}' +
+    '#imarvel ul{margin:6px 0 0;padding:0;list-style:none}#imarvel li{font:600 12px/1.4 system-ui,sans-serif;color:#ffe9a8;padding:2px 0 2px 15px;position:relative}#imarvel li:before{content:"\\25C6";position:absolute;left:0;font-size:8px;top:5px}' +
+    '#imarvel .my{font:italic 500 11.5px/1.4 system-ui,sans-serif;color:#c9d9ee;margin:6px 0 0}';
+  document.head.appendChild(st);
 })();
 
 </script>
@@ -7056,7 +7130,7 @@ G.addSystem({
 
   // the sign the AI drew for a marvel, as a picture (made once)
   const EM = {};
-  G.marvelEmblem = function (mv) { if (!mv || !mv.emblem || typeof Image === 'undefined') return null; const k = mv.id + ':' + mv.name; let e = EM[k]; if (e === undefined) { e = EM[k] = null; const im = new Image(); im.onload = function () { EM[k] = im; }; im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(mv.emblem); } return e; };
+  G.marvelEmblem = function (mv) { const ic = G.marvelIconImg ? G.marvelIconImg(mv) : null; if (ic) return ic; if (!mv || !mv.emblem || typeof Image === 'undefined') return null; const k = mv.id + ':' + mv.name; let e = EM[k]; if (e === undefined) { e = EM[k] = null; const im = new Image(); im.onload = function () { EM[k] = im; }; im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(mv.emblem); } return e; };
   /** drawn after the creature itself: (x, y) is where it stands, r its radius on screen */
   G.drawMarvel = function (ctx, c, x, y, r, t, alpha) {
     const mv = c.ph.mv; if (!mv) return;
@@ -7863,8 +7937,9 @@ G.addSystem({
   };
   G.marvelCard = function (m) {
     const does = G.marvelDoes(m);
-    return '<div class="mk">★ MARVEL · RARE</div><div class="mn">' + (m.emblem ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(m.emblem) + '">' : '') + esc(m.name) + '</div><div class="mw">' + esc(m.wonder) + '</div>' +
-      (does.length ? '<ul>' + does.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>' : '') + (m.why ? '<div class="my">' + esc(m.why) + '</div>' : '');
+    const pic = G.marvelPic ? G.marvelPic(m, 46) : '';
+    return '<div class="mh">' + pic + '<div class="mt"><div class="mk">★ MARVEL · RARE</div><span class="mn">' + esc(m.name) + '</span></div></div><div class="mw">' + esc(m.wonder) + '</div>' +
+      ((does.length || m.why) ? '<details><summary>What it does</summary>' + (does.length ? '<ul>' + does.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>' : '') + (m.why ? '<div class="my">' + esc(m.why) + '</div>' : '') + '</details>' : '');
   };
   function ui() {
     if (box) return box;
@@ -7946,7 +8021,7 @@ G.addSystem({
         '<div class="rnow"><b>' + cap(STEP[st.do] || st.do).slice(0, -1) + (st.do === 'build' ? ' ' + Math.round(d.progress * 100) + '%' : '') + '</b> · ' + dn + ' of them · about ' + Math.max(1, Math.ceil(d.steps.slice(d.i).reduce(function (a, q) { return a + q.secs; }, 0) - d.t)) + ' s to go</div></span></div>'; }
     for (let i = 0; i < order.length; i++) if (!seen['m' + order[i]]) { seen['m' + order[i]] = 1; fresh = true; }
     for (let i = 0; i < order.length && !P; i++) { const q = by[order[i]], m = q.d; if (!seen['m' + m.id]) { seen['m' + m.id] = 1; fresh = true; }
-      h += '<div class="rrow" data-go="m' + m.id + '"><span class="ric">' + (m.emblem ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(m.emblem) + '">' : '★') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(m.name) + '</b><span class="rtag">' + q.n + (q.n === 1 ? ' carries it' : ' carry it') + '</span>' + (m.words && m.words.length ? '<span class="rtag">talks</span>' : '') + '</span><div class="rsub">' + esc(m.wonder) + '</div>' + (open === 'm' + m.id ? '<div class="rmore">' + (G.marvelDoes(m).length ? '<ul>' + G.marvelDoes(m).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') + (m.why ? '<div style="margin-top:5px;font-style:italic;opacity:.8">' + esc(m.why) + '</div>' : '') + '</div>' : '') + '</span></div>'; }
+      h += '<div class="rrow" data-go="m' + m.id + '"><span class="ric">' + ((G.marvelPic && G.marvelPic(m, 34)) || '★') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(m.name) + '</b><span class="rtag">' + q.n + (q.n === 1 ? ' carries it' : ' carry it') + '</span>' + (m.words && m.words.length ? '<span class="rtag">talks</span>' : '') + '</span><div class="rsub">' + esc(m.wonder) + '</div>' + (open === 'm' + m.id ? '<div class="rmore">' + (G.marvelDoes(m).length ? '<ul>' + G.marvelDoes(m).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') + (m.why ? '<div style="margin-top:5px;font-style:italic;opacity:.8">' + esc(m.why) + '</div>' : '') + '</div>' : '') + '</span></div>'; }
     if (Wk.length && P) h += '<div class="rh">They built</div>';
     for (let i = Wk.length - 1; i >= 0 && P; i--) { const w = Wk[i], pic = w.fig && G.figurePic && G.figurePic(w.name), fl = (W.fields || []).filter(function (f) { return f.id === w.field; })[0];
       h += '<div class="rrow" data-go="w' + i + '"><span class="ric">' + (w.fig && G.figurePic && G.figurePic(w.name) ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(G.figurePic(w.name)) + '">' : '▲') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(w.name) + '</b>' + chip(w.by, w.hue) + '</span><div class="rsub">' + esc(cap(w.looks)) + '</div>' + (open === 'w' + i ? '<div class="rmore">' + (pic ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pic) + '">' : '<div style="opacity:.7">Its picture is still being drawn.</div>') + '<div class="rl" style="margin-top:0">' + (w.what ? '<i>HOW</i><span>' + names('They set out to ' + String(w.what).replace(/\.$/, '') + '.') + '</span><i>WHY</i><span>' + names(cap(w.why)) + '</span>' : '') + '<i>DOES</i><span>' + esc(fl && G.fieldWords ? (G.fieldWords(fl) || 'It simply stands there.') : 'It simply stands there.') + (fl ? ' It does not harm its builders.' : '') + '</span><i>LASTS</i><span>' + Math.max(0, Math.round(w.until - W.t)) + ' more seconds of pond time' + (w.gen ? ' · built in generation ' + w.gen : '') + '</span></div></div>' : '') + '</span></div>'; }
@@ -7960,6 +8035,7 @@ G.addSystem({
   }
   setInterval(function () { try { draw(); } catch (e) { console.error(e); } }, 800);
   G.on('new-pond', function () { seen = {}; sig = ''; });
+  G.on('marvel-icon', function () { sig = ''; });
 })();
 
 </script>

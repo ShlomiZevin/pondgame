@@ -42,10 +42,12 @@
     return null;
   };
 
+  /** a sentence cut where a sentence or a word ends, never in the middle of one */
+  G.cutText = function (s, n) { s = String(s || '').replace(/[<>]/g, '').trim(); if (s.length <= n) return s; const c = s.slice(0, n), p = Math.max(c.lastIndexOf('. '), c.lastIndexOf('! '), c.lastIndexOf('? ')); if (p > n * 0.5) return c.slice(0, p + 1); const sp = c.lastIndexOf(' '); return (sp > n * 0.5 ? c.slice(0, sp) : c).replace(/[,;:-]+$/, '') + '…'; };
   /** whatever was imagined becomes a fair marvel: a name, a story, a sign, a few effects from the fixed vocabulary, at most one special gift */
   G.cleanMarvel = function (raw) {
     if (!raw || typeof raw !== 'object') return null;
-    const name = String(raw.name || '').replace(/[<>"]/g, '').trim().slice(0, 26), wonder = String(raw.wonder || '').replace(/[<>]/g, '').trim().slice(0, 140);
+    const name = String(raw.name || '').replace(/[<>"]/g, '').trim().slice(0, 26), wonder = G.cutText(raw.wonder, 170);
     if (!name || !wonder) return null;
     const sp = SPECIALS.indexOf(raw.sp || raw.special) >= 0 ? (raw.sp || raw.special) : '';
     const f = raw.fx && typeof raw.fx === 'object' ? raw.fx : {}, fx = {}; let sum = 0;
@@ -56,7 +58,7 @@
     const v = raw.voice && typeof raw.voice === 'object' ? raw.voice : {}, emblem = typeof raw.emblem === 'string' && raw.emblem.length < 6200 && /^<svg[\s>]/.test(raw.emblem) && !/<script|javascript:|onload|href/i.test(raw.emblem) ? raw.emblem : '';
     if (sum < 0.1 && !sp && !powers.length && !words.length) fx.glow = 0.4;
     return { name: name, wonder: wonder, sp: sp, glyph: GLYPHS.indexOf(raw.glyph) >= 0 ? raw.glyph : 'star', hue: (((+raw.hue || 50) % 360) + 360) % 360, fx: fx, powers: powers, words: words.length ? words : sp === 'voice' ? WORDS : [],
-      voice: { tone: VOICES.indexOf(v.tone) >= 0 ? v.tone : 'bright', speed: isFinite(+v.speed) ? clamp(+v.speed, 0.7, 1.7) : 1.25 }, emblem: emblem, why: String(raw.why || '').replace(/[<>]/g, '').slice(0, 100), by: String(raw.by || raw.model || '').slice(0, 60) };
+      voice: { tone: VOICES.indexOf(v.tone) >= 0 ? v.tone : 'bright', speed: isFinite(+v.speed) ? clamp(+v.speed, 0.7, 1.7) : 1.25 }, emblem: emblem, why: G.cutText(raw.why, 170), iconText: String(raw.icon || raw.iconText || '').replace(/[<>"]/g, '').trim().slice(0, 100), by: String(raw.by || raw.model || '').slice(0, 60) };
   };
   /** an invented marvel becomes part of this pond (so its creatures can pass it on); returns its id */
   G.addMarvelDef = function (raw) {
