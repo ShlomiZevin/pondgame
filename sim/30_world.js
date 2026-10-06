@@ -835,6 +835,16 @@
         W.births.push({ at: 0.3 + G.rand() * 3.4, c: child, x: p.x + Math.cos(ang) * d, y: p.y + Math.sin(ang) * d, from: p, mate: mate });
       }
     }
+    // a safety net: if almost nothing is left, a few small survivors turn up in a sheltered corner (nature gives life another chance, and small ones are easy to feed)
+    if (surv.length < 14 && W.gen > 30 && surv.length > 0) {
+      const nx = W.ww * (0.3 + G.rand() * 0.4), ny = W.wh * (0.4 + G.rand() * 0.3);
+      for (let k = 0; k < 7; k++) {
+        const p = surv[(G.rand() * surv.length) | 0], gn = G.cloneGenome(p.g); gn.t[0] = Math.max(6, gn.t[0] * 0.7); const res = G.mutate(gn, wild * 0.5, null), child = G.makeCreature(res.g, p, null, res.muts);
+        child.sp = p.sp; child.E = child.ph.Emax * 0.6; child.P = child.ph.Emax * 0.3;
+        W.births.push({ at: 0.3 + G.rand() * 3.4, c: child, x: nx + G.randn() * 40, y: ny + G.randn() * 30, from: null, mate: null });
+      }
+      if (W.gen - (W.arkGen || -99) > 30) { W.arkGen = W.gen; W.discLog.push({ key: 'ark' + W.gen, text: 'Almost all of them were gone. A few small survivors turned up in a sheltered corner of the pond.', gen: W.gen }); }
+    }
     // the hall of fame: the best the watcher has really seen. A couple of children a spring are one of them crossed with a good survivor, so what once was
     // lovable is not lost to drift, to a sickness of the common kind or to a pressure that favoured something plainer
     if (W.hall && W.hall.length && surv.length >= 8 && W.cre.length < cap * 1.2) {
@@ -935,7 +945,7 @@
       if (H.length >= 20) { let a = 0, b = 0; for (let i = 0; i < 10; i++) { a += H[H.length - 1 - i]; b += H[H.length - 11 - i]; } const was = W.stall || 0; W.stall = a / 10 < b / 10 + 0.01 ? Math.min(1, was + 0.2) : Math.max(0, was - 0.35);
         if (W.stall >= 0.6 && was < 0.6 && W.gen - (W.stallNote || -99) > 40) { W.stallNote = W.gen; W.discLog.push({ key: 'stall' + W.gen, text: 'The pond has stopped getting nicer, so its creatures turn to growing bigger: size is what there is left to improve.', gen: W.gen }); G.emit('stall'); } } }
     // the drive to grow is only as strong as the pond can bear: it eases off when the pond is below its capacity (the big need feeding) and as the average size gets large
-    { const popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12; W.grow = (W.stall || 0) * clamp((popR - 0.6) / 0.3, 0, 1) * (1 - clamp((mr - 26) / 14, 0, 1)); }
+    { const popR = W.popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12; W.grow = (W.stall || 0) * clamp((popR - 0.6) / 0.3, 0, 1) * (1 - clamp((mr - 26) / 14, 0, 1)); }
     W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop });
     if (W.hist.length > 600) W.hist.shift();
     G.updateSpecies();
@@ -964,7 +974,7 @@
     for (let i = 0; i < cre.length; i++) { const c = cre[i], k = G.kindOf(c.g).kind; c.kd = k; share[k] = (share[k] || 0) + 1; c.shp = G.shapeOf(c.g); shapes[c.shp] = (shapes[c.shp] || 0) + 1; c.hb = G.hueOf(c.g); hues[c.hb]++; }
     // who lasts the winter: the well fed, the rare, and the good-looking (the pond is kind to what is admired)
     const meanR = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12;
-    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1 + (W.grow || 0) * 0.6 * clamp((cre[i].ph.r - meanR) / meanR, -0.5, 1)) * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.8 * hues[cre[i].hb] / cre.length) ;
+    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1 + (W.grow || 0) * 0.4 * clamp((cre[i].ph.r - meanR) / meanR, -0.5, 1)) * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.8 * hues[cre[i].hb] / cre.length) ;
     if (cre.length > 8) {
       // fitness sharing: a creature in a crowd of look-alikes counts for less, however it is measured, so no single look can take the whole pond
       for (let i = 0; i < cre.length; i++) if (!cre[i].fv) cre[i].fv = G.features(cre[i].g);

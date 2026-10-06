@@ -112,7 +112,7 @@
     const cn = FM.counts(f), A = FM.abilities(f, cn), ext = FM.extent(f), k = cn.k;
     const mvd = g.mv && G.marvelOf ? G.marvelOf(g.mv) : null;
     const stall = G.W && G.W.grow ? G.W.grow : 0;
-    const r = Math.min(t[0], 28 + 10 * (f.n - 1)) * (mvd && mvd.sp === 'titan' ? 1.35 : 1);          // a body of more parts can be a bigger one; the ceiling is high, so size is limited by food and by the pond, not by a rule
+    const r = Math.min(t[0], 26 + 9 * (f.n - 1)) * (mvd && mvd.sp === 'titan' ? 1.35 : 1);          // a body of more parts can be a bigger one; the ceiling is high, so size is limited by food and by the pond, not by a rule
     const FX = { speed: 0, sense: 0, eat: 0, armor: 0, spike: 0, toxin: 0, photo: 0, glow: 0, heat: 0, cold: 0, poison: 0 };
     const dig = [c[0], c[1], c[2], c[3], c[4], c[5]];
     let orgCost = 0;
@@ -186,7 +186,7 @@
     let tolSum = 0; for (let i = 9; i < 15; i++) tolSum += c[i] || 0;
     up += 0.035 * digSum + 0.02 * (c[6] + c[7] + c[8]) + 0.022 * tolSum + 0.0035 * g.w.length + 0.012 * g.h;
     if (f.bd) up += r10 * 0.05 * Math.max(0, G.body.busy(f) - 6);
-    ph.upkeep = up * (1 - 0.3 * stall);      // with nothing else left to improve, being big costs less
+    ph.upkeep = up * (1 - 0.2 * stall);      // with nothing else left to improve, being big costs less
     // compile the brain: wires grouped by target (hidden 0..h-1, then outputs)
     const nt = g.h + NOUT;
     const groups = [];
@@ -245,8 +245,9 @@
     const press = G.W && G.W.press ? G.W.press : null;
     // nudge traits
     // size answers the pond: danger favours bigger bodies, hunger and thin air smaller ones; chance does the rest
-    if (r() < m * 2) { g.t[0] += n() * 1.1 + 0.12 + 1.1 * (G.W && G.W.grow || 0) + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
-    { const st = G.W && G.W.grow || 0; if (st > 0.2 && r() < 0.09 * st * wild) { g.t[0] = Math.min(64, g.t[0] * 1.12); note('t', 0, 'grew bigger: nothing else was left to improve', true); } }
+    if (r() < m * 2) { g.t[0] += n() * 1.1 + 0.06 + 0.6 * (G.W && G.W.grow || 0) - 1.5 * clamp((0.62 - (G.W && G.W.popR !== undefined ? G.W.popR : 1)) / 0.3, 0, 1) + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
+    { const pr = G.W && G.W.popR !== undefined ? G.W.popR : 1; if (pr < 0.5 && r() < 0.1 * wild) { g.t[0] = Math.max(6, g.t[0] * 0.9); note('t', 0, 'grew smaller: there were too few of them', true); } }
+    { const st = G.W && G.W.grow || 0; if (st > 0.2 && r() < 0.05 * st * wild) { g.t[0] = Math.min(64, g.t[0] * 1.08); note('t', 0, 'grew bigger: nothing else was left to improve', true); } }
     if (press && Math.abs(press.size) > 0.2 && r() < 0.06 * Math.abs(press.size) * wild) { const up = press.size > 0; g.t[0] = Math.max(5, g.t[0] * (up ? 1.12 : 0.9)); note('t', 0, (up ? 'grew bigger, ' : 'grew smaller, ') + (press.sizeWhy || 'to suit the pond'), true); }
     if (r() < m * 2) { g.t[1] += n() * 0.07; note('t', 1, 'speed', false); }
     if (r() < m * 2.5) { g.t[4] = (g.t[4] || 0.12) + n() * 0.14; note('t', 4, 'temper', false); }
