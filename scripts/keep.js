@@ -1,0 +1,30 @@
+// Keeping and the collection, seen:  node scripts/keep.js
+const { chromium } = require('../../plaxzy-creator/node_modules/playwright-core');
+const path = require('path');
+(async () => {
+  const browser = await chromium.launch({ channel: 'chrome', headless: true });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  const errs = []; page.on('pageerror', (e) => errs.push('PAGEERROR ' + e.message));
+  await page.goto((process.env.BASE || 'http://localhost:8787') + '/dev?user=keep' + Date.now() + '&ai=0', { waitUntil: 'load' });
+  await page.waitForTimeout(3000);
+  const fr = page.frames().find((f) => f !== page.mainFrame());
+  await fr.locator('#tBegin').click(); await fr.evaluate(() => G.setSpeed(64)); await page.waitForTimeout(14000); await fr.evaluate(() => G.setSpeed(1));
+  await fr.evaluate(() => { const c = G.W.cre[3]; G.focusOn(c.x, c.y, 2); G.select(c); });
+  await page.waitForTimeout(600);
+  await fr.locator('#ikeep').click(); await page.waitForTimeout(500);
+  await page.screenshot({ path: path.join(__dirname, 'keep-1-toast.png') });
+  await fr.locator('#ikeep').click(); await page.waitForTimeout(400);
+  console.log('after two clicks on KEEP the collection holds ' + await fr.evaluate(() => G.collection.length) + ' · button says: ' + await fr.locator('#ikeep').innerText());
+  await fr.evaluate(() => { for (const i of [9, 15, 22]) { const c = G.W.cre[i]; if (c) G.keep(c); } });
+  await fr.evaluate(() => { document.querySelector('#toolbar button:nth-child(4)').click(); });
+  await page.waitForTimeout(500);
+  await fr.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /COLLECTION/.test(x.textContent)); if (b) b.click(); });
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: path.join(__dirname, 'keep-2-collection.png') });
+  await fr.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /CLOSE/.test(x.textContent)); if (b) b.click(); const c = G.W.cre[30] || G.W.cre[1]; G.select(c); });
+  await page.waitForTimeout(400);
+  await fr.locator('#ibreed').click(); await page.waitForTimeout(800);
+  await page.screenshot({ path: path.join(__dirname, 'keep-3-breed.png') });
+  console.log(errs.slice(0, 4).join('\n') || 'no errors');
+  await browser.close();
+})().catch((e) => { console.error(e); process.exit(1); });

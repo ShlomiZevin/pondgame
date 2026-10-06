@@ -554,7 +554,17 @@
     $('isub').onclick = function () { this.classList.toggle('open'); };
     $('itree').onclick = function () { G.sfx('click'); G.openTree(); };
     $('ibreed').onclick = function () { const c = G.R.sel; if (!c) return; G.sfx('click'); if (!G.collection.length) { G.banner('Nothing to breed it with yet', 'First ★ KEEP a creature you like (from this pond or another). Then choose it here to breed the two.', 5200); return; } UI.breedWith = c.id; UI.guideTab = 'coll'; G.openGuide(); };
-    $('ikeep').onclick = function () { const c = G.R.sel; if (!c) return; const it = G.keep(c); if (it) { G.sfx('discovery'); G.banner('Kept in your collection', it.name + ', a ' + it.kind.toLowerCase() + '. Find it in the Book of Life under COLLECTION; you can release it into any pond.', 5200); } };
+    // a short word right where the hand is: it shows at once and fades by itself
+    G.toast = function (html) { let t = $('toast'); if (!t) { t = el('div', 'glass', '', ui); t.id = 'toast'; t.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:7;max-width:min(300px,calc(100vw - 28px));padding:10px 14px;border-radius:14px;font-size:12.5px;line-height:1.35;border:1px solid rgba(246,211,101,.6);pointer-events:none;transition:opacity .4s,transform .4s;opacity:0;transform:translateY(8px)'; } t.innerHTML = html; const i = $('inspector'); t.style.bottom = (i && !i.classList.contains('hide') ? Math.round(i.getBoundingClientRect().height) + 22 : 14) + 'px'; t.style.opacity = '1'; t.style.transform = 'none'; clearTimeout(G.toast._t); G.toast._t = setTimeout(function () { t.style.opacity = '0'; t.style.transform = 'translateY(8px)'; }, 3200); };
+    const keptOf = function (c) { const tag = ' #' + c.id; for (let i = 0; i < G.collection.length; i++) { const n = G.collection[i].name; if (n.slice(-tag.length) === tag) return G.collection[i]; } return null; };
+    const keepLabel = function () { const c = G.R.sel, b = $('ikeep'); if (!b) return; const k = c && keptOf(c); b.innerHTML = k ? '<i>★</i>KEPT' : '<i>★</i>KEEP'; b.style.borderColor = k ? 'var(--gold)' : ''; b.style.color = k ? 'var(--gold)' : ''; b.title = k ? 'It is in your collection (BOOK, under COLLECTION).' : 'Keep this creature in your collection. It outlives the pond.'; };
+    G.on('select', keepLabel); G.on('kept', keepLabel);
+    $('ikeep').onclick = function () {
+      const c = G.R.sel; if (!c) return;
+      if (keptOf(c)) { G.sfx('click'); G.toast('<b style="color:var(--gold)">★ Already in your collection.</b><br>Open BOOK, then COLLECTION, to release or breed it.'); return; }
+      const it = G.keep(c);
+      if (it) { G.sfx('discovery'); keepLabel(); G.toast('<b style="color:var(--gold)">★ Kept: ' + escapeHtml(it.name) + '</b><br>It is in your collection now (BOOK, then COLLECTION). It outlives this pond.'); G.markDirty(); }
+    };
     $('iguide').onclick = function () { G.sfx('click'); UI.guideTab = 'live'; G.openGuide(); };
     G.on('select', function (c) {
       i.classList.toggle('hide', !c || G.mode !== 'play');

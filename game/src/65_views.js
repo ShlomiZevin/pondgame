@@ -108,20 +108,32 @@
       } else if (tab === 'coll') {
         const list = G.collection.slice().reverse();
         if (!list.length) { body.innerHTML = '<div class="empty">Your collection is empty. Click a creature you like and press ★ KEEP. What you keep outlives the pond: you can release it into any pond, to breed with what lives there.</div>'; return; }
-        const cards = el('div', 'cards', '', body);
+        if (!$('collCss')) { const st = document.createElement('style'); st.id = 'collCss'; st.textContent = '.kcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}.kcard{position:relative;display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:16px;background:rgba(7,18,31,.45);border:1px solid rgba(207,232,255,.14)}.kcard.pick{cursor:pointer;border-color:rgba(255,107,157,.5)}.kcard.pick:hover{border-color:var(--rose);background:rgba(255,107,157,.08)}.kcard .ktop{display:flex;gap:10px;align-items:center}.kcard canvas{flex:none;width:86px;height:86px;margin:-6px 0 -6px -6px}.kcard b{display:block;font-size:13.5px;line-height:1.25}.kcard .kkind{font-size:11.5px;opacity:.85;margin-top:1px}.kcard .kfacts{font-size:11px;opacity:.7;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.kcard .kmeta{font-size:10.5px;opacity:.65}.kcard .kleg{display:inline-block;padding:1px 8px;border-radius:9px;background:rgba(246,211,101,.16);border:1px solid rgba(246,211,101,.55);color:var(--gold);font:700 10px system-ui,sans-serif;letter-spacing:.06em;margin-top:3px}.kcard .kact{display:flex;gap:6px;margin-top:auto}.kcard .kact .btn{flex:1;min-height:36px;padding:0 8px;font-size:10.5px;white-space:nowrap}.kcard .kx{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;border:0;background:rgba(207,232,255,.08);color:var(--frost);cursor:pointer;font-size:13px;line-height:1;opacity:.6}.kcard .kx:hover{opacity:1;background:rgba(255,107,157,.25)}.khead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;margin-bottom:10px;border-radius:14px;background:rgba(255,107,157,.12);border:1px solid rgba(255,107,157,.45);font-size:12.5px}'; document.head.appendChild(st); }
+        const mateC = UI.breedWith ? G.W.cre.filter(function (q) { return q.id === UI.breedWith && !q.dead; })[0] : null;
+        if (UI.breedWith && !mateC) UI.breedWith = 0;
+        if (mateC) { const sp0 = G.speciesById(mateC.sp), hd = el('div', 'khead', '<span><b style="color:var(--rose)">♥ Choose a mate for ' + esc((sp0 ? sp0.name : 'Creature') + ' #' + mateC.id) + '.</b> Click one of your kept creatures: six children of the two are born in the pond.</span>', body); const cx = el('button', 'btn sm', 'CANCEL', hd); cx.onclick = function () { UI.breedWith = 0; UI.guideTab = 'coll'; G.openGuide(); }; }
+        else el('div', 'desc', 'What you keep outlives the pond. RELEASE sets a family of it free here; to breed one with a living creature, click that creature in the pond and press ♥ BREED.', body).style.margin = '0 0 10px';
+        const cards = el('div', 'kcards', '', body);
         list.forEach(function (it) {
           const g = G.unpackGenome(it.g); if (!g) return;
-          const card = el('div', 'card', '', cards);
-          cardCanvas(card, g, 5);
-          const tx = el('div', '', '', card);
-          tx.innerHTML = '<b>' + esc(it.name) + '</b><p>' + esc(it.kind) + '</p><small>' + esc(G.form.facts(g.f).slice(0, 4).join(', ')) + '</small><small>Kept in generation ' + it.gen + (it.age ? ' · ' + esc(it.age) : '') + '</small>';
-          const row = el('div', '', '', tx); row.style.cssText = 'display:flex;gap:6px;margin-top:6px;flex-wrap:wrap';
-          const mateC = UI.breedWith ? G.W.cre.filter(function (q) { return q.id === UI.breedWith && !q.dead; })[0] : null;
-          if (mateC) { const h = el('button', 'btn sm pulse', '♥ BREED WITH #' + mateC.id, row); h.onclick = function () { closeModal(); G.sfx('discovery'); UI.breedWith = 0; G.breedKept(it, mateC); }; }
-          const b = el('button', 'btn sm', 'RELEASE HERE', row);
-          b.onclick = function () { closeModal(); G.sfx('click'); G.release(it); };
-          const x = el('button', 'btn sm', 'LET GO', row);
-          x.onclick = function () { G.confirm('Remove ' + it.name + ' from your collection?', 'REMOVE', function () { const i = G.collection.indexOf(it); if (i >= 0) G.collection.splice(i, 1); UI.guideTab = 'coll'; G.openGuide(); }); };
+          const self = mateC && it.name.slice(-(' #' + mateC.id).length) === ' #' + mateC.id, legend = /^Legend/.test(it.age || '');
+          const card = el('div', 'kcard' + (mateC && !self ? ' pick' : ''), '', cards);
+          const top = el('div', 'ktop', '', card);
+          cardCanvas(top, g, 5);
+          el('div', '', '<b>' + esc(it.name) + '</b><div class="kkind">' + esc(it.kind) + '</div>' + (legend ? '<span class="kleg">★ ' + esc(it.age) + '</span>' : ''), top);
+          el('div', 'kfacts', esc(G.form.facts(g.f).slice(0, 4).join(', ')), card);
+          el('div', 'kmeta', 'Kept in generation ' + it.gen + (it.age && !legend ? ' · ' + esc(it.age) : ''), card);
+          const row = el('div', 'kact', '', card);
+          const breed = function () { closeModal(); G.sfx('discovery'); UI.breedWith = 0; G.breedKept(it, mateC); };
+          if (mateC) {
+            if (self) el('div', 'kmeta', 'This is the one you chose: pick another to be its mate.', row);
+            else { const h = el('button', 'btn sm pulse', '♥ BREED THESE TWO', row); h.onclick = function (e) { e.stopPropagation(); breed(); }; card.onclick = breed; }
+          } else {
+            const b = el('button', 'btn sm', 'RELEASE INTO THE POND', row); b.title = 'Eight of its kind are set free here, to breed with what lives in this pond.';
+            b.onclick = function () { closeModal(); G.sfx('click'); G.release(it); };
+            const x = el('button', 'kx', '✕', card); x.title = 'Let it go: remove it from your collection'; x.setAttribute('aria-label', 'Remove from collection');
+            x.onclick = function () { G.confirm('Remove ' + it.name + ' from your collection?', 'REMOVE', function () { const i = G.collection.indexOf(it); if (i >= 0) G.collection.splice(i, 1); G.markDirty(); UI.guideTab = 'coll'; G.openGuide(); }); };
+          }
         });
       } else if (tab === 'fossil') {
         const list = W.fossils.slice().reverse();
