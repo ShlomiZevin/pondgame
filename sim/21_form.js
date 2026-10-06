@@ -35,18 +35,20 @@
   //   rule: k kind, a..b the segments it grows from, e every e-th, l length, w width, j joints, g angle, c bend, t tip (0 none, 1 fingers, 2 pincer, 3 paddle), p taper
   F.cell = function (hue) {
     const r = G.rand;
-    return { sym: 0, n: 1, len: 1, prof: [1, 1, 1, 1, 1], bend: 0, rules: [], en: 0, es: 0.34, ek: 0, mk: 0, ms: 0.25, tk: 0, ts: 0.6,
+    return { bd: G.body.cell(), sym: 0, n: 1, len: 1, prof: [1, 1, 1, 1, 1], bend: 0, rules: [], en: 0, es: 0.4, ek: 0, mk: 0, ms: 0.25, tk: 0, ts: 0.6,
       hue: hue === undefined ? r() * 360 : hue, hue2: (r() < 0.5 ? -1 : 1) * (50 + r() * 110), sat: 62 + r() * 20, lit: 58 + r() * 8, pat: 0, psc: 0.5, crest: 0, shell: 0, glow: 0, venom: 0, hd: 1, nk: 0, coat: 0, hx: 0.85 + r() * 0.4, hq: 1.7 + r() * 1.2, pl: 0, seed: Math.floor(r() * 1e6) };
   };
   F.clone = function (f) {
     const o = {};
-    for (const k in f) if (k !== '_k') o[k] = f[k];
+    for (const k in f) if (k.charAt(0) !== '_') o[k] = f[k];
+    if (f.bd) o.bd = G.body.clone(f.bd);
     o.prof = f.prof.slice();
     o.rules = f.rules.map(cpRule);
     return o;
   };
   const num = function (v, lo, hi, d) { v = +v; return isFinite(v) ? clamp(v, lo, hi) : d; };
   F.fix = function (f) {
+    if (f.bd && G.body) G.body.fix(f);            // a body of free shapes: its masses are the body's segments
     f.sym = f.sym ? clamp(f.sym | 0, 3, 8) : 0;
     f.n = clamp(f.n | 0, 1, MAXN); f.len = num(f.len, 0.6, 1.5, 1); f.bend = num(f.bend, -0.3, 0.3, 0);
     if (!Array.isArray(f.prof)) f.prof = [1, 1, 1, 1, 1];
@@ -71,14 +73,14 @@
       q.on = q.on === undefined || q.on === null ? -1 : q.on | 0;
       if (q.on >= 0) { const par = q.on < i ? f.rules[q.on] : null; if (!par || !CHAIN[par.k] || q.k === 5 || (par.on >= 0 && f.rules[par.on].on >= 0)) q.on = -1; }
     }
-    f.en = clamp(f.en | 0, 0, 3); f.es = num(f.es, 0.2, 0.62, 0.34); f.ek = num(f.ek, 0, 1.2, 0);
+    f.en = clamp(f.en | 0, f.bd && (f.bd.m.length > 1 || f.rules.length > 2) ? 1 : 0, 3); f.es = num(f.es, 0.2, 0.62, 0.34); f.ek = num(f.ek, 0, 1.2, 0);
     f.mk = clamp(f.mk | 0, 0, 4); f.ms = num(f.ms, 0.14, 0.7, 0.25); f.tk = clamp(f.tk | 0, 0, 4); f.ts = num(f.ts, 0.3, 1.5, 0.6);
     f.hue = ((num(f.hue, -1e6, 1e6, 200) % 360) + 360) % 360; f.hue2 = num(f.hue2, -180, 180, 90); if (Math.abs(f.hue2) < 40) f.hue2 = f.hue2 < 0 ? -40 : 40;
     f.sat = num(f.sat, 52, 88, 70); f.lit = num(f.lit, 52, 72, 62); f.pat = clamp(f.pat | 0, 0, 5); f.psc = num(f.psc, 0.15, 1, 0.5);
     f.crest = num(f.crest, 0, 1, 0); f.shell = num(f.shell, 0, 1, 0); f.glow = num(f.glow, 0, 1, 0); f.venom = num(f.venom, 0, 1, 0); f.seed = (f.seed | 0) || 1;
     f.hd = num(f.hd, 0.7, 1.9, 1); f.nk = num(f.nk, 0, 0.7, 0); f.coat = clamp(f.coat | 0, 0, 3);
     f.hx = num(f.hx, 0.72, 1.45, 1); f.hq = num(f.hq, 1.5, 4, 2); f.pl = Math.max(0, f.pl | 0);
-    delete f._k;
+    delete f._k; delete f._b;
     return f;
   };
   function newRule(n, k) {
@@ -101,8 +103,8 @@
     // a change of structure: at most one a birth
     if (r() < 0.16 * wild) {
       const roll = r();
-      if (roll < 0.13) { if (f.n < MAXN) { f.n++; note('body grew to ' + f.n + ' segments', true); } }
-      else if (roll < 0.17) { if (f.n > 1) { f.n--; note('body shrank to ' + f.n + (f.n === 1 ? ' segment' : ' segments'), true); } }
+      if (roll < 0.13) { if (f.bd) G.body.bud(f, note); else if (f.n < MAXN) { f.n++; note('body grew to ' + f.n + ' segments', true); } }
+      else if (roll < 0.17) { if (f.bd) G.body.drop(f, note); else if (f.n > 1) { f.n--; note('body shrank to ' + f.n + (f.n === 1 ? ' segment' : ' segments'), true); } }
       else if (roll < 0.33) {
         if (f.rules.length < MAXR) {
           // what sprouts next leans towards what the pond is up against
@@ -136,7 +138,7 @@
       else if (roll < 0.90) { const up = r() < 0.7; f.shell = clamp(f.shell + (up ? 0.4 : -0.4), 0, 1); note(up ? 'grew a shell' : 'its shell thinned', true); }
       else if (roll < 0.93) { const up = r() < 0.7; f.glow = clamp(f.glow + (up ? 0.5 : -0.5), 0, 1); note(up ? 'began to glow' : 'its glow faded', true); }
       else if (roll < 0.955) { const up = r() < 0.7; f.venom = clamp(f.venom + (up ? 0.5 : -0.5), 0, 1); note(up ? 'grew poison glands' : 'its poison weakened', true); }
-      else if (roll < 0.975) { if (f.sym) { if (r() < 0.5) { f.sym = 0; note('a whole new body plan: a head and a tail', true); } else { f.sym += r() < 0.5 ? 1 : -1; note('changed its number of arms', true); } } else { f.sym = 3 + Math.floor(r() * 5); note('a whole new body plan: a star with ' + f.sym + ' arms', true); } }
+      else if (roll < 0.975 && !f.bd) { if (f.sym) { if (r() < 0.5) { f.sym = 0; note('a whole new body plan: a head and a tail', true); } else { f.sym += r() < 0.5 ? 1 : -1; note('changed its number of arms', true); } } else { f.sym = 3 + Math.floor(r() * 5); note('a whole new body plan: a star with ' + f.sym + ' arms', true); } }
       else { f.hue += 60 + r() * 240; note('a new colour', true); }
     }
     // a limb grows a joint: a copy of itself sprouts from its own tip (an arm gets a forearm, a forearm a hand)
@@ -147,12 +149,13 @@
     // a child of a new colour: rare, but it is how a pond comes to hold several colours
     if (r() < 0.03 * wild) { f.hue += 50 + r() * 260; if (r() < 0.5) f.hue2 = (r() < 0.5 ? -1 : 1) * (40 + r() * 140); note('was born a new colour', true); }
     // a whole new way of carrying the body: one of the builds this pond has been given
-    { const pls = G.W && G.W.plans ? G.W.plans : []; if (pls.length && !f.sym && f.n >= 2 && r() < 0.008 * wild) { const p = pls[Math.floor(r() * pls.length)]; if (p.id !== f.pl) { f.pl = p.id; note('took on a whole new build: the ' + p.name.toLowerCase(), true); } } else if (f.pl && r() < 0.008 * wild) { f.pl = 0; note('gave up its build for a plainer one', true); } }
+    // a shape of body imagined for this pond: now and then a child is born some way towards one of them
+    if (f.bd) { const pls = G.W && G.W.plans ? G.W.plans : []; if (pls.length && r() < 0.014 * wild) { const p = pls[Math.floor(r() * pls.length)]; if (p.id !== f.pl && p.bd) { G.body.adopt(f, p.bd, 0.65 + r() * 0.35); f.pl = p.id; note('its body took a new shape: the ' + p.name.toLowerCase() + (p.because ? ' (' + p.because + ')' : ''), true); } } }
     // heads, necks and coats
     if (r() < 0.022 * wild) { const k = Math.floor(r() * 4); if (k !== f.coat) { f.coat = k; note(['lost its coat: bare skin again', 'grew scales', 'grew fur', 'grew feathers'][k], true); } }
-    if (f.n > 1 && !f.sym && r() < 0.025 * wild) { const up = r() < 0.65; f.nk = clamp(f.nk + (up ? 0.25 : -0.25), 0, 0.7); note(up ? 'its neck narrowed: a head set apart from the body' : 'its neck thickened', true); }
-    if (r() < 0.02 * wild) { f.hx = 0.72 + r() * 0.73; f.hq = 1.5 + r() * 2.5; note(f.hq > 3 ? 'its head grew square' : f.hq < 1.8 ? 'its head grew pointed' : f.hx > 1.2 ? 'its head grew wide' : f.hx < 0.85 ? 'its head grew tall' : 'its head changed shape', true); }
-    if (r() < 0.022 * wild) { const up = r() < 0.6; f.hd = clamp(f.hd + (up ? 0.22 : -0.22), 0.7, 1.9); note(up ? 'its head grew' : 'its head shrank', true); }
+    if (f.n > 1 && !f.sym && !f.bd && r() < 0.025 * wild) { const up = r() < 0.65; f.nk = clamp(f.nk + (up ? 0.25 : -0.25), 0, 0.7); note(up ? 'its neck narrowed: a head set apart from the body' : 'its neck thickened', true); }
+    if (!f.bd && r() < 0.02 * wild) { f.hx = 0.72 + r() * 0.73; f.hq = 1.5 + r() * 2.5; note(f.hq > 3 ? 'its head grew square' : f.hq < 1.8 ? 'its head grew pointed' : f.hx > 1.2 ? 'its head grew wide' : f.hx < 0.85 ? 'its head grew tall' : 'its head changed shape', true); }
+    if (r() < 0.022 * wild) { const up = r() < 0.6; f.hd = clamp(f.hd + (up ? 0.22 : -0.22), 0.7, 1.9); note(f.bd ? (up ? 'its face grew' : 'its face shrank') : (up ? 'its head grew' : 'its head shrank'), true); }
     // a kind of part the pond was given gets its trial: now and then a child grows one, in place of an old growth if the body is full.
     // From there it is graded like everything else: by what it does for the body, by its cost, and by whether mates like the look.
     const dsl = G.W && G.W.designs ? G.W.designs : [];
@@ -196,11 +199,41 @@
     f.es += d() * 0.04; f.ek += d() * 0.12; f.ms += d() * 0.05; f.ts += d() * 0.1; f.psc += d() * 0.1;
     for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; q.l *= 1 + d() * 0.12; q.w *= 1 + d() * 0.1; q.g += d() * 0.15; q.c += d() * 0.15; }
     if (drift) note('body shape', false);
+    if (f.bd) {
+      G.body.mutate(f, m, wild, note);
+      // what the eye for beauty said of its kind is a change its children are likelier to be born with
+      if (F._fix && r() < 0.3 * wild) F.nudge(f, F._fix, note);
+      if (f.pl && G.planOf) { const p = G.planOf(f.pl); if (!p || !p.bd || G.body.dist(f.bd, p.bd) > 1.7) f.pl = 0; }      // it has drifted away from the shape it once took
+    }
     return F.fix(f);
+  };
+  /** one change towards better looks, as the judge put it */
+  F.NUDGES = ['eyes_bigger', 'two_eyes', 'simpler', 'rounder', 'bolder_colour', 'pattern', 'plain', 'bigger_face', 'shorter_parts', 'longer_parts', 'plumper', 'slimmer', 'face_on', 'more_parts', 'fewer_masses', 'more_masses', 'smile'];
+  F.nudge = function (f, fix, note) {
+    const r = G.rand; let t = '';
+    if (fix === 'eyes_bigger') { f.es += 0.07; t = 'its eyes grew'; }
+    else if (fix === 'two_eyes') { if (f.en !== 2) { f.en = 2; t = 'it now has two eyes'; } }
+    else if (fix === 'simpler') { if (f.rules.length > 1) { const i = f.rules.length - 1; t = 'lost its ' + KMANY[f.rules[i].k]; dropRule(f, i); } }
+    else if (fix === 'rounder') { if (f.bd) { for (let i = 0; i < f.bd.m.length; i++) { const q = f.bd.m[i]; for (let j = 0; j < q.r.length; j++) q.r[j] = 1 + (q.r[j] - 1) * 0.7; q.la *= 0.7; } t = 'its outline grew rounder'; } }
+    else if (fix === 'bolder_colour') { f.sat += 8; if (Math.abs(f.hue2) < 120) f.hue2 = (f.hue2 < 0 ? -1 : 1) * (120 + r() * 40); t = 'its colours grew bolder'; }
+    else if (fix === 'pattern') { if (!f.pat) { f.pat = 1 + Math.floor(r() * 5); t = 'its skin gained markings'; } }
+    else if (fix === 'plain') { if (f.pat) { f.pat = 0; t = 'its markings faded to plain skin'; } }
+    else if (fix === 'bigger_face') { f.hd += 0.2; f.es += 0.03; t = 'its face grew'; }
+    else if (fix === 'shorter_parts') { for (let i = 0; i < f.rules.length; i++) f.rules[i].l *= 0.82; if (f.rules.length) t = 'its growths grew shorter'; }
+    else if (fix === 'longer_parts') { for (let i = 0; i < f.rules.length; i++) f.rules[i].l *= 1.16; if (f.rules.length) t = 'its growths grew longer'; }
+    else if (fix === 'plumper') { for (let i = 1; i < 4; i++) f.prof[i] *= 1.1; t = 'it grew plumper'; }
+    else if (fix === 'slimmer') { for (let i = 1; i < 4; i++) f.prof[i] *= 0.9; t = 'it grew slimmer'; }
+    else if (fix === 'face_on') { if (f.bd && f.bd.v) { f.bd.v = 0; t = 'it turned to face you'; } }
+    else if (fix === 'more_parts') { if (f.rules.length < 4) { const q = newRule(f.n); f.rules.push(q); t = 'grew ' + KMANY[q.k]; } }
+    else if (fix === 'fewer_masses') { if (f.bd && G.body.drop(f, null)) t = 'lost a part of its body'; }
+    else if (fix === 'more_masses') { if (f.bd && G.body.bud(f, null)) t = 'a new part budded from its body'; }
+    else if (fix === 'smile') { f.mk = 0; f.ms += 0.06; t = 'its mouth softened into a smile'; }
+    if (t && note) note(t + ' (as the eye for beauty wished)', true);
   };
   /** a child's body from two parents: whole features come from one or the other */
   F.cross = function (a, b) {
     const r = G.rand, g = F.clone(r() < 0.5 ? a : b), o = r() < 0.5 ? a : b;
+    if (a.bd && b.bd) g.bd = G.body.cross(a.bd, b.bd);
     if (r() < 0.5) g.prof = o.prof.slice();
     if (r() < 0.5) { g.en = o.en; g.es = o.es; g.ek = o.ek; }
     if (r() < 0.5) { g.mk = o.mk; g.ms = o.ms; }
@@ -215,12 +248,13 @@
 
   // ── what the form gives: measured from the body ──
   F.counts = function (f) {
-    const c = { k: [0, 0, 0, 0, 0, 0, 0, 0, 0], dfx: { speed: 0, agility: 0, reach: 0, senses: 0, armour: 0, attack: 0 }, dAdj: '', sites: 0, legSites: 0, reach: 0, pincer: 0, paddle: 0, fingers: 0, kinds: 0, mass: 0 };
+    const c = { k: [0, 0, 0, 0, 0, 0, 0, 0, 0], dfx: { speed: 0, agility: 0, reach: 0, senses: 0, armour: 0, attack: 0 }, dAdj: '', sites: 0, legSites: 0, reach: 0, pincer: 0, paddle: 0, fingers: 0, kinds: 0, mass: 0, dres: [0, 0, 0], dwk: [0, 0, 0, 0, 0] };
     const seen = {}, N = [], RL = [], HEAD = [];      // per growth: how many there are, how far its tip is from the body, and whether it is at the front
     c.nested = 0;
     const plan = f.pl && G.planOf ? G.planOf(f.pl) : null;
     c.plan = plan;
-    if (plan) for (const ab in c.dfx) c.dfx[ab] += plan.fx[ab] || 0;
+    if (plan && plan.fx) for (const ab in c.dfx) c.dfx[ab] += plan.fx[ab] || 0;
+    if (plan && plan.res && f.bd) for (let j = 0; j < 3; j++) c.dres[j] += plan.res[j] || 0;
     for (let i = 0; i < f.rules.length; i++) {
       const q = f.rules[i];
       const dsg = dsgOf(q);
@@ -230,7 +264,7 @@
       let k = par ? N[q.on] : f.sym ? Math.ceil(f.sym / q.e) : (Math.floor((q.b - q.a) / q.e) + 1) * 2;
       if (par) c.nested++;
       HEAD[i] = par ? HEAD[q.on] : !!(f.sym || q.a === 0);
-      if (dsg) { if (dsg.place === 'back') k = f.sym ? 1 : k / 2; const mul = Math.min(2, k / 2 + 0.5) * Math.min(1.3, q.l); for (const ab in c.dfx) c.dfx[ab] += (dsg.fx[ab] || 0) * mul; if (!c.dAdj) c.dAdj = dsg.adj; }
+      if (dsg) { if (dsg.place === 'back' || dsg.place === 'wrap') k = f.sym ? 1 : k / 2; if (dsg.hits >= 0) c.dwk[dsg.hits] += Math.min(1.5, k / 2 + 0.5) * Math.min(1.3, q.l); const mul = Math.min(2, k / 2 + 0.5) * Math.min(1.3, q.l); for (const ab in c.dfx) c.dfx[ab] += (dsg.fx[ab] || 0) * mul; if (dsg.res) for (let j = 0; j < 3; j++) c.dres[j] += (dsg.res[j] || 0) * Math.min(1.3, mul); if (!c.dAdj) c.dAdj = dsg.adj; }
       N[i] = k; RL[i] = (par ? RL[q.on] + q.l * 0.7 : q.l);
       c.k[q.k] += k * q.l; c.sites += k; c.mass += k * q.l * (0.5 + q.w);
       if (!seen[q.k]) { seen[q.k] = 1; c.kinds++; }
@@ -238,18 +272,21 @@
       if (q.k === 3) c.reach = Math.max(c.reach, RL[i] * (HEAD[i] ? 1.2 : 0.6));
       if (par && !HEAD[i]) c.reach = Math.max(c.reach, RL[i] * 0.55);
     }
-    if (plan && plan.stands && plan.legs.length >= 2) c.legSites = Math.max(c.legSites, 4);
+    if (plan && plan.stands && plan.legs && plan.legs.length >= 2) c.legSites = Math.max(c.legSites, 4);
     return c;
   };
   F.abilities = function (f, c) {
     c = c || F.counts(f);
     const k = c.k, L = 2 + (f.n - 1) * 0.68 * f.len, wide = Math.max.apply(null, f.prof) * (0.74 + 0.05 * f.n);
-    const stream = f.sym ? 0.35 : clamp(L / (wide * 2.4), 0.4, 1.8) * (f.prof[0] < f.prof[2] ? 1.1 : 0.9);      // long, narrow and pointed slips through the water
+    const bm = f.bd && G.body ? G.body.measure(f) : null;
+    const stream = bm ? bm.stream : f.sym ? 0.35 : clamp(L / (wide * 2.4), 0.4, 1.8) * (f.prof[0] < f.prof[2] ? 1.1 : 0.9);      // long, narrow and pointed slips through the water
     const tail = f.sym || f.n < 2 ? 0 : [0, 0.6, 1, 0.35, 0.05][f.tk] * f.ts;
     const heavy = f.shell + 0.12 * k[5] + 0.05 * k[7];
     const D = {}; for (const ab in c.dfx) D[ab] = clamp(c.dfx[ab], -0.4, 0.55);
     // a neck lets the head reach and turn; a big head carries bigger senses; scales protect; feathers steer
-    const neck = f.sym || f.n < 2 ? 0 : f.nk;
+    const neck = f.sym || f.n < 2 || bm ? 0 : f.nk;
+    // a free body: tall reaches up, a face carried high sees far, bulk protects and slows, pairs balance, a hollow part is light
+    if (bm) { const big = clamp(bm.bulk - 1, 0, 2.5); D.reach += 0.16 * clamp(bm.tall - 1, 0, 1.2) + 0.05 * bm.stalks; D.senses += 0.12 * bm.high; D.armour += 0.07 * big; D.speed -= 0.045 * big; D.agility += 0.06 * bm.pairs + 0.08 * bm.hollow; D.armour -= 0.06 * bm.hollow; }
     D.reach += 0.22 * neck; D.agility += 0.05 * Math.min(3, c.nested); D.speed += 0.02 * Math.min(3, c.nested); D.agility += 0.08 * neck + (f.coat === 3 ? 0.06 : 0); D.senses += 0.14 * (f.hd - 1); D.armour += f.coat === 1 ? 0.12 : 0; D.speed -= f.coat === 1 ? 0.05 : f.coat === 2 ? 0.03 : 0;      // what the pond's own kinds of part add or cost
     return {
       speed: clamp(D.speed + 0.1 + 0.3 * stream + 0.32 * tail + 0.02 * Math.min(k[1], 6) + 0.04 * c.paddle - 0.2 * heavy - 0.015 * k[0] - 0.012 * c.sites, 0, 1),
@@ -314,7 +351,8 @@
     const FE = [c.pincer ? 'Clawed' : c.fingers ? 'Handed' : 'Legged', 'Finned', 'Spiny', 'Tentacled', 'Feelered', 'Plated', 'Frilled', 'Horned', c.dAdj || 'Strange'];
     let feat = '', bv = 1.2;
     for (let i = 0; i < 9; i++) if (c.k[i] > bv) { bv = c.k[i]; feat = FE[i]; }
-    if (!feat && f.en >= 3) feat = 'Many-Eyed'; if (!feat && f.shell > 0.25) feat = 'Shelled'; if (!feat && f.crest > 0.25) feat = 'Crested'; if (!feat && f.nk > 0.35 && f.n > 1 && !f.sym) feat = 'Long-Necked'; if (!feat && f.hd > 1.45) feat = 'Big-Headed'; if (!feat && f.n >= 5) feat = 'Long';
+    if (!feat && f.en >= 3) feat = 'Many-Eyed'; if (!feat && f.shell > 0.25) feat = 'Shelled'; if (!feat && f.crest > 0.25) feat = 'Crested'; if (!feat && f.nk > 0.35 && f.n > 1 && !f.sym) feat = 'Long-Necked'; if (!feat && f.hd > 1.45) feat = 'Big-Headed'; if (!feat && f.n >= 5 && !f.bd) feat = 'Long';
+    if (!feat && f.bd) { const bm = G.body.measure(f); feat = bm.hollow ? 'Ringed' : bm.pairs ? 'Twin' : bm.lobed ? 'Lobed' : bm.stalks ? 'Stalked' : bm.cls === 'T' && bm.n > 1 ? 'Tall' : bm.cls === 'W' && bm.n > 1 ? 'Wide' : ''; }
     // what it is best at, compared with what any body gets for free
     const BASE = { speed: 0.42, agility: 0.3, reach: 0.5, senses: 0.35, armour: 0.22, attack: 0.3 };
     let top = 'speed'; for (let i = 0; i < 6; i++) if (a[ABIL[i]] - BASE[ABIL[i]] > a[top] - BASE[top]) top = ABIL[i];
@@ -325,13 +363,14 @@
   /** the body in short facts, for the inspector, the story and the judge */
   F.facts = function (f) {
     const c = F.counts(f), t = [];
-    t.push(f.sym ? 'a star-shaped body with ' + f.sym + ' arms' : f.n === 1 ? 'a single round cell' : 'a body of ' + f.n + ' segments');
+    if (f.bd) { const w = G.body.words(f); for (let i = 0; i < w.length; i++) t.push(w[i]); }
+    else t.push(f.sym ? 'a star-shaped body with ' + f.sym + ' arms' : f.n === 1 ? 'a single round cell' : 'a body of ' + f.n + ' segments');
     const seen = {};
-    for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i], sk = q.k === 8 ? 'd' + q.t : q.k; if (seen[sk]) continue; seen[sk] = 1; if (q.k === 8) { const d = dsgOf(q); if (d) t.push((d.place === 'back' ? 'a ' : 'a pair of ') + d.name.toLowerCase() + (d.place === 'back' ? ' on its back' : d.place === 'head' ? 's on its head' : 's')); continue; } t.push(q.k === 0 && q.t ? 'legs ending in ' + ['', 'fingers', 'pincers', 'paddles'][q.t] : (q.l > 1.4 ? 'long ' : '') + KMANY[q.k]); }
+    for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i], sk = q.k === 8 ? 'd' + q.t : q.k; if (seen[sk]) continue; seen[sk] = 1; if (q.k === 8) { const d = dsgOf(q); if (d && d.place === 'wrap') { t.push('wearing a ' + d.name.toLowerCase() + ' it grew'); continue; } if (d) t.push((d.place === 'back' ? 'a ' : 'a pair of ') + d.name.toLowerCase() + (d.place === 'back' ? ' on its back' : d.place === 'head' ? 's on its head' : 's')); continue; } t.push(q.k === 0 && q.t ? 'legs ending in ' + ['', 'fingers', 'pincers', 'paddles'][q.t] : (q.l > 1.4 ? 'long ' : '') + KMANY[q.k]); }
     t.push(f.en === 0 ? 'no eyes' : f.en === 1 ? 'one ' + (f.es > 0.45 ? 'big ' : '') + 'eye' : f.en + (f.ek > 0.25 ? ' eyes on stalks' : f.es > 0.45 ? ' big eyes' : ' eyes'));
     if (f.mk) t.push(['', 'a beak', 'toothed jaws', 'a sucker mouth', 'whiskers'][f.mk]);
     if (f.tk && !f.sym && f.n > 1) t.push(['', 'a fan tail', 'a forked tail', 'a whip tail', 'a club tail'][f.tk]);
-    if (c.plan && !f.sym) t.unshift('the build of a ' + c.plan.name.toLowerCase() + ' (' + c.plan.note.toLowerCase().replace(/\.$/, '') + ')');
+    if (c.plan && !f.sym) t.unshift('the shape of the ' + c.plan.name.toLowerCase());
     if (f.nk > 0.35 && f.n > 1 && !f.sym) t.push('a head set on a neck'); if (f.hd > 1.45) t.push('a big head'); if (f.coat) t.push('a coat of ' + COATS[f.coat]);
     if (c.nested) t.push('parts growing on parts');
     if (f.shell > 0.25) t.push('a shell'); if (f.crest > 0.25) t.push('a crest along its back'); if (f.glow > 0.3) t.push('glowing lights'); if (f.venom > 0.3) t.push('poison glands');
@@ -343,7 +382,8 @@
     const out = [], push = function (t, good) { out.push([t, good]); };
     if (!!a.sym !== !!b.sym) push(b.sym ? 'a new body plan: a star with ' + b.sym + ' arms' : 'a new body plan: a head and a tail', true);
     else if (a.sym !== b.sym) push('arms: ' + a.sym + ' → ' + b.sym, b.sym > a.sym);
-    if (a.n !== b.n) push('body: ' + a.n + ' → ' + b.n + ' segments', b.n > a.n);
+    if (a.n !== b.n) push('body: ' + a.n + ' → ' + b.n + (a.bd && b.bd ? ' parts' : ' segments'), b.n > a.n);
+    if (a.bd && b.bd) { if (a.bd.v !== b.bd.v) push(b.bd.v ? 'now holds itself sideways on' : 'now faces you, two matching sides', true); const ma = G.body.measure(a), mb = G.body.measure(b); if (ma.pairs !== mb.pairs) push(mb.pairs > ma.pairs ? 'a part doubled into a pair' : 'a pair became one', mb.pairs > ma.pairs); if (ma.hollow !== mb.hollow) push(mb.hollow > ma.hollow ? 'a part opened into a ring' : 'its ring closed', mb.hollow > ma.hollow); if (ma.lobed !== mb.lobed) push(mb.lobed > ma.lobed ? 'its outline grew lobes' : 'its lobes smoothed away', mb.lobed > ma.lobed); if (a.bd.e !== b.bd.e) push('its face moved', true); }
     const ca = F.counts(a).k, cb = F.counts(b).k;
     const dn = function (f) { const o = {}; for (let i = 0; i < f.rules.length; i++) { const d = dsgOf(f.rules[i]); if (d) o[d.name] = 1; } return o; }, da = dn(a), db = dn(b);
     for (const x in db) if (!da[x]) push('grew a new kind of part: ' + x, true);
@@ -353,7 +393,7 @@
     if (a.mk !== b.mk) push(['its mouth became a plain opening', 'grew a beak', 'grew jaws', 'its mouth became a sucker', 'grew whiskers'][b.mk], b.mk > 0);
     if (a.tk !== b.tk) push(['lost its tail', 'grew a fan tail', 'grew a forked tail', 'grew a whip tail', 'grew a club tail'][b.tk], b.tk > 0);
     if (a.pat !== b.pat) push('skin turned ' + ['plain', 'striped', 'spotted', 'pale-bellied', 'ringed', 'saddled'][b.pat], true);
-    if ((a.pl | 0) !== (b.pl | 0)) { const p = b.pl && G.planOf ? G.planOf(b.pl) : null; push(p ? 'took on a whole new build: the ' + p.name.toLowerCase() : 'gave up its build', !!p); }
+    if ((a.pl | 0) !== (b.pl | 0)) { const p = b.pl && G.planOf ? G.planOf(b.pl) : null; if (p) push('its body took a new shape: the ' + p.name.toLowerCase(), true); }
     if (a.coat !== b.coat) push(b.coat ? 'grew a coat of ' + COATS[b.coat] : 'lost its coat', !!b.coat);
     if ((a.nk > 0.35) !== (b.nk > 0.35)) push(b.nk > 0.35 ? 'its head is now set on a neck' : 'lost its neck', b.nk > 0.35);
     if ((a.hd > 1.45) !== (b.hd > 1.45)) push(b.hd > 1.45 ? 'grew a big head' : 'its head shrank', b.hd > 1.45);
@@ -380,18 +420,19 @@
     v.push(f.nk * 0.9, (f.hd - 1) * 0.8, (f.hx - 1) * 0.7, (f.hq - 2) * 0.25, f.pl ? 1.3 : 0, f.pl ? ((f.pl * 37) % 11) / 11 : 0);
     let nest = 0; for (let i = 0; i < f.rules.length; i++) if (f.rules[i].on >= 0) nest++;
     v.push(Math.min(2, nest) * 0.5);
+    if (f.bd) { const bm = G.body.measure(f), R = f.bd.m[0].r; v.push(f.bd.v ? 0.9 : 0, Math.min(2, bm.pairs) * 0.55, bm.hollow ? 0.6 : 0, bm.cls === 'T' ? 0.6 : bm.cls === 'W' ? -0.6 : 0, bm.lobed ? 0.5 : 0, (R[0] - 1) * 0.9, (R[2] - 1) * 0.9, (R[4] - 1) * 0.9, (R[6] - 1) * 0.9, (R[8] - 1) * 0.9); }
     return v;
   };
   const r2 = function (x) { return Math.round(x * 100) / 100; };
   F.pack = function (f) {
     return [f.sym, f.n, r2(f.len), f.prof.map(r2), r2(f.bend), f.rules.map(function (q) { return [q.k, q.a, q.b, q.e, r2(q.l), r2(q.w), q.j, r2(q.g), r2(q.c), q.t, r2(q.p), q.on === undefined ? -1 : q.on]; }),
-      f.en, r2(f.es), r2(f.ek), f.mk, r2(f.ms), f.tk, r2(f.ts), Math.round(f.hue), Math.round(f.hue2), Math.round(f.sat), Math.round(f.lit), f.pat, r2(f.psc), r2(f.crest), r2(f.shell), r2(f.glow), r2(f.venom), f.seed, r2(f.hd), r2(f.nk), f.coat, r2(f.hx), r2(f.hq), f.pl | 0];
+      f.en, r2(f.es), r2(f.ek), f.mk, r2(f.ms), f.tk, r2(f.ts), Math.round(f.hue), Math.round(f.hue2), Math.round(f.sat), Math.round(f.lit), f.pat, r2(f.psc), r2(f.crest), r2(f.shell), r2(f.glow), r2(f.venom), f.seed, r2(f.hd), r2(f.nk), f.coat, r2(f.hx), r2(f.hq), f.pl | 0, f.bd ? G.body.pack(f.bd) : 0];
   };
   F.unpack = function (a) {
     if (!Array.isArray(a) || a.length < 24) return null;
     return F.fix({ sym: a[0], n: a[1], len: a[2], prof: Array.isArray(a[3]) ? a[3].map(Number) : null, bend: a[4],
       rules: (Array.isArray(a[5]) ? a[5] : []).map(function (q) { return { k: q[0], a: q[1], b: q[2], e: q[3], l: q[4], w: q[5], j: q[6], g: q[7], c: q[8], t: q[9], p: q[10], on: q[11] === undefined ? -1 : q[11] }; }),
-      en: a[6], es: a[7], ek: a[8], mk: a[9], ms: a[10], tk: a[11], ts: a[12], hue: a[13], hue2: a[14], sat: a[15], lit: a[16], pat: a[17], psc: a[18], crest: a[19], shell: a[20], glow: a[21], venom: a[22], seed: a[23], hd: a[24], nk: a[25], coat: a[26], hx: a[27], hq: a[28], pl: a[29] });
+      en: a[6], es: a[7], ek: a[8], mk: a[9], ms: a[10], tk: a[11], ts: a[12], hue: a[13], hue2: a[14], sat: a[15], lit: a[16], pat: a[17], psc: a[18], crest: a[19], shell: a[20], glow: a[21], venom: a[22], seed: a[23], hd: a[24], nk: a[25], coat: a[26], hx: a[27], hq: a[28], pl: a[29], bd: G.body.unpack(a[30]) || undefined });
   };
   F.key = function (f) { return f._k || (f._k = JSON.stringify(F.pack(f))); };
 
@@ -463,6 +504,7 @@
   }
   // its shape: an outline from where it joins the body (x 0) to its tip (x 1), ribs, and dots; in the animal's own colours
   function drawDesign(ctx, d, bx, by, ang, len, w, col, side) {
+    if (!d.pts) return;                          // something worn, not grown outward: the character painter draws those
     const c = Math.cos(ang), s = Math.sin(ang), L = len * 1.05, Wd = len * (0.7 + 0.9 * w) * side;
     const X = function (x, y) { return bx + c * x * L - s * y * Wd; }, Y = function (x, y) { return by + s * x * L + c * y * Wd; };
     const P = [[0, -0.07]].concat(d.pts, [[0, 0.07]]), n = P.length;

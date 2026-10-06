@@ -83,12 +83,12 @@
         });
         // the builds this pond was given: whole ways of carrying a body
         if (PS.length) {
-          el('h3', '', 'BUILDS', body).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:16px 0 8px;color:var(--gold)';
+          el('h3', '', 'SHAPES OF BODY', body).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:16px 0 8px;color:var(--gold)';
           const pc = el('div', 'cards', '', body);
           PS.forEach(function (p, i) {
-            let n = 0, live = null; for (let k = 0; k < W.cre.length; k++) { const ff = W.cre[k].g.f; if (ff.pl === p.id && !ff.sym && ff.n >= 2) { n++; live = live || ff; } }
-            const fx = Object.keys(p.fx).filter(function (k) { return Math.abs(p.fx[k]) > 0.04; }).map(function (k) { return k + ' ' + (p.fx[k] > 0 ? '+' : '−') + Math.abs(p.fx[k]).toFixed(2); });
-            const card = el('div', 'card' + (n ? '' : ' dead'), '<canvas width="192" height="192" style="flex:none;width:96px;height:96px;background:rgba(7,18,31,.5);border-radius:12px"></canvas><div><b>' + esc(p.name) + '</b><p>' + esc(p.note) + '</p><small>' + esc(fx.join(' · ')) + ' · ' + (n ? n + ' alive follow it' : 'nobody follows it yet') + (G.ai.labelOf(p.by) ? ' · imagined by ' + esc(G.ai.labelOf(p.by)) : '') + '</small></div>', pc);
+            let n = 0, live = null; for (let k = 0; k < W.cre.length; k++) { const ff = W.cre[k].g.f; if (ff.pl === p.id) { n++; live = live || ff; } }
+            const fx = [G.body.words({ bd: p.bd, rules: [] })[0]];
+            const card = el('div', 'card' + (n ? '' : ' dead'), '<canvas width="192" height="192" style="flex:none;width:96px;height:96px;background:rgba(7,18,31,.5);border-radius:12px"></canvas><div><b>' + esc(p.name) + '</b><p>' + esc(p.note) + '</p><small>' + esc(fx.join(' · ')) + ' · ' + (p.because ? 'why: ' + esc(p.because) + ' · ' : '') + (n ? n + ' alive have it' : 'nobody has it yet') + (G.ai.labelOf(p.by) ? ' · imagined by ' + esc(G.ai.labelOf(p.by)) : '') + '</small></div>', pc);
             const cx = card.querySelector('canvas').getContext('2d'), f = live || G.planDemo(p, (W.hue0 + i * 70) % 360);
             cx.translate(96, 106); cx.scale(0.5, 0.5); G.form.portrait(cx, f, 1.2, {});
           });
@@ -101,8 +101,8 @@
             let n = 0; for (let k = 0; k < W.cre.length; k++) if (W.cre[k].g.f.rules.some(function (q) { return q.k === 8 && q.t === d.id; })) n++;
             const fx = Object.keys(d.fx).filter(function (k) { return Math.abs(d.fx[k]) > 0.04; }).map(function (k) { return k + ' ' + (d.fx[k] > 0 ? '+' : '−') + Math.abs(d.fx[k]).toFixed(2); });
             const card = el('div', 'card' + (n ? '' : ' dead'), '<canvas width="192" height="152" style="flex:none;width:96px;height:76px;background:rgba(7,18,31,.5);border-radius:12px"></canvas><div><b>' + esc(d.name) + '</b><p>' + esc(d.note) + '</p><small>' + esc(fx.join(' · ')) + ' · sits on the ' + esc(d.place) + '</small><small>Invented in gen ' + d.gen + (G.ai.labelOf(d.by) ? ' by ' + esc(G.ai.labelOf(d.by)) : ' by the pond') + ' · ' + (n ? n + ' creatures grow it now' : 'nobody grows it now') + '</small></div>', dc);
-            const cx = card.querySelector('canvas').getContext('2d'), f = G.designDemo(d, (W.hue0 + i * 50) % 360), ex = G.form.extent(f).all, sc = Math.min(96 / ex, 76 / ex) * 0.95;
-            cx.translate(96, 76); cx.scale(sc, sc); G.form.draw(cx, f, 1.2, { swim: 0.3 });
+            const cx = card.querySelector('canvas').getContext('2d'), f = G.designDemo(d, (W.hue0 + i * 50) % 360);
+            cx.translate(96, 84); cx.scale(0.42, 0.42); G.form.portrait(cx, f, 1.2, {});
           });
         }
       } else if (tab === 'coll') {
@@ -400,7 +400,7 @@
       const one = function (k, label) { const c = cnt[k] || { asked: 0, fresh: 0 }; return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span>' + label + '</span><span>' + (c.usd ? G.ai.money(c.usd) + ' · ' : '') + '<b>' + c.fresh + '</b> new' + (c.asked > c.fresh ? ' · ' + (c.asked - c.fresh) + ' reused' : '') + '</span></div>'; };
       el('h3', '', 'AI USED THIS SESSION', root).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:14px 0 4px;color:var(--gold)';
       el('div', '', one('thing', 'Words you added') + one('event', 'Events you typed') + one('organ', 'New organs (at most ' + caps.organ + ', one per 40 s)') + one('story', 'Story chapters (at most ' + caps.story + ', one per 45 s)') + one('ideas', 'Mutation ideas (at most ' + caps['mutation-ideas'] + ', one per 2 min)') + (G.ai.sound ? one('sound', 'Sounds (one per new word, at most ' + caps.sound + ')') : '') +
-        one('judge', 'The judge of looks (at most ' + caps.judge + ', one per minute)') +
+        one('judge', 'The eye for beauty: grading creatures (at most ' + caps.judge + ')') + one('check', 'The eye for beauty: looking over new ideas (at most ' + caps.check + ')') + one('plan', 'New shapes of body (at most ' + caps.plan + ')') + one('design', 'New kinds of body part (at most ' + caps.design + ')') +
         '<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0 0;margin-top:4px;border-top:1px solid rgba(207,232,255,.15)"><span>Total</span><span><b style="color:var(--gold)">' + G.ai.money(t.usd) + '</b> · <b>' + t.fresh + '</b> new answers · ' + (t.asked - t.fresh) + ' reused for free' + (t.unpriced ? ' · ' + t.unpriced + ' with no price set' : '') + '</span></div>', root);
       el('div', 'desc', 'Fast-forward does not use more AI: the pond asks by the clock, not by the generation. Only what you type is on top of that.', root).style.marginTop = '6px';
       el('h3', '', 'WHO IMAGINES', root).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:14px 0 4px;color:var(--gold)';

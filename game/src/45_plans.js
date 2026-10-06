@@ -1,23 +1,15 @@
-// ── New builds, invented for this pond ──
-// A build is how a body is carried: where its spine runs (a frog crouches, a seahorse stands curled, a scorpion arches its
-// tail over its back) and how its legs are set. It is the one thing the genes could not reach by themselves, so the pond is
-// given builds the way it is given new kinds of part: by the AI when there is a server, from its own stock when there is not.
-// A build is then a gene like any other: a mutation may switch a body to it; the silhouette, head, growths, coat and
-// colours stay the body's own; what the build gives and costs is measured; selection decides whether it stays.
-//
-// A build:  spine  3..7 points [x, y] from head to tail. x: forward is positive. y: height above the floor. The body's length
-//                  is laid along this line.
-//           legs   up to 4, each { u (0 at the shoulders .. 1 at the hips), knee [dx, dy], foot [dx, dy], thick, air }:
-//                  knee from the hip, foot from the knee, in leg lengths, y up. `air`: it does not reach the floor (an arm).
-//           stands does it stand on the floor (true) or float in the water (false)
-//           girth  how thick the body is for its length (0.6 slender .. 1.5 stout)
-//           fx     what it gives and costs: speed, agility, reach, senses, armour, attack
+// ── Shapes of body, imagined for this pond ──
+// Chance alone reshapes bodies a little at a time. Now and then the pond is also handed a whole SHAPE of body to try: a
+// few masses and how they join. The AI imagines it, and it does so looking at the pond: what was dropped in, what is
+// killing, what the water is like, what lives here now and how the eye for beauty graded it, which earlier ideas caught on
+// and which the player chose to keep. It is told plainly what the game is for: creatures somebody would love to collect.
+// What it offers is only an offer. It is drawn and looked at before it is let in (see the judge), a mutation may then bear a
+// child some way towards it, and from there it is ordinary genetics: it spreads if it helps or is admired, and dies out if not.
 (function () {
   'use strict';
   const clamp = G.clamp;
-  const ABIL = ['speed', 'agility', 'reach', 'senses', 'armour', 'attack'];
-  const MAX = 3;          // few at a time, so the pond's own bodies keep their share; a build nobody follows makes room for the next
-  G.keptPlans = [];          // builds that came along with kept creatures (ids from 100000 up)
+  const MAX = 3;             // few at a time: a shape nobody follows makes room for the next
+  G.keptPlans = [];          // shapes that came along with kept creatures (ids from 100000 up)
 
   G.planOf = function (id) {
     const L = G.W ? G.W.plans : null;
@@ -25,85 +17,121 @@
     for (let i = 0; i < G.keptPlans.length; i++) if (G.keptPlans[i].id === id) return G.keptPlans[i];
     return null;
   };
-
   G.cleanPlan = function (raw) {
-    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.spine)) return null;
-    const n = function (v, a, b, d) { v = +v; return isFinite(v) ? clamp(v, a, b) : d; };
-    const spine = [];
-    for (let i = 0; i < raw.spine.length && spine.length < 8; i++) { const p = raw.spine[i]; if (Array.isArray(p) && isFinite(+p[0]) && isFinite(+p[1])) spine.push([n(p[0], -1, 1, 0), n(p[1], 0, 1.4, 0.3)]); }
-    if (spine.length < 3) return null;
-    let len = 0; for (let i = 1; i < spine.length; i++) len += Math.hypot(spine[i][0] - spine[i - 1][0], spine[i][1] - spine[i - 1][1]);
-    if (len < 0.35) return null;                                    // a dot is not a body
-    const legs = [];
-    if (Array.isArray(raw.legs)) for (let i = 0; i < raw.legs.length && legs.length < 4; i++) { const q = raw.legs[i]; if (!q || !Array.isArray(q.knee) || !Array.isArray(q.foot)) continue; legs.push({ u: n(q.u, 0, 1, 0.5), knee: [n(q.knee[0], -1.2, 1.2, 0), n(q.knee[1], -1.2, 1.2, -0.5)], foot: [n(q.foot[0], -1.2, 1.2, 0), n(q.foot[1], -1.4, 1.2, -0.5)], thick: n(q.thick, 0.4, 1.8, 1), air: q.air ? 1 : 0 }); }
-    const f = raw.fx && typeof raw.fx === 'object' ? raw.fx : {}, fx = {};
-    let pos = 0, neg = 0;
-    for (let i = 0; i < 6; i++) { let v = +f[ABIL[i]]; if (!isFinite(v)) v = 0; v = clamp(v, -0.3, 0.45); fx[ABIL[i]] = v; if (v > 0) pos += v; else neg -= v; }
-    if (pos > 0.7) for (let i = 0; i < 6; i++) if (fx[ABIL[i]] > 0) fx[ABIL[i]] *= 0.7 / pos;
-    if (neg < 0.08) { let worst = 0; for (let i = 1; i < 6; i++) if (fx[ABIL[i]] < fx[ABIL[worst]]) worst = i; fx[ABIL[worst]] = -0.12; neg = 0; for (let i = 0; i < 6; i++) if (fx[ABIL[i]] < 0) neg -= fx[ABIL[i]]; }      // nothing is free
-    pos = 0; for (let i = 0; i < 6; i++) if (fx[ABIL[i]] > 0) pos += fx[ABIL[i]];
-    if (pos > neg + 0.06) for (let i = 0; i < 6; i++) if (fx[ABIL[i]] > 0) fx[ABIL[i]] *= (neg + 0.06) / pos;
-    const name = String(raw.name || 'New build').replace(/[<>"]/g, '').trim().slice(0, 22) || 'New build';
+    if (!raw || typeof raw !== 'object') return null;
+    // a body as it is kept (angles in radians) or as it was imagined (angles in degrees, as people think of them)
+    let bd = null;
+    if (raw.bd && Array.isArray(raw.bd.m)) { const f = { bd: JSON.parse(JSON.stringify(raw.bd)), rules: [] }; G.body.fix(f); bd = f.bd; }
+    else bd = G.body.clean(raw.body || raw);
+    if (!bd) return null;
+    const n = function (v) { v = +v; return isFinite(v) ? clamp(v, 0, 0.3) : 0; };
+    const rs = Array.isArray(raw.res) ? raw.res : raw.res && typeof raw.res === 'object' ? [raw.res.heat, raw.res.cold, raw.res.poison] : [];
+    const name = String(raw.name || 'New shape').replace(/[<>"]/g, '').trim().slice(0, 22) || 'New shape';
     return { name: name, noun: (String(raw.noun || '').replace(/[^A-Za-z\-]/g, '').slice(0, 14) || name.split(' ').pop()).replace(/^./, function (c) { return c.toUpperCase(); }),
-      note: String(raw.note || '').replace(/[<>]/g, '').slice(0, 110), spine: spine, legs: legs, stands: raw.stands !== false, girth: n(raw.girth, 0.6, 1.5, 1), fx: fx, by: String(raw.by || raw.model || '').slice(0, 60) };
+      note: String(raw.note || '').replace(/[<>]/g, '').slice(0, 120), because: String(raw.because || '').replace(/[<>]/g, '').slice(0, 90),
+      bd: bd, res: [n(rs[0]), n(rs[1]), n(rs[2])], by: String(raw.by || raw.model || '').slice(0, 60) };
   };
-
   G.addPlan = function (def, quiet) {
     const W = G.W, p = G.cleanPlan(def);
     if (!p) return null;
     if (W.plans.some(function (x) { return x.name.toLowerCase() === p.name.toLowerCase(); })) return null;
     if (W.plans.length >= MAX) {
-      const used = {}; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].g.f.pl) used[W.cre[i].g.f.pl] = 1;
-      let at = -1; for (let i = 0; i < W.plans.length; i++) if (!used[W.plans[i].id]) { at = i; break; }
+      const used = {}; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].g.f.pl) used[W.cre[i].g.f.pl] = (used[W.cre[i].g.f.pl] || 0) + 1;
+      let at = -1, few = 1e9; for (let i = 0; i < W.plans.length; i++) { const u = used[W.plans[i].id] || 0; if (u < few && u < W.cre.length * 0.08) { few = u; at = i; } }
       if (at < 0) return null;
-      W.plans.splice(at, 1);                                        // forget the oldest build nobody follows
+      G.museNote(W.plans[at].name, few ? 'only ' + few + ' followed it' : 'nobody followed it');
+      W.plans.splice(at, 1);
     }
     p.id = W.nextPlan++; p.gen = def.gen || W.gen;
     W.plans.push(p);
     if (!quiet) G.emit('plan-new', p);
     return p;
   };
+  /** what became of an idea: told to the AI the next time it is asked, so it learns this pond */
+  G.museNote = function (name, what) { const W = G.W; if (!W) return; W.museLog = W.museLog || []; W.museLog.push({ g: W.gen, name: String(name).slice(0, 30), what: String(what).slice(0, 90) }); if (W.museLog.length > 10) W.museLog.shift(); };
 
-  // ── the pond's own stock (no server needed) ──
+  /** the pond as the AI is told of it: what was added, what happened, what kills, who lives here and how they are liked */
+  G.worldBrief = function () {
+    const W = G.W, out = { goal: 'creatures a person would love to collect: cute, clean, characterful, like a Pixar character; beauty is graded and decides who breeds' };
+    out.things = W.zones.slice(-6).map(function (z) { const bad = G.isBad && G.isBad(z); return { name: z.word, what: (z.note || '').slice(0, 80), harmful: !!bad, alive: z.alive > 0.25, weakTo: bad && G.WEAK ? G.WEAK[z.weak].id : undefined, killed: z.deaths || 0 }; });
+    out.events = (W.events || []).slice(-4).map(function (e) { return e.name + (e.note ? ': ' + String(e.note).slice(0, 70) : ''); });
+    out.pressures = W.press ? W.press.list.slice(0, 6) : [];
+    out.water = G.envText ? G.envText(W) : '';
+    const live = W.species.filter(function (s) { return !s.extinct && s.rep && s.n >= 3; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 4);
+    out.creatures = live.map(function (s) { return { kind: G.form.kind(s.rep.f).full, share: Math.round(100 * s.n / Math.max(1, W.cre.length)) + '%', body: G.form.facts(s.rep.f).slice(0, 8).join('; '), beauty: s.judge ? Math.round(s.judge.score * 10) + '/10 (' + s.judge.why + ')' : 'not graded yet' }; });
+    out.keptByPlayer = (G.collection || []).slice(-3).map(function (it) { return it.kind; });
+    const tried = [];
+    const share = function (test) { let n = 0; for (let i = 0; i < W.cre.length; i++) if (test(W.cre[i].g.f)) n++; return Math.round(100 * n / Math.max(1, W.cre.length)) + '% of the pond has it'; };
+    (W.plans || []).forEach(function (p) { tried.push({ idea: p.name + ' (a shape of body)', now: share(function (f) { return f.pl === p.id; }) }); });
+    (W.designs || []).forEach(function (d) { tried.push({ idea: d.name + ' (a part)', now: share(function (f) { return f.rules.some(function (q) { return q.k === 8 && q.t === d.id; }); }) }); });
+    (W.museLog || []).slice(-5).forEach(function (m) { tried.push({ idea: m.name, now: 'gone: ' + m.what }); });
+    out.earlierIdeas = tried.slice(-10);
+    return out;
+  };
+
+  // ── the pond's own stock, for when the AI is not asked (angles in degrees: 0 right, 90 up, 180 left, 270 down) ──
+  // radii go clockwise from the right: right, lower right, bottom right, bottom left, lower left, left, upper left, top left, top right, upper right
+  const ROUND = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
   const OWN = [
-    { name: 'Hopper', noun: 'Hopper', note: 'It crouches on big folded hind legs and leaps.', spine: [[0.3, 0.3], [0.12, 0.3], [-0.1, 0.2], [-0.26, 0.09]], legs: [{ u: 0.12, knee: [0.05, -0.5], foot: [0.2, -0.5], thick: 0.8 }, { u: 0.8, knee: [0.9, 0.7], foot: [-0.5, -0.9], thick: 1.6 }], stands: true, girth: 1.25, fx: { agility: 0.3, speed: 0.12, armour: -0.12 } },
-    { name: 'Curler', noun: 'Curler', note: 'It hangs upright in the water, its tail curled under it.', spine: [[0.14, 0.95], [0.06, 0.8], [-0.02, 0.55], [0.04, 0.3], [0.13, 0.15], [0.05, 0.04], [-0.06, 0.12]], legs: [], stands: false, girth: 0.85, fx: { agility: 0.2, senses: 0.2, speed: -0.2 } },
-    { name: 'Stinger', noun: 'Stinger', note: 'Low on many legs, its tail arched high over its back.', spine: [[0.5, 0.2], [0.1, 0.2], [-0.3, 0.2], [-0.46, 0.34], [-0.46, 0.56], [-0.36, 0.68]], legs: [{ u: 0.08, knee: [0.5, 0.5], foot: [0.4, -0.5], thick: 0.7 }, { u: 0.22, knee: [0.1, 0.6], foot: [0.1, -0.5], thick: 0.7 }, { u: 0.38, knee: [-0.4, 0.5], foot: [-0.3, -0.5], thick: 0.7 }], stands: true, girth: 0.9, fx: { attack: 0.4, speed: -0.15 } },
-    { name: 'Slider', noun: 'Slider', note: 'No legs at all: it glides on its belly, head held up.', spine: [[0.4, 0.34], [0.26, 0.2], [0.02, 0.12], [-0.36, 0.1]], legs: [], stands: true, girth: 1.3, fx: { armour: 0.35, speed: -0.25 } },
-    { name: 'Strider', noun: 'Strider', note: 'Upright on two long thin legs, head carried high and forward.', spine: [[0.2, 0.94], [0.13, 0.74], [0.0, 0.56], [-0.2, 0.5], [-0.38, 0.54]], legs: [{ u: 0.5, knee: [-0.06, -0.5], foot: [0.12, -0.5], thick: 0.65 }], stands: true, girth: 0.95, fx: { speed: 0.25, senses: 0.15, armour: -0.15 } },
-    { name: 'Reacher', noun: 'Reacher', note: 'A very long neck lifts its head far above its body.', spine: [[0.3, 1.02], [0.26, 0.76], [0.2, 0.5], [0.0, 0.42], [-0.3, 0.42]], legs: [{ u: 0.5, knee: [0, -0.5], foot: [0, -0.5], thick: 0.9 }, { u: 0.92, knee: [0, -0.5], foot: [0, -0.5], thick: 0.9 }], stands: true, girth: 0.8, fx: { reach: 0.45, agility: -0.2 } },
-    { name: 'Bounder', noun: 'Bounder', note: 'It sits back on a heavy tail and springs off great hind legs.', spine: [[0.1, 0.86], [0.05, 0.62], [-0.08, 0.36], [-0.3, 0.16], [-0.5, 0.1]], legs: [{ u: 0.2, knee: [0.14, -0.1], foot: [0.1, -0.18], thick: 0.5, air: true }, { u: 0.62, knee: [0.26, 0.04], foot: [-0.04, -0.8], thick: 1.5 }], stands: true, girth: 1.1, fx: { speed: 0.3, agility: 0.18, reach: -0.12 } },
-    { name: 'Lurker', noun: 'Lurker', note: 'It rears up and holds two folded arms ready to strike.', spine: [[0.25, 0.82], [0.2, 0.62], [0.05, 0.44], [-0.3, 0.36]], legs: [{ u: 0.12, knee: [0.28, 0.22], foot: [0.16, -0.32], thick: 0.85, air: true }, { u: 0.55, knee: [0.06, 0.2], foot: [0.1, -0.5], thick: 0.6 }, { u: 0.8, knee: [-0.04, 0.2], foot: [-0.08, -0.5], thick: 0.6 }], stands: true, girth: 0.75, fx: { attack: 0.35, reach: 0.2, speed: -0.2 } },
+    { name: 'Snowball', noun: 'Snowball', note: 'A round body with a smaller round head set on top.', body: { v: 0, e: 1, m: [{ r: ROUND }, { r: ROUND, s: 0.72, on: 0, at: 90, d: 0.85 }] } },
+    { name: 'Toadstool', noun: 'Toadstool', note: 'A wide cap over a narrow stem, the face on the stem.', body: { v: 0, e: 0, m: [{ r: [0.8, 0.9, 1.2, 1.2, 0.9, 0.8, 0.85, 1.1, 1.1, 0.85] }, { r: [1.5, 1.1, 0.7, 0.7, 1.1, 1.5, 1.2, 0.9, 0.9, 1.2], s: 1.2, on: 0, at: 90, d: 0.62 }] } },
+    { name: 'Eared One', noun: 'Earling', note: 'One round body with a pair of big round ears.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.5, on: 0, at: 52, d: 0.9, pr: 1 }] } },
+    { name: 'Star Body', noun: 'Starling', note: 'Its whole body is a five-pointed star.', body: { v: 0, e: 0, m: [{ r: ROUND, lb: 5, la: 0.22 }] } },
+    { name: 'Periscope', noun: 'Peeper', note: 'A low wide body, and the face held high on a stalk.', body: { v: 0, e: 1, m: [{ r: [1.4, 1.1, 0.8, 0.8, 1.1, 1.4, 1.1, 0.8, 0.8, 1.1] }, { r: ROUND, s: 0.6, on: 0, at: 90, d: 1.45 }] } },
+    { name: 'Bead String', noun: 'Beadling', note: 'Three beads in a row, the biggest in front.', body: { v: 1, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.82, on: 0, at: 180, d: 0.9 }, { r: ROUND, s: 0.62, on: 1, at: 180, d: 0.9 }] } },
+    { name: 'Halo', noun: 'Halo', note: 'A round body that carries a ring above it.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: [1.3, 1.1, 0.8, 0.8, 1.1, 1.3, 1.1, 0.8, 0.8, 1.1], s: 0.7, on: 0, at: 90, d: 1.2, h: 1 }] } },
+    { name: 'Totem', noun: 'Totem', note: 'Three parts stacked one on another, the face at the top.', body: { v: 0, e: 2, m: [{ r: [1.1, 1, 1, 1, 1, 1.1, 1, 0.9, 0.9, 1] }, { r: ROUND, s: 0.85, on: 0, at: 90, d: 0.8 }, { r: ROUND, s: 0.7, on: 1, at: 90, d: 0.8 }] } },
+    { name: 'Twin Bells', noun: 'Twin', note: 'A small middle with a big round body out on each side.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.95, on: 0, at: -8, d: 1.0, pr: 1 }] } },
+    { name: 'Bell', noun: 'Bell', note: 'A dome, wide and full above, cut short below.', body: { v: 0, e: 0, m: [{ r: [1.3, 1.0, 0.65, 0.65, 1.0, 1.3, 1.25, 1.15, 1.15, 1.25] }] } },
+    { name: 'Nodder', noun: 'Nodder', note: 'A round body, the head carried forward on a neck, a small rump behind.', body: { v: 1, e: 1, m: [{ r: ROUND }, { r: ROUND, s: 0.62, on: 0, at: 48, d: 1.3 }, { r: ROUND, s: 0.5, on: 0, at: 190, d: 0.8 }] } },
+    { name: 'Pear', noun: 'Pearling', note: 'Narrow above and full below, like a ripe pear.', body: { v: 0, e: 0, m: [{ r: [1.1, 1.25, 1.2, 1.2, 1.25, 1.1, 0.85, 0.8, 0.8, 0.85] }] } },
+    { name: 'Clover', noun: 'Clover', note: 'A body of three soft lobes.', body: { v: 0, e: 0, m: [{ r: ROUND, lb: 3, la: 0.2 }] } },
+    { name: 'Crown Bearer', noun: 'Crownling', note: 'A stout body with a small star set on its head.', body: { v: 0, e: 0, m: [{ r: [1.15, 1.1, 1, 1, 1.1, 1.15, 1, 0.9, 0.9, 1] }, { r: ROUND, s: 0.42, on: 0, at: 90, d: 0.95, lb: 5, la: 0.24 }] } },
   ];
   G.offlinePlan = function () {
     const r = G.rand, W = G.W, have = W ? W.plans.map(function (p) { return p.name; }) : [];
     let pick = null;
-    for (let t = 0; t < 8 && !pick; t++) { const c = OWN[Math.floor(r() * OWN.length)]; if (have.indexOf(c.name) < 0) pick = c; }
+    for (let t = 0; t < 10 && !pick; t++) { const c = OWN[Math.floor(r() * OWN.length)]; if (have.indexOf(c.name) < 0) pick = c; }
     if (!pick) return null;
     // the same idea never comes out the same twice
-    const sx = 0.88 + r() * 0.24, sy = 0.85 + r() * 0.3, fx = {};
-    for (const k in pick.fx) fx[k] = pick.fx[k] * (0.75 + r() * 0.5);
-    return { name: pick.name, noun: pick.noun, note: pick.note, spine: pick.spine.map(function (p) { return [p[0] * sx, p[1] * sy]; }), legs: pick.legs.map(function (q) { return { u: q.u, knee: q.knee.slice(), foot: q.foot.slice(), thick: q.thick * (0.85 + r() * 0.3), air: q.air }; }), stands: pick.stands, girth: pick.girth * (0.85 + r() * 0.3), fx: fx, by: '' };
+    const b = JSON.parse(JSON.stringify(pick.body));
+    for (let i = 0; i < b.m.length; i++) { const q = b.m[i]; q.r = q.r.map(function (v) { return v * (0.93 + r() * 0.14); }); if (i) { q.s *= 0.88 + r() * 0.24; q.d = (q.d || 1) * (0.92 + r() * 0.16); } }
+    return { name: pick.name, noun: pick.noun, note: pick.note, because: '', body: b, by: '' };
   };
-
-  /** a plain animal that follows this build, to show it */
+  /** a plain animal of this shape, to show it */
   G.planDemo = function (p, hue) {
     const f = G.form.cell(hue === undefined ? 190 : hue);
-    f.n = 5; f.prof = [0.8, 1.1, 1, 0.8, 0.45]; f.en = 2; f.es = 0.5; f.tk = 1; f.mk = 1; f.hue2 = 120; f.pl = p.id;
-    f.rules = p.legs.length ? [{ k: 0, a: 1, b: 3, e: 2, l: 1, w: 0.5, j: 2, g: 0.2, c: 0, t: 0, p: 0.5, on: -1 }] : [];
+    f.bd = G.body.clone(p.bd); f.en = 2; f.es = 0.5; f.hue2 = 120; f.pl = p.id || 0;
     return G.form.fix(f);
   };
 
-  // now and then the pond is given one new build to try
+  // now and then the pond is handed one new shape of body to try
   let busy = false;
   G.planTick = function (gen) {
     const W = G.W;
-    if (!W || W.title || gen < 20 || gen % 11 !== 5) return;
+    if (!W || W.title || gen < 4 || gen % 9 !== 4) return;
     const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
     if (!live) { const p = G.offlinePlan(); if (p) G.addPlan(p); return; }
     if (busy || !G.ai.allow('plan')) { if (!busy && W.plans.length < 2) { const p = G.offlinePlan(); if (p) G.addPlan(p); } return; }
     busy = true;
-    const info = { pressures: W.press ? W.press.list.slice(0, 6) : [], water: G.envText ? G.envText(W) : '', commonBodies: (W.kinds || []).slice(0, 3).map(function (k) { return k[0]; }), have: W.plans.map(function (p) { return p.name; }) };
-    G.ai.ask('plan', info).then(function (p) { busy = false; if (G.W !== W) return; if (!p || !G.addPlan(p)) { const o = G.offlinePlan(); if (o) G.addPlan(o); } }, function () { busy = false; });
+    const info = G.worldBrief(); info.have = W.plans.map(function (p) { return p.name; });
+    const own = function () { const o = G.offlinePlan(); if (o) G.addPlan(o); };
+    G.ai.ask('plan', info).then(function (raw) {
+      const p = raw ? G.cleanPlan(raw) : null;
+      if (G.W !== W) { busy = false; return; }
+      if (!p) { busy = false; own(); return; }
+      // it is drawn and looked at before it is let in
+      const demo = [G.planDemo(p, W.hue0)];
+      const top = W.species.filter(function (s) { return !s.extinct && s.rep; }).sort(function (a, b) { return b.n - a.n; })[0];
+      if (top) { const f2 = G.form.clone(top.rep.f); G.body.adopt(f2, p.bd, 1); demo.push(G.form.fix(f2)); }
+      G.lookOver(demo, 'a new shape of body called "' + p.name + '": ' + p.note).then(function (v) {
+        busy = false;
+        if (G.W !== W) return;
+        if (v && v.score < 0.42) { G.museNote(p.name, 'never let in: when drawn, the eye for beauty gave it ' + Math.round(v.score * 10) + '/10 (' + v.why + ')'); G.emit('idea-dropped', p.name, v); own(); return; }
+        const made = G.addPlan(raw);
+        if (made && v) made.seen = { score: v.score, why: v.why };
+        if (!made) own();
+      }, function () { busy = false; G.addPlan(raw); });
+    }, function () { busy = false; });
   };
 })();

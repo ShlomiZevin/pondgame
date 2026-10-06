@@ -18,7 +18,7 @@
       organs: (W.organs || []).map(function (o) { return { id: o.id, name: o.name, note: o.note, svg: o.svg && o.svg.length < 1500 ? o.svg : '', fx: o.fx, digest: o.digest, hue: Math.round(o.hue), by: o.by, gen: o.gen }; }),
       nextOrgan: W.nextOrgan || 1,
       designs: (W.designs || []).map(function (d) { return { id: d.id, name: d.name, adj: d.adj, note: d.note, place: d.place, motion: d.motion, colour: d.colour, pts: d.pts, smooth: d.smooth, ribs: d.ribs, dots: d.dots, fx: d.fx, by: d.by, gen: d.gen }; }), nextDesign: W.nextDesign || 1,
-      col: G.collection, colD: G.keptDesigns, colP: G.keptPlans, plans: W.plans || [], nextPlan: W.nextPlan || 1,
+      col: G.collection, colD: G.keptDesigns, colP: G.keptPlans, plans: W.plans || [], nextPlan: W.nextPlan || 1, museLog: W.museLog || [],
       env: W.env, ages: (W.ages || []).slice(-24), hue0: Math.round(W.hue0 || 0), fashion: W.fashion, fashionGen: W.fashionGen | 0,
       story: (W.story || []).slice(-12), events: (W.events || []).slice(-12),
       history: (W.history || []).slice(-90), evShelf: (W.evShelf || []).slice(-10).map(function (e) { const c = JSON.parse(JSON.stringify(e)); if (c.thing) c.thing.svg = ''; return c; }),
@@ -35,7 +35,7 @@
       out.cre.push([G.packGenome(c.g), Math.round(c.x), Math.round(c.y), Math.round(c.E), c.age, c.sp, c.born]);
     }
     const sp = W.species.filter(function (s) { return s.rep; }).sort(function (a, b) { return (b.extinct ? 0 : 1) - (a.extinct ? 0 : 1) || b.peak - a.peak; }).slice(0, 26);
-    sp.forEach(function (s) { out.species.push([s.id, s.name, s.born, s.parent, s.extinct ? s.diedGen || 1 : 0, s.peak, s.kills || 0, Math.round(s.hue), G.packGenome(s.rep), s.hist.slice(-40), s.judge && !s.extinct ? { score: +s.judge.score.toFixed(2), why: s.judge.why, gen: s.judge.gen } : null]); });
+    sp.forEach(function (s) { out.species.push([s.id, s.name, s.born, s.parent, s.extinct ? s.diedGen || 1 : 0, s.peak, s.kills || 0, Math.round(s.hue), G.packGenome(s.rep), s.hist.slice(-40), s.judge && !s.extinct ? { score: +s.judge.score.toFixed(2), why: s.judge.why, gen: s.judge.gen, fix: s.judge.fix || '', loved: s.loved ? 1 : 0 } : s.loved ? { loved: 1 } : null]); });
     W.fossils.slice(-12).forEach(function (f) { if (f.g) out.fossils.push([f.id, f.name, f.born, f.died, f.peak, G.packGenome(f.g)]); });
     // keep it well under 100 kB
     let s = JSON.stringify(out);
@@ -106,6 +106,7 @@
     if (Array.isArray(d.colP)) d.colP.slice(0, 16).forEach(function (q) { const o = G.cleanPlan(q); if (!o) return; o.id = Math.floor(num(q.id, 100000, 999999, 100000)); G.keptPlans.push(o); });
     W.plans = [];
     if (Array.isArray(d.plans)) d.plans.slice(0, 8).forEach(function (q) { const o = G.cleanPlan(q); if (!o) return; o.id = Math.floor(num(q.id, 1, 1e6, 1)); o.gen = num(q.gen, 0, 1e6, 0); if (!W.plans.some(function (x) { return x.id === o.id; })) W.plans.push(o); });
+    W.museLog = Array.isArray(d.museLog) ? d.museLog.slice(-10).map(function (m) { return { g: num(m && m.g, 0, 1e6, 0), name: String(m && m.name || '').replace(/[<>]/g, '').slice(0, 30), what: String(m && m.what || '').replace(/[<>]/g, '').slice(0, 90) }; }) : [];
     W.nextPlan = Math.max(Math.floor(num(d.nextPlan, 1, 1e6, 1)), W.plans.reduce(function (m, o) { return Math.max(m, o.id + 1); }, 1));
     // what the player has kept comes first of all: its kinds of part are needed to rebuild anything that carries them
     G.keptDesigns = [];
@@ -131,7 +132,8 @@
       const g = G.unpackGenome(s[8]); if (!g) return;
       const sp = { id: num(s[0], 1, 1e6, 1), name: String(s[1]).slice(0, 40), born: num(s[2], 0, 1e6, 0), parent: num(s[3], 0, 1e6, 0), extinct: !!s[4], diedGen: num(s[4], 0, 1e6, 0), peak: num(s[5], 0, 1e5, 0), kills: num(s[6], 0, 1e6, 0), hue: num(s[7], 0, 360, 0), rep: g, repFit: 0, fv: G.features(g), n: 0, fitSum: 0, hist: Array.isArray(s[9]) ? s[9].map(Number).filter(isFinite).slice(-80) : [], lastGen: W.gen, keep: true };
       if (sp.extinct) sp.lastGen = sp.diedGen;
-      if (s[10] && isFinite(+s[10].score)) sp.judge = { score: num(s[10].score, 0, 1, 0.5), why: String(s[10].why || '').replace(/[<>]/g, '').slice(0, 140), gen: num(s[10].gen, 0, 1e6, 0), fv: G.form.features(g.f) };
+      if (s[10] && s[10].loved) sp.loved = true;
+      if (s[10] && s[10].score !== undefined && isFinite(+s[10].score)) sp.judge = { score: num(s[10].score, 0, 1, 0.5), why: String(s[10].why || '').replace(/[<>]/g, '').slice(0, 140), gen: num(s[10].gen, 0, 1e6, 0), fv: G.form.features(g.f), fix: G.form.NUDGES.indexOf(s[10].fix) >= 0 ? s[10].fix : '' };
       W.species.push(sp);
     });
     if (Array.isArray(d.fossils)) d.fossils.forEach(function (f) {

@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 global.window = globalThis; globalThis.addEventListener = () => {};
 const src = path.join(__dirname, '..', 'src');
-for (const f of ['10_core.js', '20_genome.js', '21_form.js', '30_world.js', '40_words.js', '41_look.js', '43_why.js', '44_pressure.js', '45_organs.js', '45_parts.js', '45_plans.js', '46_events.js', '47_story.js', '48_judge.js', '49_eras.js']) vm.runInThisContext(fs.readFileSync(path.join(src, f), 'utf8'), { filename: f });
+for (const f of ['10_core.js', '20_genome.js', '21_form.js', '21b_body.js', '30_world.js', '40_words.js', '41_look.js', '43_why.js', '44_pressure.js', '45_organs.js', '45_parts.js', '45_plans.js', '46_events.js', '47_story.js', '48_judge.js', '49_eras.js']) vm.runInThisContext(fs.readFileSync(path.join(src, f), 'utf8'), { filename: f });
 const gens = +process.argv[2] || 200, seeds = (process.argv[3] || '11,23,57,101').split(',').map(Number);
 let all = { top: 0, eff: 0, big: 0, n: 0 };
 for (const seed of seeds) {

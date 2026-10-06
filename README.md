@@ -80,18 +80,20 @@ use it directly, and `npm run pull-game` copies it into `game/` before a commit.
 | `00_head.html` | The page and all CSS. |
 | `10_core.js` | The global `G`, the loop, input, the camera. |
 | `20_genome.js` | The genome and `G.derive` (genes → what a body can do), mutation, crossover. |
-| `21_form.js` | **The body.** Growth-rule genes, the rules of development, abilities measured from shape, taste, and the top-down drawing (puppets). |
-| `22_portrait.js` | **How creatures are drawn, in the pond and on every card**: side-view characters grown from the genes (microbe, orb, star, jelly, blob, crab, beast, upright, serpent, fish, or an invented build), every part moving. Each look is kept as a 6-frame loop. |
+| `21_form.js` | The form genome: growths (legs, fins, horns…), eyes, mouth, coat, colours; mutation and crossover; abilities measured from the body; names. Also the old top-down drawing, no longer used in the pond. |
+| `21b_body.js` | **The body itself: free shapes held in genes.** A body is 1 to 5 masses, each an outline of ten radii (and perhaps lobes), joined at an angle, pressed in or out on a stalk, single or a mirrored pair, solid or a ring. Facing you or side on. A child takes each mass from one parent or a blend of both; chance reshapes them. There are no preset animal types. |
+| `22_portrait.js` | **How creatures are drawn, in the pond and on every card.** The `free` branch draws a body of free shapes as one cartoon silhouette with its growths, every part moving; a bare single cell is drawn as an amoeba. Each look is kept as a 6-frame loop. The older fixed builds (fish, crab…) remain only for typed beings and old saves. |
 | `30_world.js` | The simulation: seasons, food, creatures, things, breeding, selection, species. |
 | `40_words.js` | Typed words, the offline word table, and `G.ai` (the one door to the server, with limits and the cost ledger). |
 | `41_look.js` | How a typed being is turned into a body so it is drawn as a character. |
 | `43_why.js` | The reason shown when a feature takes hold. |
 | `44_pressure.js` | What the pond is up against right now (it tilts which mutations appear). |
 | `45_organs.js`, `45_parts.js` | Organs and new kinds of body part invented for a pond; the collection. |
-| `45_plans.js` | **Builds** invented for a pond: a whole way of carrying a body (a spine line and how the legs are set), by the AI or from the game's own stock of eight. A build is a gene (`f.pl`); at most three live in a pond at a time. |
+| `45_plans.js` | **Shapes of body imagined for a pond**, by the AI looking at the pond (`G.worldBrief`: things dropped in, events, dangers, who lives there and their beauty grades, what the player kept, what became of earlier ideas), or from a stock of fourteen. At most three at a time; a mutation may bear a child towards one. |
 | `48_paint.js` | AI paintings of creatures. Switched off (`G.ai.drawn = true`): paintings cannot move. |
 | `46_events.js` | Free-text world events. |
-| `47_story.js`, `48_judge.js`, `49_eras.js` | The narrator, the AI judge of looks, and ages named from what actually dominates. |
+| `48_judge.js` | **The eye for beauty.** Draws the pond's kinds on one sheet and sends the picture to the AI, which grades each (0–10), says why, and names one fix. The grade is 70% of charm; charm decides mates, children and who lasts the winter; the fix becomes a likelier mutation. New ideas are drawn and looked over the same way before they are let in (`G.lookOver`). |
+| `47_story.js`, `49_eras.js` | The narrator, and ages named from what actually dominates. |
 | `50_render.js` | Drawing the pond. |
 | `55_sim.js` … `67_tree.js` | Running the sim, the HUD, the thing card, the Book of Life, the family tree, the away report. |
 | `70_audio.js`, `80_save.js`, `85_host.js`, `99_boot.js` | Sound, saving, the bridge to the hosting page, start-up. |
@@ -128,7 +130,8 @@ that hosts it, and that page calls the server. `public/dev-host.html` is a compl
 | op | server call | what for |
 |---|---|---|
 | `ai.thing` | `POST /api/ai/thing` | A typed word → what it does, how it looks. |
-| `ai.plan` | `POST /api/ai/plan` | A new build (body plan) for a pond. About $0.003 with Haiku. |
+| `ai.plan` | `POST /api/ai/plan` | A new shape of body, answering what is happening in the pond. |
+| `ai.judge` | `POST /api/ai/judge` | The picture of the creatures (base64 JPEG, about 50 kB) → a grade, a reason and a fix for each. |
 | `ai.event` | `POST /api/ai/event` | A typed sentence → a world event. |
 | `ai.organ`, `ai.design` | `POST /api/ai/organ`, `/design` | A new organ, a new kind of body part. |
 | `ai.judge` | `POST /api/ai/judge` | How striking each kind of creature looks. |
@@ -159,9 +162,23 @@ What has to change, and nothing else should:
 - Every call is priced when it is made and written to `data/books`, by model and by day. Prices are list prices, checked on 2026-10-05; correct them in `lib/ai.js` or with `PRIMORDIA_PRICES`.
 - A two-and-a-half-minute session at 64× has cost about 2 cents with Claude Haiku 4.5.
 
+## What the AI calls cost (measured 2026-10-06, one real call each)
+
+| model | a shape of body | a kind of part | grading 6 creatures from the picture |
+|---|---|---|---|
+| Claude Haiku 4.5 (default) | $0.0045 | $0.0038 | $0.0037 |
+| Claude Sonnet 5.5 | $0.0086 | about $0.008 | $0.0079 |
+| Claude Opus 5.5 | $0.027 | $0.030 | $0.016 |
+| GPT-5.6 Sol | $0.022–0.029 | $0.022 | $0.016 |
+
+A live pond on Haiku, four minutes at 64× (about 260 generations) with a knight dropped in and an ice age: **$0.076** in all (6 gradings, 6 look-overs of new ideas, 4 shapes, 4 parts, 4 story chapters, 1 thing). The calls are made by the clock, not by the generation, so an hour of play on Haiku is roughly a dollar; on Opus or Sol about five times that. `node scripts/eye.js` repeats the comparison and prints the cost of every call; `node scripts/live.js` runs the whole loop. Sol's price is promotional (OpenAI says at least through 2026-11-21): check the table in `lib/ai.js` again then.
+
 ## Known problems
 
-- **Evolution slows down.** After a while a pond settles and its creatures stay more or less the same. This is the main open problem.
+- Haiku is a generous judge (most kinds get 7–9); Opus and Sol use more of the range. A stricter judge selects harder.
+- Kinds of part can spread to nearly every creature, which makes the pond busier to look at than the judge would like.
+- A pond evolved without the AI (tests, the server's catch-up while you were away) has no grades: it goes by the built-in taste only, which does not punish clutter enough.
+- Saves from before the free bodies still load and are drawn the old way; they do not turn into free bodies.
 - An AI-invented build is only checked for being a usable line; a strange one (head low, tail high) is drawn as given.
 - `POST /api/ai/paint` and `lib/paint.js` (AI paintings) work but the game does not use them. The top-down drawing in `21_form.js` (`F.draw`, `F.rig`) is no longer used in the pond.
 - A whole pond tends to end up wearing the same coat, and kinds in one pond often share their main body part.

@@ -40,7 +40,7 @@
     if (HAS[key]) return HAS[key];
     if (key.indexOf('grow') === 0) { const k = +key.slice(4); return function (c) { return c.g.f.rules.some(function (q) { return q.k === k; }); }; }
     if (key.indexOf('mouth') === 0) { const k = +key.slice(5); return function (c) { return c.g.f.mk === k; }; }
-    if (key.indexOf('plan') === 0) { const id = +key.slice(4); return function (c) { return c.g.f.pl === id && !c.g.f.sym; }; }
+    if (key.indexOf('plan') === 0) { const id = +key.slice(4); return function (c) { return c.g.f.pl === id; }; }
     if (key.indexOf('dsg') === 0) { const id = +key.slice(3); return function (c) { return c.g.f.rules.some(function (q) { return q.k === 8 && q.t === id; }); }; }
     if (key.indexOf('organ') === 0) { const id = +key.slice(5); return function (c) { return c.g.p.some(function (p) { return p.k === id; }); }; }
     return null;

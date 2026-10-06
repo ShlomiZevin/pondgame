@@ -795,7 +795,9 @@
         const mateC = findMate(p, surv);
         if (mateC && G.rand() < 0.85) { genome = G.crossover(p.g, mateC.g); mate = mateC; }      // two parents whenever a mate is near; alone, it copies itself
         else genome = G.cloneGenome(p.g);
+        { const sp0 = p.sp ? G.speciesById(p.sp) : null; G.form._fix = sp0 && sp0.judge && sp0.judge.fix ? sp0.judge.fix : null; }      // what the judge wished for its kind
         const res = G.mutate(genome, wild, idea);
+        G.form._fix = null;
         const child = G.makeCreature(res.g, p, mate, res.muts);
         child.sp = p.sp;
         child.E = child.ph.Emax * K.repro * 0.95;
@@ -815,12 +817,14 @@
 
   /** how attractive a creature is: its own body's charm, and what the judge made of its kind */
   /** the look of a creature, as a hunter or a mate would tell it apart: its kind of body, its coat and its colour */
-  G.shapeOf = function (g) { const f = g.f, set = {}; for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on < 0) set[q.k === 8 ? 'd' + q.t : q.k] = 1; } return (f.sym ? 'star' : f.pl ? 'b' + f.pl : f.n >= 6 ? 'long' : f.n >= 3 ? 'mid' : 'short') + ':' + Object.keys(set).sort().join(',') + ':' + f.coat; };
+  G.shapeOf = function (g) { const f = g.f, set = {}; for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on < 0) set[q.k === 8 ? 'd' + q.t : q.k] = 1; } return (f.bd ? G.body.measure(f).key : f.sym ? 'star' : f.n >= 6 ? 'long' : f.n >= 3 ? 'mid' : 'short') + ':' + Object.keys(set).sort().join(',') + ':' + f.coat; };
   G.hueOf = function (g) { return Math.floor((((g.f.hue % 360) + 360) % 360) / 60); };      // one of six broad colours
   G.lookOf = function (c) { return G.shapeOf(c.g) + '|' + G.hueOf(c.g); };
   G.charmOf = function (c) {
     const s = c.sp ? G.speciesById(c.sp) : null;
-    return s && s.judge ? 0.5 * c.ph.charm + 0.5 * s.judge.score : c.ph.charm;
+    // the grade the eye for beauty gave its kind is most of it; its own body's fit to the pond's taste is the rest. What the player kept is loved outright.
+    const v = s && s.judge ? 0.3 * c.ph.charm + 0.7 * s.judge.score : c.ph.charm;
+    return s && s.loved ? Math.max(v, 0.92) : v;
   };
 
   function findMate(p, surv) {
@@ -899,7 +903,8 @@
     // what is common is hunted, crowded and sickened first: a rare kind of body has room. So several kinds live side by side.
     const share = {}, shapes = {}, hues = [0, 0, 0, 0, 0, 0];
     for (let i = 0; i < cre.length; i++) { const c = cre[i], k = G.kindOf(c.g).kind; c.kd = k; share[k] = (share[k] || 0) + 1; c.shp = G.shapeOf(c.g); shapes[c.shp] = (shapes[c.shp] || 0) + 1; c.hb = G.hueOf(c.g); hues[c.hb]++; }
-    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.55 * hues[cre[i].hb] / cre.length);
+    // who lasts the winter: the well fed, the rare, and the good-looking (the pond is kind to what is admired)
+    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.55 * hues[cre[i].hb] / cre.length) * (0.74 + 0.52 * G.charmOf(cre[i]));
     let topK = '', topN = 0; for (const k in share) if (share[k] > topN) { topN = share[k]; topK = k; }
     const crowd = topN / Math.max(1, cre.length);
     let sick = 0;
@@ -950,7 +955,7 @@
     grow0: 'First legs! Something can crawl and grab.', grow1: 'First fins! Something learned to paddle.', grow2: 'First spikes! A prickly new defence.', grow3: 'First tentacles! Long arms that reach and feel.',
     grow4: 'First feelers! Glowing tips that sense the water.', grow5: 'First armour plates!', grow6: 'First frills! A fan to show off.', grow7: 'First horns!',
     eye: 'First eye! Something can really see.', eyes3: 'Three eyes or more! Something sees all around.', mouth1: 'First beak!', mouth2: 'First jaws! Teeth, and the big prey of the deep to use them on.', mouth3: 'First sucker mouth!', mouth4: 'First whiskers!',
-    tail: 'First tail! A body built to swim.', seg2: 'More than one cell! A body with a front and a back.', seg5: 'A long body: five segments.', seg8: 'A very long body: eight segments.', seg11: 'A giant: a body of eleven segments.', coat1: 'Scales! A coat of small hard plates.', coat2: 'Fur! A warm coat.', coat3: 'Feathers!', neck: 'A neck! A head set apart from the body.', bighead: 'A big head!', nested: 'A part growing on a part! Something like a hand on an arm.', star: 'A new body plan! A star, with arms all around.',
+    tail: 'First tail! A body built to swim.', pair: 'A matching pair! One part of the body doubled, one on each side.', ring: 'A ring! A part of the body opened into a hollow.', lobes: 'Lobes! An outline that swells and dips all the way round.', stalk: 'A stalk! A part of the body held out away from the rest.', sideways: 'Sideways on! A body with a front and a back.', faceaway: 'A head! The face moved onto a part of its own.', seg2: 'More than one part! A second mass budded from the body.', seg5: 'A body of five parts.', seg8: 'A very long body: eight segments.', seg11: 'A giant: a body of eleven segments.', coat1: 'Scales! A coat of small hard plates.', coat2: 'Fur! A warm coat.', coat3: 'Feathers!', neck: 'A neck! A head set apart from the body.', bighead: 'A big head!', nested: 'A part growing on a part! Something like a hand on an arm.', star: 'A new body plan! A star, with arms all around.',
     shell: 'First shell!', crest: 'First crest!', glow: 'First glow! A creature that makes its own light.', venom: 'First poison glands!', pattern: 'First markings! Skin with a pattern.',
     walker: 'Walkers! Two pairs of legs: they can climb onto the shore.', hands: 'Hands! Fingers at the front of the body.', biter: 'A real bite: jaws strong enough for big prey.',
     hidden: 'First thought! A brain grew a hidden cell.', hidden3: 'A bigger brain: three hidden cells.',
@@ -981,7 +986,8 @@
       for (let j = 0; j < f.rules.length; j++) { const k = f.rules[j].k; if (k === 8) { const dk = 'dsg' + f.rules[j].t; if (!seen[dk]) { seen[dk] = 1; inc(dk); } continue; } if (!seen['r' + k]) { seen['r' + k] = 1; inc('grow' + k); } }
       if (f.en >= 1) inc('eye'); if (f.en >= 3) inc('eyes3'); if (f.mk) inc('mouth' + f.mk); if (f.tk && f.n > 1 && !f.sym) inc('tail');
       if (f.n >= 2) inc('seg2'); if (f.n >= 5) inc('seg5'); if (f.n >= 8) inc('seg8'); if (f.n >= 11) inc('seg11');
-      if (f.pl && !f.sym && f.n >= 2) inc('plan' + f.pl);
+      if (f.pl) inc('plan' + f.pl);
+      if (f.bd) { const bm = G.body.measure(f); if (bm.pairs) inc('pair'); if (bm.hollow) inc('ring'); if (bm.lobed) inc('lobes'); if (bm.stalks) inc('stalk'); if (f.bd.v) inc('sideways'); if (f.bd.e) inc('faceaway'); }
       if (f.coat) inc('coat' + f.coat); if (f.nk > 0.35 && f.n > 1 && !f.sym) inc('neck'); if (f.hd > 1.45) inc('bighead'); if (f.rules.some(function (q) { return q.on >= 0; })) inc('nested'); if (f.sym) inc('star');
       if (f.shell > 0.25) inc('shell'); if (f.crest > 0.25) inc('crest'); if (f.glow > 0.3) inc('glow'); if (f.venom > 0.3) inc('venom'); if (f.pat) inc('pattern');
       if (ph.lungs) inc('walker'); if (ph.hands) inc('hands'); if (ph.jaws) inc('biter');
@@ -1007,8 +1013,8 @@
       if (W.disc[k]) continue;
       const why = G.why ? G.why(k) : '';
       if (DISC[k]) G.discover(k, DISC[k] + (why ? ' ' + why : ''));
-      else if (k.indexOf('plan') === 0 && G.planOf) { const p = G.planOf(+k.slice(4)); if (p) G.discover(k, 'A whole new build took hold: the ' + p.name + '! ' + p.note + (why ? ' ' + why : '')); }
-      else if (k.indexOf('dsg') === 0 && G.designOf) { const d = G.designOf(+k.slice(3)); if (d) G.discover(k, 'A new kind of body part took hold: the ' + d.name + '! ' + d.note + (why ? ' ' + why : '')); }
+      else if (k.indexOf('plan') === 0 && G.planOf) { const p = G.planOf(+k.slice(4)); if (p) G.discover(k, 'A new shape of body took hold: the ' + p.name + '! ' + p.note + (p.because ? ' It was imagined because of this: ' + p.because + '.' : '') + (why ? ' ' + why : '')); }
+      else if (k.indexOf('dsg') === 0 && G.designOf) { const d = G.designOf(+k.slice(3)); if (d) G.discover(k, 'A new kind of body part took hold: the ' + d.name + '! ' + d.note + (d.because ? ' It was imagined because of this: ' + d.because + '.' : '') + (why ? ' ' + why : '')); }
       else if (k.indexOf('organ') === 0 && G.organOf) { const o = G.organOf(+k.slice(5)); if (o) G.discover(k, 'A new organ took hold: ' + o.name + '! ' + o.note + (why ? ' ' + why : '')); }
     }
     if (W.stats.killed >= 3) G.discover('predator', 'First predator! Creatures are eating other creatures.');
@@ -1140,6 +1146,7 @@
           hist: [], extinct: false, lastGen: W.gen, rep: null, repFit: -1, hue: c.g.t[2],
         };
         best.name = G.speciesName(c.g, best.id);
+        { const ps = parent ? G.speciesById(parent) : null; if (ps && ps.judge) best.judge = { score: ps.judge.score, why: ps.judge.why, fix: ps.judge.fix, gen: ps.judge.gen, fv: ps.judge.fv, est: true }; }
         sp.push(best);
         if (sp.length > 3) G.emit('species-new', best);
       }

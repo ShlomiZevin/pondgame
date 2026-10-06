@@ -145,12 +145,14 @@
       nseg: f.n - 1, limbs: cn.legSites, segs: [],
       reach: clamp(ext.all * ds / r, 1, 3.6),
       dig: dig, res: [
-        clamp(0.3 * c[6] + FX.heat * 0.6 + (f.coat === 0 ? 0.28 : f.coat === 1 ? 0.12 : -0.12) + 0.3 * (1 - plump) + 0.05 * Math.min(4, k[1] + k[6]), 0, 1),
-        clamp(0.3 * c[7] + FX.cold * 0.6 + (f.coat >= 2 ? 0.42 : 0) + 0.3 * plump, 0, 1),
-        clamp(0.35 * c[8] + FX.poison * 0.6 + (f.coat === 1 ? 0.25 : 0) + 0.28 * f.shell + 0.22 * f.venom, 0, 1)],
+        clamp(cn.dres[0] + 0.3 * c[6] + FX.heat * 0.6 + (f.coat === 0 ? 0.28 : f.coat === 1 ? 0.12 : -0.12) + 0.3 * (1 - plump) + 0.05 * Math.min(4, k[1] + k[6]), 0, 1),
+        clamp(cn.dres[1] + 0.3 * c[7] + FX.cold * 0.6 + (f.coat >= 2 ? 0.42 : 0) + 0.3 * plump, 0, 1),
+        clamp(cn.dres[2] + 0.35 * c[8] + FX.poison * 0.6 + (f.coat === 1 ? 0.25 : 0) + 0.28 * f.shell + 0.22 * f.venom, 0, 1)],
       photo: Math.min(2, FX.photo),
       hue: f.hue,
     };
+    // a part made to answer something in the pond works as the weapon or the shield it is
+    ph.spike += 1.2 * cn.dwk[0]; ph.gland += 1.2 * cn.dwk[1]; ph.bite += cn.dwk[2]; ph.lamp = Math.min(2, ph.lamp + cn.dwk[3]); if (cn.dwk[4]) ph.defense = 1 - (1 - ph.defense) * Math.pow(0.8, cn.dwk[4]);
     // organs change what the body can do; feeding on light means sitting still
     ph.speed *= Math.max(0.25, (1 + 0.28 * clamp(FX.speed, -2, 2)) * (1 - 0.2 * Math.min(2, FX.photo)));
     ph.sense += 55 * Math.min(2, FX.sense);

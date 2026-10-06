@@ -3,9 +3,9 @@
 //   POST /api/ai/thing   { word }            → { thing }       what a typed word is made of
 //   POST /api/ai/ideas   { gen, species }    → { ideas }       mutation ideas for the living species
 //   POST /api/ai/organ   { the pond now }    → { organ }       a new body part invented for this pond
-//   POST /api/ai/plan    { pressures, have... } → { plan }     a new BUILD: how a whole body is carried (its spine and legs)
+//   POST /api/ai/plan    { the pond, have } → { plan }         a new SHAPE OF BODY (a few masses and how they join), answering what is happening in the pond
 //   POST /api/ai/design  { pressures, have... } → { design }   a new KIND of body part: a shape, how it moves, what it gives
-//   POST /api/ai/judge   { admired, creatures } → { judge }    how striking each kind looks; part of its charm
+//   POST /api/ai/judge   { image, mime, creatures, check? } → { judge }   the model LOOKS at the creatures and grades each: score, why, one fix
 //   POST /api/ai/skin    { traits, colour }  → { skin }        how a species looks, drawn from its real traits
 //   POST /api/ai/event   { text }            → { event }       free text → something that happens
 //   POST /api/ai/story   { measured facts }  → { story }       what changed and why, in plain words
@@ -176,15 +176,15 @@ function createApp(opts = {}) {
       return send(res, r.error ? 503 : 200, r);
     }
     if (route === 'POST /api/ai/design') {
-      const body = await readJson(req, 4000);
+      const body = await readJson(req, 12000);
       return send(res, 200, await ai.design(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr }));
     }
     if (route === 'POST /api/ai/plan') {
-      const body = await readJson(req, 4000);
+      const body = await readJson(req, 12000);
       return send(res, 200, await ai.plan(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr }));
     }
     if (route === 'POST /api/ai/judge') {
-      const body = await readJson(req, 4000);
+      const body = await readJson(req, 1000000);      // it carries the picture
       return send(res, 200, await ai.judge(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr }));
     }
     if (route === 'POST /api/ai/skin') {
