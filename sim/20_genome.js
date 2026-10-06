@@ -169,7 +169,7 @@
     // charm: how well the body fits what all life finds pleasing, and what THIS pond admires
     // how nice it is to the eye: by this pond's learned taste (a free body), or the old measure (anything else)
     ph.charm = f.bd && FM.beauty ? FM.beauty(f, G.W ? G.W.taste : null) : clamp(FM.taste(f, G.W ? G.W.fashion : null, cn) * 1.15, 0, 1);
-    ph.whole = f.bd && FM.whole ? FM.whole(f).v : 0.5;      // how whole a creature it is
+    ph.whole = f.bd && FM.whole ? (FM.wholeBelief ? FM.wholeBelief(f, G.W ? G.W.taste : null) : FM.whole(f).v) : 0.5;      // how whole a creature it is
     ph.rc = r * (1 + 0.22 * Math.max(0, Math.max(ext.half, ext.wide) * ds / r - 1));
     ph.aggro = t[4] || 0;
     ph.forage = [0.5 + 1.0 * A.reach, 0.5 + 1.0 * A.agility, 0.85, 0.5 + 1.0 * A.senses, 0.45 + 1.1 * A.attack, 0.5 + 1.0 * A.speed];      // how well this body gathers each colour of food

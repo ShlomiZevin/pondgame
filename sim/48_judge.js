@@ -53,7 +53,8 @@
       f.rules = (rules || []).map(function (q) { return Object.assign({}, q); });
       return G.form.fix(f);
     };
-    return (G._refForms = [mk(200, 1.4, 0.6, 0.55, 0.05, 0.6, 0.6, 0.6, 0.72), mk(30, 2.0, 0.8, 0.6, -0.05, 0.7, 0.8, 0.9, 0.7), mk(330, 2.2, 0.85, 0.58, -0.1, 0.72, 0.9, 0.95, 0.6, [leg]), mk(120, 1.8, 0.75, 0.55, 0.0, 0.66, 0.7, 0.8, 0.7, [leg, ear])]);
+    const arm = { k: 0, a: 0, b: 0, e: 1, l: 0.55, w: 0.5, j: 2, g: 0.3, c: 0, t: 1, p: 0.5, on: -1 };
+    return (G._refForms = [mk(330, 1.8, 0.7, 0.56, 0.0, 0.64, 0.7, 0.8, 0.7, [leg, arm]), mk(120, 1.8, 0.7, 0.56, 0.0, 0.64, 0.7, 0.8, 0.68, [leg, arm]), mk(260, 1.8, 0.75, 0.56, 0.0, 0.66, 0.8, 0.8, 0.68, [leg, arm, ear]), mk(30, 2.0, 0.8, 0.6, -0.05, 0.7, 0.8, 0.9, 0.7, [leg, arm])]);
   };
   const live = function () { return G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available(); };
   const ask = function (forms, names, extra) {
@@ -145,7 +146,7 @@
         if (g.fix) { W.advice = (W.advice || []).filter(function (a) { return W.gen - a.gen <= 40; }); W.advice.push({ fix: g.fix, gen: W.gen, fv: c.fv || (c.fv = G.features(c.g)) }); if (W.advice.length > 60) W.advice.shift(); }
         if (!c.dead) G.eyeGrade(c, g);
         // the look is remembered, and every living creature that resembles this one is moved towards what the watcher said of it
-        { const fv = c.fv || G.features(c.g); (W.eyeBank = W.eyeBank || []).push({ fv: fv, b: g.b, w: g.w, f: c.g.f.bd ? c.g.f : null, x: c.g.f.bd ? G.form.looks(c.g.f) : null }); if (W.eyeBank.length > 160) W.eyeBank.shift();
+        { const fv = c.fv || G.features(c.g); (W.eyeBank = W.eyeBank || []).push({ fv: fv, b: g.b, w: g.w, f: c.g.f.bd ? c.g.f : null, x: c.g.f.bd ? G.form.looks(c.g.f) : null, v0: c.g.f.bd ? G.form.whole(c.g.f).v : 0.3 }); if (W.eyeBank.length > 160) W.eyeBank.shift();
           for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x === c || x.real || x.dead || !x.g.f.bd || x.eb === undefined) continue; const d = G.fdist(fv, x.fv || (x.fv = G.features(x.g))), wt = Math.exp(-d * d); if (wt < 0.05) continue; x.eb += 0.8 * wt * (g.b - x.eb); x.ew += 0.8 * wt * (g.w - x.ew); x.st = Math.min(x.st || 0, 1); x.ph.charm = x.eb; x.ph.whole = x.ew; } }
         if (W.taste) G.form.learn(W.taste, c.g.f, g.b, 0.03);          // the pond's own guess is corrected by every look
         const sp = c.sp ? G.speciesById(c.sp) : null;
@@ -159,8 +160,8 @@
       // the pond's own guess is taught by everything the watcher has really said: a few passes over its recent marks, newest last,
       // so the guess made for the creatures nobody has looked at keeps up with the watcher's taste
       if (W.taste && W.eyeBank && W.eyeBank.length >= 8) {
-        for (let ep = 0; ep < 3; ep++) for (let i = 0; i < W.eyeBank.length; i++) { const e = W.eyeBank[i]; if (e.f && e.x) G.form.learn(W.taste, e.f, e.b, 0.025, e.x); }
-        for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x.real || x.dead || !x.g.f.bd) continue; let nb = G.form.beauty(x.g.f, W.taste); const fv = x.fv || (x.fv = G.features(x.g)); let sw = 0, sb = 0; for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i], d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; sb += wt * q.b; } if (sw > 0.15) nb += Math.min(0.85, sw / (sw + 0.6)) * (sb / sw - nb); x.eb = clamp01(nb); x.ph.charm = x.eb; }
+        for (let ep = 0; ep < 3; ep++) for (let i = 0; i < W.eyeBank.length; i++) { const e = W.eyeBank[i]; if (e.f && e.x) { G.form.learn(W.taste, e.f, e.b, 0.025, e.x); G.form.learnWhole(W.taste, e.x, e.w, 0.03, e.v0); } }
+        for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x.real || x.dead || !x.g.f.bd) continue; let nb = G.form.beauty(x.g.f, W.taste); const fv = x.fv || (x.fv = G.features(x.g)); let sw = 0, sb = 0; for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i], d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; sb += wt * q.b; } if (sw > 0.15) nb += Math.min(0.85, sw / (sw + 0.6)) * (sb / sw - nb); x.eb = clamp01(nb); x.ph.charm = x.eb; let nw = G.form.wholeBelief(x.g.f, W.taste); let sw2 = 0, sh2 = 0; for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i], d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw2 += wt; sh2 += wt * q.w; } if (sw2 > 0.15) nw += Math.min(0.85, sw2 / (sw2 + 0.6)) * (sh2 / sw2 - nw); x.ew = clamp01(nw); x.ph.whole = x.ew; }
       }
       G.emit('watched', n);
     }, function () { watching = false; });

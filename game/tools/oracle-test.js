@@ -35,7 +35,7 @@ const rnd = (() => { let s = 12345; return () => (s = (s * 1664525 + 1013904223)
 G.sheet = (forms) => { G._sheet = forms; return 'x'; };
 G.mode = 'play'; G.catching = false;
 G.ai.provider = 'server'; G.ai.available = () => true; G.ai.hasFuel = () => true; G.ai.allow = () => true;
-G.ai.ask = (task, input) => { const forms = G._sheet || []; return Promise.resolve({ scores: forms.map((f, i) => { const t = truth(f); return { id: i + 1, score: clamp(t.b + (rnd() - 0.5) * 0.16, 0, 1) * 10, whole: clamp(t.w + (rnd() - 0.5) * 0.16, 0, 1) * 10, why: 'x', fix: t.fix }; }) }); };
+G.ai.ask = (task, input) => { const forms = G._sheet || []; return Promise.resolve({ scores: forms.map((f, i) => { const t = truth(f); return { id: i + 1, score: clamp(t.b * 0.72 + (rnd() - 0.5) * 0.16, 0, 1), whole: clamp(t.w * 0.6 + (rnd() - 0.5) * 0.16, 0, 1), why: 'x', fix: t.fix }; }) }); };
 (async () => {
   for (const seed of seeds) {
     G.newWorld({ seed }); G.founderPond();
@@ -43,6 +43,8 @@ G.ai.ask = (task, input) => { const forms = G._sheet || []; return Promise.resol
     const flush = async () => { for (let i = 0; i < 4; i++) await Promise.resolve(); };
     while (G.W.gen <= gens && !G.W.extinct) {
       G.step(0.1);
+      if (process.env.NOADVICE && G.W.advice) G.W.advice = [];
+      if (process.env.NOHALL && G.W.hall) G.W.hall = [];
       if (G.W.gen !== last) {
         last = G.W.gen;
         if (last % every === 0) { G.watchTick(); await flush(); looks++; }
@@ -54,6 +56,8 @@ G.ai.ask = (task, input) => { const forms = G._sheet || []; return Promise.resol
       }
     }
     console.log('seed ' + seed + (G.W.extinct ? ' EXTINCT gen ' + G.W.gen : '') + ' (looks ' + looks + ')\n   ' + line.join('\n   '));
+    console.log('   eyeN ' + (G.W.eyeN||0) + ' bank ' + (G.W.eyeBank||[]).length + ' hall ' + (G.W.hall||[]).length + ' taste n ' + G.W.taste.n + ' real ' + G.W.cre.filter(c=>c.real).length + '/' + G.W.cre.length + ' mean beauty by taste ' + (G.W.cre.reduce((a,c)=>a+G.form.beauty(c.g.f,G.W.taste),0)/G.W.cre.length).toFixed(2) + ' mean charm ' + (G.W.cre.reduce((a,c)=>a+c.ph.charm,0)/G.W.cre.length).toFixed(2));
+    { const B=G.W.eyeBank||[]; const mb=B.reduce((a,e)=>a+e.b,0)/B.length, pb=B.reduce((a,e)=>a+G.form.beauty(e.f,G.W.taste),0)/B.length; console.log('   bank mean mark ' + mb.toFixed(2) + ' taste on bank ' + pb.toFixed(2) + ' wb ' + G.W.taste.wb.toFixed(2)); }
     console.log('   now: ' + (G.W.kinds || []).slice(0, 4).map((k) => k[0] + ' ' + Math.round(k[1] * 100) + '%').join(', '));
   }
 })();

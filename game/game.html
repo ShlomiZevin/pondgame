@@ -607,7 +607,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     // charm: how well the body fits what all life finds pleasing, and what THIS pond admires
     // how nice it is to the eye: by this pond's learned taste (a free body), or the old measure (anything else)
     ph.charm = f.bd && FM.beauty ? FM.beauty(f, G.W ? G.W.taste : null) : clamp(FM.taste(f, G.W ? G.W.fashion : null, cn) * 1.15, 0, 1);
-    ph.whole = f.bd && FM.whole ? FM.whole(f).v : 0.5;      // how whole a creature it is
+    ph.whole = f.bd && FM.whole ? (FM.wholeBelief ? FM.wholeBelief(f, G.W ? G.W.taste : null) : FM.whole(f).v) : 0.5;      // how whole a creature it is
     ph.rc = r * (1 + 0.22 * Math.max(0, Math.max(ext.half, ext.wide) * ds / r - 1));
     ph.aggro = t[4] || 0;
     ph.forage = [0.5 + 1.0 * A.reach, 0.5 + 1.0 * A.agility, 0.85, 0.5 + 1.0 * A.senses, 0.45 + 1.1 * A.attack, 0.5 + 1.0 * A.speed];      // how well this body gathers each colour of food
@@ -983,10 +983,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       if (ok.length) { const pi = ok[Math.floor(r() * ok.length)], c = cpRule(f.rules[pi]); c.on = pi; c.l *= 0.7; c.w *= 0.85; c.g = (r() - 0.5) * 1.2; if (c.k === 0) c.t = 1 + Math.floor(r() * 3); f.rules.push(c); note('its ' + KMANY[c.k] + ' grew a joint: a part on a part', true); }
     }
     // a child of a new colour: rare, but it is how a pond comes to hold several colours
-    if (r() < (f.bd ? 0.012 : 0.03) * wild) { f.hue += 50 + r() * 260; if (r() < 0.5) f.hue2 = (r() < 0.5 ? -1 : 1) * (40 + r() * 140); note('was born a new colour', true); }
+    if (r() < (f.bd ? 0.03 : 0.03) * wild) { f.hue += 50 + r() * 260; if (r() < 0.5) f.hue2 = (r() < 0.5 ? -1 : 1) * (40 + r() * 140); note('was born a new colour', true); }
     // a whole new way of carrying the body: one of the builds this pond has been given
     // a shape of body imagined for this pond: now and then a child is born some way towards one of them
-    if (f.bd) { const pls = G.W && G.W.plans ? G.W.plans : []; if (pls.length && r() < 0.026 * wild) { const p = pls[Math.floor(r() * pls.length)]; if (p.id !== f.pl && p.bd) { const tt = 0.65 + r() * 0.35; G.body.adopt(f, p.bd, tt); f.pl = p.id; if (p.face) for (const k in p.face) if (p.face[k] !== undefined) f[k] += (p.face[k] - f[k]) * Math.min(1, tt + 0.1); note('its body took a new shape: the ' + p.name.toLowerCase() + (p.because ? ' (' + p.because + ')' : ''), true); } } }
+    if (f.bd) { const pls = G.W && G.W.plans ? G.W.plans : []; if (pls.length && r() < 0.026 * wild) { const p = pls[Math.floor(r() * pls.length)]; if (p.id !== f.pl && p.bd) { const tt = 0.65 + r() * 0.35; G.body.adopt(f, p.bd, tt); f.pl = p.id; if (p.face) for (const k in p.face) if (p.face[k] !== undefined) f[k] += (p.face[k] - f[k]) * Math.min(1, tt + 0.1);
+      if (p.kit && tt > 0.7) for (let ki = 0; ki < p.kit.length; ki++) F.nudge(f, p.kit[ki], null);      /* a plush shape comes with its stubby legs and little arms */ note('its body took a new shape: the ' + p.name.toLowerCase() + (p.because ? ' (' + p.because + ')' : ''), true); } } }
     // heads, necks and coats
     if (r() < 0.022 * wild) { const k = Math.floor(r() * 4); if (k !== f.coat) { f.coat = k; note(['lost its coat: bare skin again', 'grew scales', 'grew fur', 'grew feathers'][k], true); } }
     if (f.n > 1 && !f.sym && !f.bd && r() < 0.025 * wild) { const up = r() < 0.65; f.nk = clamp(f.nk + (up ? 0.25 : -0.25), 0, 0.7); note(up ? 'its neck narrowed: a head set apart from the body' : 'its neck thickened', true); }
@@ -1947,10 +1948,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   };
   // the taste every pond starts with: fitted to the AI's grades of pictures (b: the grade of a body with nothing to see on it)
   F.TASTE0 = { b: 0.5325, w: [-0.121, 0.0073, 0.1, 0.0137, 0.0313, -0.0019, 0.0136, -0.0162, 0, -0.0364, 0.0033, -0.0094, -0.0631, -0.0881, 0.0249, -0.032, 0.0358, 0.0729, -0.0435, -0.0798, 0.0204, 0.0382, -0.0008, -0.0684, -0.0479, 0.0371, 0.0085, -0.0465, 0.0284, -0.0495, -0.0495, -0.0101, 0.0078, -0.0422, -0.0125, 0.0211, -0.0124, -0.035, -0.0414, -0.0141, -0.0058, 0.0454, -0.0249, 0.032, -0.0437, -0.026, 0.0027, 0.0081, -0.0341, 0.0177, 0.0058, -0.1911, 0.16, 0.03, 0.04, 0.03, 0.04, 0.02, 0.1, 0.08, 0.06, 0.1, -0.09, 0.07], n: 294 };      // fitted 2026-10-06 to 294 graded pictures; held-out correlation 0.59
-  F.newTaste = function () { return { b: F.TASTE0.b, w: F.TASTE0.w.slice(), n: 0 }; };
+  F.newTaste = function () { return { b: F.TASTE0.b, w: F.TASTE0.w.slice(), n: 0, wb: 0, ww: F.TASTE0.w.map(function () { return 0; }) }; };
   F.fixTaste = function (t) {
     if (!t || !Array.isArray(t.w) || t.w.length !== NAMES.length || !isFinite(+t.b)) return null;
-    return { b: clamp(+t.b, -2, 2), w: t.w.map(function (v) { v = +v; return isFinite(v) ? clamp(v, -3, 3) : 0; }), n: Math.max(0, t.n | 0) };
+    const ok = Array.isArray(t.ww) && t.ww.length === NAMES.length;
+    return { b: clamp(+t.b, -2, 2), w: t.w.map(function (v) { v = +v; return isFinite(v) ? clamp(v, -3, 3) : 0; }), n: Math.max(0, t.n | 0), wb: ok && isFinite(+t.wb) ? clamp(+t.wb, -1, 1) : 0, ww: ok ? t.ww.map(function (v) { v = +v; return isFinite(v) ? clamp(v, -2, 2) : 0; }) : NAMES.map(function () { return 0; }) };
   };
   /** how nice this body is to the eye, 0..1, by a taste (a pond's own, or the one all ponds start with) */
   F.beauty = function (f, T) {
@@ -1969,6 +1971,20 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     T.b += k * err * 0.5;
     for (let i = 0; i < x.length; i++) T.w[i] += k * err * x[i] * 0.5;
     T.n++;
+    return err;
+  };
+  /** the hand-written wholeness, corrected by what the watcher has really said of whole creatures in this pond (a residual learned like the taste) */
+  F.wholeBelief = function (f, T, x0, v0) {
+    if (!f.bd) return 0.3;
+    let s = v0 === undefined ? F.whole(f).v : v0;
+    if (T && T.ww) { const x = x0 || F.looks(f); s += T.wb; for (let i = 0; i < x.length; i++) s += T.ww[i] * x[i]; }
+    return clamp(s, 0, 1);
+  };
+  F.learnWhole = function (T, x, grade, rate, v0) {
+    if (!T.ww) return 0;
+    let s = v0 + T.wb; for (let i = 0; i < x.length; i++) s += T.ww[i] * x[i];
+    const err = clamp(grade, 0, 1) - s, k = rate === undefined ? 0.03 : rate;
+    T.wb += k * err * 0.5; for (let i = 0; i < x.length; i++) T.ww[i] += k * err * x[i] * 0.5;
     return err;
   };
   /** How WHOLE a creature is, 0..1: does it read as a complete animal, or as a blob with things on it?
@@ -2073,7 +2089,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       const xs = Math.pow(plump, 0.4);
       const legOn = {}, armOn = {};
       for (let i = 0; i < legs.length; i++) for (let a = legs[i].a; a <= legs[i].b && a < f.n; a += legs[i].e) { if (gnd[a] && !legOn[a]) legOn[a] = legs[i]; else if (!armOn[a]) armOn[a] = legs[i]; }
-      let stands = false, legL = 0; for (const a in legOn) { stands = true; legL = Math.max(legL, 10 + 11 * Math.min(1.6, legOn[a].l)); }
+      let stands = false, legL = 0; for (const a in legOn) { stands = true; legL = Math.max(legL, 16 + 17 * Math.min(1.6, legOn[a].l)); }
       const hover = stands ? 0 : 30;
       const bw = Math.max(0.6, (LS.x1 - LS.x0) * xs), bh = Math.max(0.6, LS.y1 - LS.y0);
       const Sc = Math.min(50, 222 / bw, (208 - legL - hover) / bh);
@@ -2085,7 +2101,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       const seek = function (o, th) { for (let j = 0; j < 7; j++) { const a = th + (j % 2 ? 1 : -1) * Math.ceil(j / 2) * 0.28; if (open(o, a)) return a; } return null; };
       const of = function (i) { const out = []; for (let k = 0; k < I.length; k++) if (I[k].i === i && !I[k].far) out.push(I[k]); return out; };
       const px = function (o) { return o.s * Sc; };
-      const kk = function (o) { return clamp(px(o) / 44, 0.55, 1.2); };
+      const kk = function (o) { return clamp(px(o) / 44, 0.7, 1.2); };
       const sidesOf = function (o) { return o.m.pr && o.par ? [o.x >= o.par.x ? 1 : -1] : [1, -1]; };
       const trace = function (o, k) { const N = 36, pts = []; for (let j = 0; j < N; j++) pts.push(P(o, j / N * TAU, k)); ctx.moveTo((pts[N - 1][0] + pts[0][0]) / 2, (pts[N - 1][1] + pts[0][1]) / 2); for (let j = 0; j < N; j++) { const p = pts[j], q = pts[(j + 1) % N]; ctx.quadraticCurveTo(p[0], p[1], (p[0] + q[0]) / 2, (p[1] + q[1]) / 2); } ctx.closePath(); };
       const near = []; for (let k = 0; k < I.length; k++) if (!I[k].far) near.push(I[k]);
@@ -2115,7 +2131,16 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       // ── the body: all its masses as one shape, one outline round the lot ──
       const union = function () { ctx.beginPath(); for (let k = 0; k < near.length; k++) trace(near[k], 1); };
       union(); ctx.strokeStyle = INK; ctx.lineWidth = 5.8; ctx.stroke();
-      union(); skin(-bw * Sc / 2 - 4, baseY - bh * Sc - 4, bw * Sc + 8, bh * Sc + 8, function () { ctx.beginPath(); }, 0);
+      const rest = near.filter(function (o) { return o !== fm; });
+      if (near.length > 1 && rest.length && near.indexOf(fm) >= 0) {
+        // the head is a ball of its own over a torso of its own: each mass is lit on its own, the head casts a soft shadow under its chin, and its outline shows where it sits
+        const bnd = function (o) { const R = px(o) * 1.4; return [X(o.x) - R * xs, Y(o.y) - R, 2 * R * xs, 2 * R]; };
+        for (let k = 0; k < rest.length; k++) { const o = rest[k], b = bnd(o); ctx.beginPath(); trace(o, 1); skin(b[0], b[1], b[2], b[3], function () { ctx.beginPath(); }, 0); }
+        { const tor = rest.slice().sort(function (a, b) { return px(b) - px(a); })[0];
+          if (tor && !tor.m.pr) { ctx.save(); ctx.beginPath(); trace(tor, 1); ctx.clip(); ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.ellipse(X(tor.x), Y(tor.y) + px(tor) * 0.2, px(tor) * xs * 0.55, px(tor) * 0.62, 0, 0, TAU); ctx.fill(); ctx.restore(); } }
+        ctx.save(); ctx.beginPath(); for (let k = 0; k < rest.length; k++) trace(rest[k], 1); ctx.clip(); ctx.translate(0, px(fm) * 0.1); ctx.beginPath(); trace(fm, 1); ctx.fillStyle = 'rgba(7,18,31,0.3)'; ctx.fill(); ctx.restore();
+        { const b = bnd(fm); ctx.beginPath(); trace(fm, 1); skin(b[0], b[1], b[2], b[3], function () { ctx.beginPath(); }, 0); ctx.beginPath(); trace(fm, 1); ctx.strokeStyle = INK; ctx.globalAlpha = 0.8; ctx.lineWidth = 3.4; ctx.stroke(); ctx.globalAlpha = 1; }
+      } else { union(); skin(-bw * Sc / 2 - 4, baseY - bh * Sc - 4, bw * Sc + 8, bh * Sc + 8, function () { ctx.beginPath(); }, 0); }
       if (near.length > 1) { ctx.save(); union(); ctx.clip(); ctx.globalAlpha = 0.2; ctx.strokeStyle = INK; ctx.lineWidth = 2.4; for (let k = 1; k < near.length; k++) { ctx.beginPath(); trace(near[k], 1); ctx.stroke(); } ctx.restore(); ctx.globalAlpha = 1; }      // where one mass meets the next
       for (let k = 0; k < near.length; k++) { const o = near[k]; if (!o.m.h) continue; ctx.beginPath(); trace(o, 0.5); const g = ctx.createRadialGradient(X(o.x), Y(o.y), 1, X(o.x), Y(o.y), px(o) * 0.6); g.addColorStop(0, hsl(f.hue, f.sat * 0.6, 10, 0.95)); g.addColorStop(1, hsl(f.hue, f.sat, 24, 0.92)); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); }      // a ring: you look into the hollow of it
       for (let ri = 0; ri < R.length; ri++) { const q = R[ri]; if (q.on >= 0) continue; const d = q.k === 8 ? F._dsg(q) : null; if (q.k !== 5 && !(d && d.place === 'wrap')) continue;
@@ -2172,16 +2197,16 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         else { ctx.beginPath(); ctx.arc(ex, ey, 7 * k, 0, TAU); ink(col.limb, 2.2); }
       }
       function legOf(o, q, th, sd, far, idx) {
-        const hip = P(o, th, 0.8), w = (8 + 6 * q.w) * kk(o), st = Math.sin(B(5) + idx * 2.2 + (far || sd < 0 ? 3.14 : 0)) * 5, fx = hip[0] + (bd.v ? 0 : sd * 4) + st, fy = GROUND - 5;
+        const hip = P(o, th, 0.8), w = (12 + 7 * q.w) * kk(o), st = Math.sin(B(5) + idx * 2.2 + (far || sd < 0 ? 3.14 : 0)) * 5, fx = hip[0] + (bd.v ? 0 : sd * 4) + st, fy = GROUND - 5;
         if (far) ctx.globalAlpha = 0.75;
-        strokeLimb(hip[0], hip[1], (hip[0] + fx) / 2 + (bd.v ? 6 : sd * 7), (hip[1] + fy) / 2, fx, fy, w, far ? col.dark : col.limb); foot(fx, fy + 1, bd.v ? 1 : sd, q.t);
+        { const kx = (hip[0] + fx) / 2 + (bd.v ? 7 : sd * 8), ky = (hip[1] + fy) / 2 + 2; limb2(hip[0], hip[1], kx, ky, fx, fy, w, far ? col.dark : col.limb); ctx.beginPath(); ctx.arc(kx, ky, w * 0.6, 0, TAU); ink(far ? col.dark : col.limb, 1.8); } foot(fx, fy + 1, bd.v ? 1 : sd, q.t);
         ctx.globalAlpha = 1;
       }
       function armOf(o, q, th, a, sd, far, idx) {
-        const s0 = P(o, th, 0.85), k = kk(o), La = (24 * q.l + 10) * k, wv = Math.sin(B(2.6) + idx + (sd > 0 ? 0 : 1.4)) * 0.18, ang = a + sd * wv, ex = s0[0] + Math.cos(ang) * La, ey = s0[1] + Math.sin(ang) * La, kid = kidOf(q), tip = kid && kid.k === 0 && kid.t ? kid.t : q.t;
+        const s0 = P(o, th, 0.85), k = kk(o), La = (30 * q.l + 16) * k, wv = Math.sin(B(2.6) + idx + (sd > 0 ? 0 : 1.4)) * 0.18, ang = a + sd * wv, ex = s0[0] + Math.cos(ang) * La, ey = s0[1] + Math.sin(ang) * La, kid = kidOf(q), tip = kid && kid.k === 0 && kid.t ? kid.t : q.t;
         if (far) ctx.globalAlpha = 0.75;
-        strokeLimb(s0[0], s0[1], s0[0] + Math.cos(ang - sd * 0.5) * La * 0.55, s0[1] + Math.sin(ang - sd * 0.5) * La * 0.55, ex, ey, (9 + 4 * q.w) * k, far ? col.dark : col.limb);
-        hand(ex, ey, ang, tip, k);
+        { const wA = (13 + 5 * q.w) * k, elx = s0[0] + Math.cos(ang - sd * 0.5) * La * 0.55, ely = s0[1] + Math.sin(ang - sd * 0.5) * La * 0.55; limb2(s0[0], s0[1], elx, ely, ex, ey, wA, far ? col.dark : col.limb); ctx.beginPath(); ctx.arc(elx, ely, wA * 0.55, 0, TAU); ink(far ? col.dark : col.limb, 1.8); }
+        hand(ex, ey, ang, tip, k * 1.2);
         ctx.globalAlpha = 1;
       }
       function limbs(far) {
@@ -2381,10 +2406,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     // ── helpers (shared by every build) ──
     function ribs(x, y) { ctx.strokeStyle = 'rgba(7,18,31,.28)'; ctx.lineWidth = 1.4; for (let r = 1; r <= 3; r++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(x * (0.5 + r * 0.17), y * (1.3 - r * 0.3)); ctx.stroke(); } }
     function strokeLimb(x0, y0, cx, cy2, x1, y1, w, fill) { for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? fill : INK; ctx.lineWidth = pass ? w : w + 4.4; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(cx, cy2, x1, y1); ctx.stroke(); } }
-    function limb2(x0, y0, kx, ky, x1, y1, w, fill) { for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? fill : INK; ctx.lineWidth = pass ? w : w + 4.4; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(kx, ky); ctx.lineTo(x1, y1); ctx.stroke(); } }
+    function limb2(x0, y0, kx, ky, x1, y1, w, fill) { for (let pass = 0; pass < 3; pass++) { ctx.strokeStyle = pass === 2 ? 'rgba(255,255,255,0.3)' : pass ? fill : INK; ctx.lineWidth = pass === 2 ? w * 0.26 : pass ? w : w + 4.4; const o = pass === 2 ? -w * 0.2 : 0; ctx.beginPath(); ctx.moveTo(x0 + o, y0); ctx.lineTo(kx + o, ky); ctx.lineTo(x1 + o, y1); ctx.stroke(); } }
     function foot(x, y, sd, tip) {
       if (tip === 2) { for (let h = -1; h <= 1; h += 2) { ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + sd * 10, y + h * 10, x + sd * 18, y + h * 3); ctx.quadraticCurveTo(x + sd * 9, y + h * 4, x, y); ink('#ff8a6b', 2); } return; }
-      ctx.beginPath(); ctx.ellipse(x + sd * 5, y, tip === 3 ? 16 : 12, tip === 3 ? 6 : 7, 0, 0, TAU); ink(tip === 3 ? col.fin : col.limb, 2.2);
+      ctx.beginPath(); ctx.ellipse(x + sd * 6, y, tip === 3 ? 19 : 15, tip === 3 ? 7 : 9, 0, 0, TAU); ink(tip === 3 ? col.fin : col.limb, 2.2);
+      if (tip !== 1) { ctx.strokeStyle = INK; ctx.globalAlpha = 0.45; ctx.lineWidth = 1.5; for (let j = -1; j <= 1; j += 2) { ctx.beginPath(); ctx.moveTo(x + sd * (tip === 3 ? 12 : 9), y + j * 1.5); ctx.lineTo(x + sd * (tip === 3 ? 17 : 14), y + j * 3.2); ctx.stroke(); } ctx.globalAlpha = 1; }
       if (tip === 1) { ctx.strokeStyle = INK; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.6; for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(x + sd * (6 + j * 5), y - 4); ctx.lineTo(x + sd * (8 + j * 5), y + 4); ctx.stroke(); } ctx.globalAlpha = 1; }
     }
     // a leg of an invented build: hip on the belly, a knee and a foot where the build puts them; a foot that stands is on the floor
@@ -2480,7 +2506,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       const stalk = function (ex, ey) { if (!st) return ey; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.body : INK; ctx.lineWidth = pass ? 6 : 10; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex, ey - st); ctx.stroke(); } return ey - st; };
       if (side) { if (ne >= 1) eyeAt(cx, ey0, er * 1.15, false); if (ne >= 3) eyeAt(cx - hr * 0.5, ey0 - hr * 0.35, er * 0.45, false); }
       else if (ne === 1) eyeAt(cx, ey0, er * 1.3, false);
-      else if (ne >= 2) { eyeAt(cx - gap, stalk(cx - gap, ey0), er, false); eyeAt(cx + gap, stalk(cx + gap, ey0), er, false); if (ne === 3) eyeAt(cx, y - hr * 0.64, er * 0.42, false); }
+      else if (ne >= 2) { eyeAt(cx - gap, stalk(cx - gap, ey0), er, false); eyeAt(cx + gap, stalk(cx + gap, ey0), er, false); if (ne === 3) eyeAt(cx, y - hr * 0.64, er * 0.42, false);
+        if (!st) for (let sd = -1; sd <= 1; sd += 2) { const bx = cx + sd * gap, by = ey0 - er * 1.2; ctx.strokeStyle = INK; ctx.globalAlpha = 0.7; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(bx - sd * er * 0.75, by - er * 0.02); ctx.quadraticCurveTo(bx, by - er * 0.3, bx + sd * er * 0.8, by + er * 0.14); ctx.stroke(); ctx.globalAlpha = 1; } }
       { const bl = f.bl === undefined ? 0.4 : f.bl; ctx.globalAlpha = 0.1 + 0.5 * bl; ctx.fillStyle = '#ff7fa8'; for (let sd = (side ? 1 : -1); sd <= 1; sd += 2) { ctx.beginPath(); ctx.ellipse(cx + sd * hr * (side ? 0.05 : 0.72), y + hr * 0.42, hr * (0.12 + 0.1 * bl), hr * (0.08 + 0.06 * bl), 0, 0, TAU); ctx.fill(); } ctx.globalAlpha = 1; }
       const mx = cx + (side ? hr * 0.5 : 0), my = y + hr * (side ? 0.42 : 0.5), m = hr * (0.16 + f.ms * 0.3);
       ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.fillStyle = INK;
@@ -2657,7 +2684,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       const FM = G.form, T = W.taste, mb = ph.charm, mw = ph.whole, A = parentA && parentA.eb !== undefined && parentA.g ? parentA : null, B = parentB && parentB.eb !== undefined && parentB.g ? parentB : A;
       const hit = W.eyeSeen ? W.eyeSeen[FM.key(genome.f)] : null;
       if (hit) { c.real = { b: hit.b, w: hit.w, why: hit.why || '', gen: W.gen }; c.eb = hit.b; c.ew = hit.w; c.st = 0; }
-      else if (A && (W.eyeN || (W.eyeBank && W.eyeBank.length))) { c.eb = clamp((A.eb + B.eb) / 2 + 0.5 * (mb - (FM.beauty(A.g.f, T) + FM.beauty(B.g.f, T)) / 2), 0, 1); c.ew = clamp((A.ew + B.ew) / 2 + 0.5 * (mw - (FM.whole(A.g.f).v + FM.whole(B.g.f).v) / 2), 0, 1); c.st = Math.min(A.st || 0, B.st || 0) + 1; }
+      else if (A && (W.eyeN || (W.eyeBank && W.eyeBank.length))) { c.eb = clamp((A.eb + B.eb) / 2 + 0.5 * (mb - (FM.beauty(A.g.f, T) + FM.beauty(B.g.f, T)) / 2), 0, 1); c.ew = clamp((A.ew + B.ew) / 2 + 0.5 * (mw - (FM.wholeBelief(A.g.f, T) + FM.wholeBelief(B.g.f, T)) / 2), 0, 1); c.st = Math.min(A.st || 0, B.st || 0) + 1; }
       else { c.eb = mb; c.ew = mw; c.st = 3; }
       // and it is held against the creatures the watcher has really looked at: the more it resembles some of them, the more their marks count
       if (!hit && W.eyeBank && W.eyeBank.length) { const fv = c.fv = G.features(genome); let sw = 0, sb = 0, sh = 0; for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i], d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; sb += wt * q.b; sh += wt * q.w; } if (sw > 0.15) { const k = Math.min(0.85, sw / (sw + 0.6)); c.eb += k * (sb / sw - c.eb); c.ew += k * (sh / sw - c.ew); c.st = Math.min(c.st, 1); } }
@@ -3495,7 +3522,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const share = {}, shapes = {}, hues = [0, 0, 0, 0, 0, 0];
     for (let i = 0; i < cre.length; i++) { const c = cre[i], k = G.kindOf(c.g).kind; c.kd = k; share[k] = (share[k] || 0) + 1; c.shp = G.shapeOf(c.g); shapes[c.shp] = (shapes[c.shp] || 0) + 1; c.hb = G.hueOf(c.g); hues[c.hb]++; }
     // who lasts the winter: the well fed, the rare, and the good-looking (the pond is kind to what is admired)
-    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.55 * hues[cre[i].hb] / cre.length) ;
+    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.8 * hues[cre[i].hb] / cre.length) ;
     let topK = '', topN = 0; for (const k in share) if (share[k] > topN) { topN = share[k]; topK = k; }
     const crowd = topN / Math.max(1, cre.length);
     let sick = 0;
@@ -4941,7 +4968,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const rs = Array.isArray(raw.res) ? raw.res : raw.res && typeof raw.res === 'object' ? [raw.res.heat, raw.res.cold, raw.res.poison] : [];
     const name = String(raw.name || 'New shape').replace(/[<>"]/g, '').trim().slice(0, 22) || 'New shape';
     let face = null; if (raw.face && typeof raw.face === 'object') { const q = function (v, a, b) { v = +v; return isFinite(v) ? clamp(v, a, b) : undefined; }; face = { es: q(raw.face.es, 0.34, 0.9), ep: q(raw.face.ep, 0.36, 0.78), ey: q(raw.face.ey, -0.2, 0.36), eg: q(raw.face.eg, 0.3, 0.8), bl: q(raw.face.bl, 0, 1), sm: q(raw.face.sm, -0.2, 1), hd: q(raw.face.hd, 0.7, 2.5) }; }
-    return { face: face, name: name, noun: (String(raw.noun || '').replace(/[^A-Za-z\-]/g, '').slice(0, 14) || name.split(' ').pop()).replace(/^./, function (c) { return c.toUpperCase(); }),
+    const kit = Array.isArray(raw.kit) ? raw.kit.filter(function (k) { return k === 'legs' || k === 'arms'; }).slice(0, 2) : null;
+    return { face: face, kit: kit && kit.length ? kit : null, name: name, noun: (String(raw.noun || '').replace(/[^A-Za-z\-]/g, '').slice(0, 14) || name.split(' ').pop()).replace(/^./, function (c) { return c.toUpperCase(); }),
       note: String(raw.note || '').replace(/[<>]/g, '').slice(0, 120), because: String(raw.because || '').replace(/[<>]/g, '').slice(0, 90),
       bd: bd, res: [n(rs[0]), n(rs[1]), n(rs[2])], by: String(raw.by || raw.model || '').slice(0, 60) };
   };
@@ -5016,7 +5044,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     // the same idea never comes out the same twice
     const b = JSON.parse(JSON.stringify(pick.body));
     for (let i = 0; i < b.m.length; i++) { const q = b.m[i]; q.r = q.r.map(function (v) { return v * (0.93 + r() * 0.14); }); if (i) { q.s *= 0.88 + r() * 0.24; q.d = (q.d || 1) * (0.92 + r() * 0.16); } }
-    return { name: pick.name, noun: pick.noun, note: pick.note, because: '', body: b, by: '', face: pick.plush ? PLUSH_FACE : null };
+    return { name: pick.name, noun: pick.noun, note: pick.note, because: '', body: b, by: '', face: pick.plush ? PLUSH_FACE : null, kit: pick.plush ? ['legs', 'arms'] : null };
   };
   /** a plain animal of this shape, to show it */
   G.planDemo = function (p, hue) {
@@ -5392,7 +5420,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       f.rules = (rules || []).map(function (q) { return Object.assign({}, q); });
       return G.form.fix(f);
     };
-    return (G._refForms = [mk(200, 1.4, 0.6, 0.55, 0.05, 0.6, 0.6, 0.6, 0.72), mk(30, 2.0, 0.8, 0.6, -0.05, 0.7, 0.8, 0.9, 0.7), mk(330, 2.2, 0.85, 0.58, -0.1, 0.72, 0.9, 0.95, 0.6, [leg]), mk(120, 1.8, 0.75, 0.55, 0.0, 0.66, 0.7, 0.8, 0.7, [leg, ear])]);
+    const arm = { k: 0, a: 0, b: 0, e: 1, l: 0.55, w: 0.5, j: 2, g: 0.3, c: 0, t: 1, p: 0.5, on: -1 };
+    return (G._refForms = [mk(330, 1.8, 0.7, 0.56, 0.0, 0.64, 0.7, 0.8, 0.7, [leg, arm]), mk(120, 1.8, 0.7, 0.56, 0.0, 0.64, 0.7, 0.8, 0.68, [leg, arm]), mk(260, 1.8, 0.75, 0.56, 0.0, 0.66, 0.8, 0.8, 0.68, [leg, arm, ear]), mk(30, 2.0, 0.8, 0.6, -0.05, 0.7, 0.8, 0.9, 0.7, [leg, arm])]);
   };
   const live = function () { return G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available(); };
   const ask = function (forms, names, extra) {
@@ -5484,7 +5513,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         if (g.fix) { W.advice = (W.advice || []).filter(function (a) { return W.gen - a.gen <= 40; }); W.advice.push({ fix: g.fix, gen: W.gen, fv: c.fv || (c.fv = G.features(c.g)) }); if (W.advice.length > 60) W.advice.shift(); }
         if (!c.dead) G.eyeGrade(c, g);
         // the look is remembered, and every living creature that resembles this one is moved towards what the watcher said of it
-        { const fv = c.fv || G.features(c.g); (W.eyeBank = W.eyeBank || []).push({ fv: fv, b: g.b, w: g.w, f: c.g.f.bd ? c.g.f : null, x: c.g.f.bd ? G.form.looks(c.g.f) : null }); if (W.eyeBank.length > 160) W.eyeBank.shift();
+        { const fv = c.fv || G.features(c.g); (W.eyeBank = W.eyeBank || []).push({ fv: fv, b: g.b, w: g.w, f: c.g.f.bd ? c.g.f : null, x: c.g.f.bd ? G.form.looks(c.g.f) : null, v0: c.g.f.bd ? G.form.whole(c.g.f).v : 0.3 }); if (W.eyeBank.length > 160) W.eyeBank.shift();
           for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x === c || x.real || x.dead || !x.g.f.bd || x.eb === undefined) continue; const d = G.fdist(fv, x.fv || (x.fv = G.features(x.g))), wt = Math.exp(-d * d); if (wt < 0.05) continue; x.eb += 0.8 * wt * (g.b - x.eb); x.ew += 0.8 * wt * (g.w - x.ew); x.st = Math.min(x.st || 0, 1); x.ph.charm = x.eb; x.ph.whole = x.ew; } }
         if (W.taste) G.form.learn(W.taste, c.g.f, g.b, 0.03);          // the pond's own guess is corrected by every look
         const sp = c.sp ? G.speciesById(c.sp) : null;
@@ -5498,8 +5527,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       // the pond's own guess is taught by everything the watcher has really said: a few passes over its recent marks, newest last,
       // so the guess made for the creatures nobody has looked at keeps up with the watcher's taste
       if (W.taste && W.eyeBank && W.eyeBank.length >= 8) {
-        for (let ep = 0; ep < 3; ep++) for (let i = 0; i < W.eyeBank.length; i++) { const e = W.eyeBank[i]; if (e.f && e.x) G.form.learn(W.taste, e.f, e.b, 0.025, e.x); }
-        for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x.real || x.dead || !x.g.f.bd) continue; let nb = G.form.beauty(x.g.f, W.taste); const fv = x.fv || (x.fv = G.features(x.g)); let sw = 0, sb = 0; for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i], d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; sb += wt * q.b; } if (sw > 0.15) nb += Math.min(0.85, sw / (sw + 0.6)) * (sb / sw - nb); x.eb = clamp01(nb); x.ph.charm = x.eb; }
+        for (let ep = 0; ep < 3; ep++) for (let i = 0; i < W.eyeBank.length; i++) { const e = W.eyeBank[i]; if (e.f && e.x) { G.form.learn(W.taste, e.f, e.b, 0.025, e.x); G.form.learnWhole(W.taste, e.x, e.w, 0.03, e.v0); } }
+        for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x.real || x.dead || !x.g.f.bd) continue; let nb = G.form.beauty(x.g.f, W.taste); const fv = x.fv || (x.fv = G.features(x.g)); let sw = 0, sb = 0; for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i], d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; sb += wt * q.b; } if (sw > 0.15) nb += Math.min(0.85, sw / (sw + 0.6)) * (sb / sw - nb); x.eb = clamp01(nb); x.ph.charm = x.eb; let nw = G.form.wholeBelief(x.g.f, W.taste); let sw2 = 0, sh2 = 0; for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i], d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw2 += wt; sh2 += wt * q.w; } if (sw2 > 0.15) nw += Math.min(0.85, sw2 / (sw2 + 0.6)) * (sh2 / sw2 - nw); x.ew = clamp01(nw); x.ph.whole = x.ew; }
       }
       G.emit('watched', n);
     }, function () { watching = false; });

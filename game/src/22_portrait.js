@@ -63,7 +63,7 @@
       const xs = Math.pow(plump, 0.4);
       const legOn = {}, armOn = {};
       for (let i = 0; i < legs.length; i++) for (let a = legs[i].a; a <= legs[i].b && a < f.n; a += legs[i].e) { if (gnd[a] && !legOn[a]) legOn[a] = legs[i]; else if (!armOn[a]) armOn[a] = legs[i]; }
-      let stands = false, legL = 0; for (const a in legOn) { stands = true; legL = Math.max(legL, 10 + 11 * Math.min(1.6, legOn[a].l)); }
+      let stands = false, legL = 0; for (const a in legOn) { stands = true; legL = Math.max(legL, 16 + 17 * Math.min(1.6, legOn[a].l)); }
       const hover = stands ? 0 : 30;
       const bw = Math.max(0.6, (LS.x1 - LS.x0) * xs), bh = Math.max(0.6, LS.y1 - LS.y0);
       const Sc = Math.min(50, 222 / bw, (208 - legL - hover) / bh);
@@ -75,7 +75,7 @@
       const seek = function (o, th) { for (let j = 0; j < 7; j++) { const a = th + (j % 2 ? 1 : -1) * Math.ceil(j / 2) * 0.28; if (open(o, a)) return a; } return null; };
       const of = function (i) { const out = []; for (let k = 0; k < I.length; k++) if (I[k].i === i && !I[k].far) out.push(I[k]); return out; };
       const px = function (o) { return o.s * Sc; };
-      const kk = function (o) { return clamp(px(o) / 44, 0.55, 1.2); };
+      const kk = function (o) { return clamp(px(o) / 44, 0.7, 1.2); };
       const sidesOf = function (o) { return o.m.pr && o.par ? [o.x >= o.par.x ? 1 : -1] : [1, -1]; };
       const trace = function (o, k) { const N = 36, pts = []; for (let j = 0; j < N; j++) pts.push(P(o, j / N * TAU, k)); ctx.moveTo((pts[N - 1][0] + pts[0][0]) / 2, (pts[N - 1][1] + pts[0][1]) / 2); for (let j = 0; j < N; j++) { const p = pts[j], q = pts[(j + 1) % N]; ctx.quadraticCurveTo(p[0], p[1], (p[0] + q[0]) / 2, (p[1] + q[1]) / 2); } ctx.closePath(); };
       const near = []; for (let k = 0; k < I.length; k++) if (!I[k].far) near.push(I[k]);
@@ -105,7 +105,16 @@
       // ── the body: all its masses as one shape, one outline round the lot ──
       const union = function () { ctx.beginPath(); for (let k = 0; k < near.length; k++) trace(near[k], 1); };
       union(); ctx.strokeStyle = INK; ctx.lineWidth = 5.8; ctx.stroke();
-      union(); skin(-bw * Sc / 2 - 4, baseY - bh * Sc - 4, bw * Sc + 8, bh * Sc + 8, function () { ctx.beginPath(); }, 0);
+      const rest = near.filter(function (o) { return o !== fm; });
+      if (near.length > 1 && rest.length && near.indexOf(fm) >= 0) {
+        // the head is a ball of its own over a torso of its own: each mass is lit on its own, the head casts a soft shadow under its chin, and its outline shows where it sits
+        const bnd = function (o) { const R = px(o) * 1.4; return [X(o.x) - R * xs, Y(o.y) - R, 2 * R * xs, 2 * R]; };
+        for (let k = 0; k < rest.length; k++) { const o = rest[k], b = bnd(o); ctx.beginPath(); trace(o, 1); skin(b[0], b[1], b[2], b[3], function () { ctx.beginPath(); }, 0); }
+        { const tor = rest.slice().sort(function (a, b) { return px(b) - px(a); })[0];
+          if (tor && !tor.m.pr) { ctx.save(); ctx.beginPath(); trace(tor, 1); ctx.clip(); ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.ellipse(X(tor.x), Y(tor.y) + px(tor) * 0.2, px(tor) * xs * 0.55, px(tor) * 0.62, 0, 0, TAU); ctx.fill(); ctx.restore(); } }
+        ctx.save(); ctx.beginPath(); for (let k = 0; k < rest.length; k++) trace(rest[k], 1); ctx.clip(); ctx.translate(0, px(fm) * 0.1); ctx.beginPath(); trace(fm, 1); ctx.fillStyle = 'rgba(7,18,31,0.3)'; ctx.fill(); ctx.restore();
+        { const b = bnd(fm); ctx.beginPath(); trace(fm, 1); skin(b[0], b[1], b[2], b[3], function () { ctx.beginPath(); }, 0); ctx.beginPath(); trace(fm, 1); ctx.strokeStyle = INK; ctx.globalAlpha = 0.8; ctx.lineWidth = 3.4; ctx.stroke(); ctx.globalAlpha = 1; }
+      } else { union(); skin(-bw * Sc / 2 - 4, baseY - bh * Sc - 4, bw * Sc + 8, bh * Sc + 8, function () { ctx.beginPath(); }, 0); }
       if (near.length > 1) { ctx.save(); union(); ctx.clip(); ctx.globalAlpha = 0.2; ctx.strokeStyle = INK; ctx.lineWidth = 2.4; for (let k = 1; k < near.length; k++) { ctx.beginPath(); trace(near[k], 1); ctx.stroke(); } ctx.restore(); ctx.globalAlpha = 1; }      // where one mass meets the next
       for (let k = 0; k < near.length; k++) { const o = near[k]; if (!o.m.h) continue; ctx.beginPath(); trace(o, 0.5); const g = ctx.createRadialGradient(X(o.x), Y(o.y), 1, X(o.x), Y(o.y), px(o) * 0.6); g.addColorStop(0, hsl(f.hue, f.sat * 0.6, 10, 0.95)); g.addColorStop(1, hsl(f.hue, f.sat, 24, 0.92)); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); }      // a ring: you look into the hollow of it
       for (let ri = 0; ri < R.length; ri++) { const q = R[ri]; if (q.on >= 0) continue; const d = q.k === 8 ? F._dsg(q) : null; if (q.k !== 5 && !(d && d.place === 'wrap')) continue;
@@ -162,16 +171,16 @@
         else { ctx.beginPath(); ctx.arc(ex, ey, 7 * k, 0, TAU); ink(col.limb, 2.2); }
       }
       function legOf(o, q, th, sd, far, idx) {
-        const hip = P(o, th, 0.8), w = (8 + 6 * q.w) * kk(o), st = Math.sin(B(5) + idx * 2.2 + (far || sd < 0 ? 3.14 : 0)) * 5, fx = hip[0] + (bd.v ? 0 : sd * 4) + st, fy = GROUND - 5;
+        const hip = P(o, th, 0.8), w = (12 + 7 * q.w) * kk(o), st = Math.sin(B(5) + idx * 2.2 + (far || sd < 0 ? 3.14 : 0)) * 5, fx = hip[0] + (bd.v ? 0 : sd * 4) + st, fy = GROUND - 5;
         if (far) ctx.globalAlpha = 0.75;
-        strokeLimb(hip[0], hip[1], (hip[0] + fx) / 2 + (bd.v ? 6 : sd * 7), (hip[1] + fy) / 2, fx, fy, w, far ? col.dark : col.limb); foot(fx, fy + 1, bd.v ? 1 : sd, q.t);
+        { const kx = (hip[0] + fx) / 2 + (bd.v ? 7 : sd * 8), ky = (hip[1] + fy) / 2 + 2; limb2(hip[0], hip[1], kx, ky, fx, fy, w, far ? col.dark : col.limb); ctx.beginPath(); ctx.arc(kx, ky, w * 0.6, 0, TAU); ink(far ? col.dark : col.limb, 1.8); } foot(fx, fy + 1, bd.v ? 1 : sd, q.t);
         ctx.globalAlpha = 1;
       }
       function armOf(o, q, th, a, sd, far, idx) {
-        const s0 = P(o, th, 0.85), k = kk(o), La = (24 * q.l + 10) * k, wv = Math.sin(B(2.6) + idx + (sd > 0 ? 0 : 1.4)) * 0.18, ang = a + sd * wv, ex = s0[0] + Math.cos(ang) * La, ey = s0[1] + Math.sin(ang) * La, kid = kidOf(q), tip = kid && kid.k === 0 && kid.t ? kid.t : q.t;
+        const s0 = P(o, th, 0.85), k = kk(o), La = (30 * q.l + 16) * k, wv = Math.sin(B(2.6) + idx + (sd > 0 ? 0 : 1.4)) * 0.18, ang = a + sd * wv, ex = s0[0] + Math.cos(ang) * La, ey = s0[1] + Math.sin(ang) * La, kid = kidOf(q), tip = kid && kid.k === 0 && kid.t ? kid.t : q.t;
         if (far) ctx.globalAlpha = 0.75;
-        strokeLimb(s0[0], s0[1], s0[0] + Math.cos(ang - sd * 0.5) * La * 0.55, s0[1] + Math.sin(ang - sd * 0.5) * La * 0.55, ex, ey, (9 + 4 * q.w) * k, far ? col.dark : col.limb);
-        hand(ex, ey, ang, tip, k);
+        { const wA = (13 + 5 * q.w) * k, elx = s0[0] + Math.cos(ang - sd * 0.5) * La * 0.55, ely = s0[1] + Math.sin(ang - sd * 0.5) * La * 0.55; limb2(s0[0], s0[1], elx, ely, ex, ey, wA, far ? col.dark : col.limb); ctx.beginPath(); ctx.arc(elx, ely, wA * 0.55, 0, TAU); ink(far ? col.dark : col.limb, 1.8); }
+        hand(ex, ey, ang, tip, k * 1.2);
         ctx.globalAlpha = 1;
       }
       function limbs(far) {
@@ -371,10 +380,11 @@
     // ── helpers (shared by every build) ──
     function ribs(x, y) { ctx.strokeStyle = 'rgba(7,18,31,.28)'; ctx.lineWidth = 1.4; for (let r = 1; r <= 3; r++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(x * (0.5 + r * 0.17), y * (1.3 - r * 0.3)); ctx.stroke(); } }
     function strokeLimb(x0, y0, cx, cy2, x1, y1, w, fill) { for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? fill : INK; ctx.lineWidth = pass ? w : w + 4.4; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(cx, cy2, x1, y1); ctx.stroke(); } }
-    function limb2(x0, y0, kx, ky, x1, y1, w, fill) { for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? fill : INK; ctx.lineWidth = pass ? w : w + 4.4; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(kx, ky); ctx.lineTo(x1, y1); ctx.stroke(); } }
+    function limb2(x0, y0, kx, ky, x1, y1, w, fill) { for (let pass = 0; pass < 3; pass++) { ctx.strokeStyle = pass === 2 ? 'rgba(255,255,255,0.3)' : pass ? fill : INK; ctx.lineWidth = pass === 2 ? w * 0.26 : pass ? w : w + 4.4; const o = pass === 2 ? -w * 0.2 : 0; ctx.beginPath(); ctx.moveTo(x0 + o, y0); ctx.lineTo(kx + o, ky); ctx.lineTo(x1 + o, y1); ctx.stroke(); } }
     function foot(x, y, sd, tip) {
       if (tip === 2) { for (let h = -1; h <= 1; h += 2) { ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + sd * 10, y + h * 10, x + sd * 18, y + h * 3); ctx.quadraticCurveTo(x + sd * 9, y + h * 4, x, y); ink('#ff8a6b', 2); } return; }
-      ctx.beginPath(); ctx.ellipse(x + sd * 5, y, tip === 3 ? 16 : 12, tip === 3 ? 6 : 7, 0, 0, TAU); ink(tip === 3 ? col.fin : col.limb, 2.2);
+      ctx.beginPath(); ctx.ellipse(x + sd * 6, y, tip === 3 ? 19 : 15, tip === 3 ? 7 : 9, 0, 0, TAU); ink(tip === 3 ? col.fin : col.limb, 2.2);
+      if (tip !== 1) { ctx.strokeStyle = INK; ctx.globalAlpha = 0.45; ctx.lineWidth = 1.5; for (let j = -1; j <= 1; j += 2) { ctx.beginPath(); ctx.moveTo(x + sd * (tip === 3 ? 12 : 9), y + j * 1.5); ctx.lineTo(x + sd * (tip === 3 ? 17 : 14), y + j * 3.2); ctx.stroke(); } ctx.globalAlpha = 1; }
       if (tip === 1) { ctx.strokeStyle = INK; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.6; for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(x + sd * (6 + j * 5), y - 4); ctx.lineTo(x + sd * (8 + j * 5), y + 4); ctx.stroke(); } ctx.globalAlpha = 1; }
     }
     // a leg of an invented build: hip on the belly, a knee and a foot where the build puts them; a foot that stands is on the floor
@@ -470,7 +480,8 @@
       const stalk = function (ex, ey) { if (!st) return ey; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.body : INK; ctx.lineWidth = pass ? 6 : 10; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex, ey - st); ctx.stroke(); } return ey - st; };
       if (side) { if (ne >= 1) eyeAt(cx, ey0, er * 1.15, false); if (ne >= 3) eyeAt(cx - hr * 0.5, ey0 - hr * 0.35, er * 0.45, false); }
       else if (ne === 1) eyeAt(cx, ey0, er * 1.3, false);
-      else if (ne >= 2) { eyeAt(cx - gap, stalk(cx - gap, ey0), er, false); eyeAt(cx + gap, stalk(cx + gap, ey0), er, false); if (ne === 3) eyeAt(cx, y - hr * 0.64, er * 0.42, false); }
+      else if (ne >= 2) { eyeAt(cx - gap, stalk(cx - gap, ey0), er, false); eyeAt(cx + gap, stalk(cx + gap, ey0), er, false); if (ne === 3) eyeAt(cx, y - hr * 0.64, er * 0.42, false);
+        if (!st) for (let sd = -1; sd <= 1; sd += 2) { const bx = cx + sd * gap, by = ey0 - er * 1.2; ctx.strokeStyle = INK; ctx.globalAlpha = 0.7; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(bx - sd * er * 0.75, by - er * 0.02); ctx.quadraticCurveTo(bx, by - er * 0.3, bx + sd * er * 0.8, by + er * 0.14); ctx.stroke(); ctx.globalAlpha = 1; } }
       { const bl = f.bl === undefined ? 0.4 : f.bl; ctx.globalAlpha = 0.1 + 0.5 * bl; ctx.fillStyle = '#ff7fa8'; for (let sd = (side ? 1 : -1); sd <= 1; sd += 2) { ctx.beginPath(); ctx.ellipse(cx + sd * hr * (side ? 0.05 : 0.72), y + hr * 0.42, hr * (0.12 + 0.1 * bl), hr * (0.08 + 0.06 * bl), 0, 0, TAU); ctx.fill(); } ctx.globalAlpha = 1; }
       const mx = cx + (side ? hr * 0.5 : 0), my = y + hr * (side ? 0.42 : 0.5), m = hr * (0.16 + f.ms * 0.3);
       ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.fillStyle = INK;

@@ -40,10 +40,11 @@
   };
   // the taste every pond starts with: fitted to the AI's grades of pictures (b: the grade of a body with nothing to see on it)
   F.TASTE0 = { b: 0.5325, w: [-0.121, 0.0073, 0.1, 0.0137, 0.0313, -0.0019, 0.0136, -0.0162, 0, -0.0364, 0.0033, -0.0094, -0.0631, -0.0881, 0.0249, -0.032, 0.0358, 0.0729, -0.0435, -0.0798, 0.0204, 0.0382, -0.0008, -0.0684, -0.0479, 0.0371, 0.0085, -0.0465, 0.0284, -0.0495, -0.0495, -0.0101, 0.0078, -0.0422, -0.0125, 0.0211, -0.0124, -0.035, -0.0414, -0.0141, -0.0058, 0.0454, -0.0249, 0.032, -0.0437, -0.026, 0.0027, 0.0081, -0.0341, 0.0177, 0.0058, -0.1911, 0.16, 0.03, 0.04, 0.03, 0.04, 0.02, 0.1, 0.08, 0.06, 0.1, -0.09, 0.07], n: 294 };      // fitted 2026-10-06 to 294 graded pictures; held-out correlation 0.59
-  F.newTaste = function () { return { b: F.TASTE0.b, w: F.TASTE0.w.slice(), n: 0 }; };
+  F.newTaste = function () { return { b: F.TASTE0.b, w: F.TASTE0.w.slice(), n: 0, wb: 0, ww: F.TASTE0.w.map(function () { return 0; }) }; };
   F.fixTaste = function (t) {
     if (!t || !Array.isArray(t.w) || t.w.length !== NAMES.length || !isFinite(+t.b)) return null;
-    return { b: clamp(+t.b, -2, 2), w: t.w.map(function (v) { v = +v; return isFinite(v) ? clamp(v, -3, 3) : 0; }), n: Math.max(0, t.n | 0) };
+    const ok = Array.isArray(t.ww) && t.ww.length === NAMES.length;
+    return { b: clamp(+t.b, -2, 2), w: t.w.map(function (v) { v = +v; return isFinite(v) ? clamp(v, -3, 3) : 0; }), n: Math.max(0, t.n | 0), wb: ok && isFinite(+t.wb) ? clamp(+t.wb, -1, 1) : 0, ww: ok ? t.ww.map(function (v) { v = +v; return isFinite(v) ? clamp(v, -2, 2) : 0; }) : NAMES.map(function () { return 0; }) };
   };
   /** how nice this body is to the eye, 0..1, by a taste (a pond's own, or the one all ponds start with) */
   F.beauty = function (f, T) {
@@ -62,6 +63,20 @@
     T.b += k * err * 0.5;
     for (let i = 0; i < x.length; i++) T.w[i] += k * err * x[i] * 0.5;
     T.n++;
+    return err;
+  };
+  /** the hand-written wholeness, corrected by what the watcher has really said of whole creatures in this pond (a residual learned like the taste) */
+  F.wholeBelief = function (f, T, x0, v0) {
+    if (!f.bd) return 0.3;
+    let s = v0 === undefined ? F.whole(f).v : v0;
+    if (T && T.ww) { const x = x0 || F.looks(f); s += T.wb; for (let i = 0; i < x.length; i++) s += T.ww[i] * x[i]; }
+    return clamp(s, 0, 1);
+  };
+  F.learnWhole = function (T, x, grade, rate, v0) {
+    if (!T.ww) return 0;
+    let s = v0 + T.wb; for (let i = 0; i < x.length; i++) s += T.ww[i] * x[i];
+    const err = clamp(grade, 0, 1) - s, k = rate === undefined ? 0.03 : rate;
+    T.wb += k * err * 0.5; for (let i = 0; i < x.length; i++) T.ww[i] += k * err * x[i] * 0.5;
     return err;
   };
   /** How WHOLE a creature is, 0..1: does it read as a complete animal, or as a blob with things on it?
