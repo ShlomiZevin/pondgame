@@ -233,3 +233,7 @@ Not verified: the spoken lines were generated and returned as audio but nobody h
 - The pond's own events (`G.natureTick`) are invented by the AI from the state of the pond (`POST /api/ai/event` with `auto`), about $0.017 each, one every two minutes at most.
 - While an AI can be asked, parts, shapes, organs and marvels are never taken from the built-in lists; those lists remain only for when no server answers.
 - `scripts/deeds.js` and `scripts/nature.js` drive these live.
+
+## The rare box
+
+A box on the left of the pond (`src/56_rarebox.js`) lists what is special right now: every marvel alive (its sign, how many carry it, what it does), the plan a kind is carrying out (step, how many take part), what they built, and the last plans with how they ended. A click moves the camera there. The creature card shows a marvel in its own gold panel, with each power read out in plain words (`G.marvelDoes`). A plan keeps the watcher's time: its steps last the seconds the AI gave them at any speed, and the young of those in it take it up. Test: `node scripts/rarebox.js`, `node scripts/rarecard.js`.

@@ -929,6 +929,13 @@
     for (let i = 0; i < nb && i < sorted.length; i++) sorted[i].best = true;
     const n = cre.length || 1;
     let looksSum = 0, looksTop = 0, wholeSum = 0, wholeTop = 0; for (let i = 0; i < cre.length; i++) { const v = cre[i].ph.charm, wv = cre[i].ph.whole || 0; looksSum += v; if (v > looksTop) looksTop = v; wholeSum += wv; if (wv > wholeTop) wholeTop = wv; }
+    // has the pond stopped getting nicer? Then it turns to growing bigger: the stall (0..1) rises while the mean appeal of the pond has not gone up over the last ten
+    // generations, and falls as soon as it does. See G.mutate (size), G.derive (what size costs) and winter (who lasts).
+    { let ap = 0; for (let i = 0; i < cre.length; i++) ap += G.charmOf(cre[i]); const H = W.apHist = W.apHist || []; H.push(cre.length ? ap / cre.length : 0); if (H.length > 40) H.shift();
+      if (H.length >= 20) { let a = 0, b = 0; for (let i = 0; i < 10; i++) { a += H[H.length - 1 - i]; b += H[H.length - 11 - i]; } const was = W.stall || 0; W.stall = a / 10 < b / 10 + 0.01 ? Math.min(1, was + 0.2) : Math.max(0, was - 0.35);
+        if (W.stall >= 0.6 && was < 0.6 && W.gen - (W.stallNote || -99) > 40) { W.stallNote = W.gen; W.discLog.push({ key: 'stall' + W.gen, text: 'The pond has stopped getting nicer, so its creatures turn to growing bigger: size is what there is left to improve.', gen: W.gen }); G.emit('stall'); } } }
+    // the drive to grow is only as strong as the pond can bear: it eases off when the pond is below its capacity (the big need feeding) and as the average size gets large
+    { const popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12; W.grow = (W.stall || 0) * clamp((popR - 0.6) / 0.3, 0, 1) * (1 - clamp((mr - 26) / 14, 0, 1)); }
     W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop });
     if (W.hist.length > 600) W.hist.shift();
     G.updateSpecies();
@@ -956,7 +963,8 @@
     const share = {}, shapes = {}, hues = [0, 0, 0, 0, 0, 0];
     for (let i = 0; i < cre.length; i++) { const c = cre[i], k = G.kindOf(c.g).kind; c.kd = k; share[k] = (share[k] || 0) + 1; c.shp = G.shapeOf(c.g); shapes[c.shp] = (shapes[c.shp] || 0) + 1; c.hb = G.hueOf(c.g); hues[c.hb]++; }
     // who lasts the winter: the well fed, the rare, and the good-looking (the pond is kind to what is admired)
-    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.8 * hues[cre[i].hb] / cre.length) ;
+    const meanR = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12;
+    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1 + (W.grow || 0) * 0.6 * clamp((cre[i].ph.r - meanR) / meanR, -0.5, 1)) * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.8 * hues[cre[i].hb] / cre.length) ;
     if (cre.length > 8) {
       // fitness sharing: a creature in a crowd of look-alikes counts for less, however it is measured, so no single look can take the whole pond
       for (let i = 0; i < cre.length; i++) if (!cre[i].fv) cre[i].fv = G.features(cre[i].g);

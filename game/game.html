@@ -549,7 +549,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const t = g.t, c = g.c, f = g.f, FM = G.form, U = FM.U;
     const cn = FM.counts(f), A = FM.abilities(f, cn), ext = FM.extent(f), k = cn.k;
     const mvd = g.mv && G.marvelOf ? G.marvelOf(g.mv) : null;
-    const r = Math.min(t[0], 22 + 8 * (f.n - 1)) * (mvd && mvd.sp === 'titan' ? 1.35 : 1);          // a body of more parts can be a bigger one; the ceiling is high, so size is limited by food and by the pond, not by a rule
+    const stall = G.W && G.W.grow ? G.W.grow : 0;
+    const r = Math.min(t[0], 28 + 10 * (f.n - 1)) * (mvd && mvd.sp === 'titan' ? 1.35 : 1);          // a body of more parts can be a bigger one; the ceiling is high, so size is limited by food and by the pond, not by a rule
     const FX = { speed: 0, sense: 0, eat: 0, armor: 0, spike: 0, toxin: 0, photo: 0, glow: 0, heat: 0, cold: 0, poison: 0 };
     const dig = [c[0], c[1], c[2], c[3], c[4], c[5]];
     let orgCost = 0;
@@ -623,7 +624,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     let tolSum = 0; for (let i = 9; i < 15; i++) tolSum += c[i] || 0;
     up += 0.035 * digSum + 0.02 * (c[6] + c[7] + c[8]) + 0.022 * tolSum + 0.0035 * g.w.length + 0.012 * g.h;
     if (f.bd) up += r10 * 0.05 * Math.max(0, G.body.busy(f) - 6);
-    ph.upkeep = up;
+    ph.upkeep = up * (1 - 0.3 * stall);      // with nothing else left to improve, being big costs less
     // compile the brain: wires grouped by target (hidden 0..h-1, then outputs)
     const nt = g.h + NOUT;
     const groups = [];
@@ -682,7 +683,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const press = G.W && G.W.press ? G.W.press : null;
     // nudge traits
     // size answers the pond: danger favours bigger bodies, hunger and thin air smaller ones; chance does the rest
-    if (r() < m * 2) { g.t[0] += n() * 1.1 + 0.12 + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
+    if (r() < m * 2) { g.t[0] += n() * 1.1 + 0.12 + 1.1 * (G.W && G.W.grow || 0) + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
+    { const st = G.W && G.W.grow || 0; if (st > 0.2 && r() < 0.09 * st * wild) { g.t[0] = Math.min(64, g.t[0] * 1.12); note('t', 0, 'grew bigger: nothing else was left to improve', true); } }
     if (press && Math.abs(press.size) > 0.2 && r() < 0.06 * Math.abs(press.size) * wild) { const up = press.size > 0; g.t[0] = Math.max(5, g.t[0] * (up ? 1.12 : 0.9)); note('t', 0, (up ? 'grew bigger, ' : 'grew smaller, ') + (press.sizeWhy || 'to suit the pond'), true); }
     if (r() < m * 2) { g.t[1] += n() * 0.07; note('t', 1, 'speed', false); }
     if (r() < m * 2.5) { g.t[4] = (g.t[4] || 0.12) + n() * 0.14; note('t', 4, 'temper', false); }
@@ -3539,6 +3541,13 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     for (let i = 0; i < nb && i < sorted.length; i++) sorted[i].best = true;
     const n = cre.length || 1;
     let looksSum = 0, looksTop = 0, wholeSum = 0, wholeTop = 0; for (let i = 0; i < cre.length; i++) { const v = cre[i].ph.charm, wv = cre[i].ph.whole || 0; looksSum += v; if (v > looksTop) looksTop = v; wholeSum += wv; if (wv > wholeTop) wholeTop = wv; }
+    // has the pond stopped getting nicer? Then it turns to growing bigger: the stall (0..1) rises while the mean appeal of the pond has not gone up over the last ten
+    // generations, and falls as soon as it does. See G.mutate (size), G.derive (what size costs) and winter (who lasts).
+    { let ap = 0; for (let i = 0; i < cre.length; i++) ap += G.charmOf(cre[i]); const H = W.apHist = W.apHist || []; H.push(cre.length ? ap / cre.length : 0); if (H.length > 40) H.shift();
+      if (H.length >= 20) { let a = 0, b = 0; for (let i = 0; i < 10; i++) { a += H[H.length - 1 - i]; b += H[H.length - 11 - i]; } const was = W.stall || 0; W.stall = a / 10 < b / 10 + 0.01 ? Math.min(1, was + 0.2) : Math.max(0, was - 0.35);
+        if (W.stall >= 0.6 && was < 0.6 && W.gen - (W.stallNote || -99) > 40) { W.stallNote = W.gen; W.discLog.push({ key: 'stall' + W.gen, text: 'The pond has stopped getting nicer, so its creatures turn to growing bigger: size is what there is left to improve.', gen: W.gen }); G.emit('stall'); } } }
+    // the drive to grow is only as strong as the pond can bear: it eases off when the pond is below its capacity (the big need feeding) and as the average size gets large
+    { const popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12; W.grow = (W.stall || 0) * clamp((popR - 0.6) / 0.3, 0, 1) * (1 - clamp((mr - 26) / 14, 0, 1)); }
     W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop });
     if (W.hist.length > 600) W.hist.shift();
     G.updateSpecies();
@@ -3566,7 +3575,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const share = {}, shapes = {}, hues = [0, 0, 0, 0, 0, 0];
     for (let i = 0; i < cre.length; i++) { const c = cre[i], k = G.kindOf(c.g).kind; c.kd = k; share[k] = (share[k] || 0) + 1; c.shp = G.shapeOf(c.g); shapes[c.shp] = (shapes[c.shp] || 0) + 1; c.hb = G.hueOf(c.g); hues[c.hb]++; }
     // who lasts the winter: the well fed, the rare, and the good-looking (the pond is kind to what is admired)
-    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.8 * hues[cre[i].hb] / cre.length) ;
+    const meanR = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12;
+    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1 + (W.grow || 0) * 0.6 * clamp((cre[i].ph.r - meanR) / meanR, -0.5, 1)) * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.8 * hues[cre[i].hb] / cre.length) ;
     if (cre.length > 8) {
       // fitness sharing: a creature in a crowd of look-alikes counts for less, however it is measured, so no single look can take the whole pond
       for (let i = 0; i < cre.length; i++) if (!cre[i].fv) cre[i].fv = G.features(cre[i].g);
@@ -7556,7 +7566,7 @@ G.addSystem({
     const W = G.W; if (W.deed !== d) return;
     W.deed = null;
     for (let i = 0; i < W.cre.length; i++) if (W.cre[i].deedId === d.id) { W.cre[i].deedId = 0; W.cre[i].cryT = 0; }
-    (W.deedLog = W.deedLog || []).push(d.title); if (W.deedLog.length > 12) W.deedLog.shift();
+    (W.deedLog = W.deedLog || []).push(d.title); (W.deedPast = W.deedPast || []).push({ title: d.title, kind: d.kind, say: d.say, how: how, gen: W.gen, x: d.x, y: d.y }); if (W.deedPast.length > 5) W.deedPast.shift(); if (W.deedLog.length > 12) W.deedLog.shift();
     let made = null;
     if (how === 'done' && d.result && G.addField && G.cleanFields) {
       const r = d.result, m = Math.min(W.ww, W.wh);
@@ -7572,12 +7582,13 @@ G.addSystem({
   function deedStep(dt) {
     const W = G.W, d = W.deed, m = Math.min(W.ww, W.wh);
     let M = members(d);
+    const rt = dt / Math.max(1, G.speed || 1);                               // the plan keeps the time of whoever is watching, not of the pond: sped up, it is still there to be seen
     d.joinT = (d.joinT || 0) - dt;
-    if (M.length < d.n0 && d.joinT <= 0) { d.joinT = 1.5; const used = {}; M.forEach(function (c) { used[c.deedJ] = 1; }); for (let i = 0; i < W.cre.length && M.length < d.n0; i++) { const c = W.cre[i]; if (c.sp !== d.sp || c.dead || c.deedId) continue; let j = 0; while (used[j]) j++; used[j] = 1; c.deedId = d.id; c.deedJ = j; M.push(c); } }
+    if (M.length < d.n0 && d.joinT <= 0) { d.joinT = 1.5; const used = {}; M.forEach(function (c) { used[c.deedJ] = 1; }); for (let i = 0; i < W.cre.length && M.length < d.n0; i++) { const c = W.cre[i]; if ((c.sp !== d.sp && c.deedKin !== d.id && !(d.thin > 6)) || c.dead || c.deedId) continue; let j = 0; while (used[j]) j++; used[j] = 1; c.deedId = d.id; c.deedJ = j; M.push(c); } }
     const n = M.length;
-    if (n < 2) { finish(d, 'lost'); return; }
+    if (n < Math.min(d.n0, 6)) { d.thin = (d.thin || 0) + rt; if (n < 2) { if (d.thin > 30) finish(d, 'lost'); return; } } else d.thin = 0;      // too few just now: the plan waits for hands (after a while anyone near will do) before it is dropped
     const st = d.steps[d.i], tg = d.target ? whereIs(d.target) : null;
-    d.t += dt; d.cryT -= dt;
+    d.t += rt; d.cryT -= rt;
     if (d.cryT <= 0 && st.cry) { d.cryT = 1.6 + G.rand() * 1.6; const c = M[(G.rand() * n) | 0]; c.cryT = 1.9; c.cryW = st.cry; }
     let near = 0;
     for (let k = 0; k < n; k++) {
@@ -7597,16 +7608,17 @@ G.addSystem({
       if (dist < 60) near++;
       if (c.E < c.ph.Emax * 0.28) c.E = c.ph.Emax * 0.28;                    // a purpose keeps them going
       c.asleep = false; c.tired = Math.min(c.tired || 0, 0.5);
-      if (c.cryT > 0) c.cryT -= dt;
+      if (c.cryT > 0) c.cryT -= rt;
     }
-    if (st.do === 'build' && d.buildSecs) d.progress = Math.min(1, d.progress + (0.45 + 0.75 * near / n) * dt / d.buildSecs);
+    if (st.do === 'build' && d.buildSecs) d.progress = Math.min(1, d.progress + (0.45 + 0.75 * near / n) * rt / d.buildSecs);
     if (st.do === 'charge' && tg && near) {
-      if (tg.zone && d.win !== 'befriend') { tg.zone.life -= near * 0.55 * dt; tg.zone.hit = 1; }
-      else if (tg.field && d.win !== 'befriend') tg.field.life -= near * 0.6 * dt;
-      else if (tg.kind) { for (let i = 0; i < W.cre.length; i++) { const o = W.cre[i]; if (o.sp !== tg.kind.id || o.dead) continue; for (let k = 0; k < n; k += 2) { const c = M[k], dx = o.x - c.x, dy = o.y - c.y, d2 = dx * dx + dy * dy; if (d2 < 70 * 70) { if (d.win === 'befriend') { o.E = Math.min(o.ph.Emax, o.E + 2 * dt); c.E = Math.min(c.ph.Emax, c.E + 2 * dt); o.mend = 1; } else { const q = Math.sqrt(d2) || 1; o.E -= 3.2 * dt * (1 - o.ph.defense * 0.5); o.vx += dx / q * 90 * dt; o.vy += dy / q * 90 * dt; o.flash = 0.6; } break; } } } }
+      if (tg.zone && d.win !== 'befriend') { tg.zone.life -= near * 0.55 * rt; tg.zone.hit = 1; }
+      else if (tg.field && d.win !== 'befriend') tg.field.life -= near * 0.6 * rt;
+      else if (tg.kind) { for (let i = 0; i < W.cre.length; i++) { const o = W.cre[i]; if (o.sp !== tg.kind.id || o.dead) continue; for (let k = 0; k < n; k += 2) { const c = M[k], dx = o.x - c.x, dy = o.y - c.y, d2 = dx * dx + dy * dy; if (d2 < 70 * 70) { if (d.win === 'befriend') { o.E = Math.min(o.ph.Emax, o.E + 2 * rt); c.E = Math.min(c.ph.Emax, c.E + 2 * rt); o.mend = 1; } else { const q = Math.sqrt(d2) || 1; o.E -= 3.2 * rt * (1 - o.ph.defense * 0.5); o.vx += dx / q * 90 * dt; o.vy += dy / q * 90 * dt; o.flash = 0.6; } break; } } } }
     }
     if (d.t >= st.secs) { d.i++; d.t = 0; if (d.i >= d.steps.length) finish(d, 'done'); else G.emit('deed-step', d); }
   }
+  G.on('birth', function (c, from, mate) { const d = G.W && G.W.deed; if (!d || !c) return; if ((from && (from.deedId === d.id || from.deedKin === d.id)) || (mate && (mate.deedId === d.id || mate.deedKin === d.id))) c.deedKin = d.id; });      // the young of those in it are heirs to it
   { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (W && W.deed) deedStep(dt); if (W && W.works && W.works.length && W.works[0].until < W.t) W.works.shift(); }; }
 
   // ── seen ──
@@ -7732,6 +7744,95 @@ G.addSystem({
     }
     W.title = true;
   };
+})();
+
+</script>
+<script data-part="rarebox">
+// ── The rare box: what is special in this pond right now, in one place ──
+// A small box on the left that is always there while you play. It lists every MARVEL alive in the pond (its sign, its
+// name, how many carry it, what it does, whether it talks) and the PLAN a kind of creature is carrying out, if there is
+// one. Click a row and the camera goes to it. When something new arrives the box flashes, so it is not missed.
+(function () {
+  'use strict';
+  if (typeof document === 'undefined') return;
+  let box = null, sig = '', seen = {};
+  const esc = function (s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  // what a marvel DOES, said plainly from its own numbers (the AI made the numbers up; this only reads them out)
+  const WHO = { hunters: 'its hunters', others: 'other kinds', kin: 'its own kind', all: 'everyone near' };
+  G.marvelDoes = function (m) {
+    const out = [], P = (m && m.powers) || [];
+    for (let i = 0; i < P.length; i++) { const p = P[i], v = [];
+      if (p.hurt > 0.05) v.push('hurts'); if (p.strike > 0.05) v.push('strikes'); if (p.slow > 0.05) v.push('slows'); if (p.pull > 0.05) v.push('draws in'); if (p.pull < -0.05) v.push('pushes away'); if (p.heal > 0.05) v.push('heals'); if (p.feed > 0.05) v.push('feeds');
+      if (!v.length) continue;
+      const what = v.length > 1 ? v.slice(0, -1).join(', ') + ' and ' + v[v.length - 1] : v[0];
+      out.push((p.kind === 'pulse' ? 'Every ' + Math.round(p.every) + ' seconds a burst of ' + p.stuff + ' ' : 'A ring of ' + p.stuff + ' is always about it: it ') + what + ' ' + (WHO[p.to] || 'those near') + '.'); }
+    if (m && m.words && m.words.length) out.push('It talks: "' + m.words[0] + '"');
+    return out;
+  };
+  G.marvelCard = function (m) {
+    const does = G.marvelDoes(m);
+    return '<div class="mk">★ MARVEL · RARE</div><div class="mn">' + (m.emblem ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(m.emblem) + '">' : '') + esc(m.name) + '</div><div class="mw">' + esc(m.wonder) + '</div>' +
+      (does.length ? '<ul>' + does.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>' : '') + (m.why ? '<div class="my">' + esc(m.why) + '</div>' : '');
+  };
+  function ui() {
+    if (box) return box;
+    const st = document.createElement('style');
+    st.textContent = '#rarebox{position:fixed;left:14px;top:236px;width:min(300px,calc(100vw - 28px));padding:9px 12px;border-radius:16px;z-index:2;font:500 12px system-ui,sans-serif;color:#cfe8ff;max-height:42vh;overflow-y:auto}' +
+      '#rarebox .rk{font:700 9.5px system-ui,sans-serif;letter-spacing:.2em;color:#f6d365;text-transform:uppercase;display:flex;justify-content:space-between}' +
+      '#rarebox .rrow{display:flex;gap:9px;align-items:center;padding:6px 6px;margin:4px -6px 0;border-radius:11px;cursor:pointer;border:1px solid transparent}#rarebox .rrow:hover{background:rgba(246,211,101,.1);border-color:rgba(246,211,101,.35)}' +
+      '#rarebox .ric{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;background:rgba(7,18,31,.5)}#rarebox .ric img{width:30px;height:30px}' +
+      '#rarebox b{color:#fff;font-size:12.5px}#rarebox .rsub{font-size:10.5px;opacity:.8;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}' +
+      '#rarebox .rtag{display:inline-block;margin-left:5px;padding:0 6px;border-radius:8px;background:rgba(51,214,166,.16);border:1px solid rgba(51,214,166,.45);font-size:9.5px;color:#dffbf1}' +
+      '#rarebox .rnone{font-size:11px;opacity:.7;margin-top:4px;line-height:1.35}' +
+      '#rarebox.flash{animation:rareflash 1.4s ease-out 2}@keyframes rareflash{0%{box-shadow:0 0 0 0 rgba(246,211,101,.9)}100%{box-shadow:0 0 0 22px rgba(246,211,101,0)}}' +
+      '@media (max-width:720px){#rarebox{top:auto;bottom:150px;left:7px;max-height:26vh}}@media (max-height:560px){#rarebox{display:none}}';
+    document.head.appendChild(st);
+    box = document.createElement('div'); box.id = 'rarebox'; box.className = 'glass hide';
+    (document.getElementById('ui') || document.body).appendChild(box);
+    box.addEventListener('click', function (e) {
+      let n = e.target; while (n && n !== box && !(n.dataset && n.dataset.go)) n = n.parentNode;
+      if (!n || n === box) return;
+      const W = G.W, go = n.dataset.go;
+      if (G.sfx) G.sfx('click');
+      if (go === 'deed') { if (W.deed) G.focusOn(W.deed.x, W.deed.y, 1.6); return; }
+      if (go.charAt(0) === 'w') { const w = (W.works || [])[+go.slice(1)]; if (w) G.focusOn(w.x, w.y, 1.6); return; }
+      if (go.charAt(0) === 'p') { const p = (W.deedPast || [])[+go.slice(1)]; if (p) G.focusOn(p.x, p.y, 1.4); return; }
+      const id = +go.slice(1), L = W.cre.filter(function (c) { return !c.dead && c.g.mv === id; }).sort(function (a, b) { return G.charmOf(b) - G.charmOf(a); });
+      if (L[0]) { if (G.select) G.select(L[0]); G.focusOn(L[0].x, L[0].y, 2.4); }
+    });
+    return box;
+  }
+  const STEP = { gather: 'gathering', circle: 'in council', line: 'forming up', carry: 'fetching and carrying', build: 'building', charge: 'charging', guard: 'standing guard', scatter: 'setting off' };
+  function draw() {
+    ui();
+    const W = G.W, on = G.mode === 'play' && W && !W.title;
+    box.classList.toggle('hide', !on);
+    if (!on) { sig = ''; return; }
+    // it sits under the "pond versus" card when that is showing
+    const vs = document.getElementById('versus');
+    if (window.innerWidth > 720) box.style.top = (vs && !vs.classList.contains('hide') ? Math.round(vs.getBoundingClientRect().bottom) + 8 : 236) + 'px'; else box.style.top = '';
+    const by = {}, order = [];
+    for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i], mv = c.ph && c.ph.mv; if (!mv || c.dead) continue; if (!by[mv.id]) { by[mv.id] = { d: mv, n: 0 }; order.push(mv.id); } by[mv.id].n++; }
+    const d = W.deed, dn = d ? W.cre.filter(function (c) { return c.deedId === d.id && !c.dead; }).length : 0;
+    const Wk = W.works || [], Pa = W.deedPast || [];
+    const s2 = order.map(function (id) { return id + ':' + by[id].n; }).join(',') + '|' + (d ? d.id + ':' + d.i + ':' + dn + ':' + Math.round(d.progress * 20) + ':' + Math.round((d.steps[d.i].secs - d.t) / 2) : '') + '|' + Wk.map(function (w) { return w.name + (w.fig ? 1 : 0); }).join(',') + '|' + Pa.length + ':' + (Pa.length ? Pa[Pa.length - 1].gen : 0);
+    if (s2 === sig) return; sig = s2;
+    let fresh = false, h = '<div class="rk"><span>★ Rare in this pond</span><span>' + (order.length ? order.length + (order.length === 1 ? ' marvel' : ' marvels') : '') + '</span></div>';
+    if (d) { if (!seen['d' + d.id]) { seen['d' + d.id] = 1; fresh = true; } const st = d.steps[d.i];
+      h += '<div class="rrow" data-go="deed"><span class="ric">⚑</span><span><b>' + esc(d.title) + '</b><span class="rtag">a plan</span><div class="rsub">The ' + esc(d.kind) + ' are ' + (STEP[st.do] || st.do) + (st.do === 'build' ? ' (' + Math.round(d.progress * 100) + '%)' : '') + ', ' + dn + ' of them. Step ' + (d.i + 1) + ' of ' + d.steps.length + '. ' + esc(d.say) + '</div></span></div>'; }
+    for (let i = Wk.length - 1; i >= 0; i--) { const w = Wk[i];
+      h += '<div class="rrow" data-go="w' + i + '"><span class="ric">' + (w.fig && G.figurePic && G.figurePic(w.name) ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(G.figurePic(w.name)) + '">' : '▲') + '</span><span><b>' + esc(w.name) + '</b><span class="rtag">built</span><div class="rsub">Raised by the ' + esc(w.by) + '. ' + esc(w.looks) + '</div></span></div>'; }
+    for (let i = 0; i < order.length; i++) { const q = by[order[i]], m = q.d; if (!seen['m' + m.id]) { seen['m' + m.id] = 1; fresh = true; }
+      h += '<div class="rrow" data-go="m' + m.id + '"><span class="ric">' + (m.emblem ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(m.emblem) + '">' : '★') + '</span><span><b>' + esc(m.name) + '</b> ×' + q.n + (m.words && m.words.length ? '<span class="rtag">talks</span>' : '') + '<div class="rsub">' + esc(m.wonder) + '</div></span></div>'; }
+    for (let i = Pa.length - 1; i >= 0 && i >= Pa.length - 3; i--) { const p = Pa[i];
+      h += '<div class="rrow" data-go="p' + i + '" style="opacity:.8"><span class="ric">✓</span><span><b>' + esc(p.title) + '</b><span class="rtag">' + (p.how === 'done' ? 'done' : 'gave up') + ' · gen ' + p.gen + '</span><div class="rsub">The ' + esc(p.kind) + '. ' + esc(p.say) + '</div></span></div>'; }
+    if (!d && (order.length || Wk.length || Pa.length)) h += '<div class="rnone">No plan under way just now' + (Pa.length ? ' (the last was in generation ' + Pa[Pa.length - 1].gen + ')' : '') + '.</div>';
+    if (!d && !order.length && !Wk.length && !Pa.length) h += '<div class="rnone">Nothing rare alive just now. Every few minutes a creature is born with a marvel, or a kind decides to do something together. It will show here, and you can click it to go there.</div>';
+    box.innerHTML = h;
+    if (fresh) { box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash'); }
+  }
+  setInterval(function () { try { draw(); } catch (e) { console.error(e); } }, 800);
+  G.on('new-pond', function () { seen = {}; sig = ''; });
 })();
 
 </script>
@@ -8304,11 +8405,12 @@ G.addSystem({
   function buildInspector(ui) {
     const i = el('div', 'glass hide', '', ui); i.id = 'inspector';
     i.innerHTML = '<div class="ihead"><canvas id="iprev" width="208" height="208"></canvas><div><b id="iname"></b><small id="isub"></small></div><button class="x" id="iclose" aria-label="Close">' + ICON.close + '</button></div>' +
+      '<div id="imarvel" class="hide"></div>' +
       '<div id="ifit" style="font-size:11.5px;line-height:1.4"></div>' +
       '<div class="irows"><div id="iE"></div><div id="iAge"></div><div id="iPar" style="grid-column:span 2"></div><div class="meter"><i id="iEb"></i></div></div>' +
       '<div class="imut" id="imut"></div>' +
       '<details><summary>Genes and brain</summary><canvas id="istrip" width="560" height="80"></canvas><canvas id="ibrain" width="560" height="184" style="margin-top:6px"></canvas></details>' +
-      '<style>#inspector .ihead{flex-direction:column;align-items:center;text-align:center;position:relative;gap:0}#inspector .ihead canvas{width:150px;height:150px;margin:-14px 0 -10px}#inspector .ihead>div{width:100%}#inspector .ihead b{font-size:15px}#inspector .x{position:absolute;top:-6px;right:-6px;margin:0}#isub{text-align:left;margin-top:5px}#iacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}#iacts .btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:0 4px;font-size:10px;letter-spacing:.06em;white-space:nowrap}#iacts .btn svg{width:14px;height:14px;flex:none;margin:0}#iacts .btn i{font-style:normal;font-size:14px;line-height:1}#iacts #ikeep i{color:var(--gold)}#iacts #ibreed i{color:var(--rose)}</style>' +
+      '<style>#inspector .ihead{flex-direction:column;align-items:center;text-align:center;position:relative;gap:0}#inspector .ihead canvas{width:150px;height:150px;margin:-14px 0 -10px}#inspector .ihead>div{width:100%}#inspector .ihead b{font-size:15px}#inspector .x{position:absolute;top:-6px;right:-6px;margin:0}#isub{text-align:left;margin-top:5px}#iacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}#iacts .btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:0 4px;font-size:10px;letter-spacing:.06em;white-space:nowrap}#iacts .btn svg{width:14px;height:14px;flex:none;margin:0}#iacts .btn i{font-style:normal;font-size:14px;line-height:1}#iacts #ikeep i{color:var(--gold)}#iacts #ibreed i{color:var(--rose)}#imarvel{margin:8px 0 6px;padding:9px 11px;border-radius:12px;background:rgba(246,211,101,.12);border:1.5px solid rgba(246,211,101,.7);text-align:left}#imarvel .mk{font:800 9.5px system-ui,sans-serif;letter-spacing:.2em;color:#f6d365}#imarvel .mn{display:flex;align-items:center;gap:8px;font:800 16px system-ui,sans-serif;color:#fff;margin:2px 0 3px}#imarvel .mn img{width:30px;height:30px;flex:none}#imarvel .mw{font:600 12.5px/1.4 system-ui,sans-serif;color:#fff}#imarvel ul{margin:6px 0 0;padding:0;list-style:none}#imarvel li{font:600 11.5px/1.35 system-ui,sans-serif;color:#ffe9a8;padding:3px 0 3px 16px;position:relative}#imarvel li:before{content:"\\25C6";position:absolute;left:0;font-size:9px;top:5px}#imarvel .my{font-size:10.5px;opacity:.75;margin-top:5px;font-style:italic}</style>' +
       '<div id="iacts"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond."><i>★</i>KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection."><i>♥</i>BREED</button><button class="btn sm" id="itree" title="Its family tree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide" title="Its kind, in the Book of Life">' + ICON.book + 'KIND</button></div>';
     $('iclose').onclick = function () { G.select(null); };
     $('isub').onclick = function () { this.classList.toggle('open'); };
@@ -8464,7 +8566,8 @@ G.addSystem({
         UI.followed = null;
       }
       $('iPar').textContent = par;
-      $('isub').textContent = (sp ? G.describeSpecies(sp) : 'A newborn: its species is sorted out in autumn.') + (c.ph.mv ? '  ★ MARVEL, ' + c.ph.mv.name + ': ' + c.ph.mv.wonder : '');
+      $('isub').textContent = (sp ? G.describeSpecies(sp) : 'A newborn: its species is sorted out in autumn.');
+      { const mb = $('imarvel'), mv = c.ph.mv, key = mv ? 'm' + mv.id : ''; if (mb && mb._k !== key) { mb._k = key; mb.classList.toggle('hide', !mv); mb.innerHTML = mv && G.marvelCard ? G.marvelCard(mv) : ''; } }
       G.R.selPrev = G.preview(c.g, c.id);
     }
     const now = performance.now();

@@ -71,7 +71,7 @@
     const W = G.W; if (W.deed !== d) return;
     W.deed = null;
     for (let i = 0; i < W.cre.length; i++) if (W.cre[i].deedId === d.id) { W.cre[i].deedId = 0; W.cre[i].cryT = 0; }
-    (W.deedLog = W.deedLog || []).push(d.title); if (W.deedLog.length > 12) W.deedLog.shift();
+    (W.deedLog = W.deedLog || []).push(d.title); (W.deedPast = W.deedPast || []).push({ title: d.title, kind: d.kind, say: d.say, how: how, gen: W.gen, x: d.x, y: d.y }); if (W.deedPast.length > 5) W.deedPast.shift(); if (W.deedLog.length > 12) W.deedLog.shift();
     let made = null;
     if (how === 'done' && d.result && G.addField && G.cleanFields) {
       const r = d.result, m = Math.min(W.ww, W.wh);
@@ -87,12 +87,13 @@
   function deedStep(dt) {
     const W = G.W, d = W.deed, m = Math.min(W.ww, W.wh);
     let M = members(d);
+    const rt = dt / Math.max(1, G.speed || 1);                               // the plan keeps the time of whoever is watching, not of the pond: sped up, it is still there to be seen
     d.joinT = (d.joinT || 0) - dt;
-    if (M.length < d.n0 && d.joinT <= 0) { d.joinT = 1.5; const used = {}; M.forEach(function (c) { used[c.deedJ] = 1; }); for (let i = 0; i < W.cre.length && M.length < d.n0; i++) { const c = W.cre[i]; if (c.sp !== d.sp || c.dead || c.deedId) continue; let j = 0; while (used[j]) j++; used[j] = 1; c.deedId = d.id; c.deedJ = j; M.push(c); } }
+    if (M.length < d.n0 && d.joinT <= 0) { d.joinT = 1.5; const used = {}; M.forEach(function (c) { used[c.deedJ] = 1; }); for (let i = 0; i < W.cre.length && M.length < d.n0; i++) { const c = W.cre[i]; if ((c.sp !== d.sp && c.deedKin !== d.id && !(d.thin > 6)) || c.dead || c.deedId) continue; let j = 0; while (used[j]) j++; used[j] = 1; c.deedId = d.id; c.deedJ = j; M.push(c); } }
     const n = M.length;
-    if (n < 2) { finish(d, 'lost'); return; }
+    if (n < Math.min(d.n0, 6)) { d.thin = (d.thin || 0) + rt; if (n < 2) { if (d.thin > 30) finish(d, 'lost'); return; } } else d.thin = 0;      // too few just now: the plan waits for hands (after a while anyone near will do) before it is dropped
     const st = d.steps[d.i], tg = d.target ? whereIs(d.target) : null;
-    d.t += dt; d.cryT -= dt;
+    d.t += rt; d.cryT -= rt;
     if (d.cryT <= 0 && st.cry) { d.cryT = 1.6 + G.rand() * 1.6; const c = M[(G.rand() * n) | 0]; c.cryT = 1.9; c.cryW = st.cry; }
     let near = 0;
     for (let k = 0; k < n; k++) {
@@ -112,16 +113,17 @@
       if (dist < 60) near++;
       if (c.E < c.ph.Emax * 0.28) c.E = c.ph.Emax * 0.28;                    // a purpose keeps them going
       c.asleep = false; c.tired = Math.min(c.tired || 0, 0.5);
-      if (c.cryT > 0) c.cryT -= dt;
+      if (c.cryT > 0) c.cryT -= rt;
     }
-    if (st.do === 'build' && d.buildSecs) d.progress = Math.min(1, d.progress + (0.45 + 0.75 * near / n) * dt / d.buildSecs);
+    if (st.do === 'build' && d.buildSecs) d.progress = Math.min(1, d.progress + (0.45 + 0.75 * near / n) * rt / d.buildSecs);
     if (st.do === 'charge' && tg && near) {
-      if (tg.zone && d.win !== 'befriend') { tg.zone.life -= near * 0.55 * dt; tg.zone.hit = 1; }
-      else if (tg.field && d.win !== 'befriend') tg.field.life -= near * 0.6 * dt;
-      else if (tg.kind) { for (let i = 0; i < W.cre.length; i++) { const o = W.cre[i]; if (o.sp !== tg.kind.id || o.dead) continue; for (let k = 0; k < n; k += 2) { const c = M[k], dx = o.x - c.x, dy = o.y - c.y, d2 = dx * dx + dy * dy; if (d2 < 70 * 70) { if (d.win === 'befriend') { o.E = Math.min(o.ph.Emax, o.E + 2 * dt); c.E = Math.min(c.ph.Emax, c.E + 2 * dt); o.mend = 1; } else { const q = Math.sqrt(d2) || 1; o.E -= 3.2 * dt * (1 - o.ph.defense * 0.5); o.vx += dx / q * 90 * dt; o.vy += dy / q * 90 * dt; o.flash = 0.6; } break; } } } }
+      if (tg.zone && d.win !== 'befriend') { tg.zone.life -= near * 0.55 * rt; tg.zone.hit = 1; }
+      else if (tg.field && d.win !== 'befriend') tg.field.life -= near * 0.6 * rt;
+      else if (tg.kind) { for (let i = 0; i < W.cre.length; i++) { const o = W.cre[i]; if (o.sp !== tg.kind.id || o.dead) continue; for (let k = 0; k < n; k += 2) { const c = M[k], dx = o.x - c.x, dy = o.y - c.y, d2 = dx * dx + dy * dy; if (d2 < 70 * 70) { if (d.win === 'befriend') { o.E = Math.min(o.ph.Emax, o.E + 2 * rt); c.E = Math.min(c.ph.Emax, c.E + 2 * rt); o.mend = 1; } else { const q = Math.sqrt(d2) || 1; o.E -= 3.2 * rt * (1 - o.ph.defense * 0.5); o.vx += dx / q * 90 * dt; o.vy += dy / q * 90 * dt; o.flash = 0.6; } break; } } } }
     }
     if (d.t >= st.secs) { d.i++; d.t = 0; if (d.i >= d.steps.length) finish(d, 'done'); else G.emit('deed-step', d); }
   }
+  G.on('birth', function (c, from, mate) { const d = G.W && G.W.deed; if (!d || !c) return; if ((from && (from.deedId === d.id || from.deedKin === d.id)) || (mate && (mate.deedId === d.id || mate.deedKin === d.id))) c.deedKin = d.id; });      // the young of those in it are heirs to it
   { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (W && W.deed) deedStep(dt); if (W && W.works && W.works.length && W.works[0].until < W.t) W.works.shift(); }; }
 
   // ── seen ──

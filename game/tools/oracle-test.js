@@ -55,7 +55,7 @@ G.ai.ask = (task, input) => { const forms = G._sheet || []; return Promise.resol
           const cre = G.W.cre, n = cre.length || 1; let tb = 0, tw = 0, bb = 0, bel = 0, belw = 0, es = 0, hdv = 0, sz = 0, sp = 0; const kc = {}, hb = [0, 0, 0, 0, 0, 0]; for (const c of cre) { const k = G.shapeOf(c.g) + '|' + G.hueOf(c.g); kc[k] = (kc[k] || 0) + 1; hb[G.hueOf(c.g)]++; } let sq2 = 0; for (const k in kc) sq2 += (kc[k] / n) * (kc[k] / n); const effK = 1 / sq2, hues = hb.filter((v) => v / n >= 0.08).length;
           for (const c of cre) { const t = truth(c.g.f); tb += t.b; tw += t.w; bb = Math.max(bb, t.b); bel += c.ph.charm; belw += c.ph.whole; es += c.g.f.es; sz += c.ph.r; }
           if (last > gens / 2) { acc.b += tb / n; acc.w += tw / n; acc.d += effK; acc.n++; }
-          line.push('g' + String(last).padEnd(4) + ' TRUE beauty ' + (tb / n * 10).toFixed(1) + ' (best ' + (bb * 10).toFixed(1) + ') whole ' + (tw / n * 10).toFixed(1) + ' | believed ' + (bel / n * 10).toFixed(1) + '/' + (belw / n * 10).toFixed(1) + ' | eyes ' + (es / n).toFixed(2) + ' size ' + (sz / n).toFixed(1) + ' DIVERSITY ' + effK.toFixed(1) + ' looks, ' + hues + ' colours; kinds ' + G.W.species.filter((q) => !q.extinct).length + ' pop ' + cre.length);
+          line.push('g' + String(last).padEnd(4) + ' TRUE beauty ' + (tb / n * 10).toFixed(1) + ' (best ' + (bb * 10).toFixed(1) + ') whole ' + (tw / n * 10).toFixed(1) + ' | believed ' + (bel / n * 10).toFixed(1) + '/' + (belw / n * 10).toFixed(1) + ' | eyes ' + (es / n).toFixed(2) + ' size ' + (sz / n).toFixed(1) + ' (grow ' + (G.W.grow || 0).toFixed(1) + ')' + ' DIVERSITY ' + effK.toFixed(1) + ' looks, ' + hues + ' colours; kinds ' + G.W.species.filter((q) => !q.extinct).length + ' pop ' + cre.length);
         }
       }
     }
