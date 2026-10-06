@@ -226,3 +226,10 @@ Costs measured (one real call each unless said): a figure about $0.04–0.06 (So
 Scripts: `wish.js`, `figures.js`, `addflow.js`, `disaster.js`, `weather.js`, `keep.js`, `marvel-live.js` (each drives the real game and saves screenshots).
 
 Not verified: the spoken lines were generated and returned as audio but nobody has listened to them; whether the game's sound player honours the playback speed that gives each creature its own pitch is untested.
+
+## Added 2026-10-07: deeds, and nothing from stock lists
+
+- `game/src/54_deeds.js`, `lib/deed.js`, `POST /api/deed`: now and then one kind of creature **decides to do something together**. The AI makes up the plan from who they are and what is going on (a march on what hunts them, a fort, a council, a feast table, a peace offering), as 2–5 plain steps the game acts out (gather, circle, line, carry, build, charge, guard, scatter). What they build stays in the pond as a field that spares its builders, with an AI drawing. At most 28 take part; if members die, others of the kind take their places. About $0.01 a plan, plus about $0.06 for the drawing of what is built; one plan every 200 seconds at most.
+- The pond's own events (`G.natureTick`) are invented by the AI from the state of the pond (`POST /api/ai/event` with `auto`), about $0.017 each, one every two minutes at most.
+- While an AI can be asked, parts, shapes, organs and marvels are never taken from the built-in lists; those lists remain only for when no server answers.
+- `scripts/deeds.js` and `scripts/nature.js` drive these live.

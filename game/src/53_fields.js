@@ -110,9 +110,9 @@
       let atk = 0, wear = dt;
       for (let i = 0; i < W.cre.length; i++) {
         const c = W.cre[i]; if (c.dead) continue;
-        const rr = c.ph.r * 0.6, at = locate(f, W, c.x, c.y, f.solid ? rr : 0);
+        const own = f.spare && c.sp === f.spare, rr = c.ph.r * 0.6, at = locate(f, W, c.x, c.y, f.solid && !own ? rr : 0);
         if (!at) continue;
-        if (f.solid) {
+        if (f.solid && !own) {
           // nothing passes through it: it goes back out on the side it came from
           let nx = at.nx, ny = at.ny;
           if (at.off !== undefined) { const p0 = locate(f, W, c.px === undefined ? c.x : c.px, c.py === undefined ? c.y : c.py, 9999); if (p0 && p0.off !== undefined && (p0.off >= 0) !== (at.off >= 0)) { nx = -nx; ny = -ny; at.d = 2 * (f.shape === 'ring' ? Math.max(14, f.width * m * 0.25) : at.g ? at.g.half : 14) + 2 * rr - at.d; } }
@@ -122,6 +122,7 @@
           if (pw > 0.5) { wear += dt * pw * 0.5; atk++; }
         }
         if (!aimed(f, c, W)) continue;
+        if (own) continue;                                                     // its makers are at home in it (food that grows there is theirs to eat)
         const sh = shrug(f, c);
         if (f.hurt) { c.E -= f.hurt * 0.22 * c.ph.Emax * (1 - sh) * dt; if (f.stuff === 'fire') c.hot = Math.max(c.hot || 0, 0.6); else if (f.stuff === 'ice') c.chill = Math.max(c.chill || 0, 0.6); else if (f.stuff === 'toxic') c.pois = Math.max(c.pois || 0, 0.6); }
         if (f.kill && G.rand() < f.kill * 0.5 * (1 - sh) * dt && G.kill) { G.kill(c, 'event'); continue; }

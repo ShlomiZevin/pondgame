@@ -917,6 +917,7 @@ G.addSystem({
     drawFood();
     drawAddedThings();
     if (G.drawFields) G.drawFields(G.ctx);
+    if (G.drawDeeds) G.drawDeeds(G.ctx);
     drawCreatures();
     drawThingCaptions();
     drawEffects();

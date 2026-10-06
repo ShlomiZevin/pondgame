@@ -4,6 +4,7 @@
 //   POST /api/ai/ideas   { gen, species }    → { ideas }       mutation ideas for the living species
 //   POST /api/ai/organ   { the pond now }    → { organ }       a new body part invented for this pond
 //   POST /api/ai/marvel  { pond, creature }  → { marvel }      a super-rare gift for one lucky creature (name, wonder, a special, effects)
+//   POST /api/deed       { pond } → { deed }               a plan a kind of creature takes into its head (build, march, council...), acted out by the game
 //   POST /api/wish       { op: 'get' | 'check' | 'done', ... } → the pond's wish (kept per player), marks for a sheet of creatures, the next wish
 //   POST /api/ai/figure  { word, note, hue } → { figure: { svg, pivots, floats } }   a typed being, DRAWN by the model as a puppet of parts (kept per word)
 //   POST /api/ai/plan    { the pond, have } → { plan }         a new SHAPE OF BODY (a few masses and how they join), answering what is happening in the pond
@@ -31,6 +32,7 @@ const path = require('path');
 const { createStore } = require('./lib/store');
 const { createAi, modelsFromEnv, getUsage, attachBooks } = require('./lib/ai');
 const { createWish } = require('./lib/wish');
+const { createDeeds } = require('./lib/deed');
 const { createPonds } = require('./lib/pond');
 const { createOffline } = require('./lib/offline');
 const { createSounds } = require('./lib/sound');
@@ -76,6 +78,7 @@ function createApp(opts = {}) {
   attachBooks(store);
   const ai = createAi({ store, models, defaultModel: opts.defaultModel || process.env.PRIMORDIA_MODEL, offline, rand: opts.rand });
   const logErr = (err) => console.error('model failed:', err.message);
+  const deeds = createDeeds({ models, defaultModel: opts.defaultModel || process.env.PRIMORDIA_MODEL, getUsage });
   const wish = createWish({ store, models, defaultModel: opts.defaultModel || process.env.PRIMORDIA_MODEL, getUsage });
   const sounds = opts.sounds || createSounds({ store, apiKey: opts.leonardoKey });
   const painter = opts.painter || createPainter({ store, apiKey: opts.leonardoKey });
@@ -197,6 +200,10 @@ function createApp(opts = {}) {
     if (route === 'POST /api/ai/design') {
       const body = await readJson(req, 12000);
       return send(res, 200, await ai.design(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr }));
+    }
+    if (route === 'POST /api/deed') {      // what one kind of creature decides to do, together: made up for this pond now
+      const body = await readJson(req, 14000);
+      return send(res, 200, await deeds.decide(body, () => limiter.take(who)));
     }
     if (route === 'POST /api/wish') {      // the goal of the game: the pond's wish, how close the living creatures are to it, and its coming true
       const body = await readJson(req, 1000000);
