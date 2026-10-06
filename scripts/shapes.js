@@ -17,6 +17,7 @@ const path = require('path');
     add({ name: 'Kelp Grove', stuff: 'plant', shape: 'circle', x: 0.55, y: 0.42, r: 0.14, feed: 0.6, life: 300 });
     add({ name: 'Stone Ring', stuff: 'rock', shape: 'ring', x: 0.82, y: 0.4, r: 0.12, width: 0.1, solid: true, life: 300 });
     add({ name: 'Murk', stuff: 'toxic', shape: 'half', side: 'left', at: 0.16, slow: 0.4, life: 300 }); });
+  await fr.evaluate(() => { G.banner('Evolution invented something', 'First legs! Something can crawl and grab.'); G.banner('A body nobody has seen', 'A tall one with a sail.'); G.banner('★ A MARVEL', 'Creature #12 was born with Sail of Sweet Air. Its fuzzy sail breathes out tiny bubbles that help friends.', 12000); G.banner('The story so far', 'Long text of the story.'); });
   await page.waitForTimeout(4000);
   await page.screenshot({ path: path.join(__dirname, 'shapes.png') });
   console.log(errs.slice(0, 5).join('\n') || 'no errors');

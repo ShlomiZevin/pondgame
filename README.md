@@ -243,3 +243,7 @@ A box on the left of the pond (`src/56_rarebox.js`) lists what is special right 
 Marvels and plans keep the player's clock, not the pond's (`G.rt`): a first plan after about two minutes of play and one every two or three after it; a first marvel after about three minutes and one every three or four. The bearer of a marvel is chosen when the AI has answered. A plan says WHAT and WHY in plain words (`what`, `why` from `lib/deed.js`), and the rare box sets each kind's name apart in a coloured chip; the box folds away with a click on its heading. Builders stand back round what they build and take turns fetching.
 
 The pond grows when bodies cover more than about a twelfth of the water (`src/57_grow.js`, up to 2.6 times across); everything moves apart with it and the food stays what it was. Tests: `node scripts/pace.js`, `node scripts/grow.js`.
+
+## Order at the top
+
+`src/61_notes.js`: the banner is only for big moments (a marvel, a plan and how it ended, a wish come true, a new age, a world event), one at a time, at most two waiting, at most 8 seconds and 190 characters. Everything smaller is a note: one quiet line at a time in the bottom right corner (`G.note`). The strip of what is in force shows two; more than two fold into one pill that opens with a click.

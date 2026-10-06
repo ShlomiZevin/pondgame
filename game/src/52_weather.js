@@ -16,7 +16,7 @@
     if (cv) return;
     const st = document.createElement('style');
     st.textContent = '#wxfx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}' +
-      '#wxnow{position:fixed;left:50%;transform:translateX(-50%);top:14px;z-index:2;display:flex;flex-wrap:wrap;justify-content:center;gap:6px;width:min(560px,calc(100vw - 28px));pointer-events:none}' +
+      '#wxnow{position:fixed;left:50%;transform:translateX(-50%);top:14px;z-index:2;display:flex;flex-wrap:wrap;justify-content:center;gap:6px;width:min(560px,calc(100vw - 28px));pointer-events:none}#wxnow .wx.more{pointer-events:auto;cursor:pointer;border-color:rgba(246,211,101,.8)}#wxnow .wx.more em{font-style:normal;color:#fff;opacity:.8}' +
       '#wxnow .wx{display:flex;align-items:center;gap:8px;padding:5px 12px 6px;border-radius:14px;background:rgba(9,28,40,.86);border:1px solid rgba(246,211,101,.45);font:600 11.5px system-ui,sans-serif;color:#cfe8ff;box-shadow:0 4px 18px rgba(0,0,0,.35)}' +
       '#wxnow .wx b{color:#fff;font-weight:700}#wxnow .wx i{font-style:normal;color:#f6d365}#wxnow .wx .bar{width:46px;height:5px;border-radius:3px;background:rgba(207,232,255,.18);overflow:hidden}#wxnow .wx .bar u{display:block;height:100%;background:#f6d365}' +
       '@keyframes wishp{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1.15)}}' +
@@ -28,6 +28,7 @@
     if (pond && pond.parentNode) pond.parentNode.insertBefore(cv, pond.nextSibling); else document.body.appendChild(cv);
     ctx = cv.getContext('2d');
     strip = document.createElement('div'); strip.id = 'wxnow';
+    strip.addEventListener('click', function (e) { let n = e.target; while (n && n !== strip && !(n.classList && n.classList.contains('more'))) n = n.parentNode; if (n && n !== strip) { stripOpen = !stripOpen; stripSig = ''; drawStrip(); } });
     (document.getElementById('ui') || document.body).appendChild(strip);
     size(); window.addEventListener('resize', size);
   }
@@ -170,7 +171,7 @@
   }
 
   // the strip: what is in force, what it does, how long is left
-  let stripSig = '';
+  let stripSig = '', stripOpen = false;
   function drawStrip() {
     if (!strip) return;
     const on = G.mode === 'play' && G.W && !G.W.title, L = on ? now().list : [];
@@ -178,9 +179,11 @@
     document.body.classList.toggle('wxon', L.length > 0);
     const wish = document.getElementById('wish'), below = wish && !wish.classList.contains('hide') && window.innerWidth > 720 ? Math.round(wish.getBoundingClientRect().bottom) + 6 : 14;
     if (window.innerWidth > 720) strip.style.top = below + 'px'; else strip.style.top = '';
-    const sig = L.map(function (q) { return q.name + Math.ceil(q.left / 2); }).join('|');
+    const sig = L.map(function (q) { return q.name + Math.ceil(q.left / 2); }).join('|') + stripOpen;
     if (sig === stripSig) return; stripSig = sig;
-    strip.innerHTML = L.map(function (q) { return '<span class="wx"><b>' + String(q.name).replace(/[&<>]/g, '') + '</b>' + (q.does ? '<i>' + q.does + '</i>' : '') + '<span class="bar"><u style="width:' + Math.round(100 * Math.max(0, Math.min(1, q.left / q.of))) + '%"></u></span><span>' + Math.ceil(q.left) + 's</span></span>'; }).join('');
+    if (L.length <= 2) stripOpen = false;
+    if (L.length > 2 && !stripOpen) { strip.innerHTML = '<span class="wx more"><b>' + L.length + ' things in the water</b><i>' + L.slice(0, 3).map(function (q) { return String(q.name).replace(/[&<>]/g, ''); }).join(', ') + (L.length > 3 ? ' +' + (L.length - 3) : '') + '</i><em>▾</em></span>'; return; }
+    strip.innerHTML = (L.length > 2 ? '<span class="wx more"><b>Fold</b><em>▴</em></span>' : '') + L.map(function (q) { return '<span class="wx"><b>' + String(q.name).replace(/[&<>]/g, '') + '</b>' + (q.does ? '<i>' + q.does + '</i>' : '') + '<span class="bar"><u style="width:' + Math.round(100 * Math.max(0, Math.min(1, q.left / q.of))) + '%"></u></span><span>' + Math.ceil(q.left) + 's</span></span>'; }).join('');
   }
 
   G.on('event', function (ev) {

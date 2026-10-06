@@ -402,7 +402,7 @@
 
   let bannerTimer = 0, bannerQ = [];
   G.banner = function (kicker, text, ms) {
-    if (bannerQ.length > 4) bannerQ.shift();
+    if (bannerQ.length > 1) bannerQ.shift();
     bannerQ.push([kicker, text, ms]);
     if (!bannerTimer) nextBanner();
   };

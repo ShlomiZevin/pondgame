@@ -692,7 +692,7 @@
   G.killCreature = function (c, cause, by) { kill(c, cause, by); };
   function kill(c, cause, by) {
     if (c.dead) return;
-    if (c.g.mv && G.marvelBlessed && G.marvelBlessed(c) && !c.graceUsed && cause !== 'starved') { c.graceUsed = true; c.E = Math.max(c.E, c.ph.Emax * 0.5); c.doomed = false; c.flash = 1; return; }      /* the one who was born with a marvel is spared once, so it can be a parent */
+    if (c.g.mv && G.marvelBlessed && G.marvelBlessed(c) && (c.graceLeft === undefined ? (c.graceLeft = 6) : c.graceLeft) > 0) { c.graceLeft--; c.graceUsed = true; c.E = Math.max(c.E, c.ph.Emax * 0.5); c.doomed = false; c.flash = 1; return; }      /* the one who was born with a marvel is spared once, so it can be a parent */
     if (c.ph && c.ph.mvsp === 'luck' && G.marvelSave && G.marvelSave(c, cause)) return;      // the Lucky Star: it was missed
     c.dead = true; c.cause = cause;
     const W = G.W;
