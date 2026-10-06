@@ -96,8 +96,9 @@
     W.season = Math.floor(num(d.season, 0, 3, 0));
     W.st = num(d.st, 0, G.PH[W.season] - 0.01, 0);
     W.t = num(d.t, 0, 1e7, 0);
-    if (d.ww) W.ww = num(d.ww, 600, 3360, W.ww);
-    W.wh = num(d.wh, 600, 2000, 1000);            // a pond saved before the pond grew was 1000 tall
+    if (d.ww) W.ww = num(d.ww, 600, 9000, W.ww);
+    W.wh = num(d.wh, 600, 3700, 1000);
+    if (W.wh > 1400.5) { G.view.grow = G.clamp(W.wh / 1400, 1, 2.6); if (G.canvas) { G.resize(); W.ww = G.view.ww; W.wh = G.view.wh; } }      // a pond that had grown comes back grown            // a pond saved before the pond grew was 1000 tall
     if (d.set && typeof d.set === 'object') {
       W.set.temp = num(d.set.temp, -1, 1, 0); W.set.light = num(d.set.light, 0.2, 2, 1);
       W.set.bloom = num(d.set.bloom, 0.2, 3, 1); W.set.mut = num(d.set.mut, 0.25, 4, 1);

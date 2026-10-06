@@ -301,8 +301,8 @@
     }
     // an idea from the mutation pool (offline or from the server)
     if (idea && r() < 0.18 * wild) applyIdea(g, idea, note);
-    // a marvel can fade; the commoner it is, the likelier (one that has taken over the pond thins out, so it stays rare)
-    if (g.mv) { const sh = G.W && G.W.mvShare ? G.W.mvShare[g.mv] || 0 : 0; if (r() < (0.012 + 0.7 * Math.max(0, sh - 0.15)) * wild) { g.mv = 0; note('f', 0, 'lost its marvel', true); } }
+    // a marvel is rare, and so is passing it on: most children of a carrier are born without it (see G.marvelInherits)
+    if (g.mv && G.marvelInherits && !G.marvelInherits(g.mv)) g.mv = 0;
     G.validateGenome(g);
     return { g: g, muts: muts };
   };

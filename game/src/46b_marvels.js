@@ -79,9 +79,10 @@
     const M = W.mv = W.mv || { gen0: 0, rt0: G.rt || 0, n: 0 };
     const dtMin = M.rtLast === undefined ? 0 : Math.max(0, Math.min(2, ((G.rt || 0) - M.rtLast) / 60)); M.rtLast = G.rt || 0;      // minutes of play since the last check (a pause or a closed tab does not count)
     // how common each marvel is now: a marvel that has taken over the pond fades (see mutation), so it stays something special
-    { const sh = W.mvShare = {}, n = Math.max(1, W.cre.length); for (let i = 0; i < W.cre.length; i++) { const k = W.cre[i].g.mv; if (k) sh[k] = (sh[k] || 0) + 1 / n; } }
-    if (gen < 20 || W.cre.length < 16 || busy || gen - M.gen0 < 40) return;
-    const p = G.marvelChance(gen - M.gen0, ((G.rt || 0) - M.rt0) / 60, dtMin);
+    { const sh = W.mvShare = {}, cn = W.mvCount = {}, n = Math.max(1, W.cre.length); W.mvPend = {}; for (let i = 0; i < W.cre.length; i++) { const k = W.cre[i].g.mv; if (k) { sh[k] = (sh[k] || 0) + 1 / n; cn[k] = (cn[k] || 0) + 1; } } }
+    const mins = ((G.rt || 0) - M.rt0) / 60;
+    if (gen < 6 || W.cre.length < 16 || busy || mins < (M.n ? 3 : 2.2)) return;
+    const p = 1 - Math.exp(-(0.15 + dtMin * 1.4));
     if (G.rand() >= p && !(G.marvelForce)) return;
     G.grantMarvel();
   };
@@ -95,12 +96,12 @@
     return pool[pool.length - 1];
   }
   G.grantMarvel = function (forceId) {
-    const W = G.W, c = chooseCreature(); if (!c) return;
+    const W = G.W; let c = chooseCreature(); if (!c) return;
     const M = W.mv = W.mv || { gen0: 0, rt0: G.rt || 0, n: 0 };
     M.gen0 = W.gen; M.rt0 = G.rt || 0;           // the clock starts again whatever comes of the asking
     const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
     // with an AI to ask, a marvel is always invented: if it cannot be just now, none comes yet (it is tried again soon), never a stock one
-    const give = function (def) { if (c.dead) return; if (!def) { if (live) { M.gen0 = W.gen - 34; return; } def = BUILT[Math.floor(G.rand() * BUILT.length)]; } finish(c, def); };
+    const give = function (def) { if (c.dead || c.g.mv) c = chooseCreature(); if (!c) return; if (!def) { if (live) { M.rt0 = (G.rt || 0) - 150; return; } def = BUILT[Math.floor(G.rand() * BUILT.length)]; } finish(c, def); };
     if (forceId) { give(G.marvelOf(forceId)); return; }
     // about half the time, when there is an AI, it invents this pond's marvel; otherwise one of the built-in ones, not one seen lately
     if (live && G.ai.allow('marvel')) {
@@ -112,7 +113,7 @@
       }, function () { busy = false; if (G.W === W) give(null); });
       return;
     }
-    if (live) { M.gen0 = W.gen - 34; return; }
+    if (live) { M.rt0 = (G.rt || 0) - 150; return; }
     const recent = W.marvelRecent = W.marvelRecent || []; let def = null;
     for (let t = 0; t < 8 && !def; t++) { const d = BUILT[Math.floor(G.rand() * BUILT.length)]; if (recent.indexOf(d.id) < 0) def = d; }
     give(def || BUILT[0]);
@@ -157,8 +158,9 @@
     }
     if (ph.mv.words && ph.mv.words.length) {
       c.sayCool = (c.sayCool || 2 + G.rand() * 4) - dt;
+      if (c.sayCool <= 0 && W.lastSay !== undefined && W.t - W.lastSay < 1.6) c.sayCool = 0.6 + G.rand();      // one voice at a time: the others wait a moment
       if (c.sayCool <= 0) {
-        c.sayCool = 7 + G.rand() * 10;
+        c.sayCool = 9 + G.rand() * 12; W.lastSay = W.t;
         const w = ph.mv.words, inp = c.inp;
         let word = w[(G.rand() * w.length) | 0];
         if (inp && Math.max(inp[5], inp[6]) > 0.45 && G.rand() < 0.5) word = 'Run!'; else if (inp && Math.max(inp[1], inp[2]) > 0.5 && G.rand() < 0.25) word = 'Food!';
@@ -195,8 +197,15 @@
     if (c.zap) { c.zap.t -= dt; if (c.zap.t <= 0) c.zap = null; }
   };
   /** luck: danger sometimes misses (called as a creature is about to die) */
-  /** is this creature one of the line of the marvel that was just given (looked after for a few generations)? */
-  G.marvelBlessed = function (c) { const W = G.W, M = W && W.mv; return !!(c.g.mv && M && c.g.mv === M.blessId && W.gen <= M.bless && ((W.mvShare && W.mvShare[c.g.mv]) || 0) < 0.14); };      // only while it is still rare: past a seventh of the pond it is on its own
+  /** is this the creature that was born with the marvel, in the first generations of its life (looked after so that it can be a parent)? Its children are not looked after: a marvel is rare, and stays rare. */
+  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && c.marvelBorn !== undefined && W && W.gen <= c.marvelBorn + 20); };
+  /** does a child of a carrier get the marvel? Seldom: it comes with the creature that was given it, not with its line. About one child in eight, and never past a few carriers in a pond. */
+  G.marvelInherits = function (id) {
+    const W = G.W; if (!W) return false;
+    const cnt = (W.mvCount && W.mvCount[id]) || 0, pend = W.mvPend = W.mvPend || {}, cap = Math.max(2, Math.ceil(0.035 * Math.max(1, W.cre.length)));
+    if (cnt + (pend[id] || 0) >= cap || G.rand() >= 0.125) return false;
+    pend[id] = (pend[id] || 0) + 1; return true;
+  };
   G.marvelSave = function (c, cause) {
     if (!c.ph || c.ph.mvsp !== 'luck' || c.luckUsed || cause === 'starved' || G.rand() > 0.6) return false;
     c.luckUsed = true; c.E = Math.max(c.E, c.ph.Emax * 0.45); c.doomed = false; c.flash = 1; c.luckT = 1.4;

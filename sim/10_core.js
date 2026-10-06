@@ -102,9 +102,10 @@
     cv.width = Math.floor(W * dpr); cv.height = Math.floor(H * dpr);
     cv.style.width = W + 'px'; cv.style.height = H + 'px';
     // the pond is 1400 units tall and as wide as the window makes it at full zoom-out
-    v.base = H / 1400;
-    v.wh = 1400;
-    v.ww = G.clamp(W / v.base, 840, 3360);
+    const gr = v.grow || 1;                  // the pond grows when it is crowded (57_grow): it is then taller than 1400, and still all of it fits the window
+    v.base = H / (1400 * gr);
+    v.wh = 1400 * gr;
+    v.ww = G.clamp(W / v.base, 840 * gr, 3360 * gr);
     if (!G.cam.set) { G.cam.x = v.ww / 2; G.cam.y = v.wh / 2; G.cam.set = true; }
     G.applyCam();
     G.emit('resize');

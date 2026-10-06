@@ -29,7 +29,7 @@
   let creIdx = new Map();
 
   /** a bigger pond holds more food */
-  function foodCap(W) { return Math.round(K.foodMax * Math.max(1, W.ww * W.wh / 1.6e6)); }
+  function foodCap(W) { return Math.round(K.foodMax * Math.max(1, W.ww * W.wh / 1.6e6 / Math.pow(G.view.grow || 1, 2))); }      // (a pond that GREW for room has the food it had: more water, not more mouths)
   /** the shore is the top strip of the pond: land. Only what can breathe air may go there. */
   G.shoreY = function (W) { return W.wh * 0.16; };
   G.newWorld = function (opts) {
@@ -897,7 +897,7 @@
         if (!p.fv) p.fv = G.features(p.g);
         if (!o.fv) o.fv = G.features(o.g);
         // of the compatible ones nearby, the most charming and healthy is chosen
-        if (G.fdist(p.fv, o.fv) < 1.7) { const b = 2.2 * G.charmOf(o) + 0.3 * clamp(o.E / o.ph.Emax, 0, 1) + (o.g.mv ? 0.8 : 0) + (G.kindOf(o.g).kind === G.kindOf(p.g).kind ? 1 : 0) + (Math.abs(((o.g.f.hue - p.g.f.hue + 540) % 360) - 180) < 35 ? 0.6 : 0); if (!best || b > bd2) { best = o; bd2 = b; } }
+        if (G.fdist(p.fv, o.fv) < 1.7) { const b = 2.2 * G.charmOf(o) + 0.3 * clamp(o.E / o.ph.Emax, 0, 1) + (G.kindOf(o.g).kind === G.kindOf(p.g).kind ? 1 : 0) + (Math.abs(((o.g.f.hue - p.g.f.hue + 540) % 360) - 180) < 35 ? 0.6 : 0); if (!best || b > bd2) { best = o; bd2 = b; } }
       }
     }
     return best;

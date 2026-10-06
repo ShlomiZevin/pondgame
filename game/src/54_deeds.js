@@ -8,7 +8,7 @@
 (function () {
   'use strict';
   const clamp = G.clamp, TAU = 6.2832;
-  if (G.ai) { G.ai.gaps.deed = 200000; G.ai.caps.deed = 24; G.ai.LABEL.deed = 'What the creatures decide to do together'; }
+  if (G.ai) { G.ai.gaps.deed = 60000; G.ai.caps.deed = 40; G.ai.LABEL.deed = 'What the creatures decide to do together'; }
   const WORDS = { gather: 'gathering', circle: 'in council', line: 'forming up', carry: 'fetching and carrying', build: 'building', charge: 'charging', guard: 'standing guard', scatter: 'setting off' };
   const live = function () { return G.mode === 'play' && !G.catching && G.W && !G.W.title && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.provider === 'server' && G.ai.hasFuel(); };
   const spByName = function (name) { const W = G.W, low = String(name || '').toLowerCase(); let best = null; for (let i = 0; i < W.species.length; i++) { const s = W.species[i]; if (s.extinct || !s.n) continue; if (s.name.toLowerCase() === low) return s; if (low && (s.name.toLowerCase().indexOf(low) >= 0 || low.indexOf(s.name.toLowerCase()) >= 0)) best = s; } return best; };
@@ -46,15 +46,18 @@
     return true;
   };
   // once a generation: perhaps somebody takes something into their head
-  G.on('scored', function (h) { const W = G.W; if (!W || W.deed || h.gen < 12 || W.cre.length < 14) return; if (G.rand() < 0.3) G.deedAsk(); });
+  { let rt0 = -1, idle = 0; setInterval(function () { const W = G.W, rt = G.rt || 0; if (!W || W.title || G.mode !== 'play' || rt === rt0) { rt0 = rt; return; } const d = Math.min(20, Math.max(0, rt - rt0)); rt0 = rt;      // only time really played counts
+    if (W.deed || asking) { idle = 0; return; } idle += d;
+    if (idle < 100 || W.gen < 5 || W.cre.length < 14) return;
+    if (G.rand() < 0.5 && G.deedAsk()) idle = 0; }, 10000); }
 
   function begin(raw) {
     const W = G.W, sp = spByName(raw.kind) || W.species.filter(function (s) { return !s.extinct && s.n > 0; }).sort(function (a, b) { return b.n - a.n; })[0];
     if (!sp) return;
     const pool = W.cre.filter(function (c) { return c.sp === sp.id && !c.dead && !c.deedId; });
     if (pool.length < 4) return;
-    const d = { id: (W.nextDeed = (W.nextDeed || 0) + 1), title: raw.title, say: raw.say, sp: sp.id, kind: sp.name, hue: sp.hue || 50, steps: raw.steps, i: 0, t: 0, cryT: 0, target: raw.target, win: raw.win, result: raw.result, progress: 0, gen: W.gen };
-    const n = Math.min(28, Math.max(4, Math.round(pool.length * clamp(raw.share, 0.3, 1))));          // a band, not the whole kind: the rest go on living
+    const d = { id: (W.nextDeed = (W.nextDeed || 0) + 1), title: raw.title, say: raw.say, what: raw.what || '', why: raw.why || '', sp: sp.id, kind: sp.name, hue: sp.hue || 50, steps: raw.steps, i: 0, t: 0, cryT: 0, target: raw.target, win: raw.win, result: raw.result, progress: 0, gen: W.gen };
+    const n = Math.min(raw.steps.some(function (q) { return q.do === 'build'; }) ? 14 : 22, Math.max(4, Math.round(pool.length * clamp(raw.share, 0.3, 1))));          // a band, not the whole kind: the rest go on living
     pool.sort(function () { return G.rand() - 0.5; }).slice(0, n).forEach(function (c, j) { c.deedId = d.id; c.deedJ = j; });
     d.n0 = Math.min(n, pool.length);
     // where
@@ -71,7 +74,7 @@
     const W = G.W; if (W.deed !== d) return;
     W.deed = null;
     for (let i = 0; i < W.cre.length; i++) if (W.cre[i].deedId === d.id) { W.cre[i].deedId = 0; W.cre[i].cryT = 0; }
-    (W.deedLog = W.deedLog || []).push(d.title); (W.deedPast = W.deedPast || []).push({ title: d.title, kind: d.kind, say: d.say, how: how, gen: W.gen, x: d.x, y: d.y }); if (W.deedPast.length > 5) W.deedPast.shift(); if (W.deedLog.length > 12) W.deedLog.shift();
+    (W.deedLog = W.deedLog || []).push(d.title); (W.deedPast = W.deedPast || []).push({ title: d.title, kind: d.kind, hue: d.hue, say: d.say, what: d.what, why: d.why, how: how, gen: W.gen, x: d.x, y: d.y }); if (W.deedPast.length > 5) W.deedPast.shift(); if (W.deedLog.length > 12) W.deedLog.shift();
     let made = null;
     if (how === 'done' && d.result && G.addField && G.cleanFields) {
       const r = d.result, m = Math.min(W.ww, W.wh);
@@ -99,18 +102,19 @@
     for (let k = 0; k < n; k++) {
       const c = M[k], j = c.deedJ || k, a = j / Math.max(1, d.n0) * TAU;
       let gx = d.x, gy = d.y; c.carry = false;
-      if (st.do === 'gather') { gx += Math.cos(a) * (24 + (j % 5) * 9); gy += Math.sin(a) * (20 + (j % 5) * 7); }
+      if (st.do === 'gather') { const R = 40 + d.n0 * 3 + (j % 3) * 26; gx += Math.cos(a) * R; gy += Math.sin(a) * R * 0.8; }
       else if (st.do === 'circle') { const R = clamp(46 + d.n0 * 3.2, 60, 170), aa = a + d.t * 0.45; gx += Math.cos(aa) * R; gy += Math.sin(aa) * R * 0.8; }
       else if (st.do === 'line') { gx += (j - d.n0 / 2) * 24 + Math.sin(d.t * 0.5) * 60; gy += Math.sin(j * 0.9 + d.t * 1.2) * 8; }
       else if (st.do === 'carry') { const u = ((d.t + j * 1.7) % 9) / 9; if (u < 0.5) { gx += Math.cos(a) * 230; gy += Math.sin(a) * 190; } else c.carry = true; }
-      else if (st.do === 'build') { const R = (d.result ? d.result.size * m : 60) * 0.9 + 14; gx += Math.cos(a + Math.sin(d.t * 0.6 + j) * 0.5) * R; gy += Math.sin(a + Math.sin(d.t * 0.6 + j) * 0.5) * R * 0.8; }
+      else if (st.do === 'build') { const R = Math.min(150, (d.result ? d.result.size * m : 60)) + 46, u = ((d.t + j * 2.3) % 12) / 12;      // they stand well back round it and take turns: a third are away fetching, so what rises in the middle can be seen
+        if (u < 0.35) { gx += Math.cos(a) * (R + 170); gy += Math.sin(a) * (R + 140); } else { c.carry = u < 0.6; gx += Math.cos(a) * R; gy += Math.sin(a) * R * 0.8; } }
       else if (st.do === 'charge') { if (tg) { gx = tg.x + Math.cos(a) * 30; gy = tg.y + Math.sin(a) * 30; } }
       else if (st.do === 'guard') { gx += Math.cos(a) * 84; gy += Math.sin(a) * 70; }
       else if (st.do === 'scatter') { gx += Math.cos(a) * m * 0.44; gy += Math.sin(a) * m * 0.4; }
       gx = clamp(gx, 20, W.ww - 20); gy = clamp(gy, 30, W.wh - 20);
       const dx = gx - c.x, dy = gy - c.y, dist = Math.hypot(dx, dy) || 1, sp = Math.min(c.ph.speed * (st.do === 'charge' ? 1.5 : 1.2), dist * 2.2), k2 = Math.min(1, dt * 4);
       if (dist > 10) { c.vx += (dx / dist * sp - c.vx) * k2; c.vy += (dy / dist * sp - c.vy) * k2; c.ang = Math.atan2(dy, dx); } else { c.vx *= 0.8; c.vy *= 0.8; if (st.do === 'guard') c.ang = a; }
-      if (dist < 60) near++;
+      if (dist < 60 || (st.do === 'build' && Math.hypot(c.x - d.x, c.y - d.y) < 260)) near++;
       if (c.E < c.ph.Emax * 0.28) c.E = c.ph.Emax * 0.28;                    // a purpose keeps them going
       c.asleep = false; c.tired = Math.min(c.tired || 0, 0.5);
       if (c.cryT > 0) c.cryT -= rt;
@@ -154,7 +158,7 @@
     ctx.restore();
   };
 
-  G.on('deed', function (d) { if (G.mode !== 'play') return; if (G.sfx) G.sfx('discovery'); if (G.banner) G.banner('The ' + d.kind + ' have decided', d.title + '. ' + d.say, 10000); if (G.log) G.log('disc', 'They decided: ' + d.title, 'The ' + d.kind + '. ' + d.say); });
+  G.on('deed', function (d) { if (G.mode !== 'play') return; if (G.sfx) G.sfx('discovery'); if (G.banner) G.banner('The ' + d.kind + ' have decided', d.title + '. ' + (d.what ? 'They will ' + d.what + '. Why: ' + d.why + '.' : d.say), 12000); if (G.log) G.log('disc', 'They decided: ' + d.title, 'The ' + d.kind + '. ' + d.say); });
   G.on('deed-step', function (d) { if (G.mode !== 'play') return; const st = d.steps[d.i]; if (G.log) G.log('sel', d.title, 'Now they are ' + (WORDS[st.do] || st.do) + (st.cry ? ', crying "' + st.cry + '"' : '') + '.'); });
   G.on('deed-end', function (d, how, made) {
     const W = G.W; if (G.mode !== 'play' || !W) return;

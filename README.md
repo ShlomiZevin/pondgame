@@ -237,3 +237,9 @@ Not verified: the spoken lines were generated and returned as audio but nobody h
 ## The rare box
 
 A box on the left of the pond (`src/56_rarebox.js`) lists what is special right now: every marvel alive (its sign, how many carry it, what it does), the plan a kind is carrying out (step, how many take part), what they built, and the last plans with how they ended. A click moves the camera there. The creature card shows a marvel in its own gold panel, with each power read out in plain words (`G.marvelDoes`). A plan keeps the watcher's time: its steps last the seconds the AI gave them at any speed, and the young of those in it take it up. Test: `node scripts/rarebox.js`, `node scripts/rarecard.js`.
+
+## Pace, and a pond that grows
+
+Marvels and plans keep the player's clock, not the pond's (`G.rt`): a first plan after about two minutes of play and one every two or three after it; a first marvel after about three minutes and one every three or four. The bearer of a marvel is chosen when the AI has answered. A plan says WHAT and WHY in plain words (`what`, `why` from `lib/deed.js`), and the rare box sets each kind's name apart in a coloured chip; the box folds away with a click on its heading. Builders stand back round what they build and take turns fetching.
+
+The pond grows when bodies cover more than about a twelfth of the water (`src/57_grow.js`, up to 2.6 times across); everything moves apart with it and the food stays what it was. Tests: `node scripts/pace.js`, `node scripts/grow.js`.

@@ -310,9 +310,10 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     cv.width = Math.floor(W * dpr); cv.height = Math.floor(H * dpr);
     cv.style.width = W + 'px'; cv.style.height = H + 'px';
     // the pond is 1400 units tall and as wide as the window makes it at full zoom-out
-    v.base = H / 1400;
-    v.wh = 1400;
-    v.ww = G.clamp(W / v.base, 840, 3360);
+    const gr = v.grow || 1;                  // the pond grows when it is crowded (57_grow): it is then taller than 1400, and still all of it fits the window
+    v.base = H / (1400 * gr);
+    v.wh = 1400 * gr;
+    v.ww = G.clamp(W / v.base, 840 * gr, 3360 * gr);
     if (!G.cam.set) { G.cam.x = v.ww / 2; G.cam.y = v.wh / 2; G.cam.set = true; }
     G.applyCam();
     G.emit('resize');
@@ -739,8 +740,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     }
     // an idea from the mutation pool (offline or from the server)
     if (idea && r() < 0.18 * wild) applyIdea(g, idea, note);
-    // a marvel can fade; the commoner it is, the likelier (one that has taken over the pond thins out, so it stays rare)
-    if (g.mv) { const sh = G.W && G.W.mvShare ? G.W.mvShare[g.mv] || 0 : 0; if (r() < (0.012 + 0.7 * Math.max(0, sh - 0.15)) * wild) { g.mv = 0; note('f', 0, 'lost its marvel', true); } }
+    // a marvel is rare, and so is passing it on: most children of a carrier are born without it (see G.marvelInherits)
+    if (g.mv && G.marvelInherits && !G.marvelInherits(g.mv)) g.mv = 0;
     G.validateGenome(g);
     return { g: g, muts: muts };
   };
@@ -2642,7 +2643,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   let creIdx = new Map();
 
   /** a bigger pond holds more food */
-  function foodCap(W) { return Math.round(K.foodMax * Math.max(1, W.ww * W.wh / 1.6e6)); }
+  function foodCap(W) { return Math.round(K.foodMax * Math.max(1, W.ww * W.wh / 1.6e6 / Math.pow(G.view.grow || 1, 2))); }      // (a pond that GREW for room has the food it had: more water, not more mouths)
   /** the shore is the top strip of the pond: land. Only what can breathe air may go there. */
   G.shoreY = function (W) { return W.wh * 0.16; };
   G.newWorld = function (opts) {
@@ -3510,7 +3511,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         if (!p.fv) p.fv = G.features(p.g);
         if (!o.fv) o.fv = G.features(o.g);
         // of the compatible ones nearby, the most charming and healthy is chosen
-        if (G.fdist(p.fv, o.fv) < 1.7) { const b = 2.2 * G.charmOf(o) + 0.3 * clamp(o.E / o.ph.Emax, 0, 1) + (o.g.mv ? 0.8 : 0) + (G.kindOf(o.g).kind === G.kindOf(p.g).kind ? 1 : 0) + (Math.abs(((o.g.f.hue - p.g.f.hue + 540) % 360) - 180) < 35 ? 0.6 : 0); if (!best || b > bd2) { best = o; bd2 = b; } }
+        if (G.fdist(p.fv, o.fv) < 1.7) { const b = 2.2 * G.charmOf(o) + 0.3 * clamp(o.E / o.ph.Emax, 0, 1) + (G.kindOf(o.g).kind === G.kindOf(p.g).kind ? 1 : 0) + (Math.abs(((o.g.f.hue - p.g.f.hue + 540) % 360) - 180) < 35 ? 0.6 : 0); if (!best || b > bd2) { best = o; bd2 = b; } }
       }
     }
     return best;
@@ -5449,9 +5450,10 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const M = W.mv = W.mv || { gen0: 0, rt0: G.rt || 0, n: 0 };
     const dtMin = M.rtLast === undefined ? 0 : Math.max(0, Math.min(2, ((G.rt || 0) - M.rtLast) / 60)); M.rtLast = G.rt || 0;      // minutes of play since the last check (a pause or a closed tab does not count)
     // how common each marvel is now: a marvel that has taken over the pond fades (see mutation), so it stays something special
-    { const sh = W.mvShare = {}, n = Math.max(1, W.cre.length); for (let i = 0; i < W.cre.length; i++) { const k = W.cre[i].g.mv; if (k) sh[k] = (sh[k] || 0) + 1 / n; } }
-    if (gen < 20 || W.cre.length < 16 || busy || gen - M.gen0 < 40) return;
-    const p = G.marvelChance(gen - M.gen0, ((G.rt || 0) - M.rt0) / 60, dtMin);
+    { const sh = W.mvShare = {}, cn = W.mvCount = {}, n = Math.max(1, W.cre.length); W.mvPend = {}; for (let i = 0; i < W.cre.length; i++) { const k = W.cre[i].g.mv; if (k) { sh[k] = (sh[k] || 0) + 1 / n; cn[k] = (cn[k] || 0) + 1; } } }
+    const mins = ((G.rt || 0) - M.rt0) / 60;
+    if (gen < 6 || W.cre.length < 16 || busy || mins < (M.n ? 3 : 2.2)) return;
+    const p = 1 - Math.exp(-(0.15 + dtMin * 1.4));
     if (G.rand() >= p && !(G.marvelForce)) return;
     G.grantMarvel();
   };
@@ -5465,12 +5467,12 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     return pool[pool.length - 1];
   }
   G.grantMarvel = function (forceId) {
-    const W = G.W, c = chooseCreature(); if (!c) return;
+    const W = G.W; let c = chooseCreature(); if (!c) return;
     const M = W.mv = W.mv || { gen0: 0, rt0: G.rt || 0, n: 0 };
     M.gen0 = W.gen; M.rt0 = G.rt || 0;           // the clock starts again whatever comes of the asking
     const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
     // with an AI to ask, a marvel is always invented: if it cannot be just now, none comes yet (it is tried again soon), never a stock one
-    const give = function (def) { if (c.dead) return; if (!def) { if (live) { M.gen0 = W.gen - 34; return; } def = BUILT[Math.floor(G.rand() * BUILT.length)]; } finish(c, def); };
+    const give = function (def) { if (c.dead || c.g.mv) c = chooseCreature(); if (!c) return; if (!def) { if (live) { M.rt0 = (G.rt || 0) - 150; return; } def = BUILT[Math.floor(G.rand() * BUILT.length)]; } finish(c, def); };
     if (forceId) { give(G.marvelOf(forceId)); return; }
     // about half the time, when there is an AI, it invents this pond's marvel; otherwise one of the built-in ones, not one seen lately
     if (live && G.ai.allow('marvel')) {
@@ -5482,7 +5484,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       }, function () { busy = false; if (G.W === W) give(null); });
       return;
     }
-    if (live) { M.gen0 = W.gen - 34; return; }
+    if (live) { M.rt0 = (G.rt || 0) - 150; return; }
     const recent = W.marvelRecent = W.marvelRecent || []; let def = null;
     for (let t = 0; t < 8 && !def; t++) { const d = BUILT[Math.floor(G.rand() * BUILT.length)]; if (recent.indexOf(d.id) < 0) def = d; }
     give(def || BUILT[0]);
@@ -5527,8 +5529,9 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     }
     if (ph.mv.words && ph.mv.words.length) {
       c.sayCool = (c.sayCool || 2 + G.rand() * 4) - dt;
+      if (c.sayCool <= 0 && W.lastSay !== undefined && W.t - W.lastSay < 1.6) c.sayCool = 0.6 + G.rand();      // one voice at a time: the others wait a moment
       if (c.sayCool <= 0) {
-        c.sayCool = 7 + G.rand() * 10;
+        c.sayCool = 9 + G.rand() * 12; W.lastSay = W.t;
         const w = ph.mv.words, inp = c.inp;
         let word = w[(G.rand() * w.length) | 0];
         if (inp && Math.max(inp[5], inp[6]) > 0.45 && G.rand() < 0.5) word = 'Run!'; else if (inp && Math.max(inp[1], inp[2]) > 0.5 && G.rand() < 0.25) word = 'Food!';
@@ -5565,8 +5568,15 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (c.zap) { c.zap.t -= dt; if (c.zap.t <= 0) c.zap = null; }
   };
   /** luck: danger sometimes misses (called as a creature is about to die) */
-  /** is this creature one of the line of the marvel that was just given (looked after for a few generations)? */
-  G.marvelBlessed = function (c) { const W = G.W, M = W && W.mv; return !!(c.g.mv && M && c.g.mv === M.blessId && W.gen <= M.bless && ((W.mvShare && W.mvShare[c.g.mv]) || 0) < 0.14); };      // only while it is still rare: past a seventh of the pond it is on its own
+  /** is this the creature that was born with the marvel, in the first generations of its life (looked after so that it can be a parent)? Its children are not looked after: a marvel is rare, and stays rare. */
+  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && c.marvelBorn !== undefined && W && W.gen <= c.marvelBorn + 20); };
+  /** does a child of a carrier get the marvel? Seldom: it comes with the creature that was given it, not with its line. About one child in eight, and never past a few carriers in a pond. */
+  G.marvelInherits = function (id) {
+    const W = G.W; if (!W) return false;
+    const cnt = (W.mvCount && W.mvCount[id]) || 0, pend = W.mvPend = W.mvPend || {}, cap = Math.max(2, Math.ceil(0.035 * Math.max(1, W.cre.length)));
+    if (cnt + (pend[id] || 0) >= cap || G.rand() >= 0.125) return false;
+    pend[id] = (pend[id] || 0) + 1; return true;
+  };
   G.marvelSave = function (c, cause) {
     if (!c.ph || c.ph.mvsp !== 'luck' || c.luckUsed || cause === 'starved' || G.rand() > 0.6) return false;
     c.luckUsed = true; c.E = Math.max(c.E, c.ph.Emax * 0.45); c.doomed = false; c.flash = 1; c.luckT = 1.4;
@@ -7514,7 +7524,7 @@ G.addSystem({
 (function () {
   'use strict';
   const clamp = G.clamp, TAU = 6.2832;
-  if (G.ai) { G.ai.gaps.deed = 200000; G.ai.caps.deed = 24; G.ai.LABEL.deed = 'What the creatures decide to do together'; }
+  if (G.ai) { G.ai.gaps.deed = 60000; G.ai.caps.deed = 40; G.ai.LABEL.deed = 'What the creatures decide to do together'; }
   const WORDS = { gather: 'gathering', circle: 'in council', line: 'forming up', carry: 'fetching and carrying', build: 'building', charge: 'charging', guard: 'standing guard', scatter: 'setting off' };
   const live = function () { return G.mode === 'play' && !G.catching && G.W && !G.W.title && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.provider === 'server' && G.ai.hasFuel(); };
   const spByName = function (name) { const W = G.W, low = String(name || '').toLowerCase(); let best = null; for (let i = 0; i < W.species.length; i++) { const s = W.species[i]; if (s.extinct || !s.n) continue; if (s.name.toLowerCase() === low) return s; if (low && (s.name.toLowerCase().indexOf(low) >= 0 || low.indexOf(s.name.toLowerCase()) >= 0)) best = s; } return best; };
@@ -7552,15 +7562,18 @@ G.addSystem({
     return true;
   };
   // once a generation: perhaps somebody takes something into their head
-  G.on('scored', function (h) { const W = G.W; if (!W || W.deed || h.gen < 12 || W.cre.length < 14) return; if (G.rand() < 0.3) G.deedAsk(); });
+  { let rt0 = -1, idle = 0; setInterval(function () { const W = G.W, rt = G.rt || 0; if (!W || W.title || G.mode !== 'play' || rt === rt0) { rt0 = rt; return; } const d = Math.min(20, Math.max(0, rt - rt0)); rt0 = rt;      // only time really played counts
+    if (W.deed || asking) { idle = 0; return; } idle += d;
+    if (idle < 100 || W.gen < 5 || W.cre.length < 14) return;
+    if (G.rand() < 0.5 && G.deedAsk()) idle = 0; }, 10000); }
 
   function begin(raw) {
     const W = G.W, sp = spByName(raw.kind) || W.species.filter(function (s) { return !s.extinct && s.n > 0; }).sort(function (a, b) { return b.n - a.n; })[0];
     if (!sp) return;
     const pool = W.cre.filter(function (c) { return c.sp === sp.id && !c.dead && !c.deedId; });
     if (pool.length < 4) return;
-    const d = { id: (W.nextDeed = (W.nextDeed || 0) + 1), title: raw.title, say: raw.say, sp: sp.id, kind: sp.name, hue: sp.hue || 50, steps: raw.steps, i: 0, t: 0, cryT: 0, target: raw.target, win: raw.win, result: raw.result, progress: 0, gen: W.gen };
-    const n = Math.min(28, Math.max(4, Math.round(pool.length * clamp(raw.share, 0.3, 1))));          // a band, not the whole kind: the rest go on living
+    const d = { id: (W.nextDeed = (W.nextDeed || 0) + 1), title: raw.title, say: raw.say, what: raw.what || '', why: raw.why || '', sp: sp.id, kind: sp.name, hue: sp.hue || 50, steps: raw.steps, i: 0, t: 0, cryT: 0, target: raw.target, win: raw.win, result: raw.result, progress: 0, gen: W.gen };
+    const n = Math.min(raw.steps.some(function (q) { return q.do === 'build'; }) ? 14 : 22, Math.max(4, Math.round(pool.length * clamp(raw.share, 0.3, 1))));          // a band, not the whole kind: the rest go on living
     pool.sort(function () { return G.rand() - 0.5; }).slice(0, n).forEach(function (c, j) { c.deedId = d.id; c.deedJ = j; });
     d.n0 = Math.min(n, pool.length);
     // where
@@ -7577,7 +7590,7 @@ G.addSystem({
     const W = G.W; if (W.deed !== d) return;
     W.deed = null;
     for (let i = 0; i < W.cre.length; i++) if (W.cre[i].deedId === d.id) { W.cre[i].deedId = 0; W.cre[i].cryT = 0; }
-    (W.deedLog = W.deedLog || []).push(d.title); (W.deedPast = W.deedPast || []).push({ title: d.title, kind: d.kind, say: d.say, how: how, gen: W.gen, x: d.x, y: d.y }); if (W.deedPast.length > 5) W.deedPast.shift(); if (W.deedLog.length > 12) W.deedLog.shift();
+    (W.deedLog = W.deedLog || []).push(d.title); (W.deedPast = W.deedPast || []).push({ title: d.title, kind: d.kind, hue: d.hue, say: d.say, what: d.what, why: d.why, how: how, gen: W.gen, x: d.x, y: d.y }); if (W.deedPast.length > 5) W.deedPast.shift(); if (W.deedLog.length > 12) W.deedLog.shift();
     let made = null;
     if (how === 'done' && d.result && G.addField && G.cleanFields) {
       const r = d.result, m = Math.min(W.ww, W.wh);
@@ -7605,18 +7618,19 @@ G.addSystem({
     for (let k = 0; k < n; k++) {
       const c = M[k], j = c.deedJ || k, a = j / Math.max(1, d.n0) * TAU;
       let gx = d.x, gy = d.y; c.carry = false;
-      if (st.do === 'gather') { gx += Math.cos(a) * (24 + (j % 5) * 9); gy += Math.sin(a) * (20 + (j % 5) * 7); }
+      if (st.do === 'gather') { const R = 40 + d.n0 * 3 + (j % 3) * 26; gx += Math.cos(a) * R; gy += Math.sin(a) * R * 0.8; }
       else if (st.do === 'circle') { const R = clamp(46 + d.n0 * 3.2, 60, 170), aa = a + d.t * 0.45; gx += Math.cos(aa) * R; gy += Math.sin(aa) * R * 0.8; }
       else if (st.do === 'line') { gx += (j - d.n0 / 2) * 24 + Math.sin(d.t * 0.5) * 60; gy += Math.sin(j * 0.9 + d.t * 1.2) * 8; }
       else if (st.do === 'carry') { const u = ((d.t + j * 1.7) % 9) / 9; if (u < 0.5) { gx += Math.cos(a) * 230; gy += Math.sin(a) * 190; } else c.carry = true; }
-      else if (st.do === 'build') { const R = (d.result ? d.result.size * m : 60) * 0.9 + 14; gx += Math.cos(a + Math.sin(d.t * 0.6 + j) * 0.5) * R; gy += Math.sin(a + Math.sin(d.t * 0.6 + j) * 0.5) * R * 0.8; }
+      else if (st.do === 'build') { const R = Math.min(150, (d.result ? d.result.size * m : 60)) + 46, u = ((d.t + j * 2.3) % 12) / 12;      // they stand well back round it and take turns: a third are away fetching, so what rises in the middle can be seen
+        if (u < 0.35) { gx += Math.cos(a) * (R + 170); gy += Math.sin(a) * (R + 140); } else { c.carry = u < 0.6; gx += Math.cos(a) * R; gy += Math.sin(a) * R * 0.8; } }
       else if (st.do === 'charge') { if (tg) { gx = tg.x + Math.cos(a) * 30; gy = tg.y + Math.sin(a) * 30; } }
       else if (st.do === 'guard') { gx += Math.cos(a) * 84; gy += Math.sin(a) * 70; }
       else if (st.do === 'scatter') { gx += Math.cos(a) * m * 0.44; gy += Math.sin(a) * m * 0.4; }
       gx = clamp(gx, 20, W.ww - 20); gy = clamp(gy, 30, W.wh - 20);
       const dx = gx - c.x, dy = gy - c.y, dist = Math.hypot(dx, dy) || 1, sp = Math.min(c.ph.speed * (st.do === 'charge' ? 1.5 : 1.2), dist * 2.2), k2 = Math.min(1, dt * 4);
       if (dist > 10) { c.vx += (dx / dist * sp - c.vx) * k2; c.vy += (dy / dist * sp - c.vy) * k2; c.ang = Math.atan2(dy, dx); } else { c.vx *= 0.8; c.vy *= 0.8; if (st.do === 'guard') c.ang = a; }
-      if (dist < 60) near++;
+      if (dist < 60 || (st.do === 'build' && Math.hypot(c.x - d.x, c.y - d.y) < 260)) near++;
       if (c.E < c.ph.Emax * 0.28) c.E = c.ph.Emax * 0.28;                    // a purpose keeps them going
       c.asleep = false; c.tired = Math.min(c.tired || 0, 0.5);
       if (c.cryT > 0) c.cryT -= rt;
@@ -7660,7 +7674,7 @@ G.addSystem({
     ctx.restore();
   };
 
-  G.on('deed', function (d) { if (G.mode !== 'play') return; if (G.sfx) G.sfx('discovery'); if (G.banner) G.banner('The ' + d.kind + ' have decided', d.title + '. ' + d.say, 10000); if (G.log) G.log('disc', 'They decided: ' + d.title, 'The ' + d.kind + '. ' + d.say); });
+  G.on('deed', function (d) { if (G.mode !== 'play') return; if (G.sfx) G.sfx('discovery'); if (G.banner) G.banner('The ' + d.kind + ' have decided', d.title + '. ' + (d.what ? 'They will ' + d.what + '. Why: ' + d.why + '.' : d.say), 12000); if (G.log) G.log('disc', 'They decided: ' + d.title, 'The ' + d.kind + '. ' + d.say); });
   G.on('deed-step', function (d) { if (G.mode !== 'play') return; const st = d.steps[d.i]; if (G.log) G.log('sel', d.title, 'Now they are ' + (WORDS[st.do] || st.do) + (st.cry ? ', crying "' + st.cry + '"' : '') + '.'); });
   G.on('deed-end', function (d, how, made) {
     const W = G.W; if (G.mode !== 'play' || !W) return;
@@ -7766,7 +7780,7 @@ G.addSystem({
 (function () {
   'use strict';
   if (typeof document === 'undefined') return;
-  let box = null, sig = '', seen = {};
+  let box = null, sig = '', seen = {}, shut = false;
   const esc = function (s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   // what a marvel DOES, said plainly from its own numbers (the AI made the numbers up; this only reads them out)
   const WHO = { hunters: 'its hunters', others: 'other kinds', kin: 'its own kind', all: 'everyone near' };
@@ -7789,12 +7803,12 @@ G.addSystem({
     if (box) return box;
     const st = document.createElement('style');
     st.textContent = '#rarebox{position:fixed;left:14px;top:236px;width:min(330px,calc(100vw - 28px));padding:11px 14px;border-radius:16px;z-index:2;font:500 12px system-ui,sans-serif;color:#eaf4ff;max-height:52vh;overflow-y:auto}' +
-      '#rarebox .rk{font:800 10.5px system-ui,sans-serif;letter-spacing:.18em;color:#f6d365;margin-bottom:2px;text-transform:uppercase;display:flex;justify-content:space-between}' +
+      '#rarebox .rk{font:800 10.5px system-ui,sans-serif;letter-spacing:.18em;color:#f6d365;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;min-height:26px}#rarebox .rk u{text-decoration:none;font-size:13px;letter-spacing:0;color:#fff;opacity:.8;margin-left:6px}#rarebox.shut{width:auto}' +
       '#rarebox .rrow{display:flex;gap:10px;align-items:flex-start;padding:8px 7px;margin:4px -7px 0;border-radius:11px;cursor:pointer;border:1px solid transparent}#rarebox .rrow:hover{background:rgba(246,211,101,.1);border-color:rgba(246,211,101,.35)}' +
       '#rarebox .ric{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;background:rgba(7,18,31,.5)}#rarebox .ric img{width:30px;height:30px}' +
       '#rarebox b{color:#fff;font-size:14px;line-height:1.25}#rarebox .rsub{font-size:12.5px;color:#dcecff;line-height:1.45;margin-top:3px}' +
       '#rarebox .rtag{display:inline-block;margin-left:5px;padding:0 6px;border-radius:8px;background:rgba(51,214,166,.16);border:1px solid rgba(51,214,166,.55);font-size:10.5px;font-weight:600;color:#dffbf1;white-space:nowrap}' +
-      '#rarebox .rnone{font-size:12px;color:#b9cde2;margin-top:7px;line-height:1.4}' +
+      '#rarebox .rl{display:grid;grid-template-columns:42px 1fr;gap:2px 6px;margin-top:5px;font-size:12.5px;line-height:1.4;color:#eef6ff}#rarebox .rl i{font:800 9px system-ui,sans-serif;letter-spacing:.12em;color:#8fb2d6;padding-top:4px;font-style:normal}#rarebox .rn{display:inline-block;padding:0 7px;border-radius:9px;font-weight:700;font-size:11.5px;color:#fff;border:1px solid rgba(255,255,255,.35);white-space:nowrap}#rarebox .rnone{font-size:12px;color:#b9cde2;margin-top:7px;line-height:1.4}' +
       '#rarebox.flash{animation:rareflash 1.4s ease-out 2}@keyframes rareflash{0%{box-shadow:0 0 0 0 rgba(246,211,101,.9)}100%{box-shadow:0 0 0 22px rgba(246,211,101,0)}}' +
       '@media (max-width:720px){#rarebox{top:auto;bottom:150px;left:7px;max-height:26vh}}@media (max-height:560px){#rarebox{display:none}}';
     document.head.appendChild(st);
@@ -7802,6 +7816,7 @@ G.addSystem({
     (document.getElementById('ui') || document.body).appendChild(box);
     box.addEventListener('click', function (e) {
       let n = e.target; while (n && n !== box && !(n.dataset && n.dataset.go)) n = n.parentNode;
+      { let k = e.target; while (k && k !== box && !(k.classList && k.classList.contains('rk'))) k = k.parentNode; if (k && k !== box) { shut = !shut; sig = ''; if (G.sfx) G.sfx('click'); draw(); return; } }
       if (!n || n === box) return;
       const W = G.W, go = n.dataset.go;
       if (G.sfx) G.sfx('click');
@@ -7814,6 +7829,11 @@ G.addSystem({
     return box;
   }
   const STEP = { gather: 'gathering', circle: 'in council', line: 'forming up', carry: 'fetching and carrying', build: 'building', charge: 'charging', guard: 'standing guard', scatter: 'setting off' };
+  // a kind's name is a made-up word: it is set apart in its own colour, so it is not read as English
+  const chip = function (name, hue) { return '<span class="rn" style="background:' + G.hsl(hue === undefined ? 200 : hue, 55, 34, 0.9) + '">' + esc(name) + '</span>'; };
+  const names = function (text) { let s = esc(text); const Sp = (G.W.species || []).filter(function (q) { return !q.extinct && q.name; }).sort(function (a, b) { return b.name.length - a.name.length; }); for (let i = 0; i < Sp.length; i++) { const nm = esc(Sp[i].name), last = nm.split(' ').pop(), first = nm.split(' ')[0]; [nm + 's', nm, first + 's', first, last + 's'].some(function (w) { const k = s.indexOf(w); if (w.length < 4 || k < 0 || s.lastIndexOf('<span', k) > s.lastIndexOf('</span>', k)) return false; s = s.slice(0, k) + chip(w, Sp[i].hue) + s.slice(k + w.length); return true; }); } return s; };
+  const cap = function (s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1).replace(/\.$/, '') + '.'; };
+  const plan = function (p, now) { return '<div class="rl"><i>WHO</i><span>' + chip(p.kind, p.hue) + '</span>' + (p.what ? '<i>WHAT</i><span>' + names('They ' + (now ? 'want to ' : 'set out to ') + p.what.replace(/\.$/, '') + '.') + '</span><i>WHY</i><span>' + names(cap(p.why)) + '</span>' : '<i>WHAT</i><span>' + names(p.say) + '</span>') + (now || '') + '</div>'; };
   function draw() {
     ui();
     const W = G.W, on = G.mode === 'play' && W && !W.title;
@@ -7827,16 +7847,17 @@ G.addSystem({
     const d = W.deed, dn = d ? W.cre.filter(function (c) { return c.deedId === d.id && !c.dead; }).length : 0;
     const Wk = W.works || [], Pa = W.deedPast || [];
     const s2 = order.map(function (id) { return id + ':' + by[id].n; }).join(',') + '|' + (d ? d.id + ':' + d.i + ':' + dn + ':' + Math.round(d.progress * 20) + ':' + Math.round((d.steps[d.i].secs - d.t) / 2) : '') + '|' + Wk.map(function (w) { return w.name + (w.fig ? 1 : 0); }).join(',') + '|' + Pa.length + ':' + (Pa.length ? Pa[Pa.length - 1].gen : 0);
-    if (s2 === sig) return; sig = s2;
-    let fresh = false, h = '<div class="rk"><span>★ Rare in this pond</span><span>' + (order.length ? order.length + (order.length === 1 ? ' marvel' : ' marvels') : '') + '</span></div>';
+    if (s2 + shut === sig) return; sig = s2 + shut; box.classList.toggle('shut', shut);
+    let fresh = false, h = '<div class="rk"><span>★ Rare in this pond</span><span>' + [order.length ? order.length + (order.length === 1 ? ' marvel' : ' marvels') : '', d ? 'a plan' : '', Wk.length ? Wk.length + ' built' : ''].filter(Boolean).join(' · ') + '<u>' + (shut ? '▸' : '▾') + '</u></span></div>';
+    if (shut) { for (let i = 0; i < order.length; i++) if (!seen['m' + order[i]]) { seen['m' + order[i]] = 1; fresh = true; } if (d && !seen['d' + d.id]) { seen['d' + d.id] = 1; fresh = true; } box.innerHTML = h; if (fresh) { box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash'); } return; }
     if (d) { if (!seen['d' + d.id]) { seen['d' + d.id] = 1; fresh = true; } const st = d.steps[d.i];
-      h += '<div class="rrow" data-go="deed"><span class="ric">⚑</span><span><b>' + esc(d.title) + '</b><span class="rtag">a plan</span><div class="rsub">The ' + esc(d.kind) + ' are ' + (STEP[st.do] || st.do) + (st.do === 'build' ? ' (' + Math.round(d.progress * 100) + '%)' : '') + ', ' + dn + ' of them. Step ' + (d.i + 1) + ' of ' + d.steps.length + '. ' + esc(d.say) + '</div></span></div>'; }
+      h += '<div class="rrow" data-go="deed"><span class="ric">⚑</span><span><b>' + esc(d.title) + '</b><span class="rtag">a plan</span>' + plan(d, '<i>NOW</i><span><b style="font-size:12.5px;color:#f6d365">' + cap(STEP[st.do] || st.do).slice(0, -1) + (st.do === 'build' ? ' ' + Math.round(d.progress * 100) + '%' : '') + '</b> · ' + dn + ' of them · step ' + (d.i + 1) + ' of ' + d.steps.length + '</span>') + '</span></div>'; }
     for (let i = Wk.length - 1; i >= 0; i--) { const w = Wk[i];
-      h += '<div class="rrow" data-go="w' + i + '"><span class="ric">' + (w.fig && G.figurePic && G.figurePic(w.name) ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(G.figurePic(w.name)) + '">' : '▲') + '</span><span><b>' + esc(w.name) + '</b><span class="rtag">built</span><div class="rsub">Raised by the ' + esc(w.by) + '. ' + esc(w.looks) + '</div></span></div>'; }
+      h += '<div class="rrow" data-go="w' + i + '"><span class="ric">' + (w.fig && G.figurePic && G.figurePic(w.name) ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(G.figurePic(w.name)) + '">' : '▲') + '</span><span><b>' + esc(w.name) + '</b><span class="rtag">built</span><div class="rl"><i>BY</i><span>' + chip(w.by, w.hue) + '</span><i>IT IS</i><span>' + esc(cap(w.looks)) + '</span></div></span></div>'; }
     for (let i = 0; i < order.length; i++) { const q = by[order[i]], m = q.d; if (!seen['m' + m.id]) { seen['m' + m.id] = 1; fresh = true; }
       h += '<div class="rrow" data-go="m' + m.id + '"><span class="ric">' + (m.emblem ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(m.emblem) + '">' : '★') + '</span><span><b>' + esc(m.name) + '</b> ×' + q.n + (m.words && m.words.length ? '<span class="rtag">talks</span>' : '') + '<div class="rsub">' + esc(m.wonder) + '</div></span></div>'; }
     for (let i = Pa.length - 1; i >= 0 && i >= Pa.length - 3; i--) { const p = Pa[i];
-      h += '<div class="rrow" data-go="p' + i + '" style="opacity:.8"><span class="ric">✓</span><span><b>' + esc(p.title) + '</b><span class="rtag">' + (p.how === 'done' ? 'done' : 'gave up') + ' · gen ' + p.gen + '</span><div class="rsub">The ' + esc(p.kind) + '. ' + esc(p.say) + '</div></span></div>'; }
+      h += '<div class="rrow" data-go="p' + i + '" style="opacity:.8"><span class="ric">✓</span><span><b>' + esc(p.title) + '</b><span class="rtag">' + (p.how === 'done' ? 'done' : 'gave up') + ' · gen ' + p.gen + '</span>' + plan(p, '') + '</span></div>'; }
     if (!d && (order.length || Wk.length || Pa.length)) h += '<div class="rnone">No plan under way just now' + (Pa.length ? ' (the last was in generation ' + Pa[Pa.length - 1].gen + ')' : '') + '.</div>';
     if (!d && !order.length && !Wk.length && !Pa.length) h += '<div class="rnone">Nothing rare alive just now. Every few minutes a creature is born with a marvel, or a kind decides to do something together. It will show here, and you can click it to go there.</div>';
     box.innerHTML = h;
@@ -7844,6 +7865,45 @@ G.addSystem({
   }
   setInterval(function () { try { draw(); } catch (e) { console.error(e); } }, 800);
   G.on('new-pond', function () { seen = {}; sig = ''; });
+})();
+
+</script>
+<script data-part="grow">
+// ── The pond grows ──
+// A pond of tiny cells is roomy; the same pond full of big creatures is a crush where nothing can be made out. So the pond
+// itself widens as its creatures take up more of it: each generation it looks at how much of the water is covered by bodies
+// and, when that is too much, grows a little (up to about two and a half times across). Everything in it moves apart with
+// it, and the food stays what it was, so there is more room, not more mouths. The whole pond still fits the screen.
+(function () {
+  'use strict';
+  const MAXG = 2.6, ROOM = 0.085;          // bodies may cover about a twelfth of the water
+  /** how much of the pond is covered by bodies (0..1) */
+  G.pondCover = function () { const W = G.W; if (!W || !W.cre.length) return 0; let a = 0; for (let i = 0; i < W.cre.length; i++) { const r = (W.cre[i].ph.r || 8) * 1.9; a += 3.1416 * r * r; } return a / (W.ww * W.wh); };
+  /** make the pond g times its first size, moving everything in it apart */
+  G.pondGrowTo = function (g) {
+    const W = G.W, v = G.view; if (!W) return;
+    g = G.clamp(g, 1, MAXG); if (Math.abs(g - (v.grow || 1)) < 0.001) return;
+    const ow = W.ww, oh = W.wh, cx = G.cam.x / ow, cy = G.cam.y / oh;
+    v.grow = g;
+    if (G.canvas) G.resize(); else { v.wh = 1400 * g; v.ww = ow * v.wh / oh; }
+    W.ww = v.ww; W.wh = v.wh;
+    const kx = W.ww / ow, ky = W.wh / oh;
+    const mv = function (L, also) { if (!L) return; for (let i = 0; i < L.length; i++) { const o = L[i]; if (!o || typeof o.x !== 'number') continue; o.x *= kx; o.y *= ky; if (also) { if (typeof o.px === 'number') { o.px *= kx; o.py *= ky; } if (typeof o.tx === 'number') { o.tx *= kx; o.ty *= ky; } } } };
+    mv(W.cre, true); mv(W.food); mv(W.zones); mv(W.births); mv(W.lights); mv(W.works); mv(W.deedPast); if (W.deed) mv([W.deed]);
+    G.cam.x = cx * W.ww; G.cam.y = cy * W.wh; G.applyCam();
+    G.emit('pond-grew', g);
+  };
+  let told = 1;
+  G.on('scored', function () {
+    const W = G.W, v = G.view; if (!W || W.title) return;
+    const g = v.grow || 1, want = G.clamp(g * Math.sqrt(G.pondCover() / ROOM), 1, MAXG);
+    if (want > g * 1.02) G.pondGrowTo(Math.min(want, g * 1.1));              // a tenth at a time: it widens over a few generations
+    else if (want < g * 0.6) G.pondGrowTo(Math.max(want, g * 0.985));         // and draws in again, slowly, if they turn small
+    const now = v.grow || 1;
+    if (G.mode === 'play' && now >= told + 0.3) { told = now; if (G.toast) G.toast('The pond has grown: there are more of them, and bigger, so there is more water.'); if (G.log) G.log('disc', 'The pond grew', 'It is now ' + now.toFixed(1) + ' times as wide as it began.'); }
+  });
+  // a new pond starts small again
+  { const new0 = G.newWorld; G.newWorld = function (opts) { const v = G.view; if (v.grow && v.grow !== 1) { v.grow = 1; if (G.canvas) G.resize(); else { v.ww = v.ww * 1400 / v.wh; v.wh = 1400; } } told = 1; return new0(opts); }; }
 })();
 
 </script>
@@ -9936,8 +9996,9 @@ G.addSystem({
     W.season = Math.floor(num(d.season, 0, 3, 0));
     W.st = num(d.st, 0, G.PH[W.season] - 0.01, 0);
     W.t = num(d.t, 0, 1e7, 0);
-    if (d.ww) W.ww = num(d.ww, 600, 3360, W.ww);
-    W.wh = num(d.wh, 600, 2000, 1000);            // a pond saved before the pond grew was 1000 tall
+    if (d.ww) W.ww = num(d.ww, 600, 9000, W.ww);
+    W.wh = num(d.wh, 600, 3700, 1000);
+    if (W.wh > 1400.5) { G.view.grow = G.clamp(W.wh / 1400, 1, 2.6); if (G.canvas) { G.resize(); W.ww = G.view.ww; W.wh = G.view.wh; } }      // a pond that had grown comes back grown            // a pond saved before the pond grew was 1000 tall
     if (d.set && typeof d.set === 'object') {
       W.set.temp = num(d.set.temp, -1, 1, 0); W.set.light = num(d.set.light, 0.2, 2, 1);
       W.set.bloom = num(d.set.bloom, 0.2, 3, 1); W.set.mut = num(d.set.mut, 0.25, 4, 1);
