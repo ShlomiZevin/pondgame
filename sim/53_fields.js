@@ -245,6 +245,7 @@
         path(ctx, f, W); ctx.strokeStyle = f.solid ? '#14202e' : light; ctx.lineWidth = f.solid ? 4 : 2.2; ctx.globalAlpha = f.solid ? 1 : 0.7; if (f.shape !== 'all') ctx.stroke(); ctx.globalAlpha = 1;
       }
       // its name and what it does
+      if (f.quiet && !coming) continue;
       const c = centre(f, W), inv = 1 / Math.max(0.7, v.scale), does = words(f), line2 = coming ? 'coming in ' + Math.ceil(f.start - W.t) + 's' + (does ? ' · ' + does : '') : (does || 'harmless') + (f.solid ? ' · ' + Math.round((1 - hp) * 100) + '% worn' + (f.atk ? ' · ' + f.atk + ' breaking it' : f.weak >= 0 && G.WEAK ? ' · weak to ' + G.WEAK[f.weak].text : '') : ' · ' + Math.ceil(f.life) + 's');
       ctx.save(); ctx.translate(c[0], c[1]); ctx.scale(inv, inv); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = '700 12px system-ui, sans-serif'; const w1 = ctx.measureText(f.name).width; ctx.font = '600 10.5px system-ui, sans-serif'; const tw = Math.max(w1, ctx.measureText(line2).width) + 20;

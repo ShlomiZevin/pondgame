@@ -48,7 +48,7 @@
   // once a generation: perhaps somebody takes something into their head
   { let rt0 = -1, idle = 0; setInterval(function () { const W = G.W, rt = G.rt || 0; if (!W || W.title || G.mode !== 'play' || rt === rt0) { rt0 = rt; return; } const d = Math.min(20, Math.max(0, rt - rt0)); rt0 = rt;      // only time really played counts
     if (W.deed || asking) { idle = 0; return; } idle += d;
-    if (idle < 100 || W.gen < 5 || W.cre.length < 14) return;
+    if (idle < 150 || W.gen < 5 || W.cre.length < 14) return;
     if (G.rand() < 0.5 && G.deedAsk()) idle = 0; }, 10000); }
 
   function begin(raw) {
@@ -79,8 +79,8 @@
     if (how === 'done' && d.result && G.addField && G.cleanFields) {
       const r = d.result, m = Math.min(W.ww, W.wh);
       const f = G.addField(G.cleanFields([{ name: r.name, stuff: r.stuff, shape: r.solid ? 'ring' : r.shape, x: d.x / W.ww, y: d.y / W.wh, r: r.size, width: 0.1, solid: r.solid, feed: r.feed, slow: r.slow, hurt: Math.min(r.hurt, 0.5), pull: r.pull, life: r.life }])[0]);
-      if (f) f.spare = d.sp;                                                  // it is theirs: it does not harm them
-      made = { name: r.name, looks: r.looks, x: d.x, y: d.y, r: Math.min(r.size * m, 150), until: W.t + r.life, by: d.kind, hue: d.hue, field: f ? f.id : 0 };
+      if (f) { f.spare = d.sp; f.quiet = true; }                                                  // it is theirs: it does not harm them
+      made = { name: r.name, looks: r.looks, x: d.x, y: d.y, r: Math.min(r.size * m, 150), until: W.t + r.life, by: d.kind, hue: d.hue, field: f ? f.id : 0, plan: d.title, what: d.what, why: d.why, gen: W.gen };
       (W.works = W.works || []).push(made); if (W.works.length > 6) W.works.shift();
       if (G.figureFor) G.figureFor({ name: r.name, note: r.looks + ' Built by small pond creatures.', hue: d.hue }, r.looks).then(function (fig) { made.fig = fig || null; });
     }
@@ -131,7 +131,16 @@
   { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (W && W.deed) deedStep(dt); if (W && W.works && W.works.length && W.works[0].until < W.t) W.works.shift(); }; }
 
   // ── seen ──
-  const mound = function (ctx, x, y, r, hue, grow) { for (let i = 0; i < 9; i++) { const a = i * 2.4, q = (0.25 + (i % 3) * 0.2) * r * grow; ctx.beginPath(); ctx.arc(x + Math.cos(a) * q * 0.8, y - (i / 9) * r * 0.9 * grow + Math.sin(a) * q * 0.2, r * (0.3 - i * 0.018) * (0.5 + 0.5 * grow), 0, TAU); ctx.fillStyle = G.hsl(hue + i * 6, 35, 46 + (i % 3) * 8, 1); ctx.fill(); ctx.strokeStyle = '#14202e'; ctx.lineWidth = 2; ctx.stroke(); } };
+  // what is being raised, before its picture has come: a neat rounded heap, lit from above, with a glow and a few sparks
+  const mound = function (ctx, x, y, r, hue, grow) {
+    const R = Math.min(r, 110) * (0.35 + 0.65 * grow), t = G.rt || 0, rows = [[0, 0, 0.5], [-0.42, 0.1, 0.36], [0.42, 0.1, 0.36], [-0.2, -0.36, 0.34], [0.22, -0.36, 0.34], [0, -0.66, 0.28]].slice(0, 1 + Math.round(5 * grow));
+    let g = ctx.createRadialGradient(x, y - R * 0.3, 0, x, y - R * 0.3, R * 1.5); g.addColorStop(0, G.hsl(hue, 80, 70, 0.28)); g.addColorStop(1, G.hsl(hue, 80, 70, 0)); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - R * 0.3, R * 1.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(4,12,20,0.3)'; ctx.beginPath(); ctx.ellipse(x, y + R * 0.46, R * 0.95, R * 0.2, 0, 0, TAU); ctx.fill();
+    for (let i = 0; i < rows.length; i++) { const cx = x + rows[i][0] * R, cy = y + rows[i][1] * R, rr = rows[i][2] * R;
+      g = ctx.createRadialGradient(cx - rr * 0.35, cy - rr * 0.4, rr * 0.1, cx, cy, rr); g.addColorStop(0, G.hsl(hue + i * 9, 50, 78, 1)); g.addColorStop(1, G.hsl(hue + i * 9, 45, 40, 1));
+      ctx.beginPath(); ctx.arc(cx, cy, rr, 0, TAU); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = '#14202e'; ctx.lineWidth = 2; ctx.stroke(); }
+    for (let i = 0; i < 6; i++) { const a = t * 0.9 + i * 1.05, q = 0.5 + 0.5 * Math.sin(t * 2.4 + i * 1.7); ctx.beginPath(); ctx.arc(x + Math.cos(a) * R * 1.05, y - R * 0.3 + Math.sin(a) * R * 0.8, 1.4 + 2.2 * q, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,' + (0.25 + 0.6 * q) + ')'; ctx.fill(); }
+  };
   G.drawDeeds = function (ctx) {
     const W = G.W; if (!W || (!W.deed && !(W.works && W.works.length))) return;
     const v = G.view, s = v.scale * v.dpr, t = G.rt || 0, inv = 1 / Math.max(0.7, v.scale);

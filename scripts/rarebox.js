@@ -15,7 +15,7 @@ const path = require('path');
   await fr.evaluate(() => G.setSpeed(16));
   await page.waitForTimeout(1200);
   await page.screenshot({ path: path.join(__dirname, 'rarebox-0-empty.png') });
-  await fr.evaluate(() => { G.grantMarvel(); G.deedAsk(); });
+  await fr.evaluate(() => { G.ai.gaps.deed = 0; G.ai.gaps.marvel = 0; G.grantMarvel(); G.deedAsk(); });
   let seen = null;
   for (let t = 0; t < 45 && !seen; t++) { await page.waitForTimeout(1500); seen = await fr.evaluate(() => { const c = G.W.cre.find((x) => x.ph.mv && !x.dead); if (!c || !G.W.deed) return null; G.select(c); return G.marvelDoes(c.ph.mv).join(' / ') || '(no powers)'; }); }
   console.log('marvel does: ' + seen);
@@ -28,6 +28,7 @@ const path = require('path');
   console.log('the plan was ' + plan + ' s long; at x16 it took ' + Math.round((Date.now() - t0) / 1000) + ' s to watch · creatures left: ' + await fr.evaluate(() => G.W.cre.length));
   await page.waitForTimeout(6000);
   await page.screenshot({ path: path.join(__dirname, 'rarebox-2-after.png') });
+  { const row = fr.locator('#rarebox [data-go^="w"]').first(); if (await row.count()) { await row.click(); await page.waitForTimeout(1500); await page.screenshot({ path: path.join(__dirname, 'rarebox-3-open.png') }); } }
   console.log('box after: ' + (await fr.locator('#rarebox').innerText()).replace(/\n+/g, ' | ').slice(0, 600));
   console.log(errs.slice(0, 5).join('\n') || 'no errors');
   await browser.close();

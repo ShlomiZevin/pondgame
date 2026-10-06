@@ -11,7 +11,7 @@ const path = require('path');
   await fr.locator('#tBegin').click();
   await fr.evaluate(() => { G.ai.gaps.deed = 1e9; G.ai.gaps.marvel = 1e9; G.ai.gaps.nature = 1e9; G.setSpeed(32); });
   await page.waitForTimeout(6000);
-  await fr.evaluate(() => { G.setSpeed(1); const add = (o) => G.addField(G.cleanFields([o])[0]);
+  await fr.evaluate(() => { G.setSpeed(1); G.cam.z = 1; G.applyCam(); const add = (o) => G.addField(G.cleanFields([o])[0]);
     add({ name: 'Ice Wall', stuff: 'ice', shape: 'line', across: 'vertical', at: 0.3, width: 0.06, solid: true, gap: 0.14, gapAt: 0.6, life: 300 });
     add({ name: 'Lava Flow', stuff: 'fire', shape: 'band', across: 'horizontal', at: 0.78, width: 0.12, hurt: 0.5, life: 300 });
     add({ name: 'Kelp Grove', stuff: 'plant', shape: 'circle', x: 0.55, y: 0.42, r: 0.14, feed: 0.6, life: 300 });

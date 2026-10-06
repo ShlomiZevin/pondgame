@@ -100,7 +100,6 @@
   // Every few seconds it is shown a sheet of living creatures nobody has looked at yet: first those whose marks are oldest guesses, and
   // those the pond believes are its best (a guess must be checked before it is bred from). Its marks become those creatures' own.
   let watching = false;
-  G.WATCH_BUDGET = 0.4;          // dollars a session may spend on looking at living creatures before the watcher goes quiet
   const clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
   const c01 = function (v) { v = +v; return isFinite(v) ? G.clamp(v, 0, 1) : NaN; };
   G.eyeGrade = function (c, g) { c.real = { b: g.b, w: g.w, why: g.why || '', fix: g.fix || '', gen: G.W.gen }; c.eb = g.b; c.ew = g.w; c.st = 0; c.ph.charm = g.b; c.ph.whole = g.w; };
@@ -121,11 +120,12 @@
   G.watchTick = function () {
     const W = G.W;
     if (!W || W.title || watching || !live() || W.cre.length < 4) return;
+    // one look every nine seconds, as it has always been (G.ai.gaps.watch), and at most one every two generations: at normal speed a generation lasts about a
+    // minute, and the pond has hardly changed between two looks, so looking more often would only cost.
+    if (W.lastLookGen !== undefined && W.gen - W.lastLookGen < 2) return;
     const picks = G.watchPick(12);
-    // the watcher's own spending slows it as it goes, whatever model it is: looking often at first, when the pond is learning what is nice,
-    // then rarely. A session's looks cost about 20 to 30 cents in all (WATCH_BUDGET); once spent it looks only now and then.
-    { const sp = G.ai.count && G.ai.count.watch ? G.ai.count.watch.usd || 0 : 0, B = G.WATCH_BUDGET; G.ai.gaps.watch = sp < B * 0.3 ? 2500 : sp < B * 0.6 ? 6000 : sp < B ? 12000 : 60000; }
     if (picks.length < 4 || !G.ai.allow('watch')) return;
+    W.lastLookGen = W.gen;
     const refs = G.referenceForms(), img = G.sheet(refs.concat(picks.map(function (c) { return c.g.f; })), { cw: 176, ch: 182, sc: 0.48, cols: 4, refs: refs.length });
     if (!img) return;
     watching = true;

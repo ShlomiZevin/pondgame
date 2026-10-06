@@ -8,7 +8,7 @@ const secs = +process.argv[2] || 60;
   await page.goto((process.env.BASE || 'http://localhost:8787') + '/dev?user=state' + Date.now(), { waitUntil: 'load' });
   await page.waitForTimeout(2500);
   const fr = page.frames().find((f) => f !== page.mainFrame());
-  await fr.locator('#tBegin').click(); await fr.evaluate(() => G.setSpeed(64));
+  await fr.locator('#tBegin').click(); await fr.evaluate((sp) => G.setSpeed(sp), +(process.env.SPEED || 64));
   for (let t = 0; t < secs; t += 15) {
     await page.waitForTimeout(15000);
     console.log(await fr.evaluate(() => { const W = G.W, B = W.eyeBank || []; const m = (f) => (B.length ? B.reduce((a, e) => a + f(e), 0) / B.length : 0); const live = W.cre.length ? W.cre.reduce((a, c) => a + c.ph.whole, 0) / W.cre.length : 0; return 'gen ' + W.gen + ' eyeN ' + (W.eyeN || 0) + ' bank ' + B.length + ' hall ' + (W.hall || []).length + ' bank marks beauty ' + m((e) => e.b).toFixed(2) + ' whole ' + m((e) => e.w).toFixed(2) + ' | belief whole ' + live.toFixed(2) + ' wb ' + W.taste.wb.toFixed(2) + ' | watch asked ' + ((G.ai.count.watch || {}).asked || 0) + ' $' + ((G.ai.count.watch || {}).usd || 0).toFixed(3); }));

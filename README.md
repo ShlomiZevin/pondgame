@@ -247,3 +247,7 @@ The pond grows when bodies cover more than about a twelfth of the water (`src/57
 ## Order at the top
 
 `src/61_notes.js`: the banner is only for big moments (a marvel, a plan and how it ended, a wish come true, a new age, a world event), one at a time, at most two waiting, at most 8 seconds and 190 characters. Everything smaller is a note: one quiet line at a time in the bottom right corner (`G.note`). The strip of what is in force shows two; more than two fold into one pill that opens with a click.
+
+## Beyond the pond, the box in two tabs, and the budget
+
+`src/58_beyond.js`: the pond has no wall; at its sides and floor the water goes on into a mist with far lights and, now and then, something large passing. When the pond grows (`57_grow.js`, now eased over seconds) the mist draws back. The rare box has two tabs, Plans and Marvels; a click on a row goes there and opens its details (a built thing: its picture, how and why it was built, what it does, how long it lasts). `src/69_budget.js` holds the limits for the AI calls that happen by themselves (plans, marvels, the pond's own events, wish checks): about a dollar and a quarter at most in a sitting.

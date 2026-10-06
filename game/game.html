@@ -4244,7 +4244,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     model: '',           // the player's choice ('' = the server's default)
     // automatic calls (organs, the story, mutation ideas) are limited by wall-clock time and a session budget,
     // so the cost is the same whether the pond runs at 1x or 64x, for a minute or a day
-    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 40000, check: 3000, watch: 5000, marvel: 12000, nature: 120000, design: 50000, paint: 22000, plan: 55000 },
+    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 40000, check: 3000, watch: 9000, marvel: 12000, nature: 120000, design: 50000, paint: 22000, plan: 55000 },
     caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 45, check: 36, watch: 500, marvel: 40, nature: 60, design: 18, paint: 16, plan: 18 },
     used: {}, lastAt: {},
     // what this session has asked the server for: { kind: { asked, fresh } }. "fresh" = a model really ran;
@@ -5587,32 +5587,69 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 </script>
 <script data-part="46c_voice">
 // ── A creature that talks is heard ──
-// When a marvel speaks, its line appears over its head; here it is also SPOKEN. The words go to the server, which has them said by
-// a speech model in the tone the marvel was given, and keeps the sound for good, so a line is paid for once. The creature's own
-// pace makes the voice its own: quick and high for something small, slow and low for something big. Speech is dear, so only a
-// few new lines are made in a session; lines already made are free.
+// When a marvel speaks, its line appears over its head, and here it is also HEARD, for nothing: the words are turned into a short
+// babble made on the spot (a tiny voice synth: syllables follow the word, a vowel colours each one, the pitch follows the creature's size,
+// the tone follows the voice the marvel was given), kept as a sound and played through Plaxzy Sound, so mute and volume work as for
+// everything else. A real spoken line from a speech model costs about thirteen cents, which is far too dear for a creature that talks all
+// day, so it is OFF (G.VOICE_REAL) and, if ever switched on, limited to one or two short lines a session.
 (function () {
   'use strict';
-  if (G.ai) { G.ai.gaps.voice = 2500; G.ai.caps.voice = 10; G.ai.LABEL.voice = 'Creatures speaking aloud (Leonardo)'; }
-  const made = {};           // line → 'asked' | 'ready' | 'none'
+  if (typeof window === 'undefined') return;
+  G.VOICE_REAL = false;
+  if (G.ai) { G.ai.gaps.voice = 90000; G.ai.caps.voice = 2; G.ai.LABEL.voice = 'Creatures speaking aloud (Leonardo, off)'; }
+  const made = {};           // key → 'ready' | 'none' | 'asked'
   let lastPlay = 0;
   const now = function () { return typeof performance !== 'undefined' ? performance.now() : Date.now(); };
+  const SR = 16000, VOW = { a: 800, e: 560, i: 330, o: 480, u: 340 }, TONE = { sweet: 1.15, bright: 1.3, cheeky: 1.5, gruff: 0.62, wise: 0.85, tiny: 1.9 };
+  /** a word as a short wave file (base64): a few syllables, each a buzz with a vowel's formant, gliding up for "!" and "?" */
+  function babble(word, toneF, sizeF) {
+    const letters = String(word).toLowerCase().replace(/[^a-z]/g, '') || 'la', nsyl = Math.max(1, Math.min(6, Math.round(letters.length / 2.3)));
+    const N = Math.floor(SR * Math.min(0.9, 0.1 * nsyl + 0.12)), buf = new Float32Array(N), last = String(word).slice(-1), base = 300 * toneF * sizeF;
+    let ph = 0;
+    for (let s = 0; s < nsyl; s++) {
+      const i0 = Math.floor(s * N / nsyl), i1 = Math.floor((s + 1) * N / nsyl), ch = letters.charCodeAt((s * 2) % letters.length), v = letters.charAt((s * 2 + 1) % letters.length);
+      const formant = VOW[VOW[v] ? v : 'aeiou'.charAt(ch % 5)], f0 = base * (0.8 + ((ch * 7 + s * 13) % 10) / 16), f1 = f0 * (last === '!' ? 1.18 : last === '?' ? 1.28 : 0.92);
+      for (let i = i0; i < i1; i++) {
+        const u = (i - i0) / Math.max(1, i1 - i0), f = f0 + (f1 - f0) * u + 5 * Math.sin(i / SR * 44);
+        ph += 6.2832 * f / SR; let x = 0;
+        for (let k = 1; k <= 8; k++) { const w = Math.exp(-Math.pow((k * f - formant * 1.4) / (formant * 0.9), 2)); x += w * Math.sin(k * ph) / k; }
+        buf[i] += x * Math.min(1, u * 12) * Math.min(1, (1 - u) * 6);
+      }
+    }
+    let pk = 0; for (let i = 0; i < N; i++) pk = Math.max(pk, Math.abs(buf[i]));
+    const bytes = new Uint8Array(44 + N * 2), dv = new DataView(bytes.buffer), W = function (o, s) { for (let i = 0; i < s.length; i++) bytes[o + i] = s.charCodeAt(i); };
+    W(0, 'RIFF'); dv.setUint32(4, 36 + N * 2, true); W(8, 'WAVEfmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, SR, true); dv.setUint32(28, SR * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); W(36, 'data'); dv.setUint32(40, N * 2, true);
+    for (let i = 0; i < N; i++) dv.setInt16(44 + i * 2, Math.max(-1, Math.min(1, buf[i] / (pk || 1) * 0.8)) * 32767, true);
+    let bin = ''; for (let i = 0; i < bytes.length; i += 4096) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 4096));
+    return btoa(bin);
+  }
   G.on('say', function (c, word) {
-    if (G.mode !== 'play' || G.speed > 4 || !window.PXS || !G.host || !G.host.ready || !G.host.caps || !G.host.caps.ai || G.ai.sound === false) return;
+    if (G.mode !== 'play' || G.speed > 4 || !window.PXS) return;
     const mv = c.ph && c.ph.mv; if (!mv) return;
+    const t = (mv.voice && mv.voice.tone) || 'bright', toneF = TONE[t] || 1.3, size = c.ph.r || 12, sizeF = Math.max(0.5, Math.min(2, Math.pow(12 / Math.max(6, size), 0.55)));
+    const key = 'bab:' + t + ':' + Math.round(sizeF * 6) + ':' + String(word).toLowerCase().slice(0, 24);
+    const t0 = now(); if (t0 - lastPlay < 900) return;
+    const pan = G.W ? Math.max(-1, Math.min(1, (c.x / G.W.ww - 0.5) * 1.6)) : 0;
+    if (made[key] !== 'ready') {
+      try { const d = {}; d[key] = 'data:audio/wav;base64,' + babble(word, toneF, sizeF); PXS.define(d); made[key] = 'ready'; } catch (e) { made[key] = 'none'; console.error(e); return; }
+    }
+    lastPlay = t0;
+    try { PXS.play(key, { volume: 0.5, pan: pan }); } catch (e) { console.error(e); }
+    if (G.VOICE_REAL && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.sound !== false && String(word).length <= 18) realLine(c, word, mv, key);
+  });
+  // the real thing: only if G.VOICE_REAL is switched on, and then at most two short lines a session (see G.ai.caps.voice)
+  function realLine(c, word, mv, babbleKey) {
     const tone = (mv.voice && mv.voice.tone) || 'bright', speed = (mv.voice && mv.voice.speed) || 1.25, key = 'say:' + tone + ':' + String(word).toLowerCase();
-    const play = function () { if (now() - lastPlay < 1800) return; lastPlay = now(); try { PXS.play(key, { speed: speed, rate: speed, volume: 0.9 }); } catch (e) { console.error(e); } };
-    if (made[key] === 'ready') { play(); return; }
-    if (made[key]) return;
-    if (!G.ai.allow('voice')) return;
+    if (made[key] === 'ready') { try { PXS.play(key, { speed: speed, rate: speed, volume: 0.9 }); } catch (e) { console.error(e); } return; }
+    if (made[key] || !G.ai.allow('voice')) return;
     made[key] = 'asked';
     G.host.call('ai.voice', { text: word, tone: tone }, 60000).then(function (r) {
       G.ai.tally('voice', r && (r.source === 'leonardo' ? 'leonardo' : r.source), r && r.usd);
       if (!r || !r.sound || !/^audio\/(mpeg|wav|ogg|mp4)$/.test(r.sound.mime) || typeof r.sound.b64 !== 'string' || r.sound.b64.length > 600000) { made[key] = 'none'; return; }
       const def = {}; def[key] = 'data:' + r.sound.mime + ';base64,' + r.sound.b64;
-      try { PXS.define(def); made[key] = 'ready'; if (c.say && !c.dead) play(); } catch (e) { made[key] = 'none'; console.error(e); }
+      try { PXS.define(def); made[key] = 'ready'; } catch (e) { made[key] = 'none'; console.error(e); }
     }, function () { made[key] = 'none'; });
-  });
+  }
 })();
 
 </script>
@@ -5821,7 +5858,6 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   // Every few seconds it is shown a sheet of living creatures nobody has looked at yet: first those whose marks are oldest guesses, and
   // those the pond believes are its best (a guess must be checked before it is bred from). Its marks become those creatures' own.
   let watching = false;
-  G.WATCH_BUDGET = 0.4;          // dollars a session may spend on looking at living creatures before the watcher goes quiet
   const clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
   const c01 = function (v) { v = +v; return isFinite(v) ? G.clamp(v, 0, 1) : NaN; };
   G.eyeGrade = function (c, g) { c.real = { b: g.b, w: g.w, why: g.why || '', fix: g.fix || '', gen: G.W.gen }; c.eb = g.b; c.ew = g.w; c.st = 0; c.ph.charm = g.b; c.ph.whole = g.w; };
@@ -5842,11 +5878,12 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   G.watchTick = function () {
     const W = G.W;
     if (!W || W.title || watching || !live() || W.cre.length < 4) return;
+    // one look every nine seconds, as it has always been (G.ai.gaps.watch), and at most one every two generations: at normal speed a generation lasts about a
+    // minute, and the pond has hardly changed between two looks, so looking more often would only cost.
+    if (W.lastLookGen !== undefined && W.gen - W.lastLookGen < 2) return;
     const picks = G.watchPick(12);
-    // the watcher's own spending slows it as it goes, whatever model it is: looking often at first, when the pond is learning what is nice,
-    // then rarely. A session's looks cost about 20 to 30 cents in all (WATCH_BUDGET); once spent it looks only now and then.
-    { const sp = G.ai.count && G.ai.count.watch ? G.ai.count.watch.usd || 0 : 0, B = G.WATCH_BUDGET; G.ai.gaps.watch = sp < B * 0.3 ? 2500 : sp < B * 0.6 ? 6000 : sp < B ? 12000 : 60000; }
     if (picks.length < 4 || !G.ai.allow('watch')) return;
+    W.lastLookGen = W.gen;
     const refs = G.referenceForms(), img = G.sheet(refs.concat(picks.map(function (c) { return c.g.f; })), { cw: 176, ch: 182, sc: 0.48, cols: 4, refs: refs.length });
     if (!img) return;
     watching = true;
@@ -6976,6 +7013,7 @@ G.addSystem({
     drawAddedThings();
     if (G.drawFields) G.drawFields(G.ctx);
     if (G.drawDeeds) G.drawDeeds(G.ctx);
+    if (G.drawBeyond) G.drawBeyond(G.ctx);
     drawCreatures();
     drawThingCaptions();
     drawEffects();
@@ -7516,6 +7554,7 @@ G.addSystem({
         path(ctx, f, W); ctx.strokeStyle = f.solid ? '#14202e' : light; ctx.lineWidth = f.solid ? 4 : 2.2; ctx.globalAlpha = f.solid ? 1 : 0.7; if (f.shape !== 'all') ctx.stroke(); ctx.globalAlpha = 1;
       }
       // its name and what it does
+      if (f.quiet && !coming) continue;
       const c = centre(f, W), inv = 1 / Math.max(0.7, v.scale), does = words(f), line2 = coming ? 'coming in ' + Math.ceil(f.start - W.t) + 's' + (does ? ' · ' + does : '') : (does || 'harmless') + (f.solid ? ' · ' + Math.round((1 - hp) * 100) + '% worn' + (f.atk ? ' · ' + f.atk + ' breaking it' : f.weak >= 0 && G.WEAK ? ' · weak to ' + G.WEAK[f.weak].text : '') : ' · ' + Math.ceil(f.life) + 's');
       ctx.save(); ctx.translate(c[0], c[1]); ctx.scale(inv, inv); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = '700 12px system-ui, sans-serif'; const w1 = ctx.measureText(f.name).width; ctx.font = '600 10.5px system-ui, sans-serif'; const tw = Math.max(w1, ctx.measureText(line2).width) + 20;
@@ -7583,7 +7622,7 @@ G.addSystem({
   // once a generation: perhaps somebody takes something into their head
   { let rt0 = -1, idle = 0; setInterval(function () { const W = G.W, rt = G.rt || 0; if (!W || W.title || G.mode !== 'play' || rt === rt0) { rt0 = rt; return; } const d = Math.min(20, Math.max(0, rt - rt0)); rt0 = rt;      // only time really played counts
     if (W.deed || asking) { idle = 0; return; } idle += d;
-    if (idle < 100 || W.gen < 5 || W.cre.length < 14) return;
+    if (idle < 150 || W.gen < 5 || W.cre.length < 14) return;
     if (G.rand() < 0.5 && G.deedAsk()) idle = 0; }, 10000); }
 
   function begin(raw) {
@@ -7614,8 +7653,8 @@ G.addSystem({
     if (how === 'done' && d.result && G.addField && G.cleanFields) {
       const r = d.result, m = Math.min(W.ww, W.wh);
       const f = G.addField(G.cleanFields([{ name: r.name, stuff: r.stuff, shape: r.solid ? 'ring' : r.shape, x: d.x / W.ww, y: d.y / W.wh, r: r.size, width: 0.1, solid: r.solid, feed: r.feed, slow: r.slow, hurt: Math.min(r.hurt, 0.5), pull: r.pull, life: r.life }])[0]);
-      if (f) f.spare = d.sp;                                                  // it is theirs: it does not harm them
-      made = { name: r.name, looks: r.looks, x: d.x, y: d.y, r: Math.min(r.size * m, 150), until: W.t + r.life, by: d.kind, hue: d.hue, field: f ? f.id : 0 };
+      if (f) { f.spare = d.sp; f.quiet = true; }                                                  // it is theirs: it does not harm them
+      made = { name: r.name, looks: r.looks, x: d.x, y: d.y, r: Math.min(r.size * m, 150), until: W.t + r.life, by: d.kind, hue: d.hue, field: f ? f.id : 0, plan: d.title, what: d.what, why: d.why, gen: W.gen };
       (W.works = W.works || []).push(made); if (W.works.length > 6) W.works.shift();
       if (G.figureFor) G.figureFor({ name: r.name, note: r.looks + ' Built by small pond creatures.', hue: d.hue }, r.looks).then(function (fig) { made.fig = fig || null; });
     }
@@ -7666,7 +7705,16 @@ G.addSystem({
   { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (W && W.deed) deedStep(dt); if (W && W.works && W.works.length && W.works[0].until < W.t) W.works.shift(); }; }
 
   // ── seen ──
-  const mound = function (ctx, x, y, r, hue, grow) { for (let i = 0; i < 9; i++) { const a = i * 2.4, q = (0.25 + (i % 3) * 0.2) * r * grow; ctx.beginPath(); ctx.arc(x + Math.cos(a) * q * 0.8, y - (i / 9) * r * 0.9 * grow + Math.sin(a) * q * 0.2, r * (0.3 - i * 0.018) * (0.5 + 0.5 * grow), 0, TAU); ctx.fillStyle = G.hsl(hue + i * 6, 35, 46 + (i % 3) * 8, 1); ctx.fill(); ctx.strokeStyle = '#14202e'; ctx.lineWidth = 2; ctx.stroke(); } };
+  // what is being raised, before its picture has come: a neat rounded heap, lit from above, with a glow and a few sparks
+  const mound = function (ctx, x, y, r, hue, grow) {
+    const R = Math.min(r, 110) * (0.35 + 0.65 * grow), t = G.rt || 0, rows = [[0, 0, 0.5], [-0.42, 0.1, 0.36], [0.42, 0.1, 0.36], [-0.2, -0.36, 0.34], [0.22, -0.36, 0.34], [0, -0.66, 0.28]].slice(0, 1 + Math.round(5 * grow));
+    let g = ctx.createRadialGradient(x, y - R * 0.3, 0, x, y - R * 0.3, R * 1.5); g.addColorStop(0, G.hsl(hue, 80, 70, 0.28)); g.addColorStop(1, G.hsl(hue, 80, 70, 0)); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - R * 0.3, R * 1.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(4,12,20,0.3)'; ctx.beginPath(); ctx.ellipse(x, y + R * 0.46, R * 0.95, R * 0.2, 0, 0, TAU); ctx.fill();
+    for (let i = 0; i < rows.length; i++) { const cx = x + rows[i][0] * R, cy = y + rows[i][1] * R, rr = rows[i][2] * R;
+      g = ctx.createRadialGradient(cx - rr * 0.35, cy - rr * 0.4, rr * 0.1, cx, cy, rr); g.addColorStop(0, G.hsl(hue + i * 9, 50, 78, 1)); g.addColorStop(1, G.hsl(hue + i * 9, 45, 40, 1));
+      ctx.beginPath(); ctx.arc(cx, cy, rr, 0, TAU); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = '#14202e'; ctx.lineWidth = 2; ctx.stroke(); }
+    for (let i = 0; i < 6; i++) { const a = t * 0.9 + i * 1.05, q = 0.5 + 0.5 * Math.sin(t * 2.4 + i * 1.7); ctx.beginPath(); ctx.arc(x + Math.cos(a) * R * 1.05, y - R * 0.3 + Math.sin(a) * R * 0.8, 1.4 + 2.2 * q, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,' + (0.25 + 0.6 * q) + ')'; ctx.fill(); }
+  };
   G.drawDeeds = function (ctx) {
     const W = G.W; if (!W || (!W.deed && !(W.works && W.works.length))) return;
     const v = G.view, s = v.scale * v.dpr, t = G.rt || 0, inv = 1 / Math.max(0.7, v.scale);
@@ -7799,7 +7847,7 @@ G.addSystem({
 (function () {
   'use strict';
   if (typeof document === 'undefined') return;
-  let box = null, sig = '', seen = {}, shut = false;
+  let box = null, sig = '', seen = {}, shut = false, tab = 'plans', open = '';
   const esc = function (s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   // what a marvel DOES, said plainly from its own numbers (the AI made the numbers up; this only reads them out)
   const WHO = { hunters: 'its hunters', others: 'other kinds', kin: 'its own kind', all: 'everyone near' };
@@ -7821,23 +7869,39 @@ G.addSystem({
   function ui() {
     if (box) return box;
     const st = document.createElement('style');
-    st.textContent = '#rarebox{position:fixed;left:14px;top:236px;width:min(330px,calc(100vw - 28px));padding:11px 14px;border-radius:16px;z-index:2;font:500 12px system-ui,sans-serif;color:#eaf4ff;max-height:52vh;overflow-y:auto}' +
-      '#rarebox .rk{font:800 10.5px system-ui,sans-serif;letter-spacing:.18em;color:#f6d365;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;min-height:26px}#rarebox .rk u{text-decoration:none;font-size:13px;letter-spacing:0;color:#fff;opacity:.8;margin-left:6px}#rarebox.shut{width:auto}' +
-      '#rarebox .rrow{display:flex;gap:10px;align-items:flex-start;padding:8px 7px;margin:4px -7px 0;border-radius:11px;cursor:pointer;border:1px solid transparent}#rarebox .rrow:hover{background:rgba(246,211,101,.1);border-color:rgba(246,211,101,.35)}' +
-      '#rarebox .ric{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;background:rgba(7,18,31,.5)}#rarebox .ric img{width:30px;height:30px}' +
-      '#rarebox b{color:#fff;font-size:14px;line-height:1.25}#rarebox .rsub{font-size:12.5px;color:#dcecff;line-height:1.45;margin-top:3px}' +
-      '#rarebox .rtag{display:inline-block;margin-left:5px;padding:0 6px;border-radius:8px;background:rgba(51,214,166,.16);border:1px solid rgba(51,214,166,.55);font-size:10.5px;font-weight:600;color:#dffbf1;white-space:nowrap}' +
-      '#rarebox .rl{display:grid;grid-template-columns:42px 1fr;gap:2px 6px;margin-top:5px;font-size:12.5px;line-height:1.4;color:#eef6ff}#rarebox .rl i{font:800 9px system-ui,sans-serif;letter-spacing:.12em;color:#8fb2d6;padding-top:4px;font-style:normal}#rarebox .rn{display:inline-block;padding:0 7px;border-radius:9px;font-weight:700;font-size:11.5px;color:#fff;border:1px solid rgba(255,255,255,.35);white-space:nowrap}#rarebox .rnone{font-size:12px;color:#b9cde2;margin-top:7px;line-height:1.4}' +
+    st.textContent = '#rarebox{position:fixed;left:14px;top:236px;width:min(340px,calc(100vw - 28px));padding:10px 12px 12px;border-radius:18px;z-index:2;font:500 12.5px/1.45 system-ui,sans-serif;color:#eaf4ff;max-height:54vh;overflow-y:auto;scrollbar-width:thin}' +
+      '#rarebox.shut{width:auto;padding:7px 10px 7px 12px;border-radius:999px}' +
+      '#rarebox .rk{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;min-height:28px}#rarebox .rk>span:first-child{font:800 10.5px system-ui,sans-serif;letter-spacing:.16em;color:#f6d365;text-transform:uppercase;white-space:nowrap}' +
+      '#rarebox .rc{display:flex;align-items:center;gap:5px}#rarebox .rc em{font:700 10.5px system-ui,sans-serif;font-style:normal;padding:2px 8px;border-radius:999px;background:rgba(246,211,101,.16);border:1px solid rgba(246,211,101,.55);color:#ffe9a8;white-space:nowrap}' +
+      '#rarebox .rk u{text-decoration:none;display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;font-size:11px}#rarebox .rk:hover u{background:rgba(255,255,255,.22)}' +
+      '#rarebox .rh{font:800 9px system-ui,sans-serif;letter-spacing:.16em;color:#8fb2d6;text-transform:uppercase;margin:11px 2px 5px}' +
+      '#rarebox .rrow{position:relative;display:flex;gap:10px;align-items:flex-start;padding:9px 26px 10px 9px;margin-top:6px;border-radius:13px;cursor:pointer;background:rgba(7,18,31,.38);border:1px solid rgba(207,232,255,.12);transition:background .15s,border-color .15s}#rarebox .rrow:hover{background:rgba(246,211,101,.1);border-color:rgba(246,211,101,.5)}' +
+      '#rarebox .rrow:after{content:"\\203A";position:absolute;right:9px;top:8px;font-size:18px;line-height:1;color:#fff;opacity:.35}#rarebox .rrow:hover:after{opacity:.9}' +
+      '#rarebox .rrow.live{background:rgba(246,211,101,.09);border-color:rgba(246,211,101,.55)}#rarebox .rrow.old{padding-top:7px;padding-bottom:7px;background:transparent}' +
+      '#rarebox .ric{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;background:rgba(7,18,31,.6);border:1px solid rgba(207,232,255,.18)}#rarebox .ric img{width:28px;height:28px}#rarebox .old .ric{width:24px;height:24px;font-size:12px;opacity:.8}' +
+      '#rarebox .rt{display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px}#rarebox b{color:#fff;font-size:14px;line-height:1.25}#rarebox .old b{font-size:12.5px;font-weight:600}' +
+      '#rarebox .rsub{font-size:12.5px;color:#dcecff;margin-top:3px}#rarebox .old .rsub{font-size:11.5px;color:#b9cde2;margin-top:1px}' +
+      '#rarebox .rtag{display:inline-block;padding:1px 7px;border-radius:999px;background:rgba(51,214,166,.16);border:1px solid rgba(51,214,166,.55);font-size:10px;font-weight:700;color:#dffbf1;white-space:nowrap}#rarebox .rtag.no{background:rgba(255,125,150,.14);border-color:rgba(255,125,150,.5);color:#ffdfe6}' +
+      '#rarebox .rl{display:grid;grid-template-columns:38px 1fr;gap:5px 8px;margin-top:7px;font-size:12.5px;color:#eef6ff}#rarebox .rl i{font:800 8.5px system-ui,sans-serif;letter-spacing:.12em;color:#8fb2d6;padding-top:4px;font-style:normal}' +
+      '#rarebox .rn{display:inline-block;padding:0 8px;border-radius:999px;font-weight:700;font-size:11.5px;line-height:1.6;color:#fff;border:1px solid rgba(255,255,255,.35);white-space:nowrap}' +
+      '#rarebox .rs{display:flex;gap:4px;margin-top:9px}#rarebox .rs span{flex:1;min-width:0;text-align:center;font:700 8.5px system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#8fb2d6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#rarebox .rs span:before{content:"";display:block;height:5px;border-radius:3px;background:rgba(207,232,255,.18);margin-bottom:3px}#rarebox .rs .dn{color:#bfe9d9}#rarebox .rs .dn:before{background:#33d6a6}#rarebox .rs .on{color:#f6d365}#rarebox .rs .on:before{background:linear-gradient(90deg,#f6d365 var(--p),rgba(207,232,255,.18) var(--p))}' +
+      '#rarebox .rnow{margin-top:5px;font-size:12px;color:#dcecff}#rarebox .rnow b{font-size:12.5px;color:#f6d365}' +
+      '#rarebox .rnone{font-size:12px;color:#b9cde2;margin:8px 2px 0;line-height:1.45}' +
+      '#rarebox{scrollbar-color:rgba(207,232,255,.35) transparent}#rarebox::-webkit-scrollbar{width:6px}#rarebox::-webkit-scrollbar-track{background:transparent}#rarebox::-webkit-scrollbar-thumb{background:rgba(207,232,255,.3);border-radius:3px}' +
+      '#rarebox .tabs2{display:flex;gap:6px;margin:8px 0 2px}#rarebox .tabs2 span{flex:1;text-align:center;padding:6px 4px;border-radius:10px;cursor:pointer;font:700 11.5px system-ui,sans-serif;color:#b9cde2;background:rgba(7,18,31,.4);border:1px solid rgba(207,232,255,.14)}#rarebox .tabs2 span.on{color:#14202e;background:#f6d365;border-color:#f6d365}#rarebox .tabs2 span i{font-style:normal;opacity:.75;margin-left:4px}#rarebox .tabs2 span.new:not(.on){border-color:#f6d365;color:#ffe9a8}' +
+      '#rarebox .rmore{margin-top:8px;padding-top:8px;border-top:1px solid rgba(207,232,255,.16);font-size:12px;color:#dcecff}#rarebox .rmore img{display:block;width:120px;height:120px;margin:0 auto 6px}#rarebox .rmore ul{margin:4px 0 0;padding:0;list-style:none}#rarebox .rmore li{padding:2px 0 2px 14px;position:relative;color:#ffe9a8;font-weight:600}#rarebox .rmore li:before{content:"\\25C6";position:absolute;left:0;font-size:8px;top:6px}' +
       '#rarebox.flash{animation:rareflash 1.4s ease-out 2}@keyframes rareflash{0%{box-shadow:0 0 0 0 rgba(246,211,101,.9)}100%{box-shadow:0 0 0 22px rgba(246,211,101,0)}}' +
-      '@media (max-width:720px){#rarebox{top:auto;bottom:150px;left:7px;max-height:26vh}}@media (max-height:560px){#rarebox{display:none}}';
+      '@media (max-width:720px){#rarebox{top:auto;bottom:150px;left:7px;max-height:30vh}}@media (max-height:560px){#rarebox{display:none}}';
     document.head.appendChild(st);
     box = document.createElement('div'); box.id = 'rarebox'; box.className = 'glass hide';
     (document.getElementById('ui') || document.body).appendChild(box);
     box.addEventListener('click', function (e) {
       let n = e.target; while (n && n !== box && !(n.dataset && n.dataset.go)) n = n.parentNode;
       { let k = e.target; while (k && k !== box && !(k.classList && k.classList.contains('rk'))) k = k.parentNode; if (k && k !== box) { shut = !shut; sig = ''; if (G.sfx) G.sfx('click'); draw(); return; } }
+      { let k = e.target; while (k && k !== box && !(k.dataset && k.dataset.tab)) k = k.parentNode; if (k && k !== box) { tab = k.dataset.tab; sig = ''; if (G.sfx) G.sfx('click'); draw(); return; } }
       if (!n || n === box) return;
       const W = G.W, go = n.dataset.go;
+      open = open === go ? '' : go; sig = ''; setTimeout(draw, 0);
       if (G.sfx) G.sfx('click');
       if (go === 'deed') { if (W.deed) G.focusOn(W.deed.x, W.deed.y, 1.6); return; }
       if (go.charAt(0) === 'w') { const w = (W.works || [])[+go.slice(1)]; if (w) G.focusOn(w.x, w.y, 1.6); return; }
@@ -7847,6 +7911,7 @@ G.addSystem({
     });
     return box;
   }
+  const SHORT = { gather: 'gather', circle: 'council', line: 'form up', carry: 'fetch', build: 'build', charge: 'charge', guard: 'guard', scatter: 'set off' };
   const STEP = { gather: 'gathering', circle: 'in council', line: 'forming up', carry: 'fetching and carrying', build: 'building', charge: 'charging', guard: 'standing guard', scatter: 'setting off' };
   // a kind's name is a made-up word: it is set apart in its own colour, so it is not read as English
   const chip = function (name, hue) { return '<span class="rn" style="background:' + G.hsl(hue === undefined ? 200 : hue, 55, 34, 0.9) + '">' + esc(name) + '</span>'; };
@@ -7866,19 +7931,30 @@ G.addSystem({
     const d = W.deed, dn = d ? W.cre.filter(function (c) { return c.deedId === d.id && !c.dead; }).length : 0;
     const Wk = W.works || [], Pa = W.deedPast || [];
     const s2 = order.map(function (id) { return id + ':' + by[id].n; }).join(',') + '|' + (d ? d.id + ':' + d.i + ':' + dn + ':' + Math.round(d.progress * 20) + ':' + Math.round((d.steps[d.i].secs - d.t) / 2) : '') + '|' + Wk.map(function (w) { return w.name + (w.fig ? 1 : 0); }).join(',') + '|' + Pa.length + ':' + (Pa.length ? Pa[Pa.length - 1].gen : 0);
-    if (s2 + shut === sig) return; sig = s2 + shut; box.classList.toggle('shut', shut);
-    let fresh = false, h = '<div class="rk"><span>★ Rare in this pond</span><span>' + [order.length ? order.length + (order.length === 1 ? ' marvel' : ' marvels') : '', d ? 'a plan' : '', Wk.length ? Wk.length + ' built' : ''].filter(Boolean).join(' · ') + '<u>' + (shut ? '▸' : '▾') + '</u></span></div>';
+    if (s2 + shut + tab + open === sig) return; sig = s2 + shut + tab + open; box.classList.toggle('shut', shut);
+    const chips = [order.length ? order.length + (order.length === 1 ? ' marvel' : ' marvels') : '', d ? 'a plan' : '', Wk.length ? Wk.length + ' built' : ''].filter(Boolean);
+    let fresh = false, h = '<div class="rk" title="' + (shut ? 'Open' : 'Fold away') + '"><span>★ Rare' + (shut ? '' : ' in this pond') + '</span><span class="rc">' + chips.map(function (c) { return '<em>' + c + '</em>'; }).join('') + '<u>' + (shut ? '▸' : '▾') + '</u></span></div>';
     if (shut) { for (let i = 0; i < order.length; i++) if (!seen['m' + order[i]]) { seen['m' + order[i]] = 1; fresh = true; } if (d && !seen['d' + d.id]) { seen['d' + d.id] = 1; fresh = true; } box.innerHTML = h; if (fresh) { box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash'); } return; }
-    if (d) { if (!seen['d' + d.id]) { seen['d' + d.id] = 1; fresh = true; } const st = d.steps[d.i];
-      h += '<div class="rrow" data-go="deed"><span class="ric">⚑</span><span><b>' + esc(d.title) + '</b><span class="rtag">a plan</span>' + plan(d, '<i>NOW</i><span><b style="font-size:12.5px;color:#f6d365">' + cap(STEP[st.do] || st.do).slice(0, -1) + (st.do === 'build' ? ' ' + Math.round(d.progress * 100) + '%' : '') + '</b> · ' + dn + ' of them · step ' + (d.i + 1) + ' of ' + d.steps.length + '</span>') + '</span></div>'; }
-    for (let i = Wk.length - 1; i >= 0; i--) { const w = Wk[i];
-      h += '<div class="rrow" data-go="w' + i + '"><span class="ric">' + (w.fig && G.figurePic && G.figurePic(w.name) ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(G.figurePic(w.name)) + '">' : '▲') + '</span><span><b>' + esc(w.name) + '</b><span class="rtag">built</span><div class="rl"><i>BY</i><span>' + chip(w.by, w.hue) + '</span><i>IT IS</i><span>' + esc(cap(w.looks)) + '</span></div></span></div>'; }
-    for (let i = 0; i < order.length; i++) { const q = by[order[i]], m = q.d; if (!seen['m' + m.id]) { seen['m' + m.id] = 1; fresh = true; }
-      h += '<div class="rrow" data-go="m' + m.id + '"><span class="ric">' + (m.emblem ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(m.emblem) + '">' : '★') + '</span><span><b>' + esc(m.name) + '</b> ×' + q.n + (m.words && m.words.length ? '<span class="rtag">talks</span>' : '') + '<div class="rsub">' + esc(m.wonder) + '</div></span></div>'; }
-    for (let i = Pa.length - 1; i >= 0 && i >= Pa.length - 3; i--) { const p = Pa[i];
-      h += '<div class="rrow" data-go="p' + i + '" style="opacity:.8"><span class="ric">✓</span><span><b>' + esc(p.title) + '</b><span class="rtag">' + (p.how === 'done' ? 'done' : 'gave up') + ' · gen ' + p.gen + '</span>' + plan(p, '') + '</span></div>'; }
-    if (!d && (order.length || Wk.length || Pa.length)) h += '<div class="rnone">No plan under way just now' + (Pa.length ? ' (the last was in generation ' + Pa[Pa.length - 1].gen + ')' : '') + '.</div>';
-    if (!d && !order.length && !Wk.length && !Pa.length) h += '<div class="rnone">Nothing rare alive just now. Every few minutes a creature is born with a marvel, or a kind decides to do something together. It will show here, and you can click it to go there.</div>';
+    const newM = order.some(function (id) { return !seen['m' + id]; }), newD = !!(d && !seen['d' + d.id]);
+    if (newD) tab = 'plans'; else if (newM && !d) tab = 'marvels';
+    h += '<div class="tabs2"><span data-tab="plans" class="' + (tab === 'plans' ? 'on' : '') + (d ? ' new' : '') + '">⚑ Plans<i>' + ((d ? 1 : 0) + Wk.length + Pa.length || '') + '</i></span><span data-tab="marvels" class="' + (tab === 'marvels' ? 'on' : '') + (order.length ? ' new' : '') + '">★ Marvels<i>' + (order.length || '') + '</i></span></div>';
+    const P = tab === 'plans';
+    if (d && !P && !seen['d' + d.id]) { seen['d' + d.id] = 1; fresh = true; }
+    if (d && P) { if (!seen['d' + d.id]) { seen['d' + d.id] = 1; fresh = true; } const st = d.steps[d.i];
+      h += '<div class="rh">Happening now</div><div class="rrow live" data-go="deed"><span class="ric">⚑</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(d.title) + '</b><span class="rtag">a plan</span></span>' + plan(d, ' ') +
+        '<div class="rs">' + d.steps.map(function (q, i) { return '<span class="' + (i < d.i ? 'dn' : i === d.i ? 'on' : '') + '"' + (i === d.i ? ' style="--p:' + Math.round(100 * Math.min(1, d.t / q.secs)) + '%"' : '') + '>' + (SHORT[q.do] || q.do) + '</span>'; }).join('') + '</div>' +
+        '<div class="rnow"><b>' + cap(STEP[st.do] || st.do).slice(0, -1) + (st.do === 'build' ? ' ' + Math.round(d.progress * 100) + '%' : '') + '</b> · ' + dn + ' of them · about ' + Math.max(1, Math.ceil(d.steps.slice(d.i).reduce(function (a, q) { return a + q.secs; }, 0) - d.t)) + ' s to go</div></span></div>'; }
+    for (let i = 0; i < order.length; i++) if (!seen['m' + order[i]]) { seen['m' + order[i]] = 1; fresh = true; }
+    for (let i = 0; i < order.length && !P; i++) { const q = by[order[i]], m = q.d; if (!seen['m' + m.id]) { seen['m' + m.id] = 1; fresh = true; }
+      h += '<div class="rrow" data-go="m' + m.id + '"><span class="ric">' + (m.emblem ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(m.emblem) + '">' : '★') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(m.name) + '</b><span class="rtag">' + q.n + (q.n === 1 ? ' carries it' : ' carry it') + '</span>' + (m.words && m.words.length ? '<span class="rtag">talks</span>' : '') + '</span><div class="rsub">' + esc(m.wonder) + '</div>' + (open === 'm' + m.id ? '<div class="rmore">' + (G.marvelDoes(m).length ? '<ul>' + G.marvelDoes(m).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') + (m.why ? '<div style="margin-top:5px;font-style:italic;opacity:.8">' + esc(m.why) + '</div>' : '') + '</div>' : '') + '</span></div>'; }
+    if (Wk.length && P) h += '<div class="rh">They built</div>';
+    for (let i = Wk.length - 1; i >= 0 && P; i--) { const w = Wk[i], pic = w.fig && G.figurePic && G.figurePic(w.name), fl = (W.fields || []).filter(function (f) { return f.id === w.field; })[0];
+      h += '<div class="rrow" data-go="w' + i + '"><span class="ric">' + (w.fig && G.figurePic && G.figurePic(w.name) ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(G.figurePic(w.name)) + '">' : '▲') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(w.name) + '</b>' + chip(w.by, w.hue) + '</span><div class="rsub">' + esc(cap(w.looks)) + '</div>' + (open === 'w' + i ? '<div class="rmore">' + (pic ? '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pic) + '">' : '<div style="opacity:.7">Its picture is still being drawn.</div>') + '<div class="rl" style="margin-top:0">' + (w.what ? '<i>HOW</i><span>' + names('They set out to ' + String(w.what).replace(/\.$/, '') + '.') + '</span><i>WHY</i><span>' + names(cap(w.why)) + '</span>' : '') + '<i>DOES</i><span>' + esc(fl && G.fieldWords ? (G.fieldWords(fl) || 'It simply stands there.') : 'It simply stands there.') + (fl ? ' It does not harm its builders.' : '') + '</span><i>LASTS</i><span>' + Math.max(0, Math.round(w.until - W.t)) + ' more seconds of pond time' + (w.gen ? ' · built in generation ' + w.gen : '') + '</span></div></div>' : '') + '</span></div>'; }
+    if (Pa.length && P) h += '<div class="rh">Earlier plans</div>';
+    for (let i = Pa.length - 1; i >= 0 && i >= Pa.length - 3 && P; i--) { const p = Pa[i];
+      h += '<div class="rrow old" data-go="p' + i + '"><span class="ric">' + (p.how === 'done' ? '✓' : '✕') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(p.title) + '</b><span class="rtag' + (p.how === 'done' ? '' : ' no') + '">' + (p.how === 'done' ? 'done' : 'gave up') + ' · gen ' + p.gen + '</span></span><div class="rsub">' + chip(p.kind, p.hue) + ' ' + (p.what ? names('set out to ' + p.what.replace(/\.$/, '') + '.') : names(p.say)) + '</div></span></div>'; }
+    if (P && !d) h += '<div class="rnone">' + (Wk.length || Pa.length ? 'No plan under way just now.' : 'No plan yet. Every few minutes a kind of creature decides to do something together: build, march, meet. It shows here.') + '</div>';
+    if (!P && !order.length) h += '<div class="rnone">No marvel alive just now. Every few minutes a creature is born with a rare gift. It shows here, and a click takes you to it.</div>';
     box.innerHTML = h;
     if (fresh) { box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash'); }
   }
@@ -7904,25 +7980,77 @@ G.addSystem({
     g = G.clamp(g, 1, MAXG); if (Math.abs(g - (v.grow || 1)) < 0.001) return;
     const ow = W.ww, oh = W.wh, cx = G.cam.x / ow, cy = G.cam.y / oh;
     v.grow = g;
-    if (G.canvas) G.resize(); else { v.wh = 1400 * g; v.ww = ow * v.wh / oh; }
+    v.wh = 1400 * g; if (G.canvas && v.h) { v.base = v.h / v.wh; v.ww = G.clamp(v.w / v.base, 840 * g, 3360 * g); } else v.ww = ow * v.wh / oh;      // (the same sum as G.resize, without rebuilding the canvas)
     W.ww = v.ww; W.wh = v.wh;
     const kx = W.ww / ow, ky = W.wh / oh;
     const mv = function (L, also) { if (!L) return; for (let i = 0; i < L.length; i++) { const o = L[i]; if (!o || typeof o.x !== 'number') continue; o.x *= kx; o.y *= ky; if (also) { if (typeof o.px === 'number') { o.px *= kx; o.py *= ky; } if (typeof o.tx === 'number') { o.tx *= kx; o.ty *= ky; } } } };
     mv(W.cre, true); mv(W.food); mv(W.zones); mv(W.births); mv(W.lights); mv(W.works); mv(W.deedPast); if (W.deed) mv([W.deed]);
     G.cam.x = cx * W.ww; G.cam.y = cy * W.wh; G.applyCam();
-    G.emit('pond-grew', g);
   };
-  let told = 1;
+  let told = 1, aim = 0;
+  if (typeof setInterval !== 'undefined' && typeof document !== 'undefined') setInterval(function () { const W = G.W, v = G.view; if (!W || W.title || !aim || G.mode !== 'play') return; const g = v.grow || 1; if (Math.abs(aim - g) < 0.002) { aim = 0; return; } G.pondGrowTo(g + G.clamp(aim - g, -0.004, 0.006)); }, 50);
   G.on('scored', function () {
     const W = G.W, v = G.view; if (!W || W.title) return;
     const g = v.grow || 1, want = G.clamp(g * Math.sqrt(G.pondCover() / ROOM), 1, MAXG);
-    if (want > g * 1.02) G.pondGrowTo(Math.min(want, g * 1.1));              // a tenth at a time: it widens over a few generations
-    else if (want < g * 0.6) G.pondGrowTo(Math.max(want, g * 0.985));         // and draws in again, slowly, if they turn small
+    let to = 0;
+    if (want > g * 1.02) to = Math.min(want, g * 1.12);                      // an eighth at a time: it widens over a few generations
+    else if (want < g * 0.6) to = Math.max(want, g * 0.985);                 // and draws in again, slowly, if they turn small
+    if (to) { if (typeof document === 'undefined' || G.mode !== 'play') G.pondGrowTo(to); else { if (to > g) G.emit('pond-grew', to); aim = to; } }
     const now = v.grow || 1;
-    if (G.mode === 'play' && now >= told + 0.3) { told = now; if (G.toast) G.toast('The pond has grown: there are more of them, and bigger, so there is more water.'); if (G.log) G.log('disc', 'The pond grew', 'It is now ' + now.toFixed(1) + ' times as wide as it began.'); }
+    if (G.mode === 'play' && now >= told + 0.3) { told = now; if (G.toast) G.toast('The mist drew back: the pond is wider now, because its creatures needed the room.'); if (G.log) G.log('disc', 'The pond grew', 'It is now ' + now.toFixed(1) + ' times as wide as it began.'); }
   });
   // a new pond starts small again
   { const new0 = G.newWorld; G.newWorld = function (opts) { const v = G.view; if (v.grow && v.grow !== 1) { v.grow = 1; if (G.canvas) G.resize(); else { v.ww = v.ww * 1400 / v.wh; v.wh = 1400; } } told = 1; return new0(opts); }; }
+})();
+
+</script>
+<script data-part="beyond">
+// ── Beyond the pond ──
+// The pond has no wall round it. At its sides and its floor the water simply goes on, into a mist nobody has been through:
+// far lights wink in it, and now and then something very large passes. When the pond grows (57_grow) it is this mist that
+// draws back, and what was hidden becomes water to live in. Drawn over the pond, in the pond's own measure.
+(function () {
+  'use strict';
+  const TAU = 6.2832;
+  let pulse = 0;          // 1 just after the mist drew back, fading: the rim glows for a moment
+  G.on('pond-grew', function () { pulse = 1; });
+  G.drawBeyond = function (ctx) {
+    const W = G.W; if (!W || W.title) return;
+    const v = G.view, s = v.scale * v.dpr, t = G.rt || 0, ww = W.ww, wh = W.wh, B = Math.min(ww, wh) * 0.14, top = G.shoreY ? G.shoreY(W) : 0;
+    // nothing of it is on screen when you are zoomed in on the middle
+    const x0 = -v.ox / v.scale, y0 = -v.oy / v.scale, x1 = x0 + v.w / v.scale, y1 = y0 + v.h / v.scale;
+    if (x0 > B && x1 < ww - B && y1 < wh - B) { pulse = Math.max(0, pulse - 0.01); return; }
+    ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr);
+    const mist = function (a) { return 'rgba(5,16,27,' + a + ')'; };
+    const band = function (gx0, gy0, gx1, gy1, rx, ry, rw, rh) { const g = ctx.createLinearGradient(gx0, gy0, gx1, gy1); g.addColorStop(0, mist(0.96)); g.addColorStop(0.45, mist(0.55)); g.addColorStop(1, mist(0)); ctx.fillStyle = g; ctx.fillRect(rx, ry, rw, rh); };
+    band(0, 0, B, 0, -400, top, B + 400, wh - top + 400);                       // left
+    band(ww, 0, ww - B, 0, ww - B, top, B + 400, wh - top + 400);               // right
+    band(0, wh, 0, wh - B, -400, wh - B, ww + 800, B + 400);                    // the floor
+    // the mist moves: slow banks of it drifting along the edges
+    for (let i = 0; i < 26; i++) {
+      const side = i % 3, u = ((i * 0.381966 + t * (0.004 + (i % 5) * 0.0012)) % 1), in_ = (0.25 + 0.55 * ((i * 0.7548) % 1)) * B, r = B * (0.5 + ((i * 0.5698) % 1) * 0.6);
+      const x = side === 0 ? in_ : side === 1 ? ww - in_ : u * ww, y = side === 2 ? wh - in_ : top + u * (wh - top);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(130,185,215,' + (0.17 + 0.07 * Math.sin(t * 0.4 + i)) + ')'); g.addColorStop(1, 'rgba(120,170,200,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    }
+    // far lights in it: somebody else's ponds, or eyes
+    for (let i = 0; i < 46; i++) {
+      const side = i % 3, u = (i * 0.618034) % 1, in_ = (0.08 + 0.5 * ((i * 0.3247) % 1)) * B, tw = 0.5 + 0.5 * Math.sin(t * (0.6 + (i % 7) * 0.13) + i * 2.1);
+      const x = side === 0 ? in_ : side === 1 ? ww - in_ : u * ww, y = side === 2 ? wh - in_ : top + u * (wh - top);
+      ctx.beginPath(); ctx.arc(x, y, 2.2 + 3.2 * tw, 0, TAU); ctx.fillStyle = 'hsla(' + (170 + (i * 47) % 120) + ',80%,78%,' + (0.2 + 0.6 * tw) + ')'; ctx.fill();
+    }
+    // and, every so often, something very large goes by out there
+    { const period = 70, k = Math.floor(t / period), u = (t % period) / 26; if (u < 1) { const side = k % 3, dir = k % 2 ? 1 : -1, len = B * 2.6, q = dir > 0 ? u : 1 - u, a = Math.sin(u * 3.1416) * 0.5;
+        const x = side === 0 ? B * 0.22 : side === 1 ? ww - B * 0.22 : -len + q * (ww + len * 2), y = side === 2 ? wh - B * 0.22 : top - len + q * (wh - top + len * 2), vert = side !== 2;
+        ctx.save(); ctx.translate(x, y); if (vert) ctx.rotate(1.5708); ctx.scale(dir, 1);
+        ctx.fillStyle = 'rgba(2,8,14,' + a + ')'; ctx.beginPath(); ctx.ellipse(0, 0, len * 0.5, B * 0.2, 0, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-len * 0.45, 0); ctx.lineTo(-len * 0.72, -B * 0.22); ctx.lineTo(-len * 0.72, B * 0.22); ctx.closePath(); ctx.fill();      // a tail
+        ctx.beginPath(); ctx.arc(len * 0.36, -B * 0.04, B * 0.028, 0, TAU); ctx.fillStyle = 'rgba(190,240,255,' + a * 1.3 + ')'; ctx.fill();                    // an eye
+        ctx.restore(); } }
+    // the mist has just drawn back: its edge shines for a moment
+    if (pulse > 0.01) { ctx.strokeStyle = 'rgba(190,235,255,' + 0.55 * pulse + ')'; ctx.lineWidth = 6 + 26 * (1 - pulse); ctx.beginPath(); ctx.moveTo(B, top); ctx.lineTo(B, wh - B); ctx.lineTo(ww - B, wh - B); ctx.lineTo(ww - B, top); ctx.stroke(); pulse = Math.max(0, pulse - 0.006); }
+    ctx.restore();
+  };
 })();
 
 </script>
@@ -8999,7 +9127,7 @@ G.addSystem({
     if (!on) return;
     if (S.busy || !S.cur) { box.classList.remove('open'); S.open = false; box.innerHTML = '<div class="wk"><span>✦ The wish of the pond</span></div><div class="wdream"><span class="wdot"></span>' + (S.asked === 'another' ? 'The pond is dreaming of something else…' : S.asked === 'next' ? 'The pond is dreaming its next wish…' : 'The pond is dreaming…') + '</div>'; return; }
     const b = S.best, pct = b ? Math.round(b.close * 10) : 0;
-    box.innerHTML = '<div class="wk"><span>✦ The pond wishes for · level ' + S.level + '</span><span>' + (S.legends.length ? '★ ' + S.legends.length + (S.legends.length === 1 ? ' wish granted' : ' wishes granted') : '') + '</span></div>' +
+    box.innerHTML = '<div class="wk"><span>✦ The pond wishes for · level ' + S.level + '</span><span>' + (S.legends.length ? '★ ' + S.legends.length + (S.legends.length === 1 ? ' wish granted' : ' wishes granted') + ' · all your ponds' : '') + '</span></div>' +
       '<div class="wt">' + esc(S.cur.title) + '</div>' +
       '<div class="wbar"><i style="width:' + pct + '%"></i><b></b></div>' +
       '<div class="wsub"><small>' + (b ? 'Closest so far: <b style="color:#f6d365">' + b.close + ' of 10</b>' + (b.name ? ' (' + esc(b.name) + ')' : '') + '. ' + esc(b.why) + '.' : 'Nobody has been looked at yet. The pond looks every half a minute.') + '</small></div>' +
@@ -9881,6 +10009,27 @@ G.addSystem({
     draw();
     G.sfx('click');
   };
+})();
+
+</script>
+<script data-part="budget">
+// ── What a session may spend on the things that happen by themselves ──
+// One place for the limits on the AI calls nobody typed for: how far apart (milliseconds of real time) and how many in one
+// sitting. Worked out so that an hour of play costs cents, not dollars, whatever the speed:
+//   a plan          about 1.2 cents, and about 5 cents more if they build something (its picture)   at most 12
+//   a marvel        about 1.2 cents                                                                  at most 12
+//   the pond's own event  about 1.7 cents                                                            at most 10, five minutes apart
+//   the wish, looked at   about 0.35 cents                                                           once a minute, at most 60
+// Together: at most about a dollar and a quarter in a sitting, and usually far less.
+(function () {
+  'use strict';
+  if (!G.ai) return;
+  const g = G.ai.gaps, c = G.ai.caps;
+  g.deed = 90000; c.deed = 12;
+  g.marvel = 120000; c.marvel = 12;
+  g.nature = 300000; c.nature = 10;
+  g.wishcheck = 60000; c.wishcheck = 60;
+  c.figure = 14;
 })();
 
 </script>
