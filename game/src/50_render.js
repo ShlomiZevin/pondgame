@@ -407,13 +407,18 @@ function drawAddedThings() {
   }
   for (let i = 0; i < W.zones.length; i++) {
     const z = W.zones[i];
-    const form = G.zoneForm ? G.zoneForm(z) : null, im = form ? null : thingImage(z);
+    const fig = G.figureOf ? G.figureOf(z) : null, form = fig ? null : G.zoneForm ? G.zoneForm(z) : null, im = form || fig ? null : thingImage(z);
     const label = z.alive > 0.25 && z.genN > 1 ? z.word + ' · gen ' + z.genN : z.word;
-    drawOrb(ctx, z, z.x, z.y, z.r * 0.8, z.k, '', false, !!im || !!form);
+    drawOrb(ctx, z, z.x, z.y, z.r * 0.8, z.k, '', false, !!im || !!form || !!fig);
     if (form) {
       const sc = Math.max(84, z.r * 1.15) / 150 * (1 + 0.12 * Math.max(0, z.bite || 0));
       ctx.save(); ctx.globalAlpha = Math.min(1, 0.4 + z.k); ctx.translate(z.x, z.y - z.r * 0.08); ctx.scale(sc, sc);
       G.form.portrait(ctx, form, G.rt + z.id, {}); ctx.restore();
+    }
+    if (fig) {      // the AI's own drawing of what was typed, moving as a puppet
+      const sc = Math.max(84, z.r * 1.15) / 150 * (1 + 0.12 * Math.max(0, z.bite || 0)) * 1.15;
+      ctx.save(); ctx.globalAlpha = Math.min(1, 0.4 + z.k); ctx.translate(z.x, z.y - z.r * 0.08 + 104 * sc / 1.15); ctx.scale(sc, sc);
+      G.drawFigure(ctx, fig, z, G.rt + z.id); ctx.restore();
     }
     if (false) {
       const st = null;

@@ -3,6 +3,7 @@
 //   POST /api/ai/thing   { word }            → { thing }       what a typed word is made of
 //   POST /api/ai/ideas   { gen, species }    → { ideas }       mutation ideas for the living species
 //   POST /api/ai/organ   { the pond now }    → { organ }       a new body part invented for this pond
+//   POST /api/ai/figure  { word, note, hue } → { figure: { svg, pivots, floats } }   a typed being, DRAWN by the model as a puppet of parts (kept per word)
 //   POST /api/ai/plan    { the pond, have } → { plan }         a new SHAPE OF BODY (a few masses and how they join), answering what is happening in the pond
 //   POST /api/ai/design  { pressures, have... } → { design }   a new KIND of body part: a shape, how it moves, what it gives
 //   POST /api/ai/judge   { image, mime, creatures, check? } → { judge }   the model LOOKS at the creatures and grades each: score, why, one fix
@@ -178,6 +179,11 @@ function createApp(opts = {}) {
     if (route === 'POST /api/ai/design') {
       const body = await readJson(req, 12000);
       return send(res, 200, await ai.design(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr }));
+    }
+    if (route === 'POST /api/ai/figure') {
+      const body = await readJson(req, 2000);
+      const r = await ai.figure(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr });
+      return send(res, r.error === 'refused' ? 422 : r.error ? 400 : 200, r);
     }
     if (route === 'POST /api/ai/plan') {
       const body = await readJson(req, 12000);

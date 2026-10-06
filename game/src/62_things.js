@@ -32,7 +32,8 @@
   };
 
   function picture(z) {
-    if (z.svg) return '<img alt="" width="64" height="64" style="flex:none;border-radius:14px;background:rgba(7,18,31,.55);padding:4px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(z.svg) + '">';
+    const pic = z._figSvg || z.svg;
+    if (pic) return '<img alt="" width="64" height="64" style="flex:none;border-radius:14px;background:rgba(7,18,31,.55);padding:4px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pic) + '">';
     return '<div style="flex:none;width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 40% 35%, ' + G.hsl(z.hue, 90, 80, 1) + ', ' + G.hsl(z.hue, 85, 50, 0.5) + ' 60%, transparent 72%)"></div>';
   }
 
