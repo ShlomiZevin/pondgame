@@ -121,14 +121,14 @@
       const u = Math.max(0, (ts - splash.t0) / 3400);
       if (u >= 1) splash = null;
       else {
-        const c = COL[splash.kind] || COL.wonder, a = u < 0.12 ? u / 0.12 : u > 0.7 ? (1 - u) / 0.3 : 1;
+        const c = COL[splash.kind] || COL.wonder, lit = splash.kind === 'dark' ? [190, 195, 255] : c.map(function (v) { return Math.round(v + (255 - v) * 0.45); }), a = u < 0.12 ? u / 0.12 : u > 0.7 ? (1 - u) / 0.3 : 1;
         ctx.fillStyle = rgba(c, 0.3 * Math.max(0, 1 - u * 3)); ctx.fillRect(0, 0, W_, H_);
-        ctx.strokeStyle = rgba(c, 0.8 * (1 - u)); ctx.lineWidth = 10 * (1 - u) + 2; ctx.beginPath(); ctx.arc(W_ / 2, H_ / 2, u * Math.max(W_, H_) * 0.75, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = rgba(lit, 0.8 * (1 - u)); ctx.lineWidth = 10 * (1 - u) + 2; ctx.beginPath(); ctx.arc(W_ / 2, H_ / 2, u * Math.max(W_, H_) * 0.75, 0, TAU); ctx.stroke();
         const fs = Math.max(26, Math.min(64, W_ / Math.max(10, splash.name.length * 0.62)));
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '800 ' + fs + 'px system-ui, sans-serif';
-        ctx.shadowColor = rgba(c, 0.95 * a); ctx.shadowBlur = 34; ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(7,18,31,' + 0.85 * a + ')'; ctx.strokeText(splash.name.toUpperCase(), W_ / 2, H_ * 0.42);
+        ctx.shadowColor = rgba(lit, 0.95 * a); ctx.shadowBlur = 34; ctx.lineWidth = 7; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(4,10,18,' + 0.95 * a + ')'; ctx.strokeText(splash.name.toUpperCase(), W_ / 2, H_ * 0.42);
         ctx.fillStyle = 'rgba(255,255,255,' + a + ')'; ctx.fillText(splash.name.toUpperCase(), W_ / 2, H_ * 0.42); ctx.shadowBlur = 0;
-        if (splash.does) { ctx.font = '700 ' + Math.round(fs * 0.34) + 'px system-ui, sans-serif'; ctx.fillStyle = rgba(c, a); ctx.strokeText(splash.does, W_ / 2, H_ * 0.42 + fs * 0.85); ctx.fillText(splash.does, W_ / 2, H_ * 0.42 + fs * 0.85); }
+        if (splash.does) { ctx.font = '700 ' + Math.round(fs * 0.34) + 'px system-ui, sans-serif'; ctx.lineWidth = 5; ctx.fillStyle = rgba(lit, a); ctx.strokeText(splash.does, W_ / 2, H_ * 0.42 + fs * 0.85); ctx.fillText(splash.does, W_ / 2, H_ * 0.42 + fs * 0.85); }
       }
     }
   }
