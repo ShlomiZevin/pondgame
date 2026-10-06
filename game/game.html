@@ -3606,7 +3606,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     for (let i = 0; i < sorted.length; i++) {
       const c = sorted[i];
       let die = c.fit < 0.10 || c.sick === true;
-      if (!die && c.age >= K.maxAge) die = G.rand() < 0.45 * (c.age - K.maxAge + 1);
+      if (!die && c.age >= K.maxAge && !(G.marvelBlessed && G.marvelBlessed(c))) die = G.rand() < 0.45 * (c.age - K.maxAge + 1);
       if (!die && G.rand() < 0.04) die = true;      // bad luck happens
       if (die) doom.push(c);
     }
@@ -5568,8 +5568,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (c.zap) { c.zap.t -= dt; if (c.zap.t <= 0) c.zap = null; }
   };
   /** luck: danger sometimes misses (called as a creature is about to die) */
-  /** is this the creature that was born with the marvel, in the first generations of its life (looked after so that it can be a parent)? Its children are not looked after: a marvel is rare, and stays rare. */
-  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && c.marvelBorn !== undefined && W && W.gen <= c.marvelBorn + 20); };
+  /** is this the creature that was born with the marvel, in the first generations of its life (looked after so that it can be a parent, and it does not die of old age for a while)? Its children are not looked after: a marvel is rare, and stays rare. */
+  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && c.marvelBorn !== undefined && W && W.gen <= c.marvelBorn + 30); };
   /** does a child of a carrier get the marvel? Seldom: it comes with the creature that was given it, not with its line. About one child in eight, and never past a few carriers in a pond. */
   G.marvelInherits = function (id) {
     const W = G.W; if (!W) return false;
@@ -7452,14 +7452,30 @@ G.addSystem({
     return t.join(' · ');
   };
   G.fieldWords = words;
+  // The outline of a region, as something that GREW or was thrown up, not ruled with a ruler: every edge wanders and breathes a
+  // little (each region in its own way, from its id). The effect on creatures keeps the plain shape underneath; the wander is small.
   function path(ctx, f, W) {
-    const m = Math.min(W.ww, W.wh);
+    const m = Math.min(W.ww, W.wh), t = G.rt || 0, p0 = (f.id || 1) * 2.399, soft = f.solid ? 0.25 : 1;
+    const wob = function (u) { return 0.5 * Math.sin(u * 0.021 + p0) + 0.3 * Math.sin(u * 0.047 + p0 * 1.7 + t * 0.35 * soft) + 0.2 * Math.sin(u * 0.093 + p0 * 2.9 - t * 0.5 * soft); };      // -1..1 along an edge (u in pond units)
+    const curve = function (P) { const n = P.length; ctx.moveTo((P[n - 1][0] + P[0][0]) / 2, (P[n - 1][1] + P[0][1]) / 2); for (let i = 0; i < n; i++) { const q = P[(i + 1) % n]; ctx.quadraticCurveTo(P[i][0], P[i][1], (P[i][0] + q[0]) / 2, (P[i][1] + q[1]) / 2); } ctx.closePath(); };      // a closed line through points, rounded: no corners
+    const blob = function (cx, cy, R, back) { const N = Math.max(14, Math.min(40, Math.round(R / 16))), A = Math.min(R * 0.1, 26), P = []; for (let i = 0; i < N; i++) { const k = back ? N - 1 - i : i, ang = k / N * TAU, rr = R + A * 0.6 * Math.sin(ang * 2 + p0 + (back ? 2 : 0)) + A * 0.5 * Math.sin(ang * 3 - p0 * 1.3 + t * 0.3 * soft) + A * 0.35 * Math.sin(ang * 5 + p0 * 2.1 - t * 0.4 * soft); P.push([cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr]); } curve(P); };
     ctx.beginPath();
     if (f.shape === 'all') ctx.rect(0, 0, W.ww, W.wh);
-    else if (f.shape === 'circle') ctx.arc(f.x * W.ww, f.y * W.wh, f.r * m, 0, TAU);
-    else if (f.shape === 'ring') { const half = Math.max(14, f.width * m * 0.25); ctx.arc(f.x * W.ww, f.y * W.wh, f.r * m + half, 0, TAU); ctx.arc(f.x * W.ww, f.y * W.wh, Math.max(1, f.r * m - half), 0, TAU, true); }
-    else if (f.shape === 'half') { const s = f.side; if (s === 'left') ctx.rect(0, 0, f.at * W.ww, W.wh); else if (s === 'right') ctx.rect(f.at * W.ww, 0, W.ww * (1 - f.at), W.wh); else if (s === 'top') ctx.rect(0, 0, W.ww, f.at * W.wh); else ctx.rect(0, f.at * W.wh, W.ww, W.wh * (1 - f.at)); }
-    else { const g = geom(f, W), seg = f.gap > 0 ? [[0, f.gapAt - f.gap / 2], [f.gapAt + f.gap / 2, 1]] : [[0, 1]]; for (let q = 0; q < seg.length; q++) { const ax = g.x1 + g.ux * g.len * seg[q][0], ay = g.y1 + g.uy * g.len * seg[q][0], bx = g.x1 + g.ux * g.len * seg[q][1], by = g.y1 + g.uy * g.len * seg[q][1]; ctx.moveTo(ax + g.nx * g.half, ay + g.ny * g.half); ctx.lineTo(bx + g.nx * g.half, by + g.ny * g.half); ctx.lineTo(bx - g.nx * g.half, by - g.ny * g.half); ctx.lineTo(ax - g.nx * g.half, ay - g.ny * g.half); ctx.closePath(); } }
+    else if (f.shape === 'circle') blob(f.x * W.ww, f.y * W.wh, f.r * m);
+    else if (f.shape === 'ring') { const half = Math.max(14, f.width * m * 0.25); blob(f.x * W.ww, f.y * W.wh, f.r * m + half); blob(f.x * W.ww, f.y * W.wh, Math.max(1, f.r * m - half), true); }
+    else if (f.shape === 'half') {
+      // its one inner edge is a shoreline, not a cut
+      const s = f.side, vert = s === 'left' || s === 'right', L = vert ? W.wh : W.ww, e = f.at * (vert ? W.ww : W.wh), A = Math.min(34, m * 0.03), far = s === 'left' || s === 'top' ? -60 : (vert ? W.ww : W.wh) + 60;
+      const P = []; for (let u = -90; u <= L + 90; u += 60) { const o = e + A * wob(u * 0.8); P.push(vert ? [o, u] : [u, o]); }
+      P.push(vert ? [far, L + 90] : [L + 90, far]); P.push(vert ? [far, -90] : [-90, far]); curve(P);
+    }
+    else { const g = geom(f, W), seg = f.gap > 0 ? [[0, f.gapAt - f.gap / 2], [f.gapAt + f.gap / 2, 1]] : [[0, 1]], A = Math.min(g.half * 0.45, 24), B = Math.min(g.half * 0.3, 16);
+      for (let q = 0; q < seg.length; q++) { const u0 = g.len * seg[q][0], u1 = g.len * seg[q][1], n = Math.max(2, Math.round((u1 - u0) / 60)), pts = [], P = [];
+        for (let i = 0; i <= n; i++) { const u = u0 + (u1 - u0) * i / n, mid = A * wob(u * 0.7), wd = g.half + B * wob(u * 1.1 + 700), end = Math.min(1, Math.min(i, n - i) / 1.5 + 0.35);      // it wanders, swells and thins, and tapers at its ends
+          pts.push([g.x1 + g.ux * u + g.nx * mid, g.y1 + g.uy * u + g.ny * mid, wd * end]); }
+        for (let i = 0; i <= n; i++) P.push([pts[i][0] + g.nx * pts[i][2], pts[i][1] + g.ny * pts[i][2]]);
+        for (let i = n; i >= 0; i--) P.push([pts[i][0] - g.nx * pts[i][2], pts[i][1] - g.ny * pts[i][2]]);
+        curve(P); } }
   }
   function centre(f, W) { if (f.shape === 'circle' || f.shape === 'ring') return [f.x * W.ww, f.y * W.wh - (f.shape === 'ring' ? f.r * Math.min(W.ww, W.wh) : 0)]; if (f.shape === 'half') return f.side === 'left' ? [f.at * W.ww * 0.5, W.wh * 0.5] : f.side === 'right' ? [W.ww * (1 + f.at) / 2, W.wh * 0.5] : f.side === 'top' ? [W.ww / 2, f.at * W.wh * 0.5] : [W.ww / 2, W.wh * (1 + f.at) / 2]; if (f.shape === 'all') return [W.ww / 2, W.wh * 0.3]; const g = geom(f, W), t = f.gap > 0 ? clamp(f.gapAt + (f.gapAt > 0.5 ? -0.28 : 0.28), 0.12, 0.88) : 0.5; return [g.x1 + g.ux * g.len * t + g.nx * (g.half + 14), g.y1 + g.uy * g.len * t + g.ny * (g.half + 14)]; }
   G.drawFields = function (ctx) {
@@ -7488,7 +7504,7 @@ G.addSystem({
           else if (f.stuff === 'toxic') { const yy = by - ((t * 22 + ph * 30) % 50); ctx.beginPath(); ctx.arc(bx, yy, sz * 1.4, 0, TAU); ctx.strokeStyle = G.hsl(f.hue, 90, 70, 0.7); ctx.lineWidth = 1.5; ctx.stroke(); }
           else if (f.stuff === 'ice') { ctx.beginPath(); ctx.moveTo(bx - sz * 2, by); ctx.lineTo(bx + sz * 2, by + sz); ctx.strokeStyle = 'rgba(255,255,255,' + (0.35 + 0.3 * Math.sin(t * 2 + ph)) + ')'; ctx.lineWidth = 1.6; ctx.stroke(); }
           else if (f.stuff === 'plant') { ctx.beginPath(); ctx.ellipse(bx, by, sz * 2, sz, ph + Math.sin(t * 1.5 + ph) * 0.3, 0, TAU); ctx.fillStyle = G.hsl(f.hue + 20 * Math.sin(ph), 60, 38 + 14 * Math.sin(ph * 3), 0.75); ctx.fill(); }
-          else if (f.stuff === 'rock') { ctx.beginPath(); ctx.rect(bx, by, sz * 5, sz * 3.4); ctx.strokeStyle = 'rgba(20,32,46,0.4)'; ctx.lineWidth = 1.6; ctx.stroke(); }
+          else if (f.stuff === 'rock') { ctx.beginPath(); ctx.ellipse(bx, by, sz * 3.2, sz * 2.2, ph, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fill(); ctx.strokeStyle = 'rgba(20,32,46,0.4)'; ctx.lineWidth = 1.6; ctx.stroke(); }
           else if (f.stuff !== 'dark') { const tw = 0.5 + 0.5 * Math.sin(t * 5 + ph * 3); ctx.beginPath(); ctx.arc(bx, by, sz * 0.5 * (0.6 + tw), 0, TAU); ctx.fillStyle = 'rgba(255,255,255,' + 0.75 * tw + ')'; ctx.fill(); }
         }
         if (f.pull > 0.1 && (f.shape === 'circle')) { ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2.5; for (let a = 0; a < 3; a++) { ctx.beginPath(); for (let u = 0; u <= 1; u += 0.05) { const rad = f.r * m * (1 - u), ang = t * 2.2 + a * TAU / 3 + u * 5; const px = f.x * W.ww + Math.cos(ang) * rad, py = f.y * W.wh + Math.sin(ang) * rad; if (u) ctx.lineTo(px, py); else ctx.moveTo(px, py); } ctx.stroke(); } }      // a whirlpool turns

@@ -992,7 +992,7 @@
     for (let i = 0; i < sorted.length; i++) {
       const c = sorted[i];
       let die = c.fit < 0.10 || c.sick === true;
-      if (!die && c.age >= K.maxAge) die = G.rand() < 0.45 * (c.age - K.maxAge + 1);
+      if (!die && c.age >= K.maxAge && !(G.marvelBlessed && G.marvelBlessed(c))) die = G.rand() < 0.45 * (c.age - K.maxAge + 1);
       if (!die && G.rand() < 0.04) die = true;      // bad luck happens
       if (die) doom.push(c);
     }

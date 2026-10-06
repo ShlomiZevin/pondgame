@@ -197,8 +197,8 @@
     if (c.zap) { c.zap.t -= dt; if (c.zap.t <= 0) c.zap = null; }
   };
   /** luck: danger sometimes misses (called as a creature is about to die) */
-  /** is this the creature that was born with the marvel, in the first generations of its life (looked after so that it can be a parent)? Its children are not looked after: a marvel is rare, and stays rare. */
-  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && c.marvelBorn !== undefined && W && W.gen <= c.marvelBorn + 20); };
+  /** is this the creature that was born with the marvel, in the first generations of its life (looked after so that it can be a parent, and it does not die of old age for a while)? Its children are not looked after: a marvel is rare, and stays rare. */
+  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && c.marvelBorn !== undefined && W && W.gen <= c.marvelBorn + 30); };
   /** does a child of a carrier get the marvel? Seldom: it comes with the creature that was given it, not with its line. About one child in eight, and never past a few carriers in a pond. */
   G.marvelInherits = function (id) {
     const W = G.W; if (!W) return false;
