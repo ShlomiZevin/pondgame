@@ -676,7 +676,9 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const note = function (kind, i, text, big) { muts.push({ kind: kind, i: i, text: text, big: !!big }); };
     const press = G.W && G.W.press ? G.W.press : null;
     // nudge traits
-    if (r() < m * 2) { g.t[0] += n() * 1.1; note('t', 0, 'size', false); }
+    // size answers the pond: danger favours bigger bodies, hunger and thin air smaller ones; chance does the rest
+    if (r() < m * 2) { g.t[0] += n() * 1.1 + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
+    if (press && Math.abs(press.size) > 0.2 && r() < 0.06 * Math.abs(press.size) * wild) { const up = press.size > 0; g.t[0] = Math.max(5, g.t[0] * (up ? 1.12 : 0.9)); note('t', 0, (up ? 'grew bigger, ' : 'grew smaller, ') + (press.sizeWhy || 'to suit the pond'), true); }
     if (r() < m * 2) { g.t[1] += n() * 0.07; note('t', 1, 'speed', false); }
     if (r() < m * 2.5) { g.t[4] = (g.t[4] || 0.12) + n() * 0.14; note('t', 4, 'temper', false); }
     for (let i = 0; i < 15; i++) {
@@ -859,7 +861,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   F.cell = function (hue) {
     const r = G.rand;
     return { bd: G.body.cell(), sym: 0, n: 1, len: 1, prof: [1, 1, 1, 1, 1], bend: 0, rules: [], en: 0, es: 0.4, ek: 0, mk: 0, ms: 0.25, tk: 0, ts: 0.6,
-      hue: hue === undefined ? r() * 360 : hue, hue2: (r() < 0.5 ? -1 : 1) * (50 + r() * 110), sat: 62 + r() * 20, lit: 58 + r() * 8, pat: 0, psc: 0.5, crest: 0, shell: 0, glow: 0, venom: 0, hd: 1, nk: 0, coat: 0, hx: 0.85 + r() * 0.4, hq: 1.7 + r() * 1.2, pl: 0, seed: Math.floor(r() * 1e6) };
+      hue: hue === undefined ? r() * 360 : hue, hue2: (r() < 0.5 ? -1 : 1) * (50 + r() * 110), sat: 62 + r() * 20, lit: 58 + r() * 8, pat: 0, psc: 0.5, crest: 0, shell: 0, glow: 0, venom: 0, hd: 1, nk: 0, coat: 0, eg: 0.5, ey: 0.14, ep: 0.46, bl: 0.4, sm: 0.5, hx: 0.85 + r() * 0.4, hq: 1.7 + r() * 1.2, pl: 0, seed: Math.floor(r() * 1e6) };
   };
   F.clone = function (f) {
     const o = {};
@@ -896,12 +898,13 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       q.on = q.on === undefined || q.on === null ? -1 : q.on | 0;
       if (q.on >= 0) { const par = q.on < i ? f.rules[q.on] : null; if (!par || !CHAIN[par.k] || q.k === 5 || (par.on >= 0 && f.rules[par.on].on >= 0)) q.on = -1; }
     }
-    f.en = clamp(f.en | 0, f.bd && (f.bd.m.length > 1 || f.rules.length > 2) ? 1 : 0, 3); f.es = num(f.es, f.bd ? 0.34 : 0.2, 0.62, 0.4); f.ek = num(f.ek, 0, 1.2, 0);
+    f.en = clamp(f.en | 0, f.bd && (f.bd.m.length > 1 || f.rules.length > 2) ? 1 : 0, 3); f.es = num(f.es, f.bd ? 0.34 : 0.2, f.bd ? 0.9 : 0.62, 0.4); f.ek = num(f.ek, 0, 1.2, 0);
     f.mk = clamp(f.mk | 0, 0, 4); f.ms = num(f.ms, 0.14, 0.7, 0.25); f.tk = clamp(f.tk | 0, 0, 4); f.ts = num(f.ts, 0.3, 1.5, 0.6);
     f.hue = ((num(f.hue, -1e6, 1e6, 200) % 360) + 360) % 360; f.hue2 = num(f.hue2, -180, 180, 90); if (Math.abs(f.hue2) < 40) f.hue2 = f.hue2 < 0 ? -40 : 40;
     f.sat = num(f.sat, 52, 88, 70); f.lit = num(f.lit, 52, 72, 62); f.pat = clamp(f.pat | 0, 0, 5); f.psc = num(f.psc, 0.15, 1, 0.5);
     f.crest = num(f.crest, 0, 1, 0); f.shell = num(f.shell, 0, 1, 0); f.glow = num(f.glow, 0, 1, 0); f.venom = num(f.venom, 0, 1, 0); f.seed = (f.seed | 0) || 1;
-    f.hd = num(f.hd, 0.7, 1.9, 1); f.nk = num(f.nk, 0, 0.7, 0); f.coat = clamp(f.coat | 0, 0, 3);
+    f.hd = num(f.hd, 0.7, f.bd ? 2.5 : 1.9, 1);
+    f.eg = num(f.eg, 0.3, 0.8, 0.5); f.ey = num(f.ey, -0.2, 0.36, 0.14); f.ep = num(f.ep, 0.36, 0.78, 0.46); f.bl = num(f.bl, 0, 1, 0.4); f.sm = num(f.sm, -0.2, 1, 0.5); f.nk = num(f.nk, 0, 0.7, 0); f.coat = clamp(f.coat | 0, 0, 3);
     f.hx = num(f.hx, 0.72, 1.45, 1); f.hq = num(f.hq, 1.5, 4, 2); f.pl = Math.max(0, f.pl | 0);
     if (f.bd) while (f.rules.length > 4) dropRule(f, f.rules.length - 1);
     delete f._k; delete f._b;
@@ -983,7 +986,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (r() < (f.bd ? 0.012 : 0.03) * wild) { f.hue += 50 + r() * 260; if (r() < 0.5) f.hue2 = (r() < 0.5 ? -1 : 1) * (40 + r() * 140); note('was born a new colour', true); }
     // a whole new way of carrying the body: one of the builds this pond has been given
     // a shape of body imagined for this pond: now and then a child is born some way towards one of them
-    if (f.bd) { const pls = G.W && G.W.plans ? G.W.plans : []; if (pls.length && r() < 0.014 * wild) { const p = pls[Math.floor(r() * pls.length)]; if (p.id !== f.pl && p.bd) { G.body.adopt(f, p.bd, 0.65 + r() * 0.35); f.pl = p.id; note('its body took a new shape: the ' + p.name.toLowerCase() + (p.because ? ' (' + p.because + ')' : ''), true); } } }
+    if (f.bd) { const pls = G.W && G.W.plans ? G.W.plans : []; if (pls.length && r() < 0.026 * wild) { const p = pls[Math.floor(r() * pls.length)]; if (p.id !== f.pl && p.bd) { const tt = 0.65 + r() * 0.35; G.body.adopt(f, p.bd, tt); f.pl = p.id; if (p.face) for (const k in p.face) if (p.face[k] !== undefined) f[k] += (p.face[k] - f[k]) * Math.min(1, tt + 0.1); note('its body took a new shape: the ' + p.name.toLowerCase() + (p.because ? ' (' + p.because + ')' : ''), true); } } }
     // heads, necks and coats
     if (r() < 0.022 * wild) { const k = Math.floor(r() * 4); if (k !== f.coat) { f.coat = k; note(['lost its coat: bare skin again', 'grew scales', 'grew fur', 'grew feathers'][k], true); } }
     if (f.n > 1 && !f.sym && !f.bd && r() < 0.025 * wild) { const up = r() < 0.65; f.nk = clamp(f.nk + (up ? 0.25 : -0.25), 0, 0.7); note(up ? 'its neck narrowed: a head set apart from the body' : 'its neck thickened', true); }
@@ -1029,21 +1032,22 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     for (let i = 0; i < 5; i++) f.prof[i] *= 1 + d() * 0.14;
     f.bend += d() * 0.05; f.hd *= 1 + d() * 0.07; f.nk += d() * 0.04; f.hx *= 1 + d() * 0.08; f.hq *= 1 + d() * 0.1;
     f.hue += d() * 12; f.hue2 += d() * 14; f.sat += d() * 5; f.lit += d() * 4;
-    f.es += d() * 0.04; f.ek += d() * 0.12; f.ms += d() * 0.05; f.ts += d() * 0.1; f.psc += d() * 0.1;
+    f.es += d() * 0.04; f.eg += d() * 0.03; f.ey += d() * 0.04; f.ep += d() * 0.03; f.bl += d() * 0.08; f.sm += d() * 0.08; f.ek += d() * 0.12; f.ms += d() * 0.05; f.ts += d() * 0.1; f.psc += d() * 0.1;
     for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; q.l *= 1 + d() * 0.12; q.w *= 1 + d() * 0.1; q.g += d() * 0.15; q.c += d() * 0.15; }
     if (drift) note('body shape', false);
     if (f.bd) {
       G.body.mutate(f, m, wild, note);
       // what the eye for beauty said of its kind is a change its children are likelier to be born with
-      if (F._fix && r() < 0.3 * wild) F.nudge(f, F._fix, note);
+      if (F._fix && r() < 0.4 * wild) F.nudge(f, F._fix, note);
       if (f.pl && G.planOf) { const p = G.planOf(f.pl); if (!p || !p.bd || G.body.dist(f.bd, p.bd) > 1.7) f.pl = 0; }      // it has drifted away from the shape it once took
     }
     return F.fix(f);
   };
   /** one change towards better looks, as the judge put it */
-  F.NUDGES = ['eyes_bigger', 'two_eyes', 'simpler', 'rounder', 'bolder_colour', 'pattern', 'plain', 'bigger_face', 'shorter_parts', 'longer_parts', 'plumper', 'slimmer', 'face_on', 'more_parts', 'fewer_masses', 'more_masses', 'smile'];
+  F.NUDGES = ['eyes_bigger', 'two_eyes', 'simpler', 'rounder', 'bolder_colour', 'pattern', 'plain', 'bigger_face', 'shorter_parts', 'longer_parts', 'plumper', 'slimmer', 'face_on', 'more_parts', 'fewer_masses', 'more_masses', 'smile', 'eyes_apart', 'eyes_closer', 'eyes_lower', 'pupils_bigger', 'blush', 'bigger_head', 'smaller_body', 'legs', 'arms'];
   F.nudge = function (f, fix, note) {
     const r = G.rand; let t = '';
+    const headBigger = function (k) { const M = f.bd.m, e = f.bd.e; if (e > 0) M[e].s = Math.min(1.25, M[e].s * (1 + 0.12 * k)); else for (let i = 1; i < M.length; i++) M[i].s = Math.max(0.3, M[i].s * (1 - 0.1 * k)); };
     if (fix === 'eyes_bigger') { f.es += 0.07; t = 'its eyes grew'; }
     else if (fix === 'two_eyes') { if (f.en !== 2) { f.en = 2; t = 'it now has two eyes'; } }
     else if (fix === 'simpler') { if (f.rules.length > 1) { const i = f.rules.length - 1; t = 'lost its ' + KMANY[f.rules[i].k]; dropRule(f, i); } }
@@ -1060,7 +1064,23 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     else if (fix === 'more_parts') { if (f.rules.length < 4) { const q = newRule(f.n); f.rules.push(q); t = 'grew ' + KMANY[q.k]; } }
     else if (fix === 'fewer_masses') { if (f.bd && G.body.drop(f, null)) t = 'lost a part of its body'; }
     else if (fix === 'more_masses') { if (f.bd && G.body.bud(f, null)) t = 'a new part budded from its body'; }
-    else if (fix === 'smile') { f.mk = 0; f.ms += 0.06; t = 'its mouth softened into a smile'; }
+    else if (fix === 'smile') { f.mk = 0; f.ms += 0.06; f.sm += 0.2; t = 'its mouth softened into a smile'; }
+    else if (fix === 'eyes_apart') { f.eg += 0.06; t = 'its eyes sit wider apart'; }
+    else if (fix === 'eyes_closer') { f.eg -= 0.06; t = 'its eyes sit closer together'; }
+    else if (fix === 'eyes_lower') { f.ey -= 0.07; t = 'its eyes sit lower on its face'; }
+    else if (fix === 'pupils_bigger') { f.ep += 0.05; t = 'its pupils grew, a softer look'; }
+    else if (fix === 'blush') { f.bl += 0.25; t = 'its cheeks grew rosier'; }
+    else if (fix === 'bigger_head') { if (f.bd && f.bd.m.length > 1) headBigger(1); f.hd += 0.15; t = 'its head grew bigger beside its body'; }
+    else if (fix === 'legs' || fix === 'arms') {
+      // stubby limbs on the mass that rests lowest (legs) and a second set on the same mass (the painter draws those as arms)
+      if (f.bd && f.rules.length < 4) {
+        const L = G.body.lay(f, null), gnd = G.body.ground(L); let at = -1; for (let i = 0; i < f.bd.m.length; i++) if (gnd[i] && (at < 0 || f.bd.m[i].s > f.bd.m[at].s)) at = i;
+        if (at >= 0) { const ex = f.rules.filter(function (q) { return q.k === 0 && q.on < 0 && q.a <= at && q.b >= at; }).length;
+          if (fix === 'legs' && !ex) { f.rules.push({ k: 0, a: at, b: at, e: 1, l: 0.6, w: 0.6, j: 2, g: 0.2, c: 0, t: 3, p: 0.5, on: -1 }); t = 'it grew two short stubby legs'; }
+          else if (fix === 'arms' && ex === 1) { f.rules.push({ k: 0, a: at, b: at, e: 1, l: 0.55, w: 0.5, j: 2, g: 0.3, c: 0, t: 1, p: 0.5, on: -1 }); t = 'it grew two small arms'; } }
+      }
+    }
+    else if (fix === 'smaller_body') { if (f.bd && f.bd.m.length > 1) { headBigger(0.8); t = 'its body shrank beneath its head'; } else { f.hd += 0.2; t = 'its head grew'; } }
     if (t && note) note(t + ' (as the eye for beauty wished)', true);
   };
   /** a child's body from two parents: whole features come from one or the other */
@@ -1068,8 +1088,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const r = G.rand, g = F.clone(r() < 0.5 ? a : b), o = r() < 0.5 ? a : b;
     if (a.bd && b.bd) g.bd = G.body.cross(a.bd, b.bd);
     if (r() < 0.5) g.prof = o.prof.slice();
-    if (r() < 0.5) { g.en = o.en; g.es = o.es; g.ek = o.ek; }
-    if (r() < 0.5) { g.mk = o.mk; g.ms = o.ms; }
+    if (r() < 0.5) { g.en = o.en; g.es = o.es; g.ek = o.ek; g.eg = o.eg; g.ey = o.ey; g.ep = o.ep; }
+    if (r() < 0.5) { g.mk = o.mk; g.ms = o.ms; g.sm = o.sm; g.bl = o.bl; }
     if (r() < 0.5) { g.tk = o.tk; g.ts = o.ts; }
     if (r() < 0.5) { g.pat = o.pat; g.psc = o.psc; }
     if (r() < 0.5) { g.hue = o.hue; g.hue2 = o.hue2; g.sat = o.sat; g.lit = o.lit; }
@@ -1260,13 +1280,13 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   const r2 = function (x) { return Math.round(x * 100) / 100; };
   F.pack = function (f) {
     return [f.sym, f.n, r2(f.len), f.prof.map(r2), r2(f.bend), f.rules.map(function (q) { return [q.k, q.a, q.b, q.e, r2(q.l), r2(q.w), q.j, r2(q.g), r2(q.c), q.t, r2(q.p), q.on === undefined ? -1 : q.on]; }),
-      f.en, r2(f.es), r2(f.ek), f.mk, r2(f.ms), f.tk, r2(f.ts), Math.round(f.hue), Math.round(f.hue2), Math.round(f.sat), Math.round(f.lit), f.pat, r2(f.psc), r2(f.crest), r2(f.shell), r2(f.glow), r2(f.venom), f.seed, r2(f.hd), r2(f.nk), f.coat, r2(f.hx), r2(f.hq), f.pl | 0, f.bd ? G.body.pack(f.bd) : 0];
+      f.en, r2(f.es), r2(f.ek), f.mk, r2(f.ms), f.tk, r2(f.ts), Math.round(f.hue), Math.round(f.hue2), Math.round(f.sat), Math.round(f.lit), f.pat, r2(f.psc), r2(f.crest), r2(f.shell), r2(f.glow), r2(f.venom), f.seed, r2(f.hd), r2(f.nk), f.coat, r2(f.hx), r2(f.hq), f.pl | 0, f.bd ? G.body.pack(f.bd) : 0, r2(f.eg), r2(f.ey), r2(f.ep), r2(f.bl), r2(f.sm)];
   };
   F.unpack = function (a) {
     if (!Array.isArray(a) || a.length < 24) return null;
     return F.fix({ sym: a[0], n: a[1], len: a[2], prof: Array.isArray(a[3]) ? a[3].map(Number) : null, bend: a[4],
       rules: (Array.isArray(a[5]) ? a[5] : []).map(function (q) { return { k: q[0], a: q[1], b: q[2], e: q[3], l: q[4], w: q[5], j: q[6], g: q[7], c: q[8], t: q[9], p: q[10], on: q[11] === undefined ? -1 : q[11] }; }),
-      en: a[6], es: a[7], ek: a[8], mk: a[9], ms: a[10], tk: a[11], ts: a[12], hue: a[13], hue2: a[14], sat: a[15], lit: a[16], pat: a[17], psc: a[18], crest: a[19], shell: a[20], glow: a[21], venom: a[22], seed: a[23], hd: a[24], nk: a[25], coat: a[26], hx: a[27], hq: a[28], pl: a[29], bd: G.body.unpack(a[30]) || undefined });
+      en: a[6], es: a[7], ek: a[8], mk: a[9], ms: a[10], tk: a[11], ts: a[12], hue: a[13], hue2: a[14], sat: a[15], lit: a[16], pat: a[17], psc: a[18], crest: a[19], shell: a[20], glow: a[21], venom: a[22], seed: a[23], hd: a[24], nk: a[25], coat: a[26], hx: a[27], hq: a[28], pl: a[29], bd: G.body.unpack(a[30]) || undefined, eg: a[31], ey: a[32], ep: a[33], bl: a[34], sm: a[35] });
   };
   F.key = function (f) { return f._k || (f._k = JSON.stringify(F.pack(f))); };
 
@@ -1781,7 +1801,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (M.length >= MAXM) return false;
     const par = Math.floor(r() * M.length), src = M[par], pr = r() < 0.32 ? 1 : 0;
     const rr = src.r.map(function (v) { return 1 + (v - 1) * (r() < 0.5 ? 1 : 0.3) + (r() - 0.5) * 0.12; });
-    M.push(mass({ r: rr, s: 0.42 + r() * 0.55, on: par, at: bd.v ? r() * TAU - PI : pr ? (r() - 0.5) * 2 : (r() < 0.62 ? -PI / 2 : PI / 2), d: 0.6 + r() * 0.75, pr: pr, lb: r() < 0.15 ? 3 + Math.floor(r() * 5) : 0, la: 0.12 }));
+    M.push(mass({ r: rr, s: 0.42 + r() * 0.55, on: par, at: bd.v ? r() * TAU - PI : pr ? (r() - 0.5) * 2 : (r() < 0.35 ? -PI / 2 : PI / 2), d: 0.6 + r() * 0.75, pr: pr, lb: r() < 0.15 ? 3 + Math.floor(r() * 5) : 0, la: 0.12 }));
     if (note) note(pr ? 'a pair of new parts budded from its body' : 'a new part budded from its body', true);
     return true;
   };
@@ -1897,7 +1917,9 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   const F = G.form, clamp = G.clamp;
   const NAMES = ['eyes0', 'eyes1', 'eyes2', 'eyes3', 'eyeSize', 'eyeStalk', 'face', 'm2', 'm3', 'pairs', 'hollow', 'lobed', 'stalk', 'side', 'faceAway', 'tall', 'wide', 'plump', 'busy', 'busy2',
     'legs', 'arms', 'fins', 'spikes', 'tentacles', 'feelers', 'plates', 'frills', 'horns', 'designs', 'wrap', 'tail', 'beak', 'jaws', 'sucker', 'whiskers', 'scales', 'fur', 'feathers', 'marked', 'stripes', 'spots',
-    'shell', 'crest', 'glow', 'venom', 'sat', 'lit', 'contrast', 'longest', 'nested', 'bare'];
+    'shell', 'crest', 'glow', 'venom', 'sat', 'lit', 'contrast', 'longest', 'nested', 'bare',
+    // what makes a face lovable (the baby schema the eye responds to): big wide-set low eyes, big soft pupils, a smile, a big head on a small body, round outlines, stubby limbs, a tidy body, no spikes
+    'eyeBig', 'eyeLow', 'eyeSet', 'pupil', 'smile', 'blush', 'headBig', 'round', 'stubby', 'tidy', 'spiky', 'sig'];
   F.LOOKS = NAMES;
   /** what can be seen on a body, as numbers (each about 0..1) */
   F.looks = function (f) {
@@ -1909,10 +1931,22 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       clamp(bm.tall - 1, 0, 1), clamp(bm.asp - 1, 0, 1), (plump - 0.55) / 1.05, busy / 10, busy * busy / 100,
       stands, has[0] && !stands ? 1 : 0, has[1], has[2], has[3], has[4], has[5], has[6], has[7], Math.min(2, dsg) / 2, wrap, f.tk ? 1 : 0, f.mk === 1 ? 1 : 0, f.mk === 2 ? 1 : 0, f.mk === 3 ? 1 : 0, f.mk === 4 ? 1 : 0,
       f.coat === 1 ? 1 : 0, f.coat === 2 ? 1 : 0, f.coat === 3 ? 1 : 0, f.pat ? 1 : 0, f.pat === 1 ? 1 : 0, f.pat === 2 ? 1 : 0, f.shell > 0.25 ? 1 : 0, f.crest > 0.25 ? 1 : 0, f.glow > 0.3 ? 1 : 0, f.venom > 0.3 ? 1 : 0,
-      (f.sat - 52) / 36, (f.lit - 52) / 20, Math.abs(f.hue2) / 180, clamp(longest / 2.2, 0, 1), c.nested ? 1 : 0, f.rules.length === 0 && bm.n === 1 ? 1 : 0];
+      (f.sat - 52) / 36, (f.lit - 52) / 20, Math.abs(f.hue2) / 180, clamp(longest / 2.2, 0, 1), c.nested ? 1 : 0, f.rules.length === 0 && bm.n === 1 ? 1 : 0].concat(F.cuteLooks(f, bm, busy));
+  };
+  /** the proportions and face of a body as numbers (each 0..1) */
+  F.cuteLooks = function (f, bm, busy) {
+    const M = f.bd.m, en = Math.min(f.en, 2) / 2, ne = f.en > 0 ? 1 : 0;
+    let mm = 0; for (let i = 0; i < M.length; i++) { let lo = 9, hi = 0; for (let j = 0; j < M.length * 0 + M[i].r.length; j++) { lo = Math.min(lo, M[i].r[j]); hi = Math.max(hi, M[i].r[j]); } mm += lo / hi; } mm /= M.length;
+    let sq = 0, tot = 0; for (let i = 0; i < M.length; i++) { const a = M[i].s * M[i].s * (M[i].pr ? 2 : 1); tot += a; if (i === f.bd.e) sq = a; }
+    let ln = 0, nl = 0, sp = 0; const sg = {}; for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on >= 0) continue; if (q.k === 0) { ln += q.l; nl++; } if (q.k === 2) sp++; if (q.k === 7 || q.k === 1 || q.k === 3 || q.k === 6 || q.k === 8) sg[q.k] = 1; }
+    // signature features: real-animal parts (horns, fins, tentacles, frills, an invented part), a tail, a shell, ears (a pair of masses), a coat, markings. One or two make a character; none is bland, more than three is clutter
+    if (f.tk) sg.t = 1; if (f.shell > 0.25) sg.s = 1; if (f.coat) sg.c = 1; if (f.pat) sg.p = 1; if (bm.pairs) sg.e = 1; const ns = Object.keys(sg).length;
+    return [clamp((f.es - 0.34) / 0.4, 0, 1) * en, ne * clamp(0.3 + (0.14 - f.ey) / 0.3, 0, 1), f.en === 2 ? 1 - Math.min(1, Math.abs(f.eg - 0.55) / 0.25) : 0, ne * clamp((f.ep - 0.4) / 0.3, 0, 1), clamp(f.sm, 0, 1), clamp(f.bl, 0, 1),
+      clamp(((M.length > 1 ? sq / tot : 0.5) - 0.3) / 0.4, 0, 1) * 0.6 + 0.4 * clamp((f.hd - 1) / 1.2, 0, 1), clamp((mm - 0.6) / 0.4, 0, 1) * (bm.lobed ? 0.5 : 1), nl ? 1 - clamp((ln / nl - 0.6) / 1.2, 0, 1) : 0.5,
+      busy <= 5.5 ? 1 : Math.max(0, 1 - (busy - 5.5) * 0.3), Math.min(1, (sp + (f.crest > 0.25 ? 1 : 0)) * 0.5), ns === 0 ? 0 : ns <= 2 ? 1 : ns === 3 ? 0.5 : 0];
   };
   // the taste every pond starts with: fitted to the AI's grades of pictures (b: the grade of a body with nothing to see on it)
-  F.TASTE0 = { b: 0.5325, w: [-0.121, 0.0073, 0.1, 0.0137, 0.0313, -0.0019, 0.0136, -0.0162, 0, -0.0364, 0.0033, -0.0094, -0.0631, -0.0881, 0.0249, -0.032, 0.0358, 0.0729, -0.0435, -0.0798, 0.0204, 0.0382, -0.0008, -0.0684, -0.0479, 0.0371, 0.0085, -0.0465, 0.0284, -0.0495, -0.0495, -0.0101, 0.0078, -0.0422, -0.0125, 0.0211, -0.0124, -0.035, -0.0414, -0.0141, -0.0058, 0.0454, -0.0249, 0.032, -0.0437, -0.026, 0.0027, 0.0081, -0.0341, 0.0177, 0.0058, -0.1911], n: 294 };      // fitted 2026-10-06 to 294 graded pictures; held-out correlation 0.59
+  F.TASTE0 = { b: 0.5325, w: [-0.121, 0.0073, 0.1, 0.0137, 0.0313, -0.0019, 0.0136, -0.0162, 0, -0.0364, 0.0033, -0.0094, -0.0631, -0.0881, 0.0249, -0.032, 0.0358, 0.0729, -0.0435, -0.0798, 0.0204, 0.0382, -0.0008, -0.0684, -0.0479, 0.0371, 0.0085, -0.0465, 0.0284, -0.0495, -0.0495, -0.0101, 0.0078, -0.0422, -0.0125, 0.0211, -0.0124, -0.035, -0.0414, -0.0141, -0.0058, 0.0454, -0.0249, 0.032, -0.0437, -0.026, 0.0027, 0.0081, -0.0341, 0.0177, 0.0058, -0.1911, 0.16, 0.03, 0.04, 0.03, 0.04, 0.02, 0.1, 0.08, 0.06, 0.1, -0.09, 0.07], n: 294 };      // fitted 2026-10-06 to 294 graded pictures; held-out correlation 0.59
   F.newTaste = function () { return { b: F.TASTE0.b, w: F.TASTE0.w.slice(), n: 0 }; };
   F.fixTaste = function (t) {
     if (!t || !Array.isArray(t.w) || t.w.length !== NAMES.length || !isFinite(+t.b)) return null;
@@ -1924,11 +1958,12 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     T = T || F.TASTE0;
     const x = F.looks(f); let s = T.b;
     for (let i = 0; i < x.length; i++) s += T.w[i] * x[i];
-    return clamp(s, 0, 1);
+    // a soft ceiling, not a wall: two good bodies stay in order instead of both scoring the top mark
+    return s < 0 ? 0 : s < 0.8 ? s : 0.8 + 0.2 * Math.tanh((s - 0.8) / 0.2);
   };
   /** the eye graded this body: the taste is corrected a little towards what it said */
-  F.learn = function (T, f, grade, rate) {
-    const x = F.looks(f); let s = T.b;
+  F.learn = function (T, f, grade, rate, x0) {
+    const x = x0 || F.looks(f); let s = T.b;
     for (let i = 0; i < x.length; i++) s += T.w[i] * x[i];
     const err = clamp(grade, 0, 1) - s, k = rate === undefined ? 0.06 : rate;
     T.b += k * err * 0.5;
@@ -2436,30 +2471,32 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       if (o.collect) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4); o.collect.push([ex, ey, r]); return; }
       if (lid) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(col.dark, 2.4); ctx.beginPath(); ctx.moveTo(ex - r * 0.7, ey); ctx.quadraticCurveTo(ex, ey + r * 0.6, ex + r * 0.7, ey); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); return; }
       ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4);
-      F._pupil(ctx, ex, ey, r, lx, ly, hsl(f.hue + f.hue2, 68, 44, 1), INK, 0.46);
+      F._pupil(ctx, ex, ey, r, lx, ly, hsl(f.hue + f.hue2, 68, 44, 1), INK, f.ep || 0.46);
     }
     // the face. side 0: it looks straight at you. side 1: its head points to the right; you see the eye on this side
     function face(x, y, hr, side, isStar) {
-      const ne = f.en, er = clamp(hr * (0.24 + f.es * 0.44), 7, hr * 0.5), gap = hr * 0.5;
-      const st = f.ek > 0.25 && !isStar && !side ? hr * (0.5 + f.ek * 0.5) : 0, cx = x + (side ? hr * 0.22 : 0), ey0 = y - hr * 0.14;
+      const ne = f.en, er = clamp(hr * (0.22 + f.es * 0.5), 7, hr * 0.66), gap = Math.max(hr * (f.eg || 0.5), er * 1.08);
+      const st = f.ek > 0.25 && !isStar && !side ? hr * (0.5 + f.ek * 0.5) : 0, cx = x + (side ? hr * 0.22 : 0), ey0 = y - hr * (f.ey === undefined ? 0.14 : f.ey);
       const stalk = function (ex, ey) { if (!st) return ey; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.body : INK; ctx.lineWidth = pass ? 6 : 10; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex, ey - st); ctx.stroke(); } return ey - st; };
       if (side) { if (ne >= 1) eyeAt(cx, ey0, er * 1.15, false); if (ne >= 3) eyeAt(cx - hr * 0.5, ey0 - hr * 0.35, er * 0.45, false); }
       else if (ne === 1) eyeAt(cx, ey0, er * 1.3, false);
       else if (ne >= 2) { eyeAt(cx - gap, stalk(cx - gap, ey0), er, false); eyeAt(cx + gap, stalk(cx + gap, ey0), er, false); if (ne === 3) eyeAt(cx, y - hr * 0.64, er * 0.42, false); }
-      ctx.globalAlpha = 0.4; ctx.fillStyle = '#ff7fa8'; for (let sd = (side ? 1 : -1); sd <= 1; sd += 2) { ctx.beginPath(); ctx.ellipse(cx + sd * hr * (side ? 0.05 : 0.72), y + hr * 0.4, hr * 0.17, hr * 0.11, 0, 0, TAU); ctx.fill(); } ctx.globalAlpha = 1;
+      { const bl = f.bl === undefined ? 0.4 : f.bl; ctx.globalAlpha = 0.1 + 0.5 * bl; ctx.fillStyle = '#ff7fa8'; for (let sd = (side ? 1 : -1); sd <= 1; sd += 2) { ctx.beginPath(); ctx.ellipse(cx + sd * hr * (side ? 0.05 : 0.72), y + hr * 0.42, hr * (0.12 + 0.1 * bl), hr * (0.08 + 0.06 * bl), 0, 0, TAU); ctx.fill(); } ctx.globalAlpha = 1; }
       const mx = cx + (side ? hr * 0.5 : 0), my = y + hr * (side ? 0.42 : 0.5), m = hr * (0.16 + f.ms * 0.3);
       ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.fillStyle = INK;
       if (f.mk === 1) { ctx.beginPath(); if (side) { ctx.moveTo(mx - m * 0.2, my - m * 0.8); ctx.lineTo(mx + m * 1.9, my - m * 0.1); ctx.lineTo(mx - m * 0.2, my + m * 0.6); } else { ctx.moveTo(mx - m * 0.8, my - m * 0.3); ctx.lineTo(mx, my + m * 0.9); ctx.lineTo(mx + m * 0.8, my - m * 0.3); ctx.quadraticCurveTo(mx, my - m * 0.7, mx - m * 0.8, my - m * 0.3); } ctx.closePath(); ink('#f6b34a', 2.2); }
       else if (f.mk === 2) { ctx.beginPath(); if (side) { ctx.moveTo(mx - m * 1.6, my - m * 0.1); ctx.quadraticCurveTo(mx - m * 0.2, my + m * 1.1, mx + m * 1.1, my - m * 0.3); } else { ctx.moveTo(mx - m * 1.3, my - m * 0.2); ctx.quadraticCurveTo(mx, my + m * 1.3, mx + m * 1.3, my - m * 0.2); } ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; for (let j = -1; j <= 1; j += 2) { const tx = mx + j * m * (side ? 0.45 : 0.6) - (side ? m * 0.25 : 0); ctx.beginPath(); ctx.moveTo(tx - m * 0.2, my - m * 0.12); ctx.lineTo(tx, my + m * 0.45); ctx.lineTo(tx + m * 0.2, my - m * 0.12); ctx.fill(); } }
       else if (f.mk === 3) { ctx.beginPath(); ctx.arc(mx, my, m * 0.7, 0, TAU); ink('#ff9fc4', 2.2); ctx.beginPath(); ctx.arc(mx, my, m * 0.3, 0, TAU); ctx.fillStyle = INK; ctx.fill(); }
-      else { ctx.beginPath(); ctx.moveTo(mx - m, my - m * 0.2); ctx.quadraticCurveTo(mx, my + m * 0.8, mx + m, my - m * 0.2); ctx.stroke(); if (f.mk === 4) { ctx.lineWidth = 1.6; for (let sd = (side ? 1 : -1); sd <= 1; sd += 2) for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(mx + sd * m * 1.2, my); ctx.lineTo(mx + sd * (m * 1.2 + hr * 0.6), my + j * hr * 0.16); ctx.stroke(); } } }
+      else if (!side && f.mk === 0 && f.sm > 0.72) { const w = m * (0.9 + 0.5 * (f.sm - 0.72)); ctx.beginPath(); ctx.moveTo(mx - w, my - m * 0.25); ctx.quadraticCurveTo(mx, my + m * 1.7, mx + w, my - m * 0.25); ctx.quadraticCurveTo(mx, my + m * 0.15, mx - w, my - m * 0.25); ctx.closePath(); ctx.fillStyle = hsl(350, 55, 22, 1); ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); ctx.save(); ctx.clip(); ctx.fillStyle = '#ff8fa6'; ctx.beginPath(); ctx.ellipse(mx, my + m * 1.15, w * 0.5, m * 0.5, 0, 0, TAU); ctx.fill(); ctx.restore(); }
+      else { ctx.beginPath(); ctx.moveTo(mx - m, my - m * 0.2); ctx.quadraticCurveTo(mx, my + m * (0.2 + 0.9 * (f.sm === undefined ? 0.5 : f.sm)), mx + m, my - m * 0.2); ctx.stroke(); if (f.mk === 4) { ctx.lineWidth = 1.6; for (let sd = (side ? 1 : -1); sd <= 1; sd += 2) for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(mx + sd * m * 1.2, my); ctx.lineTo(mx + sd * (m * 1.2 + hr * 0.6), my + j * hr * 0.16); ctx.stroke(); } } }
     }
   };
 
   /** the living part of an eye: iris, pupil, two lights, and the soft shade of the upper lid */
   F._pupil = function (ctx, ex, ey, r, lx, ly, iris, ink, pup) {
     const px = ex + lx * r * 0.2, py = ey + ly * r * 0.2 + r * 0.04;
-    ctx.beginPath(); ctx.arc(px, py, r * 0.74, 0, TAU); ctx.fillStyle = iris; ctx.fill();
+    ctx.beginPath(); ctx.arc(px, py, r * 0.82, 0, TAU); ctx.fillStyle = iris; ctx.fill();
+    { const gl = ctx.createRadialGradient(px, py + r * 0.45, 0, px, py + r * 0.45, r * 0.6); gl.addColorStop(0, 'rgba(255,255,255,0.4)'); gl.addColorStop(1, 'rgba(255,255,255,0)'); ctx.save(); ctx.beginPath(); ctx.arc(px, py, r * 0.82, 0, TAU); ctx.clip(); ctx.fillStyle = gl; ctx.fillRect(px - r, py - r, r * 2, r * 2); ctx.restore(); }
     ctx.beginPath(); ctx.arc(px, py, r * pup, 0, TAU); ctx.fillStyle = ink; ctx.fill();
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px - r * 0.26, py - r * 0.3, r * 0.24, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(px + r * 0.24, py + r * 0.26, r * 0.1, 0, TAU); ctx.fill();
     ctx.save(); ctx.beginPath(); ctx.arc(ex, ey, r * 0.98, 0, TAU); ctx.clip(); ctx.fillStyle = 'rgba(7,18,31,0.16)'; ctx.beginPath(); ctx.ellipse(ex, ey - r * 0.95, r * 1.25, r * 0.62, 0, 0, TAU); ctx.fill(); ctx.restore();
@@ -2480,7 +2517,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (s) { s.used = G.rt || 0; return s; }
     if (keptN > 150) { const now = G.rt || 0; for (const k in kept) if (now - kept[k].used > 3) { delete kept[k]; keptN--; } if (keptN > 230) { for (const k in kept) delete kept[k]; keptN = 0; } }
     s = kept[key] = { fr: [frame(f, 0)], ink: '', dark: '', build: F.build(f), used: G.rt || 0 }; keptN++;
-    s.ink = F._ink(); s.dark = F._colours(f).dark; s.iris = 'hsl(' + Math.round((((f.hue + f.hue2) % 360) + 360) % 360) + ',68%,44%)';
+    s.pup = f.ep || 0.46; s.ink = F._ink(); s.dark = F._colours(f).dark; s.iris = 'hsl(' + Math.round((((f.hue + f.hue2) % 360) + 360) % 360) + ',68%,44%)';
     return s;
   };
   /** the kept character at the origin at this point of its loop (phase 0..1), then its eyes, alive. mood: { lx, ly, lid 0..1, wide } */
@@ -2499,7 +2536,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     for (let q = 0; q < fr.eyes.length; q++) {
       const e = fr.eyes[q], r = e[2];
       if (mood.lid >= 1) { ctx.beginPath(); ctx.arc(e[0], e[1], r, 0, TAU); ctx.fillStyle = s.dark; ctx.fill(); ctx.strokeStyle = s.ink; ctx.lineWidth = 2.4; ctx.stroke(); ctx.beginPath(); ctx.moveTo(e[0] - r * 0.7, e[1]); ctx.quadraticCurveTo(e[0], e[1] + r * 0.6, e[0] + r * 0.7, e[1]); ctx.stroke(); continue; }
-      F._pupil(ctx, e[0], e[1], r, lx, ly, s.iris, s.ink, mood.wide ? 0.3 : 0.46);
+      F._pupil(ctx, e[0], e[1], r, lx, ly, s.iris, s.ink, mood.wide ? s.pup * 0.65 : s.pup);
       if (mood.lid > 0) { ctx.save(); ctx.beginPath(); ctx.arc(e[0], e[1], r * 1.02, 0, TAU); ctx.clip(); ctx.fillStyle = s.dark; ctx.fillRect(e[0] - r * 1.1, e[1] - r * 1.1, r * 2.2, r * 2.2 * mood.lid * 0.75); ctx.restore(); }      // heavy lids: tired, or sick
     }
     return s;
@@ -3319,7 +3356,9 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         const mateC = findMate(p, surv);
         if (mateC && G.rand() < 0.85) { genome = G.crossover(p.g, mateC.g); mate = mateC; }      // two parents whenever a mate is near; alone, it copies itself
         else genome = G.cloneGenome(p.g);
-        { const sp0 = p.sp ? G.speciesById(p.sp) : null; G.form._fix = sp0 && sp0.judge && sp0.judge.fix ? sp0.judge.fix : null; }      // what the judge wished for its kind
+        { const sp0 = p.sp ? G.speciesById(p.sp) : null; G.form._fix = p.real && p.real.fix ? p.real.fix : sp0 && sp0.judge && sp0.judge.fix ? sp0.judge.fix : null;
+          // what the watcher has lately said of the pond's creatures is advice for the whole pond, not only for the ones it happened to see
+          if (!G.form._fix && W.advice && W.advice.length && G.rand() < 0.6) { const fvp = p.fv || (p.fv = G.features(p.g)); let best = null, bd = 2.2; for (let q = 0; q < W.advice.length; q++) { const a = W.advice[q]; if (W.gen - a.gen > 40 || !a.fv) continue; const dd = G.fdist(fvp, a.fv); if (dd < bd) { bd = dd; best = a; } } if (best) G.form._fix = best.fix; } }      // what the judge wished for its kind
         const res = G.mutate(genome, wild, idea);
         G.form._fix = null;
         const child = G.makeCreature(res.g, p, mate, res.muts);
@@ -3336,6 +3375,23 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         W.births.push({ at: 0.3 + G.rand() * 3.4, c: child, x: p.x + Math.cos(ang) * d, y: p.y + Math.sin(ang) * d, from: p, mate: mate });
       }
     }
+    // the hall of fame: the best the watcher has really seen. A couple of children a spring are one of them crossed with a good survivor, so what once was
+    // lovable is not lost to drift, to a sickness of the common kind or to a pressure that favoured something plainer
+    if (W.hall && W.hall.length && surv.length >= 8 && W.cre.length < cap * 1.2) {
+      const nh = G.rand() < 0.5 ? 2 : 1;
+      for (let k = 0; k < nh; k++) {
+        const h = W.hall[(G.rand() * W.hall.length) | 0]; let p = null;
+        { let bs = -1e9; for (let t = 0; t < 10; t++) { const o = surv[(G.rand() * surv.length) | 0], fo = o.fv || (o.fv = G.features(o.g)), sc = G.charmOf(o) - 0.35 * G.fdist(fo, h.fv); if (sc > bs) { bs = sc; p = o; } } }
+        if (!p || !h) continue;
+        const res = G.mutate(G.crossover(h.g, p.g), wild * 0.6, null);
+        const child = G.makeCreature(res.g, p, null, res.muts);
+        child.sp = p.sp; child.E = child.ph.Emax * K.repro * 0.95; child.P = child.ph.Emax * 0.12;
+        if (!p.snap) p.snap = G.snapOf(p);
+        child.dad = p.snap; child.mate = { id: 0, gen: h.gen, g: h.g };
+        const ang = G.rand() * PI2, d = p.ph.r + child.ph.r + 4;
+        W.births.push({ at: 0.3 + G.rand() * 3.4, c: child, x: p.x + Math.cos(ang) * d, y: p.y + Math.sin(ang) * d, from: p, mate: null });
+      }
+    }
     G.emit('spring', plan.length);
   }
 
@@ -3348,7 +3404,15 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const s = c.sp ? G.speciesById(c.sp) : null;
     // the grade the eye for beauty gave its kind is most of it; its own body's fit to the pond's taste is the rest. What the player kept is loved outright.
     // a grade counts for what it is next to the other grades in this pond: so a generous judge and a strict one select alike
-    const v = 0.5 * c.ph.charm + 0.5 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);
+    let v = 0.5 * c.ph.charm + 0.5 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);
+    // a guess is not a look: where the watcher has really seen creatures, one nobody has looked at is held back towards what the watcher really said of this pond.
+    // Selecting the highest guesses every generation would pile up error (the winner's curse); this keeps belief close to the truth.
+    const W1 = G.W;
+    if (!c.real && W1 && W1.eyeBank && W1.eyeBank.length >= 6) {
+      if (W1._emGen !== W1.gen) { let t = 0; for (let i = 0; i < W1.eyeBank.length; i++) t += (W1.eyeBank[i].b + W1.eyeBank[i].w) / 2; W1._em = t / W1.eyeBank.length; W1._emGen = W1.gen; }
+      const k = clamp(0.3 + 0.12 * (c.st === undefined ? 3 : c.st), 0.3, 0.75);
+      v = W1._em + (v - W1._em) * (1 - k);
+    }
     return s && s.loved ? Math.max(v, 0.92) : v;
   };
 
@@ -4080,7 +4144,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     model: '',           // the player's choice ('' = the server's default)
     // automatic calls (organs, the story, mutation ideas) are limited by wall-clock time and a session budget,
     // so the cost is the same whether the pond runs at 1x or 64x, for a minute or a day
-    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 40000, check: 3000, watch: 9000, design: 50000, paint: 22000, plan: 55000 },
+    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 40000, check: 3000, watch: 5000, design: 50000, paint: 22000, plan: 55000 },
     caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 45, check: 36, watch: 500, design: 18, paint: 16, plan: 18 },
     used: {}, lastAt: {},
     // what this session has asked the server for: { kind: { asked, fresh } }. "fresh" = a model really ran;
@@ -4210,6 +4274,95 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 })();
 
 </script>
+<script data-part="figure">
+// ── A typed thing, drawn as what it is ──
+// When the player types "a knight with a sword", the pond should hold a knight with a sword. The body vocabulary the pond's
+// own creatures grow from cannot say that, so a typed being is DRAWN by the AI: a small cartoon in separate parts (body,
+// head, arms, legs, tail, whatever is on its back; what it holds is part of its near arm), each with the point it turns
+// about. The game cuts the drawing into those parts and moves them like a paper puppet: legs step, arms swing (the near arm
+// lifts what it holds when the being strikes), the head nods, a tail wags, wings beat. The drawing is made once for a word
+// and kept on the server, so the same word is free ever after. Until it arrives, and for anything that is not a being, the
+// pond draws the thing the way it always did.
+(function () {
+  'use strict';
+  const IDS = ['back', 'tail', 'leg-far', 'arm-far', 'body', 'leg-near', 'head', 'arm-near'];
+  if (G.ai) { G.ai.gaps.figure = 1500; G.ai.caps.figure = 40; G.ai.LABEL.figure = 'Drawing the beings you typed'; }
+  const ready = {};          // word → figure, shared by every thing of that word in this session
+  // the player's own words for a thing ("a human knight with a sword"), kept beside the short name the pond gave it ("Knight")
+  const typed = {};
+  if (G.ai && G.ai.ask) { const ask0 = G.ai.ask; G.ai.ask = function (task, input, schema) { const p = ask0.call(G.ai, task, input, schema); if (task === 'thing' && typeof input === 'string') p.then(function (info) { if (info && info.name) typed[String(info.name).toLowerCase()] = input.slice(0, 120); }, function () {}); return p; }; }
+
+  // the drawing, cut into its parts: each becomes a picture of its own
+  function build(fig, done) {
+    let doc;
+    try { doc = new DOMParser().parseFromString(fig.svg, 'image/svg+xml'); } catch (e) { return done(null); }
+    const root = doc && doc.documentElement;
+    if (!root || root.nodeName.toLowerCase() !== 'svg' || doc.getElementsByTagName('parsererror').length) return done(null);
+    const parts = [];
+    let defs = '';
+    for (let i = 0; i < root.childNodes.length; i++) {
+      const n = root.childNodes[i]; if (n.nodeType !== 1) continue;
+      const tag = n.nodeName.toLowerCase(), id = n.getAttribute('id') || '';
+      if (tag === 'defs') { defs += n.outerHTML; continue; }
+      // anything the model left outside a named group is drawn with the body
+      parts.push({ id: tag === 'g' && IDS.indexOf(id) >= 0 ? id : 'body', xml: n.outerHTML });
+    }
+    if (!parts.length) return done(null);
+    let left = parts.length, bad = false;
+    const out = { parts: [], pivots: fig.pivots || {}, floats: !!fig.floats, svg: fig.svg };
+    parts.forEach(function (p, k) {
+      const im = new Image();
+      im.onload = function () { out.parts[k] = { id: p.id, img: im }; if (--left === 0) done(bad ? null : out); };
+      im.onerror = function () { bad = true; if (--left === 0) done(null); };
+      im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" width="400" height="480">' + defs + p.xml + '</svg>');
+    });
+  }
+
+  /** the whole drawing of a thing by its name, once it has arrived (for menus and cards) */
+  G.figurePic = function (name) { const f = ready[String(name || '').toLowerCase()]; return f ? f.svg : ''; };
+  /** the drawing of this thing, if it is a being and its drawing has arrived; asks for it the first time */
+  G.figureOf = function (z) {
+    if (z._fig !== undefined) return z._fig;
+    if (z.p && z.p.vault > 0.2) return (z._fig = null);        // a wall is drawn as a wall
+    const key = String(z.word || '').toLowerCase();
+    if (ready[key]) return (z._fig = ready[key]);
+    if (z._figAsked) return null;
+    if (!(G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.provider === 'server')) return null;
+    if (!G.ai.allow('figure')) return null;
+    z._figAsked = true;
+    G.host.call('ai.figure', { word: z.word, typed: typed[key] || z.word, note: z.note || '', hue: Math.round(z.hue) }, 260000).then(function (r) {
+      G.ai.tally('figure', r && r.source, r && r.usd);
+      if (!r || !r.figure || typeof r.figure.svg !== 'string' || r.figure.svg.length > 46000) { z._fig = null; return; }
+      build(r.figure, function (f) { z._fig = f; if (f) { ready[key] = f; z._figSvg = f.svg; G.emit('figure', z); } });
+    }, function () { z._figAsked = false; z._figFail = (z._figFail || 0) + 1; if (z._figFail > 1) z._fig = null; });
+    return null;
+  };
+
+  /** draw the being with its feet at the origin, one unit to a unit of its drawing (it is 240 tall). t: time; z: the thing */
+  G.drawFigure = function (ctx, f, z, t) {
+    const moves = z.p && z.p.moves > 0.15, walk = moves ? 1 : 0.3, strike = Math.max(0, Math.min(1, z.bite || 0));
+    // it faces the way it is going
+    const want = moves && Math.cos(z.ma || 0) < 0 ? -1 : 1; z._fc = z._fc === undefined ? want : z._fc + (want - z._fc) * 0.12;
+    const bob = f.floats ? Math.sin(t * 1.8) * 5 - 8 : -Math.abs(Math.sin(t * 5)) * 3 * walk;
+    const A = { 'leg-near': Math.sin(t * 5) * 0.3 * walk, 'leg-far': -Math.sin(t * 5) * 0.3 * walk, 'arm-near': Math.sin(t * 2.2) * 0.2 - strike * 1.1, 'arm-far': -Math.sin(t * 2.2) * 0.16, head: Math.sin(t * 1.6) * 0.05, tail: Math.sin(t * 3) * 0.24, back: Math.sin(t * 4.2) * 0.12, body: 0 };
+    ctx.save();
+    ctx.scale((z._fc >= 0 ? 1 : -1) * Math.max(0.3, Math.abs(z._fc)), 1);
+    ctx.translate(-100, -228 + bob);
+    for (let i = 0; i < f.parts.length; i++) {
+      const p = f.parts[i]; if (!p) continue;
+      const pv = f.pivots[p.id] || [100, 130], a = A[p.id] || 0;
+      ctx.save(); ctx.translate(pv[0], pv[1]);
+      if (p.id === 'body') ctx.scale(1, 1 + Math.sin(t * 2.2) * 0.015); else if (p.id === 'head') ctx.translate(0, Math.sin(t * 2.2) * 1.2);
+      ctx.rotate(a); ctx.translate(-pv[0], -pv[1]);
+      ctx.drawImage(p.img, 0, 0, 200, 240);
+      ctx.restore();
+    }
+    ctx.restore();
+  };
+  G.on('zone', function (z) { if (G.mode === 'play') G.figureOf(z); });
+})();
+
+</script>
 <script data-part="why">
 // ── Why: a feature that takes hold comes with its reason ──
 // Mutation is blind; what spreads is not. When something new takes hold, the pond says why, from what it can measure:
@@ -4332,7 +4485,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   /** Measured once a generation. part[k] and fx[name] are extra weights; c[i] tilts a chemistry gene; list is for people (and the AI). */
   G.measurePressures = function () {
     const W = G.W;
-    const P = { part: new Array(9).fill(0), fx: {}, c: new Array(15).fill(0), list: [] };
+    const P = { part: new Array(9).fill(0), fx: {}, c: new Array(15).fill(0), list: [], size: 0, sizeWhy: '' };
     const fx = function (k, v) { P.fx[k] = (P.fx[k] || 0) + v; };
     const temp = W.set.temp + (W.mods.length ? G.modSum('temp') : 0);
     if (temp < -0.25) { fx('cold', 3); P.c[7] += 1; P.list.push('the water is cold'); }
@@ -4343,12 +4496,16 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (W.lastStats && W.cre.length && (W.lastStats.gasp || 0) > W.lastStats.breaths * 0.2) { P.o2 = 2; P.list.push('the water is thin on oxygen (fins and frills breathe better; small bodies need less)'); }
     if (light > 1.2) { fx('photo', 2.5); P.list.push('there is plenty of light'); }
     if (W.mods.length && G.modSum('poison') > 0.1) { fx('poison', 4); P.c[8] += 2; P.list.push('the whole pond is poisoned'); }
+    // size: a hunter takes only prey well under its own size, so danger makes a bigger body a likelier thing to stumble on; hunger, heat and thin air favour small bodies
+    if (W.lastStats && (W.lastStats.killed > 5 || W.lastStats.fights > 12)) { P.size += 1; P.sizeWhy = 'to be too big to bite'; }
+    if (W.lastStats && W.lastStats.protShort > W.cre.length * 0.3 && P.size <= 0) { P.size -= 0.5; P.sizeWhy = 'to need less food'; }
     if (W.lastStats && W.lastStats.killed > 5) { fx('armor', 2); fx('spike', 1.5); fx('toxin', 1.5); fx('speed', 1); P.part[3] += 1.5; P.part[2] += 1; P.part[6] += 1; P.list.push('hunters are about'); }
     if (W.lastStats && W.lastStats.fights > 12) { fx('armor', 2); fx('speed', 1.5); fx('spike', 1); P.part[3] += 1.5; P.part[1] += 1; P.list.push('a violent kind is attacking the others'); }
     for (let i = 0; i < W.zones.length; i++) {
       const z = W.zones[i], p = z.p;
       if (G.isBad(z)) {
         const w = WEAK[z.weak];
+        if ((p.eats || 0) + (p.deadly || 0) > 0.2) { P.size += 0.8; P.sizeWhy = 'to be too big for ' + z.word + ' to swallow'; }
         P.part[w.part] += 2.5; fx(w.id === 'bite' ? 'eat' : w.id, 2.5);
         P.c[9 + z.sig] += 1;
         P.list.push(z.word + ' is hurting them (it is weak to ' + w.text + ')');
@@ -4369,6 +4526,10 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       if (left[t] > 25 && eaters[t] < W.cre.length * 0.3) { P.c[t] += 1.5; P.digest = t; if (P.list.length < 6) P.list.push('there is ' + names[t] + ' food that few can eat'); }
     }
     if (W.lastStats && W.lastStats.protShort > W.cre.length * 0.3) { P.c[0] += 1.5; P.part[0] += 1; P.list.push('protein is short: elaborate bodies cannot build children on algae alone (scraps and meat are rich)'); }
+    if (W.cre.length && W.food.length < 40) { P.size -= 0.8; P.sizeWhy = 'to need less food'; }
+    if (P.o2) { P.size -= 0.6; P.sizeWhy = 'to need less air'; }
+    if (temp > 0.25) { P.size -= 0.3; if (!P.sizeWhy) P.sizeWhy = 'to shed heat'; }
+    P.size = clamp(P.size, -1.5, 2);
     if (W.cre.length && W.food.length < 40) { fx('eat', 1.5); fx('sense', 1.5); P.part[4] += 1; P.list.push('food is scarce'); }
     // the visible answers: a coat, a build, eyes, a colour
     const B = P.body = { coat: -1, plump: 0, eyes: 0, hue: -1 };
@@ -4779,7 +4940,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const n = function (v) { v = +v; return isFinite(v) ? clamp(v, 0, 0.3) : 0; };
     const rs = Array.isArray(raw.res) ? raw.res : raw.res && typeof raw.res === 'object' ? [raw.res.heat, raw.res.cold, raw.res.poison] : [];
     const name = String(raw.name || 'New shape').replace(/[<>"]/g, '').trim().slice(0, 22) || 'New shape';
-    return { name: name, noun: (String(raw.noun || '').replace(/[^A-Za-z\-]/g, '').slice(0, 14) || name.split(' ').pop()).replace(/^./, function (c) { return c.toUpperCase(); }),
+    let face = null; if (raw.face && typeof raw.face === 'object') { const q = function (v, a, b) { v = +v; return isFinite(v) ? clamp(v, a, b) : undefined; }; face = { es: q(raw.face.es, 0.34, 0.9), ep: q(raw.face.ep, 0.36, 0.78), ey: q(raw.face.ey, -0.2, 0.36), eg: q(raw.face.eg, 0.3, 0.8), bl: q(raw.face.bl, 0, 1), sm: q(raw.face.sm, -0.2, 1), hd: q(raw.face.hd, 0.7, 2.5) }; }
+    return { face: face, name: name, noun: (String(raw.noun || '').replace(/[^A-Za-z\-]/g, '').slice(0, 14) || name.split(' ').pop()).replace(/^./, function (c) { return c.toUpperCase(); }),
       note: String(raw.note || '').replace(/[<>]/g, '').slice(0, 120), because: String(raw.because || '').replace(/[<>]/g, '').slice(0, 90),
       bd: bd, res: [n(rs[0]), n(rs[1]), n(rs[2])], by: String(raw.by || raw.model || '').slice(0, 60) };
   };
@@ -4824,31 +4986,37 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   // ── the pond's own stock, for when the AI is not asked (angles in degrees: 0 right, 90 up, 180 left, 270 down) ──
   // radii go clockwise from the right: right, lower right, bottom right, bottom left, lower left, left, upper left, top left, top right, upper right
   const ROUND = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+  const PLUSH_FACE = { es: 0.72, ep: 0.62, ey: 0.0, eg: 0.56, bl: 0.7, sm: 0.85, hd: 1.7 };
   const OWN = [
-    { name: 'Snowball', noun: 'Snowball', note: 'A round body with a smaller round head set on top.', body: { v: 0, e: 1, m: [{ r: ROUND }, { r: ROUND, s: 0.72, on: 0, at: 90, d: 0.85 }] } },
+    { plush: true, name: 'Snowball', noun: 'Snowball', note: 'A round body with a smaller round head set on top.', body: { v: 0, e: 1, m: [{ r: ROUND }, { r: ROUND, s: 0.72, on: 0, at: 90, d: 0.85 }] } },
     { name: 'Toadstool', noun: 'Toadstool', note: 'A wide cap over a narrow stem, the face on the stem.', body: { v: 0, e: 0, m: [{ r: [0.8, 0.9, 1.2, 1.2, 0.9, 0.8, 0.85, 1.1, 1.1, 0.85] }, { r: [1.5, 1.1, 0.7, 0.7, 1.1, 1.5, 1.2, 0.9, 0.9, 1.2], s: 1.2, on: 0, at: 90, d: 0.62 }] } },
-    { name: 'Eared One', noun: 'Earling', note: 'One round body with a pair of big round ears.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.5, on: 0, at: 52, d: 0.9, pr: 1 }] } },
-    { name: 'Star Body', noun: 'Starling', note: 'Its whole body is a five-pointed star.', body: { v: 0, e: 0, m: [{ r: ROUND, lb: 5, la: 0.22 }] } },
+    { plush: true, name: 'Eared One', noun: 'Earling', note: 'One round body with a pair of big round ears.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.5, on: 0, at: 52, d: 0.9, pr: 1 }] } },
     { name: 'Periscope', noun: 'Peeper', note: 'A low wide body, and the face held high on a stalk.', body: { v: 0, e: 1, m: [{ r: [1.4, 1.1, 0.8, 0.8, 1.1, 1.4, 1.1, 0.8, 0.8, 1.1] }, { r: ROUND, s: 0.6, on: 0, at: 90, d: 1.45 }] } },
     { name: 'Bead String', noun: 'Beadling', note: 'Three beads in a row, the biggest in front.', body: { v: 1, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.82, on: 0, at: 180, d: 0.9 }, { r: ROUND, s: 0.62, on: 1, at: 180, d: 0.9 }] } },
-    { name: 'Halo', noun: 'Halo', note: 'A round body that carries a ring above it.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: [1.3, 1.1, 0.8, 0.8, 1.1, 1.3, 1.1, 0.8, 0.8, 1.1], s: 0.7, on: 0, at: 90, d: 1.2, h: 1 }] } },
-    { name: 'Totem', noun: 'Totem', note: 'Three parts stacked one on another, the face at the top.', body: { v: 0, e: 2, m: [{ r: [1.1, 1, 1, 1, 1, 1.1, 1, 0.9, 0.9, 1] }, { r: ROUND, s: 0.85, on: 0, at: 90, d: 0.8 }, { r: ROUND, s: 0.7, on: 1, at: 90, d: 0.8 }] } },
     { name: 'Twin Bells', noun: 'Twin', note: 'A small middle with a big round body out on each side.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.95, on: 0, at: -8, d: 1.0, pr: 1 }] } },
     { name: 'Bell', noun: 'Bell', note: 'A dome, wide and full above, cut short below.', body: { v: 0, e: 0, m: [{ r: [1.3, 1.0, 0.65, 0.65, 1.0, 1.3, 1.25, 1.15, 1.15, 1.25] }] } },
     { name: 'Nodder', noun: 'Nodder', note: 'A round body, the head carried forward on a neck, a small rump behind.', body: { v: 1, e: 1, m: [{ r: ROUND }, { r: ROUND, s: 0.62, on: 0, at: 48, d: 1.3 }, { r: ROUND, s: 0.5, on: 0, at: 190, d: 0.8 }] } },
     { name: 'Pear', noun: 'Pearling', note: 'Narrow above and full below, like a ripe pear.', body: { v: 0, e: 0, m: [{ r: [1.1, 1.25, 1.2, 1.2, 1.25, 1.1, 0.85, 0.8, 0.8, 0.85] }] } },
     { name: 'Clover', noun: 'Clover', note: 'A body of three soft lobes.', body: { v: 0, e: 0, m: [{ r: ROUND, lb: 3, la: 0.2 }] } },
-    { name: 'Crown Bearer', noun: 'Crownling', note: 'A stout body with a small star set on its head.', body: { v: 0, e: 0, m: [{ r: [1.15, 1.1, 1, 1, 1.1, 1.15, 1, 0.9, 0.9, 1] }, { r: ROUND, s: 0.42, on: 0, at: 90, d: 0.95, lb: 5, la: 0.24 }] } },
+    // the proportions of a loved character: a big head with a big face, a small body beneath it
+    { plush: true, name: 'Bean Baby', noun: 'Beanling', note: 'A big round head on a small round body.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.66, on: 0, at: 270, d: 0.82 }] } },
+    { plush: true, name: 'Plush Cub', noun: 'Cub', note: 'A big head with two round ears and a small body.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.68, on: 0, at: 270, d: 0.8 }, { r: ROUND, s: 0.34, on: 0, at: 55, d: 0.95, pr: 1 }] } },
+    { plush: true, name: 'Little Hero', noun: 'Hero', note: 'A big head, a small pear body and two round mitts.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: [1, 1.1, 1.15, 1.15, 1.1, 1, 0.92, 0.9, 0.9, 0.92], s: 0.74, on: 0, at: 270, d: 0.8 }, { r: ROUND, s: 0.3, on: 1, at: 345, d: 0.95, pr: 1 }] } },
+    { plush: true, name: 'Pudgy', noun: 'Pudge', note: 'A fat round body with a face almost as big as itself.', body: { v: 0, e: 1, m: [{ r: [1, 1.1, 1.15, 1.15, 1.1, 1, 0.95, 0.92, 0.92, 0.95] }, { r: ROUND, s: 0.86, on: 0, at: 90, d: 0.7 }] } },
+    { plush: true, name: 'Sleepy Bun', noun: 'Bun', note: 'A wide soft bun of a head over a tiny body.', body: { v: 0, e: 0, m: [{ r: [1.2, 1.05, 0.95, 0.95, 1.05, 1.2, 1.05, 0.95, 0.95, 1.05] }, { r: ROUND, s: 0.55, on: 0, at: 270, d: 0.78 }] } },
   ];
   G.offlinePlan = function () {
     const r = G.rand, W = G.W, have = W ? W.plans.map(function (p) { return p.name; }) : [];
     let pick = null;
+    // the stock leans to the plush ones: a big face over a small soft body, with the face settings that go with it
+    const pool = r() < 0.65 ? OWN.filter(function (c) { return c.plush; }) : OWN;
+    for (let t = 0; t < 12 && !pick; t++) { const c = pool[Math.floor(r() * pool.length)]; if (have.indexOf(c.name) < 0) pick = c; }
     for (let t = 0; t < 10 && !pick; t++) { const c = OWN[Math.floor(r() * OWN.length)]; if (have.indexOf(c.name) < 0) pick = c; }
     if (!pick) return null;
     // the same idea never comes out the same twice
     const b = JSON.parse(JSON.stringify(pick.body));
     for (let i = 0; i < b.m.length; i++) { const q = b.m[i]; q.r = q.r.map(function (v) { return v * (0.93 + r() * 0.14); }); if (i) { q.s *= 0.88 + r() * 0.24; q.d = (q.d || 1) * (0.92 + r() * 0.16); } }
-    return { name: pick.name, noun: pick.noun, note: pick.note, because: '', body: b, by: '' };
+    return { name: pick.name, noun: pick.noun, note: pick.note, because: '', body: b, by: '', face: pick.plush ? PLUSH_FACE : null };
   };
   /** a plain animal of this shape, to show it */
   G.planDemo = function (p, hue) {
@@ -5198,7 +5366,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   G.sheet = function (forms, o) {
     if (typeof document === 'undefined' || !forms.length) return null;
     o = o || {};
-    const n = forms.length, cols = o.cols || (n <= 2 ? n : n <= 4 ? 2 : 3), rows = Math.ceil(n / cols), CW = o.cw || 226, CH = o.ch || 232, SC = o.sc || 0.62;
+    const rf = o.refs | 0, n = forms.length, cols = o.cols || (n <= 2 ? n : n <= 4 ? 2 : 3), rows = Math.ceil(n / cols), CW = o.cw || 226, CH = o.ch || 232, SC = o.sc || 0.62;
     const cv = document.createElement('canvas'); cv.width = cols * CW; cv.height = rows * CH;
     const ctx = cv.getContext('2d');
     ctx.fillStyle = '#0d2f3d'; ctx.fillRect(0, 0, cv.width, cv.height);
@@ -5207,11 +5375,24 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       ctx.save(); ctx.translate(x + CW / 2, y + 190 * SC + 6); ctx.scale(SC, SC);
       try { G.form.portrait(ctx, forms[i], 1.3 + i, {}); } catch (e) { console.error(e); }
       ctx.restore();
-      ctx.fillStyle = 'rgba(7,18,31,0.85)'; ctx.beginPath(); ctx.arc(x + 22, y + 22, 15, 0, 6.2832); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.font = '700 19px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(i + 1), x + 22, y + 23);
+      ctx.fillStyle = i < rf ? 'rgba(160,120,10,0.95)' : 'rgba(7,18,31,0.85)'; ctx.beginPath(); ctx.arc(x + 22, y + 22, 15, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '700 19px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(i < rf ? '★' : String(i - rf + 1), x + 22, y + 23);
+      if (i < rf) { ctx.strokeStyle = 'rgba(255,205,70,0.55)'; ctx.lineWidth = 3; ctx.strokeRect(x + 2, y + 2, CW - 4, CH - 4); }
       if (i % cols) { ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(x, y, 1, CH); }
     }
     try { return cv.toDataURL('image/jpeg', 0.86).split(',')[1] || null; } catch (e) { return null; }
+  };
+  /** the look the owner loves, as four hand-set characters: they stand in the first row of every sheet as what a 9 looks like */
+  G.referenceForms = function () {
+    if (G._refForms) return G._refForms;
+    const R1 = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], leg = { k: 0, a: 0, b: 0, e: 1, l: 0.7, w: 0.6, j: 2, g: 0.2, c: 0, t: 3, p: 0.5, on: -1 }, ear = { k: 7, a: 1, b: 1, e: 1, l: 0.5, w: 0.5, j: 2, g: 0, c: 0, t: 0, p: 0.5, on: -1 };
+    const mk = function (hue, hd, es, eg, ey, ep, bl, sm, bs, rules) {
+      const f = G.form.cell(hue); f.hue2 = 60; f.en = 2; f.es = es; f.hd = hd; f.eg = eg; f.ey = ey; f.ep = ep; f.bl = bl; f.sm = sm; f.seed = 7 + Math.round(hue);
+      f.bd = { v: 0, e: 1, m: [{ r: R1.slice(), s: 1, on: -1, at: 0, d: 1, pr: 0, h: 0, lb: 0, la: 0 }, { r: R1.slice(), s: bs, on: 0, at: -Math.PI / 2, d: 0.85, pr: 0, h: 0, lb: 0, la: 0 }] };
+      f.rules = (rules || []).map(function (q) { return Object.assign({}, q); });
+      return G.form.fix(f);
+    };
+    return (G._refForms = [mk(200, 1.4, 0.6, 0.55, 0.05, 0.6, 0.6, 0.6, 0.72), mk(30, 2.0, 0.8, 0.6, -0.05, 0.7, 0.8, 0.9, 0.7), mk(330, 2.2, 0.85, 0.58, -0.1, 0.72, 0.9, 0.95, 0.6, [leg]), mk(120, 1.8, 0.75, 0.55, 0.0, 0.66, 0.7, 0.8, 0.7, [leg, ear])]);
   };
   const live = function () { return G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available(); };
   const ask = function (forms, names, extra) {
@@ -5265,42 +5446,61 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   // Every few seconds it is shown a sheet of living creatures nobody has looked at yet: first those whose marks are oldest guesses, and
   // those the pond believes are its best (a guess must be checked before it is bred from). Its marks become those creatures' own.
   let watching = false;
+  G.WATCH_BUDGET = 0.3;          // dollars a session may spend on looking at living creatures before the watcher goes quiet
+  const clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
   const c01 = function (v) { v = +v; return isFinite(v) ? G.clamp(v, 0, 1) : NaN; };
-  G.eyeGrade = function (c, g) { c.real = { b: g.b, w: g.w, why: g.why || '', gen: G.W.gen }; c.eb = g.b; c.ew = g.w; c.st = 0; c.ph.charm = g.b; c.ph.whole = g.w; };
+  G.eyeGrade = function (c, g) { c.real = { b: g.b, w: g.w, why: g.why || '', fix: g.fix || '', gen: G.W.gen }; c.eb = g.b; c.ew = g.w; c.st = 0; c.ph.charm = g.b; c.ph.whole = g.w; };
   G.watchPick = function (max) {
     const W = G.W, L = [], seen = W.eyeSeen || {};
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.real || !c.g.f.bd) continue; const hit = seen[G.form.key(c.g.f)]; if (hit) { G.eyeGrade(c, hit); continue; } L.push(c); }
     L.sort(function (a, b) { return ((b.st || 0) * 0.5 + 6 * G.charmOf(b)) - ((a.st || 0) * 0.5 + 6 * G.charmOf(a)); });
-    const out = [], kinds = {};
-    for (let i = 0; i < L.length && out.length < max; i++) { const k = G.shapeOf(L[i].g) + '|' + G.hueOf(L[i].g); if (kinds[k] >= 3) continue; kinds[k] = (kinds[k] || 0) + 1; out.push(L[i]); }
+    // one creature to a species (the one the pond thinks best: it is the one that will breed), and a species is not looked at again for a few generations
+    const out = [], kinds = {}, sl = W.spLook = W.spLook || {};
+    for (let i = 0; i < L.length && out.length < max; i++) { const c = L[i], k = c.sp ? 's' + c.sp : G.shapeOf(c.g) + '|' + G.hueOf(c.g); if (kinds[k] || (c.sp && W.gen - (sl[c.sp] === undefined ? -99 : sl[c.sp]) < 6)) continue; kinds[k] = 1; out.push(c); }
+    // a pond of two or three species still gets a look: the look-alike kinds within them stand in
+    if (out.length < 4) { const lk = {}; for (let i = 0; i < L.length && out.length < 5; i++) { const c = L[i], k = G.shapeOf(c.g) + '|' + G.hueOf(c.g); if (lk[k] || out.indexOf(c) >= 0) continue; lk[k] = 1; out.push(c); } }
     return out;
   };
   G.watchTick = function () {
     const W = G.W;
     if (!W || W.title || watching || !live() || W.cre.length < 4) return;
     const picks = G.watchPick(12);
+    // the watcher's own spending slows it as it goes, whatever model it is: looking often at first, when the pond is learning what is nice,
+    // then rarely. A session's looks cost about 20 to 30 cents in all (WATCH_BUDGET); once spent it looks only now and then.
+    { const sp = G.ai.count && G.ai.count.watch ? G.ai.count.watch.usd || 0 : 0, B = G.WATCH_BUDGET; G.ai.gaps.watch = sp < B * 0.35 ? 5000 : sp < B * 0.7 ? 9000 : sp < B ? 16000 : 60000; }
     if (picks.length < 4 || !G.ai.allow('watch')) return;
-    const img = G.sheet(picks.map(function (c) { return c.g.f; }), { cw: 176, ch: 182, sc: 0.48, cols: 4 });
+    const refs = G.referenceForms(), img = G.sheet(refs.concat(picks.map(function (c) { return c.g.f; })), { cw: 176, ch: 182, sc: 0.48, cols: 4, refs: refs.length });
     if (!img) return;
     watching = true;
-    G.ai.ask('judge', { image: img, mime: 'image/jpeg', lean: 1, count: picks.length, kind: 'watch' }).then(function (res) {
+    G.ai.ask('judge', { image: img, mime: 'image/jpeg', lean: 1, count: picks.length, refs: refs.length, kind: 'watch' }).then(function (res) {
       watching = false;
       if (G.W !== W || !res || !Array.isArray(res.scores)) return;
       if (!W.eyeSeen || (W.eyeKeys || 0) > 700) { W.eyeSeen = {}; W.eyeKeys = 0; }
       let n = 0;
       for (let i = 0; i < res.scores.length; i++) {
-        const s = res.scores[i], c = picks[(s.id | 0) - 1], g = { b: c01(s.score), w: c01(s.whole), why: String(s.why || '').replace(/[<>]/g, '').slice(0, 70) };
+        const s = res.scores[i], c = picks[(s.id | 0) - 1], g = { b: c01(s.score), w: c01(s.whole), why: String(s.why || '').replace(/[<>]/g, '').slice(0, 70), fix: (G.form.NUDGES || []).indexOf(s.fix) >= 0 ? s.fix : '' };
         if (!c || isNaN(g.b) || isNaN(g.w)) continue;
         W.eyeSeen[G.form.key(c.g.f)] = g; W.eyeKeys++; n++;
+        if (g.fix) { W.advice = (W.advice || []).filter(function (a) { return W.gen - a.gen <= 40; }); W.advice.push({ fix: g.fix, gen: W.gen, fv: c.fv || (c.fv = G.features(c.g)) }); if (W.advice.length > 60) W.advice.shift(); }
         if (!c.dead) G.eyeGrade(c, g);
         // the look is remembered, and every living creature that resembles this one is moved towards what the watcher said of it
-        { const fv = c.fv || G.features(c.g); (W.eyeBank = W.eyeBank || []).push({ fv: fv, b: g.b, w: g.w }); if (W.eyeBank.length > 160) W.eyeBank.shift();
+        { const fv = c.fv || G.features(c.g); (W.eyeBank = W.eyeBank || []).push({ fv: fv, b: g.b, w: g.w, f: c.g.f.bd ? c.g.f : null, x: c.g.f.bd ? G.form.looks(c.g.f) : null }); if (W.eyeBank.length > 160) W.eyeBank.shift();
           for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x === c || x.real || x.dead || !x.g.f.bd || x.eb === undefined) continue; const d = G.fdist(fv, x.fv || (x.fv = G.features(x.g))), wt = Math.exp(-d * d); if (wt < 0.05) continue; x.eb += 0.8 * wt * (g.b - x.eb); x.ew += 0.8 * wt * (g.w - x.ew); x.st = Math.min(x.st || 0, 1); x.ph.charm = x.eb; x.ph.whole = x.ew; } }
         if (W.taste) G.form.learn(W.taste, c.g.f, g.b, 0.03);          // the pond's own guess is corrected by every look
         const sp = c.sp ? G.speciesById(c.sp) : null;
-        if (sp && (!sp.judge || sp.judge.est || g.b + g.w >= sp.judge.score + (sp.judge.whole || 0) - 0.05 || W.gen - sp.judge.gen > 5)) sp.judge = { score: g.b, whole: g.w, why: g.why, gen: W.gen, fv: sp.fv ? sp.fv.slice() : [] };
+        if (c.sp) (W.spLook = W.spLook || {})[c.sp] = W.gen;
+        // the best the watcher has really seen are kept (a hall of fame): they can be bred again if the pond loses what they had
+        if (c.g.f.bd) { const sc = (g.b + g.w) / 2, H = W.hall = W.hall || [], fvh = c.fv || G.features(c.g); let near = -1; for (let h = 0; h < H.length; h++) if (G.fdist(fvh, H[h].fv) < 0.8) { near = h; break; }
+          if (near >= 0) { if (sc > H[near].s) H[near] = { g: G.cloneGenome(c.g), fv: fvh, s: sc, gen: W.gen }; } else if (H.length < 8) H.push({ g: G.cloneGenome(c.g), fv: fvh, s: sc, gen: W.gen }); else { let lo = 0; for (let h = 1; h < H.length; h++) if (H[h].s < H[lo].s) lo = h; if (sc > H[lo].s) H[lo] = { g: G.cloneGenome(c.g), fv: fvh, s: sc, gen: W.gen }; } }
+        if (sp && (!sp.judge || sp.judge.est || g.b + g.w >= sp.judge.score + (sp.judge.whole || 0) - 0.05 || W.gen - sp.judge.gen > 5)) sp.judge = { score: g.b, whole: g.w, why: g.why, fix: g.fix, gen: W.gen, fv: sp.fv ? sp.fv.slice() : [] };
       }
       W.eyeN = (W.eyeN || 0) + n;
+      // the pond's own guess is taught by everything the watcher has really said: a few passes over its recent marks, newest last,
+      // so the guess made for the creatures nobody has looked at keeps up with the watcher's taste
+      if (W.taste && W.eyeBank && W.eyeBank.length >= 8) {
+        for (let ep = 0; ep < 3; ep++) for (let i = 0; i < W.eyeBank.length; i++) { const e = W.eyeBank[i]; if (e.f && e.x) G.form.learn(W.taste, e.f, e.b, 0.025, e.x); }
+        for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x.real || x.dead || !x.g.f.bd) continue; let nb = G.form.beauty(x.g.f, W.taste); const fv = x.fv || (x.fv = G.features(x.g)); let sw = 0, sb = 0; for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i], d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; sb += wt * q.b; } if (sw > 0.15) nb += Math.min(0.85, sw / (sw + 0.6)) * (sb / sw - nb); x.eb = clamp01(nb); x.ph.charm = x.eb; }
+      }
       G.emit('watched', n);
     }, function () { watching = false; });
   };
@@ -5887,13 +6087,20 @@ function drawAddedThings() {
   }
   for (let i = 0; i < W.zones.length; i++) {
     const z = W.zones[i];
-    const form = G.zoneForm ? G.zoneForm(z) : null, im = form ? null : thingImage(z);
+    const fig = G.figureOf ? G.figureOf(z) : null, form = fig ? null : G.zoneForm ? G.zoneForm(z) : null, im = form || fig ? null : thingImage(z);
     const label = z.alive > 0.25 && z.genN > 1 ? z.word + ' · gen ' + z.genN : z.word;
-    drawOrb(ctx, z, z.x, z.y, z.r * 0.8, z.k, '', false, !!im || !!form);
+    drawOrb(ctx, z, z.x, z.y, z.r * 0.8, z.k, '', false, !!im || !!form || !!fig);
     if (form) {
       const sc = Math.max(84, z.r * 1.15) / 150 * (1 + 0.12 * Math.max(0, z.bite || 0));
       ctx.save(); ctx.globalAlpha = Math.min(1, 0.4 + z.k); ctx.translate(z.x, z.y - z.r * 0.08); ctx.scale(sc, sc);
       G.form.portrait(ctx, form, G.rt + z.id, {}); ctx.restore();
+    }
+    if (fig) {      // the AI's own drawing of what was typed, moving as a puppet
+      const sc = Math.max(84, z.r * 1.15) / 150 * (1 + 0.12 * Math.max(0, z.bite || 0)) * 1.15;
+      ctx.save(); ctx.globalAlpha = Math.min(1, 0.4 + z.k); ctx.translate(z.x, z.y - z.r * 0.08 + 104 * sc / 1.15); ctx.scale(sc, sc);
+      G.drawFigure(ctx, fig, z, G.rt + z.id); ctx.restore();
+    } else if (z._figAsked && z._fig === undefined && G.speed <= 8) {      // its picture is on the way: say so, since what stands there now is only a stand-in
+      ctx.save(); ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(246,211,101,' + (0.6 + 0.3 * Math.sin(G.rt * 4)) + ')'; ctx.fillText('the AI is drawing what you typed: this is a stand-in', z.x, z.y - Math.max(84, z.r * 1.15) * 1.25); ctx.restore();
     }
     if (false) {
       const st = null;
@@ -6397,6 +6604,168 @@ G.addSystem({
 });
 
 </script>
+<script data-part="weather">
+// ── What is happening to the pond, made visible ──
+// A world event used to be a line of text and a flash. Now it is SEEN and it stays seen for as long as it lasts:
+//   · when it strikes: its name across the middle of the pond, a ring bursting outwards, a burst of its own weather
+//   · while it lasts: the water is tinted and filled with what it is (snow and frost at the edges for cold, embers and a
+//     shimmer for heat, darkness closing in, green murk and bubbles for poison, drifting motes when mutations run wild,
+//     streaks when a current sweeps through), and a strip under the wish card names it, says what it does, and counts it down.
+// It draws on a layer of its own over the pond and under the buttons, and only reads the world; it changes nothing in it.
+(function () {
+  'use strict';
+  if (typeof document === 'undefined') return;
+  let cv = null, ctx = null, strip = null, W_ = 0, H_ = 0, last = 0, splash = null, parts = [], cleared = true;
+  const seen = {};           // an event's first-seen length, so its countdown bar knows the whole
+  const TAU = 6.2832;
+
+  function setup() {
+    if (cv) return;
+    const st = document.createElement('style');
+    st.textContent = '#wxfx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}' +
+      '#wxnow{position:fixed;left:50%;transform:translateX(-50%);top:14px;z-index:2;display:flex;flex-wrap:wrap;justify-content:center;gap:6px;width:min(560px,calc(100vw - 28px));pointer-events:none}' +
+      '#wxnow .wx{display:flex;align-items:center;gap:8px;padding:5px 12px 6px;border-radius:14px;background:rgba(9,28,40,.86);border:1px solid rgba(246,211,101,.45);font:600 11.5px system-ui,sans-serif;color:#cfe8ff;box-shadow:0 4px 18px rgba(0,0,0,.35)}' +
+      '#wxnow .wx b{color:#fff;font-weight:700}#wxnow .wx i{font-style:normal;color:#f6d365}#wxnow .wx .bar{width:46px;height:5px;border-radius:3px;background:rgba(207,232,255,.18);overflow:hidden}#wxnow .wx .bar u{display:block;height:100%;background:#f6d365}' +
+      '@media (min-width:721px){body.wxon #banner.show{transform:translate(-50%,150px) !important}}' +
+      '@media (max-width:720px){#wxnow{top:auto;bottom:160px}}@media (max-height:560px){#wxnow{display:none}}';
+    document.head.appendChild(st);
+    cv = document.createElement('canvas'); cv.id = 'wxfx';
+    const pond = document.getElementById('pond');
+    if (pond && pond.parentNode) pond.parentNode.insertBefore(cv, pond.nextSibling); else document.body.appendChild(cv);
+    ctx = cv.getContext('2d');
+    strip = document.createElement('div'); strip.id = 'wxnow';
+    (document.getElementById('ui') || document.body).appendChild(strip);
+    size(); window.addEventListener('resize', size);
+  }
+  function size() { W_ = cv.width = Math.max(320, window.innerWidth); H_ = cv.height = Math.max(240, window.innerHeight); }
+
+  // what is in force right now, added up
+  function now() {
+    const W = G.W, o = { temp: 0, light: 0, poison: 0, food: 1, mutate: 1, list: [] };
+    if (!W || !W.mods) return o;
+    for (let i = 0; i < W.mods.length; i++) {
+      const m = W.mods[i], left = m.until - W.t; if (!(left > 0)) continue;
+      o.temp += m.temp || 0; o.light += m.light || 0; o.poison += m.poison || 0; o.food *= m.food || 1; o.mutate = Math.max(o.mutate, m.mutate || 1);
+      const key = m.name + '|' + Math.round(m.until); if (!seen[key]) seen[key] = left;
+      o.list.push({ name: m.name, left: left, of: seen[key], does: words(m) });
+    }
+    return o;
+  }
+  function words(m) {
+    const t = [];
+    if (m.temp < -0.05) t.push('freezing'); else if (m.temp > 0.05) t.push('scorching');
+    if (m.light < -0.05) t.push('dark'); else if (m.light > 0.05) t.push('bright');
+    if (m.poison > 0.05) t.push('poisoned');
+    if (m.food < 0.95) t.push('food is scarce'); else if (m.food > 1.05) t.push('food is plenty');
+    if (m.mutate > 1.05) t.push('mutations run wild');
+    return t.join(' · ');
+  }
+  function kindOf(ev) {
+    if (ev.temp < -0.05) return 'cold'; if (ev.temp > 0.05) return 'heat'; if (ev.poison > 0.05) return 'poison';
+    if (ev.light < -0.05) return 'dark'; if (ev.kill && ev.kill.share > 0.02) return 'death'; if (ev.current > 0.05) return 'flood';
+    if (ev.mutate > 1.05) return 'mutate'; if (ev.food > 1.05 || (ev.feed && ev.feed.count > 0)) return 'feast'; if (ev.food < 0.95) return 'famine';
+    return 'wonder';
+  }
+  const COL = { cold: [170, 215, 255], heat: [255, 140, 60], poison: [110, 220, 70], dark: [20, 20, 45], death: [255, 80, 100], flood: [90, 170, 255], mutate: [200, 110, 255], feast: [120, 240, 150], famine: [150, 150, 150], wonder: [246, 211, 101] };
+  const rgba = function (c, a) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; };
+
+  function spawn(kind, n, burst) {
+    for (let i = 0; i < n && parts.length < 190; i++) {
+      const p = { k: kind, x: Math.random() * W_, y: 0, vx: 0, vy: 0, r: 2, life: 1, a: Math.random() * TAU };
+      if (kind === 'cold') { p.y = burst ? Math.random() * H_ : -8; p.vy = 40 + Math.random() * 70; p.vx = -20 + Math.random() * 40; p.r = 1.5 + Math.random() * 3; }
+      else if (kind === 'heat') { p.y = burst ? Math.random() * H_ : H_ + 8; p.vy = -(50 + Math.random() * 90); p.vx = -15 + Math.random() * 30; p.r = 1.5 + Math.random() * 2.5; }
+      else if (kind === 'poison') { p.y = burst ? Math.random() * H_ : H_ + 10; p.vy = -(25 + Math.random() * 50); p.r = 3 + Math.random() * 7; }
+      else if (kind === 'mutate') { p.y = Math.random() * H_; p.vy = -10 + Math.random() * 20; p.vx = -10 + Math.random() * 20; p.r = 1.5 + Math.random() * 2.5; p.life = 0.6 + Math.random() * 0.8; }
+      else if (kind === 'feast') { p.y = burst ? Math.random() * H_ : -8; p.vy = 30 + Math.random() * 50; p.r = 2 + Math.random() * 3; }
+      else if (kind === 'flood') { p.y = Math.random() * H_; p.r = 30 + Math.random() * 70; p.life = 0.5 + Math.random() * 0.5; }
+      else { p.y = Math.random() * H_; p.vy = -20 + Math.random() * 40; p.vx = -20 + Math.random() * 40; p.r = 2 + Math.random() * 3; p.life = 0.8; }
+      parts.push(p);
+    }
+  }
+
+  function frame(ts) {
+    requestAnimationFrame(frame);
+    if (!cv) return;
+    const dt = Math.min(0.05, (ts - last) / 1000 || 0.016); last = ts;
+    const on = G.mode === 'play' && G.W && !G.W.title;
+    const N = on ? now() : { temp: 0, light: 0, poison: 0, food: 1, mutate: 1, list: [] };
+    const fl = on && G.W.flood && G.W.flood.t > 0 ? G.W.flood : null;
+    const active = on && (N.list.length || fl || splash || parts.length);
+    if (!active) { if (!cleared) { ctx.clearRect(0, 0, W_, H_); cleared = true; } return; }
+    cleared = false;
+    ctx.clearRect(0, 0, W_, H_);
+    const t = ts / 1000;
+    // ── the water itself ──
+    if (N.temp < -0.05) { const k = Math.min(1, -N.temp); ctx.fillStyle = rgba(COL.cold, 0.06 + 0.1 * k); ctx.fillRect(0, 0, W_, H_);
+      const g = ctx.createRadialGradient(W_ / 2, H_ / 2, Math.min(W_, H_) * 0.34, W_ / 2, H_ / 2, Math.max(W_, H_) * 0.72); g.addColorStop(0, 'rgba(235,246,255,0)'); g.addColorStop(1, 'rgba(235,246,255,' + (0.22 + 0.26 * k) + ')'); ctx.fillStyle = g; ctx.fillRect(0, 0, W_, H_);      // frost closing in from the edges
+      if (Math.random() < dt * (30 + 60 * k)) spawn('cold', 1); }
+    if (N.temp > 0.05) { const k = Math.min(1, N.temp); ctx.fillStyle = rgba(COL.heat, 0.08 + 0.13 * k + 0.02 * Math.sin(t * 3)); ctx.fillRect(0, 0, W_, H_);
+      const g = ctx.createLinearGradient(0, H_, 0, H_ * 0.45); g.addColorStop(0, 'rgba(255,90,30,' + (0.28 + 0.2 * k) + ')'); g.addColorStop(1, 'rgba(255,90,30,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W_, H_);
+      if (Math.random() < dt * (25 + 50 * k)) spawn('heat', 1); }
+    if (N.light < -0.05) { const k = Math.min(1, -N.light); const g = ctx.createRadialGradient(W_ / 2, H_ / 2, Math.min(W_, H_) * (0.42 - 0.2 * k), W_ / 2, H_ / 2, Math.max(W_, H_) * 0.7); g.addColorStop(0, 'rgba(3,4,14,' + 0.12 * k + ')'); g.addColorStop(1, 'rgba(3,4,14,' + (0.55 + 0.35 * k) + ')'); ctx.fillStyle = g; ctx.fillRect(0, 0, W_, H_); }
+    if (N.light > 0.05) { ctx.fillStyle = 'rgba(255,250,205,' + (0.06 + 0.1 * Math.min(1, N.light)) + ')'; ctx.fillRect(0, 0, W_, H_); }
+    if (N.poison > 0.05) { const k = Math.min(1, N.poison * 2); ctx.fillStyle = rgba(COL.poison, 0.1 + 0.14 * k + 0.02 * Math.sin(t * 2)); ctx.fillRect(0, 0, W_, H_); if (Math.random() < dt * (10 + 22 * k)) spawn('poison', 1); }
+    if (N.food < 0.95) { ctx.fillStyle = 'rgba(120,120,125,' + (0.1 + 0.25 * (1 - N.food)) + ')'; ctx.fillRect(0, 0, W_, H_); }
+    if (N.food > 1.05 && Math.random() < dt * 14) spawn('feast', 1);
+    if (N.mutate > 1.05) { ctx.fillStyle = rgba(COL.mutate, 0.05 + 0.03 * Math.sin(t * 2.4)); ctx.fillRect(0, 0, W_, H_); if (Math.random() < dt * 22) spawn('mutate', 1); }
+    if (fl && Math.random() < dt * 60) spawn('flood', 1);
+    // ── what drifts in it ──
+    const fa = fl ? Math.atan2(fl.fy, fl.fx) : 0;
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      if (p.k === 'flood') { p.x += Math.cos(fa) * 900 * dt; p.y += Math.sin(fa) * 900 * dt; p.life -= dt * 1.4; ctx.strokeStyle = 'rgba(200,230,255,' + Math.max(0, p.life) * 0.5 + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - Math.cos(fa) * p.r, p.y - Math.sin(fa) * p.r); ctx.stroke(); }
+      else {
+        p.x += (p.vx + Math.sin(t * 1.5 + p.a) * 14) * dt; p.y += p.vy * dt; if (p.k === 'mutate' || p.k === 'wonder' || p.k === 'death') p.life -= dt * 0.7;
+        const c = COL[p.k] || COL.wonder, al = Math.min(1, p.life) * (p.k === 'poison' ? 0.4 : 0.85);
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU);
+        if (p.k === 'poison') { ctx.strokeStyle = rgba(c, al + 0.25); ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = rgba(c, al * 0.4); ctx.fill(); }
+        else { ctx.fillStyle = p.k === 'cold' ? 'rgba(255,255,255,' + al + ')' : rgba(c, al); ctx.fill(); }
+      }
+      if (p.life <= 0 || p.y < -90 || p.y > H_ + 90 || p.x < -120 || p.x > W_ + 120) parts.splice(i, 1);
+    }
+    // ── the moment it strikes ──
+    if (splash) {
+      const u = Math.max(0, (ts - splash.t0) / 3400);
+      if (u >= 1) splash = null;
+      else {
+        const c = COL[splash.kind] || COL.wonder, a = u < 0.12 ? u / 0.12 : u > 0.7 ? (1 - u) / 0.3 : 1;
+        ctx.fillStyle = rgba(c, 0.3 * Math.max(0, 1 - u * 3)); ctx.fillRect(0, 0, W_, H_);
+        ctx.strokeStyle = rgba(c, 0.8 * (1 - u)); ctx.lineWidth = 10 * (1 - u) + 2; ctx.beginPath(); ctx.arc(W_ / 2, H_ / 2, u * Math.max(W_, H_) * 0.75, 0, TAU); ctx.stroke();
+        const fs = Math.max(26, Math.min(64, W_ / Math.max(10, splash.name.length * 0.62)));
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '800 ' + fs + 'px system-ui, sans-serif';
+        ctx.shadowColor = rgba(c, 0.95 * a); ctx.shadowBlur = 34; ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(7,18,31,' + 0.85 * a + ')'; ctx.strokeText(splash.name.toUpperCase(), W_ / 2, H_ * 0.42);
+        ctx.fillStyle = 'rgba(255,255,255,' + a + ')'; ctx.fillText(splash.name.toUpperCase(), W_ / 2, H_ * 0.42); ctx.shadowBlur = 0;
+        if (splash.does) { ctx.font = '700 ' + Math.round(fs * 0.34) + 'px system-ui, sans-serif'; ctx.fillStyle = rgba(c, a); ctx.strokeText(splash.does, W_ / 2, H_ * 0.42 + fs * 0.85); ctx.fillText(splash.does, W_ / 2, H_ * 0.42 + fs * 0.85); }
+      }
+    }
+  }
+
+  // the strip: what is in force, what it does, how long is left
+  let stripSig = '';
+  function drawStrip() {
+    if (!strip) return;
+    const on = G.mode === 'play' && G.W && !G.W.title, L = on ? now().list : [];
+    document.body.classList.toggle('wxon', L.length > 0);
+    const wish = document.getElementById('wish'), below = wish && !wish.classList.contains('hide') && window.innerWidth > 720 ? Math.round(wish.getBoundingClientRect().bottom) + 6 : 14;
+    if (window.innerWidth > 720) strip.style.top = below + 'px'; else strip.style.top = '';
+    const sig = L.map(function (q) { return q.name + Math.ceil(q.left / 2); }).join('|');
+    if (sig === stripSig) return; stripSig = sig;
+    strip.innerHTML = L.map(function (q) { return '<span class="wx"><b>' + String(q.name).replace(/[&<>]/g, '') + '</b>' + (q.does ? '<i>' + q.does + '</i>' : '') + '<span class="bar"><u style="width:' + Math.round(100 * Math.max(0, Math.min(1, q.left / q.of))) + '%"></u></span><span>' + Math.ceil(q.left) + 's</span></span>'; }).join('');
+  }
+
+  G.on('event', function (ev) {
+    if (G.mode !== 'play') return;
+    setup();
+    const kind = kindOf(ev);
+    splash = { name: String(ev.name || 'Something happened'), does: words(ev) || (ev.kill && ev.kill.share > 0.02 ? 'many are taken' : ev.gift ? 'bodies change at once' : ev.admire ? 'taste changes' : ev.thing ? 'something arrives' : ''), kind: kind, t0: performance.now() };
+    spawn(kind === 'famine' || kind === 'dark' ? 'wonder' : kind, 70, true);
+  });
+  setup();
+  requestAnimationFrame(frame);
+  setInterval(function () { try { drawStrip(); } catch (e) { console.error(e); } }, 500);
+})();
+
+</script>
 <script data-part="sim">
 // ── Running the pond: fixed steps, fast-forward, starting and seeding ponds ──
 (function () {
@@ -6712,7 +7081,8 @@ G.addSystem({
       const lab = el('div', 'ilabel', 'Yours: drop again', pop); lab.style.marginTop = '0'; pop.insertBefore(lab, $('wordIn'));
       const row = el('div', 'chips shelf', '', pop); row.style.cssText = 'margin:4px 0 12px'; pop.insertBefore(row, $('wordIn'));
       shelf.forEach(function (t) {
-        const c = el('button', 'chip', (t.svg ? '<img alt="" width="20" height="20" style="vertical-align:middle;margin-right:5px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(t.svg) + '">' : '') + escapeHtml(t.name), row);
+        const fp = G.figurePic ? G.figurePic(t.name) : '', pic = fp || t.svg;
+        const c = el('button', 'chip', (pic ? '<img alt="" width="' + (fp ? 30 : 20) + '" height="' + (fp ? 36 : 20) + '" style="vertical-align:middle;margin:' + (fp ? '-6px 6px -6px -4px' : '0 5px 0 0') + '" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pic) + '">' : '') + escapeHtml(t.name), row);
         c.onclick = function () { G.sfx('click'); G.beginPlacing(JSON.parse(JSON.stringify(t))); closePop(); };
       });
     }
@@ -7033,12 +7403,23 @@ G.addSystem({
       '<div class="irows"><div id="iE"></div><div id="iAge"></div><div id="iPar" style="grid-column:span 2"></div><div class="meter"><i id="iEb"></i></div></div>' +
       '<div class="imut" id="imut"></div>' +
       '<details><summary>Genes and brain</summary><canvas id="istrip" width="560" height="80"></canvas><canvas id="ibrain" width="560" height="184" style="margin-top:6px"></canvas></details>' +
-      '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond.">★ KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection.">♥ BREED</button><button class="btn sm" id="itree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide">' + ICON.book + 'SPECIES</button></div>';
+      '<style>#iacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}#iacts .btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:0 4px;font-size:10px;letter-spacing:.06em;white-space:nowrap}#iacts .btn svg{width:14px;height:14px;flex:none;margin:0}#iacts .btn i{font-style:normal;font-size:14px;line-height:1}#iacts #ikeep i{color:var(--gold)}#iacts #ibreed i{color:var(--rose)}</style>' +
+      '<div id="iacts"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond."><i>★</i>KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection."><i>♥</i>BREED</button><button class="btn sm" id="itree" title="Its family tree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide" title="Its kind, in the Book of Life">' + ICON.book + 'KIND</button></div>';
     $('iclose').onclick = function () { G.select(null); };
     $('isub').onclick = function () { this.classList.toggle('open'); };
     $('itree').onclick = function () { G.sfx('click'); G.openTree(); };
     $('ibreed').onclick = function () { const c = G.R.sel; if (!c) return; G.sfx('click'); if (!G.collection.length) { G.banner('Nothing to breed it with yet', 'First ★ KEEP a creature you like (from this pond or another). Then choose it here to breed the two.', 5200); return; } UI.breedWith = c.id; UI.guideTab = 'coll'; G.openGuide(); };
-    $('ikeep').onclick = function () { const c = G.R.sel; if (!c) return; const it = G.keep(c); if (it) { G.sfx('discovery'); G.banner('Kept in your collection', it.name + ', a ' + it.kind.toLowerCase() + '. Find it in the Book of Life under COLLECTION; you can release it into any pond.', 5200); } };
+    // a short word right where the hand is: it shows at once and fades by itself
+    G.toast = function (html) { let t = $('toast'); if (!t) { t = el('div', 'glass', '', ui); t.id = 'toast'; t.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:7;max-width:min(300px,calc(100vw - 28px));padding:10px 14px;border-radius:14px;font-size:12.5px;line-height:1.35;border:1px solid rgba(246,211,101,.6);pointer-events:none;transition:opacity .4s,transform .4s;opacity:0;transform:translateY(8px)'; } t.innerHTML = html; const i = $('inspector'); t.style.bottom = (i && !i.classList.contains('hide') ? Math.round(i.getBoundingClientRect().height) + 22 : 14) + 'px'; t.style.opacity = '1'; t.style.transform = 'none'; clearTimeout(G.toast._t); G.toast._t = setTimeout(function () { t.style.opacity = '0'; t.style.transform = 'translateY(8px)'; }, 3200); };
+    const keptOf = function (c) { const tag = ' #' + c.id; for (let i = 0; i < G.collection.length; i++) { const n = G.collection[i].name; if (n.slice(-tag.length) === tag) return G.collection[i]; } return null; };
+    const keepLabel = function () { const c = G.R.sel, b = $('ikeep'); if (!b) return; const k = c && keptOf(c); b.innerHTML = k ? '<i>★</i>KEPT' : '<i>★</i>KEEP'; b.style.borderColor = k ? 'var(--gold)' : ''; b.style.color = k ? 'var(--gold)' : ''; b.title = k ? 'It is in your collection (BOOK, under COLLECTION).' : 'Keep this creature in your collection. It outlives the pond.'; };
+    G.on('select', keepLabel); G.on('kept', keepLabel);
+    $('ikeep').onclick = function () {
+      const c = G.R.sel; if (!c) return;
+      if (keptOf(c)) { G.sfx('click'); G.toast('<b style="color:var(--gold)">★ Already in your collection.</b><br>Open BOOK, then COLLECTION, to release or breed it.'); return; }
+      const it = G.keep(c);
+      if (it) { G.sfx('discovery'); keepLabel(); G.toast('<b style="color:var(--gold)">★ Kept: ' + escapeHtml(it.name) + '</b><br>It is in your collection now (BOOK, then COLLECTION). It outlives this pond.'); G.markDirty(); }
+    };
     $('iguide').onclick = function () { G.sfx('click'); UI.guideTab = 'live'; G.openGuide(); };
     G.on('select', function (c) {
       i.classList.toggle('hide', !c || G.mode !== 'play');
@@ -7267,7 +7648,8 @@ G.addSystem({
   };
 
   function picture(z) {
-    if (z.svg) return '<img alt="" width="64" height="64" style="flex:none;border-radius:14px;background:rgba(7,18,31,.55);padding:4px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(z.svg) + '">';
+    const pic = z._figSvg || z.svg;
+    if (pic) return '<img alt="" width="64" height="64" style="flex:none;border-radius:14px;background:rgba(7,18,31,.55);padding:4px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pic) + '">';
     return '<div style="flex:none;width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 40% 35%, ' + G.hsl(z.hue, 90, 80, 1) + ', ' + G.hsl(z.hue, 85, 50, 0.5) + ' 60%, transparent 72%)"></div>';
   }
 
@@ -7434,6 +7816,145 @@ G.addSystem({
 })();
 
 </script>
+<script data-part="wish">
+// ── The pond's wish: the goal of the game ──
+// The pond dreams of one creature at a time ("a brave little thing with a blade"). The wish is always on screen. The player
+// makes it come true with what they already have: dropping things in, causing events, keeping and breeding. Every so often
+// the AI is shown a picture of the pond's living kinds and says how close each is to the wish, so the card can say "closest
+// so far: 6 of 10, it has the blade but no fur yet". When one is close enough the wish comes true: the creature is kept as
+// a LEGEND, the level rises, and the pond dreams a harder one. Wishes, level and legends live on the server, per player.
+(function () {
+  'use strict';
+  const NEED = 8;                 // how close (of 10) a creature must be for the wish to come true
+  const S = G.wish = { level: 1, cur: null, best: null, legends: [], busy: false, open: false, lastKeys: '' };
+  if (G.ai) { G.ai.gaps.wish = 4000; G.ai.caps.wish = 40; G.ai.gaps.wishcheck = 26000; G.ai.caps.wishcheck = 160; G.ai.LABEL.wish = 'The wishes of the pond'; G.ai.LABEL.wishcheck = 'Checking the creatures against the wish'; }
+  const live = function () { return G.mode === 'play' && !G.catching && G.W && !G.W.title && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.provider === 'server' && G.ai.hasFuel(); };
+  const esc = function (s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  const brief = function () { try { return G.worldBrief ? G.worldBrief() : {}; } catch (e) { return {}; } };
+
+  // ── the card ──
+  let box = null;
+  function ui() {
+    if (box || typeof document === 'undefined') return box;
+    const st = document.createElement('style');
+    st.textContent = '#wish{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:2;width:min(470px,calc(100vw - 28px));padding:8px 14px;border-radius:18px;cursor:pointer;font:500 12.5px system-ui,sans-serif;color:#cfe8ff;line-height:1.35}' +
+      '#wish .wk{font:700 9.5px system-ui,sans-serif;letter-spacing:.2em;color:#f6d365;text-transform:uppercase;display:flex;justify-content:space-between;gap:10px}' +
+      '#wish .wt{font:700 15px system-ui,sans-serif;color:#fff;margin:2px 0 1px}' +
+      '#wish .wbar{height:7px;border-radius:4px;background:rgba(207,232,255,.14);overflow:hidden;margin:5px 0 3px;position:relative}#wish .wbar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#33d6a6,#f6d365);transition:width .6s}#wish .wbar b{position:absolute;top:-2px;bottom:-2px;left:' + NEED * 10 + '%;width:2px;background:#fff;opacity:.7}' +
+      '#wish .wmore{display:none;margin-top:8px;padding-top:8px;border-top:1px solid rgba(207,232,255,.14)}#wish.open .wmore{display:block}' +
+      '#wish .wmore p{margin:0;font-size:12px;line-height:1.45;color:#cfe8ff;opacity:.9}#wish .wsay{font-style:italic;font-size:13px !important;color:#fff !important;opacity:1 !important}' +
+      '#wish .wlab{font:700 9px system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#f6d365;opacity:.85;margin:9px 0 3px}' +
+      '#wish .wneeds{display:flex;flex-wrap:wrap;gap:5px}#wish .wchip{display:inline-flex;align-items:center;height:22px;padding:0 10px;border-radius:11px;background:rgba(51,214,166,.14);border:1px solid rgba(51,214,166,.45);font:600 11.5px system-ui,sans-serif;color:#dffbf1;white-space:nowrap}' +
+      '#wish .wfoot{display:flex;justify-content:flex-end;margin-top:10px}' +
+      '#wish .wbtn{padding:0 14px;height:32px;border-radius:999px;border:1px solid rgba(207,232,255,.25);background:rgba(7,18,31,.45);color:#cfe8ff;font:700 10px system-ui,sans-serif;letter-spacing:.14em;cursor:pointer}' +
+      '#wish small{opacity:.8}#wish .wsub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#wish.open{z-index:90;background:rgba(9,28,40,.97)}#wish .wdream{display:flex;align-items:center;gap:9px;font:600 13px system-ui,sans-serif;color:#fff;padding:3px 0}#wish .wdot{width:9px;height:9px;border-radius:50%;background:#f6d365;animation:wishp 1s ease-in-out infinite}@keyframes wishp{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1.15)}}#wish.open .wsub{white-space:normal}' +
+      '@media (min-width:721px){#banner.show{transform:translate(-50%,112px) !important}}' +
+      '@media (max-width:720px){#wish{top:auto;bottom:74px;font-size:12px}#wish .wt{font-size:13.5px}}@media (max-height:560px){#wish .wsub{display:none}}';
+    document.head.appendChild(st);
+    box = document.createElement('div'); box.id = 'wish'; box.className = 'glass hide';
+    (document.getElementById('ui') || document.body).appendChild(box);
+    box.addEventListener('click', function (e) {
+      if (e.target && e.target.id === 'wishAnother') { e.stopPropagation(); another(); return; }
+      S.open = !S.open; box.classList.toggle('open', S.open); if (G.sfx) G.sfx('click');
+    });
+    return box;
+  }
+  function draw() {
+    if (!ui()) return;
+    const on = G.mode === 'play' && G.W && !G.W.title && (S.cur || S.busy);
+    box.classList.toggle('hide', !on);
+    if (!on) return;
+    if (S.busy || !S.cur) { box.classList.remove('open'); S.open = false; box.innerHTML = '<div class="wk"><span>✦ The wish of the pond</span></div><div class="wdream"><span class="wdot"></span>' + (S.asked === 'another' ? 'The pond is dreaming of something else…' : S.asked === 'next' ? 'The pond is dreaming its next wish…' : 'The pond is dreaming…') + '</div>'; return; }
+    const b = S.best, pct = b ? Math.round(b.close * 10) : 0;
+    box.innerHTML = '<div class="wk"><span>✦ The pond wishes for · level ' + S.level + '</span><span>' + (S.legends.length ? S.legends.length + (S.legends.length === 1 ? ' legend' : ' legends') : '') + '</span></div>' +
+      '<div class="wt">' + esc(S.cur.title) + '</div>' +
+      '<div class="wbar"><i style="width:' + pct + '%"></i><b></b></div>' +
+      '<div class="wsub"><small>' + (b ? 'Closest so far: <b style="color:#f6d365">' + b.close + ' of 10</b>' + (b.name ? ' (' + esc(b.name) + ')' : '') + '. ' + esc(b.why) + '.' : 'Nobody has been looked at yet. The pond looks every half a minute.') + '</small></div>' +
+      '<div class="wmore"><p class="wsay">“' + esc(S.cur.text) + '”</p>' +
+      '<div class="wlab">It must have</div><div class="wneeds">' + S.cur.needs.map(function (n) { return '<span class="wchip">' + esc(n) + '</span>'; }).join('') + '</div>' +
+      (S.cur.hint ? '<div class="wlab">A thought</div><p>' + esc(S.cur.hint) + '</p>' : '') +
+      '<div class="wlab">How</div><p>It comes true when a living creature reaches ' + NEED + ' of 10. You steer: ADD things, cause WORLD events, ★ KEEP and ♥ BREED the ones heading the right way.</p>' +
+      (S.legends.length ? '<div class="wlab">Your legends</div><p>' + S.legends.slice(-4).reverse().map(function (l) { return esc(l.title) + (l.name ? ' (' + esc(l.name) + ')' : ''); }).join(' · ') + '</p>' : '') +
+      '<div class="wfoot"><button class="wbtn" id="wishAnother">A DIFFERENT WISH</button></div></div>';
+  }
+
+  // ── asking the server ──
+  function take(r) {
+    if (!r) return;
+    if (typeof r.level === 'number') S.level = r.level;
+    if (Array.isArray(r.legends)) S.legends = r.legends;
+    if (r.wish && (!S.cur || S.cur.id !== r.wish.id)) { S.cur = r.wish; S.best = null; S.lastKeys = ''; if (G.mode === 'play' && G.banner) G.banner('The pond wishes for', r.wish.title + '. ' + (r.wish.text || ''), 7000); }
+    else if (r.wish) S.cur = r.wish;
+  }
+  function fetchWish(extra) {
+    if (S.busy || !live() || !G.ai.allow('wish')) return;
+    S.busy = true; S.asked = extra && extra.another ? 'another' : 'first'; draw();
+    const p = { op: 'get', pond: brief() }; if (extra) for (const k in extra) p[k] = extra[k];
+    G.host.call('wish', p, 60000).then(function (r) { S.busy = false; G.ai.tally('wish', r && r.source, r && r.usd); take(r); draw(); }, function () { S.busy = false; draw(); });
+  }
+  function another() { if (!S.cur) return; if (G.sfx) G.sfx('click'); fetchWish({ another: 1 }); }
+
+  // one living creature of each kind of look, the commonest first
+  function candidates(max) {
+    const W = G.W, by = {}, keys = [];
+    for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !c.g || !c.g.f) continue; const k = (G.shapeOf ? G.shapeOf(c.g) : '') + '|' + (G.hueOf ? G.hueOf(c.g) : 0); if (!by[k]) { by[k] = { n: 0, c: c }; keys.push(k); } by[k].n++; if (G.charmOf && G.charmOf(c) > G.charmOf(by[k].c)) by[k].c = c; }
+    keys.sort(function (a, b) { return by[b].n - by[a].n; });
+    return keys.slice(0, max).map(function (k) { return by[k].c; });
+  }
+  function check() {
+    const W = G.W;
+    if (!S.cur || S.busy || S.checking || !live() || !G.sheet || W.cre.length < 4) return;
+    const picks = candidates(8); if (picks.length < 1) return;
+    const sig = picks.map(function (c) { return G.form.key(c.g.f); }).join('~');
+    if (sig === S.lastKeys) return;                           // nothing new to look at
+    if (!G.ai.allow('wishcheck')) return;
+    const img = G.sheet(picks.map(function (c) { return c.g.f; }), { cw: 200, ch: 206, sc: 0.55, cols: 4 });
+    if (!img) return;
+    S.checking = true; S.lastKeys = sig;
+    const wishId = S.cur.id;
+    G.host.call('wish', { op: 'check', image: img, mime: 'image/jpeg', count: picks.length }, 90000).then(function (r) {
+      S.checking = false;
+      G.ai.tally('wishcheck', r && r.source, r && r.usd);
+      if (G.W !== W || !S.cur || S.cur.id !== wishId || !r || !Array.isArray(r.marks)) return;
+      let top = null;
+      for (let i = 0; i < r.marks.length; i++) { const m = r.marks[i], c = picks[m.id - 1]; if (!c) continue; if (!top || m.close > top.close) top = { close: m.close, why: m.why, c: c }; }
+      if (!top) return;
+      const sp = top.c.sp && G.speciesById ? G.speciesById(top.c.sp) : null;
+      if (!S.best || top.close >= S.best.close || W.gen - S.best.gen > 12) S.best = { close: top.close, why: top.why, name: sp ? sp.name : '', gen: W.gen };
+      if (top.close >= NEED && !top.c.dead) grant(top.c, top); else draw();
+    }, function () { S.checking = false; });
+  }
+
+  // ── it came true ──
+  function story() {
+    const W = G.W, bits = [];
+    (W.zones || []).slice(-4).forEach(function (z) { bits.push(z.word + ' (dropped in generation ' + z.born + ')'); });
+    (W.events || []).slice(-3).forEach(function (e) { bits.push(e.name + ' (generation ' + e.g + ')'); });
+    return 'Born in generation ' + W.gen + (bits.length ? '. In its world: ' + bits.join(', ') : ', in a quiet pond') + '.';
+  }
+  function grant(c, top) {
+    const W = G.W, wish = S.cur, sp = c.sp && G.speciesById ? G.speciesById(c.sp) : null;
+    let item = null;
+    try { item = G.keep ? G.keep(c) : null; } catch (e) { console.error(e); }
+    if (item) item.age = ('Legend · ' + wish.title).slice(0, 70);          // the collection shows this line under its name
+    const name = item ? item.name : (sp ? sp.name : 'A creature');
+    if (G.sfx) G.sfx('discovery');
+    if (G.select) G.select(c); if (G.focusOn) G.focusOn(c.x, c.y, 2.2);
+    if (G.banner) G.banner('A wish came true', wish.title + ': ' + name + '. ' + top.why + '. It is a Legend now, kept in your collection (BOOK).', 11000);
+    if (G.log) G.log('disc', 'A wish came true: ' + wish.title, name + ' is a Legend. ' + top.why + '. ' + story());
+    if (W.discLog) W.discLog.push({ key: 'wish' + wish.id, text: 'A wish came true: ' + wish.title + '. ' + name + ' became a Legend. ' + story(), gen: W.gen });
+    if (G.markDirty) G.markDirty();
+    S.cur = null; S.best = null; S.busy = true; S.asked = 'next'; draw();
+    G.host.call('wish', { op: 'done', wish: wish.id, name: name, gen: W.gen, why: top.why, story: story(), pond: brief() }, 60000).then(function (r) { S.busy = false; G.ai.tally('wish', r && r.source, r && r.usd); take(r); draw(); G.emit('wish-done', wish, name); }, function () { S.busy = false; draw(); });
+  }
+
+  if (typeof document !== 'undefined' && typeof setInterval === 'function') setInterval(function () {
+    try { if (!live()) { draw(); return; } if (!S.cur) fetchWish(); else check(); draw(); } catch (e) { console.error(e); }
+  }, 3000);
+  G.on('new-pond', function () { S.best = null; S.lastKeys = ''; S.checking = false; });
+})();
+
+</script>
 <script data-part="views">
 // ── Screens: title, field guide, family tree, menu, confirmations, the still pond ──
 (function () {
@@ -7545,20 +8066,32 @@ G.addSystem({
       } else if (tab === 'coll') {
         const list = G.collection.slice().reverse();
         if (!list.length) { body.innerHTML = '<div class="empty">Your collection is empty. Click a creature you like and press ★ KEEP. What you keep outlives the pond: you can release it into any pond, to breed with what lives there.</div>'; return; }
-        const cards = el('div', 'cards', '', body);
+        if (!$('collCss')) { const st = document.createElement('style'); st.id = 'collCss'; st.textContent = '.kcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}.kcard{position:relative;display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:16px;background:rgba(7,18,31,.45);border:1px solid rgba(207,232,255,.14)}.kcard.pick{cursor:pointer;border-color:rgba(255,107,157,.5)}.kcard.pick:hover{border-color:var(--rose);background:rgba(255,107,157,.08)}.kcard .ktop{display:flex;gap:10px;align-items:center}.kcard canvas{flex:none;width:86px;height:86px;margin:-6px 0 -6px -6px}.kcard b{display:block;font-size:13.5px;line-height:1.25}.kcard .kkind{font-size:11.5px;opacity:.85;margin-top:1px}.kcard .kfacts{font-size:11px;opacity:.7;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.kcard .kmeta{font-size:10.5px;opacity:.65}.kcard .kleg{display:inline-block;padding:1px 8px;border-radius:9px;background:rgba(246,211,101,.16);border:1px solid rgba(246,211,101,.55);color:var(--gold);font:700 10px system-ui,sans-serif;letter-spacing:.06em;margin-top:3px}.kcard .kact{display:flex;gap:6px;margin-top:auto}.kcard .kact .btn{flex:1;min-height:36px;padding:0 8px;font-size:10.5px;white-space:nowrap}.kcard .kx{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;border:0;background:rgba(207,232,255,.08);color:var(--frost);cursor:pointer;font-size:13px;line-height:1;opacity:.6}.kcard .kx:hover{opacity:1;background:rgba(255,107,157,.25)}.khead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;margin-bottom:10px;border-radius:14px;background:rgba(255,107,157,.12);border:1px solid rgba(255,107,157,.45);font-size:12.5px}'; document.head.appendChild(st); }
+        const mateC = UI.breedWith ? G.W.cre.filter(function (q) { return q.id === UI.breedWith && !q.dead; })[0] : null;
+        if (UI.breedWith && !mateC) UI.breedWith = 0;
+        if (mateC) { const sp0 = G.speciesById(mateC.sp), hd = el('div', 'khead', '<span><b style="color:var(--rose)">♥ Choose a mate for ' + esc((sp0 ? sp0.name : 'Creature') + ' #' + mateC.id) + '.</b> Click one of your kept creatures: six children of the two are born in the pond.</span>', body); const cx = el('button', 'btn sm', 'CANCEL', hd); cx.onclick = function () { UI.breedWith = 0; UI.guideTab = 'coll'; G.openGuide(); }; }
+        else el('div', 'desc', 'What you keep outlives the pond. RELEASE sets a family of it free here; to breed one with a living creature, click that creature in the pond and press ♥ BREED.', body).style.margin = '0 0 10px';
+        const cards = el('div', 'kcards', '', body);
         list.forEach(function (it) {
           const g = G.unpackGenome(it.g); if (!g) return;
-          const card = el('div', 'card', '', cards);
-          cardCanvas(card, g, 5);
-          const tx = el('div', '', '', card);
-          tx.innerHTML = '<b>' + esc(it.name) + '</b><p>' + esc(it.kind) + '</p><small>' + esc(G.form.facts(g.f).slice(0, 4).join(', ')) + '</small><small>Kept in generation ' + it.gen + (it.age ? ' · ' + esc(it.age) : '') + '</small>';
-          const row = el('div', '', '', tx); row.style.cssText = 'display:flex;gap:6px;margin-top:6px;flex-wrap:wrap';
-          const mateC = UI.breedWith ? G.W.cre.filter(function (q) { return q.id === UI.breedWith && !q.dead; })[0] : null;
-          if (mateC) { const h = el('button', 'btn sm pulse', '♥ BREED WITH #' + mateC.id, row); h.onclick = function () { closeModal(); G.sfx('discovery'); UI.breedWith = 0; G.breedKept(it, mateC); }; }
-          const b = el('button', 'btn sm', 'RELEASE HERE', row);
-          b.onclick = function () { closeModal(); G.sfx('click'); G.release(it); };
-          const x = el('button', 'btn sm', 'LET GO', row);
-          x.onclick = function () { G.confirm('Remove ' + it.name + ' from your collection?', 'REMOVE', function () { const i = G.collection.indexOf(it); if (i >= 0) G.collection.splice(i, 1); UI.guideTab = 'coll'; G.openGuide(); }); };
+          const self = mateC && it.name.slice(-(' #' + mateC.id).length) === ' #' + mateC.id, legend = /^Legend/.test(it.age || '');
+          const card = el('div', 'kcard' + (mateC && !self ? ' pick' : ''), '', cards);
+          const top = el('div', 'ktop', '', card);
+          cardCanvas(top, g, 5);
+          el('div', '', '<b>' + esc(it.name) + '</b><div class="kkind">' + esc(it.kind) + '</div>' + (legend ? '<span class="kleg">★ ' + esc(it.age) + '</span>' : ''), top);
+          el('div', 'kfacts', esc(G.form.facts(g.f).slice(0, 4).join(', ')), card);
+          el('div', 'kmeta', 'Kept in generation ' + it.gen + (it.age && !legend ? ' · ' + esc(it.age) : ''), card);
+          const row = el('div', 'kact', '', card);
+          const breed = function () { closeModal(); G.sfx('discovery'); UI.breedWith = 0; G.breedKept(it, mateC); };
+          if (mateC) {
+            if (self) el('div', 'kmeta', 'This is the one you chose: pick another to be its mate.', row);
+            else { const h = el('button', 'btn sm pulse', '♥ BREED THESE TWO', row); h.onclick = function (e) { e.stopPropagation(); breed(); }; card.onclick = breed; }
+          } else {
+            const b = el('button', 'btn sm', 'RELEASE INTO THE POND', row); b.title = 'Eight of its kind are set free here, to breed with what lives in this pond.';
+            b.onclick = function () { closeModal(); G.sfx('click'); G.release(it); };
+            const x = el('button', 'kx', '✕', card); x.title = 'Let it go: remove it from your collection'; x.setAttribute('aria-label', 'Remove from collection');
+            x.onclick = function () { G.confirm('Remove ' + it.name + ' from your collection?', 'REMOVE', function () { const i = G.collection.indexOf(it); if (i >= 0) G.collection.splice(i, 1); G.markDirty(); UI.guideTab = 'coll'; G.openGuide(); }); };
+          }
         });
       } else if (tab === 'fossil') {
         const list = W.fossils.slice().reverse();

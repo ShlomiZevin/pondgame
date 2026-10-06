@@ -461,30 +461,32 @@
       if (o.collect) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4); o.collect.push([ex, ey, r]); return; }
       if (lid) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(col.dark, 2.4); ctx.beginPath(); ctx.moveTo(ex - r * 0.7, ey); ctx.quadraticCurveTo(ex, ey + r * 0.6, ex + r * 0.7, ey); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); return; }
       ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4);
-      F._pupil(ctx, ex, ey, r, lx, ly, hsl(f.hue + f.hue2, 68, 44, 1), INK, 0.46);
+      F._pupil(ctx, ex, ey, r, lx, ly, hsl(f.hue + f.hue2, 68, 44, 1), INK, f.ep || 0.46);
     }
     // the face. side 0: it looks straight at you. side 1: its head points to the right; you see the eye on this side
     function face(x, y, hr, side, isStar) {
-      const ne = f.en, er = clamp(hr * (0.24 + f.es * 0.44), 7, hr * 0.5), gap = hr * 0.5;
-      const st = f.ek > 0.25 && !isStar && !side ? hr * (0.5 + f.ek * 0.5) : 0, cx = x + (side ? hr * 0.22 : 0), ey0 = y - hr * 0.14;
+      const ne = f.en, er = clamp(hr * (0.22 + f.es * 0.5), 7, hr * 0.66), gap = Math.max(hr * (f.eg || 0.5), er * 1.08);
+      const st = f.ek > 0.25 && !isStar && !side ? hr * (0.5 + f.ek * 0.5) : 0, cx = x + (side ? hr * 0.22 : 0), ey0 = y - hr * (f.ey === undefined ? 0.14 : f.ey);
       const stalk = function (ex, ey) { if (!st) return ey; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.body : INK; ctx.lineWidth = pass ? 6 : 10; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex, ey - st); ctx.stroke(); } return ey - st; };
       if (side) { if (ne >= 1) eyeAt(cx, ey0, er * 1.15, false); if (ne >= 3) eyeAt(cx - hr * 0.5, ey0 - hr * 0.35, er * 0.45, false); }
       else if (ne === 1) eyeAt(cx, ey0, er * 1.3, false);
       else if (ne >= 2) { eyeAt(cx - gap, stalk(cx - gap, ey0), er, false); eyeAt(cx + gap, stalk(cx + gap, ey0), er, false); if (ne === 3) eyeAt(cx, y - hr * 0.64, er * 0.42, false); }
-      ctx.globalAlpha = 0.4; ctx.fillStyle = '#ff7fa8'; for (let sd = (side ? 1 : -1); sd <= 1; sd += 2) { ctx.beginPath(); ctx.ellipse(cx + sd * hr * (side ? 0.05 : 0.72), y + hr * 0.4, hr * 0.17, hr * 0.11, 0, 0, TAU); ctx.fill(); } ctx.globalAlpha = 1;
+      { const bl = f.bl === undefined ? 0.4 : f.bl; ctx.globalAlpha = 0.1 + 0.5 * bl; ctx.fillStyle = '#ff7fa8'; for (let sd = (side ? 1 : -1); sd <= 1; sd += 2) { ctx.beginPath(); ctx.ellipse(cx + sd * hr * (side ? 0.05 : 0.72), y + hr * 0.42, hr * (0.12 + 0.1 * bl), hr * (0.08 + 0.06 * bl), 0, 0, TAU); ctx.fill(); } ctx.globalAlpha = 1; }
       const mx = cx + (side ? hr * 0.5 : 0), my = y + hr * (side ? 0.42 : 0.5), m = hr * (0.16 + f.ms * 0.3);
       ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.fillStyle = INK;
       if (f.mk === 1) { ctx.beginPath(); if (side) { ctx.moveTo(mx - m * 0.2, my - m * 0.8); ctx.lineTo(mx + m * 1.9, my - m * 0.1); ctx.lineTo(mx - m * 0.2, my + m * 0.6); } else { ctx.moveTo(mx - m * 0.8, my - m * 0.3); ctx.lineTo(mx, my + m * 0.9); ctx.lineTo(mx + m * 0.8, my - m * 0.3); ctx.quadraticCurveTo(mx, my - m * 0.7, mx - m * 0.8, my - m * 0.3); } ctx.closePath(); ink('#f6b34a', 2.2); }
       else if (f.mk === 2) { ctx.beginPath(); if (side) { ctx.moveTo(mx - m * 1.6, my - m * 0.1); ctx.quadraticCurveTo(mx - m * 0.2, my + m * 1.1, mx + m * 1.1, my - m * 0.3); } else { ctx.moveTo(mx - m * 1.3, my - m * 0.2); ctx.quadraticCurveTo(mx, my + m * 1.3, mx + m * 1.3, my - m * 0.2); } ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; for (let j = -1; j <= 1; j += 2) { const tx = mx + j * m * (side ? 0.45 : 0.6) - (side ? m * 0.25 : 0); ctx.beginPath(); ctx.moveTo(tx - m * 0.2, my - m * 0.12); ctx.lineTo(tx, my + m * 0.45); ctx.lineTo(tx + m * 0.2, my - m * 0.12); ctx.fill(); } }
       else if (f.mk === 3) { ctx.beginPath(); ctx.arc(mx, my, m * 0.7, 0, TAU); ink('#ff9fc4', 2.2); ctx.beginPath(); ctx.arc(mx, my, m * 0.3, 0, TAU); ctx.fillStyle = INK; ctx.fill(); }
-      else { ctx.beginPath(); ctx.moveTo(mx - m, my - m * 0.2); ctx.quadraticCurveTo(mx, my + m * 0.8, mx + m, my - m * 0.2); ctx.stroke(); if (f.mk === 4) { ctx.lineWidth = 1.6; for (let sd = (side ? 1 : -1); sd <= 1; sd += 2) for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(mx + sd * m * 1.2, my); ctx.lineTo(mx + sd * (m * 1.2 + hr * 0.6), my + j * hr * 0.16); ctx.stroke(); } } }
+      else if (!side && f.mk === 0 && f.sm > 0.72) { const w = m * (0.9 + 0.5 * (f.sm - 0.72)); ctx.beginPath(); ctx.moveTo(mx - w, my - m * 0.25); ctx.quadraticCurveTo(mx, my + m * 1.7, mx + w, my - m * 0.25); ctx.quadraticCurveTo(mx, my + m * 0.15, mx - w, my - m * 0.25); ctx.closePath(); ctx.fillStyle = hsl(350, 55, 22, 1); ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); ctx.save(); ctx.clip(); ctx.fillStyle = '#ff8fa6'; ctx.beginPath(); ctx.ellipse(mx, my + m * 1.15, w * 0.5, m * 0.5, 0, 0, TAU); ctx.fill(); ctx.restore(); }
+      else { ctx.beginPath(); ctx.moveTo(mx - m, my - m * 0.2); ctx.quadraticCurveTo(mx, my + m * (0.2 + 0.9 * (f.sm === undefined ? 0.5 : f.sm)), mx + m, my - m * 0.2); ctx.stroke(); if (f.mk === 4) { ctx.lineWidth = 1.6; for (let sd = (side ? 1 : -1); sd <= 1; sd += 2) for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(mx + sd * m * 1.2, my); ctx.lineTo(mx + sd * (m * 1.2 + hr * 0.6), my + j * hr * 0.16); ctx.stroke(); } } }
     }
   };
 
   /** the living part of an eye: iris, pupil, two lights, and the soft shade of the upper lid */
   F._pupil = function (ctx, ex, ey, r, lx, ly, iris, ink, pup) {
     const px = ex + lx * r * 0.2, py = ey + ly * r * 0.2 + r * 0.04;
-    ctx.beginPath(); ctx.arc(px, py, r * 0.74, 0, TAU); ctx.fillStyle = iris; ctx.fill();
+    ctx.beginPath(); ctx.arc(px, py, r * 0.82, 0, TAU); ctx.fillStyle = iris; ctx.fill();
+    { const gl = ctx.createRadialGradient(px, py + r * 0.45, 0, px, py + r * 0.45, r * 0.6); gl.addColorStop(0, 'rgba(255,255,255,0.4)'); gl.addColorStop(1, 'rgba(255,255,255,0)'); ctx.save(); ctx.beginPath(); ctx.arc(px, py, r * 0.82, 0, TAU); ctx.clip(); ctx.fillStyle = gl; ctx.fillRect(px - r, py - r, r * 2, r * 2); ctx.restore(); }
     ctx.beginPath(); ctx.arc(px, py, r * pup, 0, TAU); ctx.fillStyle = ink; ctx.fill();
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px - r * 0.26, py - r * 0.3, r * 0.24, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(px + r * 0.24, py + r * 0.26, r * 0.1, 0, TAU); ctx.fill();
     ctx.save(); ctx.beginPath(); ctx.arc(ex, ey, r * 0.98, 0, TAU); ctx.clip(); ctx.fillStyle = 'rgba(7,18,31,0.16)'; ctx.beginPath(); ctx.ellipse(ex, ey - r * 0.95, r * 1.25, r * 0.62, 0, 0, TAU); ctx.fill(); ctx.restore();
@@ -505,7 +507,7 @@
     if (s) { s.used = G.rt || 0; return s; }
     if (keptN > 150) { const now = G.rt || 0; for (const k in kept) if (now - kept[k].used > 3) { delete kept[k]; keptN--; } if (keptN > 230) { for (const k in kept) delete kept[k]; keptN = 0; } }
     s = kept[key] = { fr: [frame(f, 0)], ink: '', dark: '', build: F.build(f), used: G.rt || 0 }; keptN++;
-    s.ink = F._ink(); s.dark = F._colours(f).dark; s.iris = 'hsl(' + Math.round((((f.hue + f.hue2) % 360) + 360) % 360) + ',68%,44%)';
+    s.pup = f.ep || 0.46; s.ink = F._ink(); s.dark = F._colours(f).dark; s.iris = 'hsl(' + Math.round((((f.hue + f.hue2) % 360) + 360) % 360) + ',68%,44%)';
     return s;
   };
   /** the kept character at the origin at this point of its loop (phase 0..1), then its eyes, alive. mood: { lx, ly, lid 0..1, wide } */
@@ -524,7 +526,7 @@
     for (let q = 0; q < fr.eyes.length; q++) {
       const e = fr.eyes[q], r = e[2];
       if (mood.lid >= 1) { ctx.beginPath(); ctx.arc(e[0], e[1], r, 0, TAU); ctx.fillStyle = s.dark; ctx.fill(); ctx.strokeStyle = s.ink; ctx.lineWidth = 2.4; ctx.stroke(); ctx.beginPath(); ctx.moveTo(e[0] - r * 0.7, e[1]); ctx.quadraticCurveTo(e[0], e[1] + r * 0.6, e[0] + r * 0.7, e[1]); ctx.stroke(); continue; }
-      F._pupil(ctx, e[0], e[1], r, lx, ly, s.iris, s.ink, mood.wide ? 0.3 : 0.46);
+      F._pupil(ctx, e[0], e[1], r, lx, ly, s.iris, s.ink, mood.wide ? s.pup * 0.65 : s.pup);
       if (mood.lid > 0) { ctx.save(); ctx.beginPath(); ctx.arc(e[0], e[1], r * 1.02, 0, TAU); ctx.clip(); ctx.fillStyle = s.dark; ctx.fillRect(e[0] - r * 1.1, e[1] - r * 1.1, r * 2.2, r * 2.2 * mood.lid * 0.75); ctx.restore(); }      // heavy lids: tired, or sick
     }
     return s;

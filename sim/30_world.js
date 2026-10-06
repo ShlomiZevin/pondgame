@@ -808,7 +808,9 @@
         const mateC = findMate(p, surv);
         if (mateC && G.rand() < 0.85) { genome = G.crossover(p.g, mateC.g); mate = mateC; }      // two parents whenever a mate is near; alone, it copies itself
         else genome = G.cloneGenome(p.g);
-        { const sp0 = p.sp ? G.speciesById(p.sp) : null; G.form._fix = sp0 && sp0.judge && sp0.judge.fix ? sp0.judge.fix : null; }      // what the judge wished for its kind
+        { const sp0 = p.sp ? G.speciesById(p.sp) : null; G.form._fix = p.real && p.real.fix ? p.real.fix : sp0 && sp0.judge && sp0.judge.fix ? sp0.judge.fix : null;
+          // what the watcher has lately said of the pond's creatures is advice for the whole pond, not only for the ones it happened to see
+          if (!G.form._fix && W.advice && W.advice.length && G.rand() < 0.6) { const fvp = p.fv || (p.fv = G.features(p.g)); let best = null, bd = 2.2; for (let q = 0; q < W.advice.length; q++) { const a = W.advice[q]; if (W.gen - a.gen > 40 || !a.fv) continue; const dd = G.fdist(fvp, a.fv); if (dd < bd) { bd = dd; best = a; } } if (best) G.form._fix = best.fix; } }      // what the judge wished for its kind
         const res = G.mutate(genome, wild, idea);
         G.form._fix = null;
         const child = G.makeCreature(res.g, p, mate, res.muts);
@@ -825,6 +827,23 @@
         W.births.push({ at: 0.3 + G.rand() * 3.4, c: child, x: p.x + Math.cos(ang) * d, y: p.y + Math.sin(ang) * d, from: p, mate: mate });
       }
     }
+    // the hall of fame: the best the watcher has really seen. A couple of children a spring are one of them crossed with a good survivor, so what once was
+    // lovable is not lost to drift, to a sickness of the common kind or to a pressure that favoured something plainer
+    if (W.hall && W.hall.length && surv.length >= 8 && W.cre.length < cap * 1.2) {
+      const nh = G.rand() < 0.5 ? 2 : 1;
+      for (let k = 0; k < nh; k++) {
+        const h = W.hall[(G.rand() * W.hall.length) | 0]; let p = null;
+        { let bs = -1e9; for (let t = 0; t < 10; t++) { const o = surv[(G.rand() * surv.length) | 0], fo = o.fv || (o.fv = G.features(o.g)), sc = G.charmOf(o) - 0.35 * G.fdist(fo, h.fv); if (sc > bs) { bs = sc; p = o; } } }
+        if (!p || !h) continue;
+        const res = G.mutate(G.crossover(h.g, p.g), wild * 0.6, null);
+        const child = G.makeCreature(res.g, p, null, res.muts);
+        child.sp = p.sp; child.E = child.ph.Emax * K.repro * 0.95; child.P = child.ph.Emax * 0.12;
+        if (!p.snap) p.snap = G.snapOf(p);
+        child.dad = p.snap; child.mate = { id: 0, gen: h.gen, g: h.g };
+        const ang = G.rand() * PI2, d = p.ph.r + child.ph.r + 4;
+        W.births.push({ at: 0.3 + G.rand() * 3.4, c: child, x: p.x + Math.cos(ang) * d, y: p.y + Math.sin(ang) * d, from: p, mate: null });
+      }
+    }
     G.emit('spring', plan.length);
   }
 
@@ -837,7 +856,15 @@
     const s = c.sp ? G.speciesById(c.sp) : null;
     // the grade the eye for beauty gave its kind is most of it; its own body's fit to the pond's taste is the rest. What the player kept is loved outright.
     // a grade counts for what it is next to the other grades in this pond: so a generous judge and a strict one select alike
-    const v = 0.5 * c.ph.charm + 0.5 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);
+    let v = 0.5 * c.ph.charm + 0.5 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);
+    // a guess is not a look: where the watcher has really seen creatures, one nobody has looked at is held back towards what the watcher really said of this pond.
+    // Selecting the highest guesses every generation would pile up error (the winner's curse); this keeps belief close to the truth.
+    const W1 = G.W;
+    if (!c.real && W1 && W1.eyeBank && W1.eyeBank.length >= 6) {
+      if (W1._emGen !== W1.gen) { let t = 0; for (let i = 0; i < W1.eyeBank.length; i++) t += (W1.eyeBank[i].b + W1.eyeBank[i].w) / 2; W1._em = t / W1.eyeBank.length; W1._emGen = W1.gen; }
+      const k = clamp(0.3 + 0.12 * (c.st === undefined ? 3 : c.st), 0.3, 0.75);
+      v = W1._em + (v - W1._em) * (1 - k);
+    }
     return s && s.loved ? Math.max(v, 0.92) : v;
   };
 

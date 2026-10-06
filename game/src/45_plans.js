@@ -27,7 +27,8 @@
     const n = function (v) { v = +v; return isFinite(v) ? clamp(v, 0, 0.3) : 0; };
     const rs = Array.isArray(raw.res) ? raw.res : raw.res && typeof raw.res === 'object' ? [raw.res.heat, raw.res.cold, raw.res.poison] : [];
     const name = String(raw.name || 'New shape').replace(/[<>"]/g, '').trim().slice(0, 22) || 'New shape';
-    return { name: name, noun: (String(raw.noun || '').replace(/[^A-Za-z\-]/g, '').slice(0, 14) || name.split(' ').pop()).replace(/^./, function (c) { return c.toUpperCase(); }),
+    let face = null; if (raw.face && typeof raw.face === 'object') { const q = function (v, a, b) { v = +v; return isFinite(v) ? clamp(v, a, b) : undefined; }; face = { es: q(raw.face.es, 0.34, 0.9), ep: q(raw.face.ep, 0.36, 0.78), ey: q(raw.face.ey, -0.2, 0.36), eg: q(raw.face.eg, 0.3, 0.8), bl: q(raw.face.bl, 0, 1), sm: q(raw.face.sm, -0.2, 1), hd: q(raw.face.hd, 0.7, 2.5) }; }
+    return { face: face, name: name, noun: (String(raw.noun || '').replace(/[^A-Za-z\-]/g, '').slice(0, 14) || name.split(' ').pop()).replace(/^./, function (c) { return c.toUpperCase(); }),
       note: String(raw.note || '').replace(/[<>]/g, '').slice(0, 120), because: String(raw.because || '').replace(/[<>]/g, '').slice(0, 90),
       bd: bd, res: [n(rs[0]), n(rs[1]), n(rs[2])], by: String(raw.by || raw.model || '').slice(0, 60) };
   };
@@ -72,31 +73,37 @@
   // ── the pond's own stock, for when the AI is not asked (angles in degrees: 0 right, 90 up, 180 left, 270 down) ──
   // radii go clockwise from the right: right, lower right, bottom right, bottom left, lower left, left, upper left, top left, top right, upper right
   const ROUND = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+  const PLUSH_FACE = { es: 0.72, ep: 0.62, ey: 0.0, eg: 0.56, bl: 0.7, sm: 0.85, hd: 1.7 };
   const OWN = [
-    { name: 'Snowball', noun: 'Snowball', note: 'A round body with a smaller round head set on top.', body: { v: 0, e: 1, m: [{ r: ROUND }, { r: ROUND, s: 0.72, on: 0, at: 90, d: 0.85 }] } },
+    { plush: true, name: 'Snowball', noun: 'Snowball', note: 'A round body with a smaller round head set on top.', body: { v: 0, e: 1, m: [{ r: ROUND }, { r: ROUND, s: 0.72, on: 0, at: 90, d: 0.85 }] } },
     { name: 'Toadstool', noun: 'Toadstool', note: 'A wide cap over a narrow stem, the face on the stem.', body: { v: 0, e: 0, m: [{ r: [0.8, 0.9, 1.2, 1.2, 0.9, 0.8, 0.85, 1.1, 1.1, 0.85] }, { r: [1.5, 1.1, 0.7, 0.7, 1.1, 1.5, 1.2, 0.9, 0.9, 1.2], s: 1.2, on: 0, at: 90, d: 0.62 }] } },
-    { name: 'Eared One', noun: 'Earling', note: 'One round body with a pair of big round ears.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.5, on: 0, at: 52, d: 0.9, pr: 1 }] } },
-    { name: 'Star Body', noun: 'Starling', note: 'Its whole body is a five-pointed star.', body: { v: 0, e: 0, m: [{ r: ROUND, lb: 5, la: 0.22 }] } },
+    { plush: true, name: 'Eared One', noun: 'Earling', note: 'One round body with a pair of big round ears.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.5, on: 0, at: 52, d: 0.9, pr: 1 }] } },
     { name: 'Periscope', noun: 'Peeper', note: 'A low wide body, and the face held high on a stalk.', body: { v: 0, e: 1, m: [{ r: [1.4, 1.1, 0.8, 0.8, 1.1, 1.4, 1.1, 0.8, 0.8, 1.1] }, { r: ROUND, s: 0.6, on: 0, at: 90, d: 1.45 }] } },
     { name: 'Bead String', noun: 'Beadling', note: 'Three beads in a row, the biggest in front.', body: { v: 1, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.82, on: 0, at: 180, d: 0.9 }, { r: ROUND, s: 0.62, on: 1, at: 180, d: 0.9 }] } },
-    { name: 'Halo', noun: 'Halo', note: 'A round body that carries a ring above it.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: [1.3, 1.1, 0.8, 0.8, 1.1, 1.3, 1.1, 0.8, 0.8, 1.1], s: 0.7, on: 0, at: 90, d: 1.2, h: 1 }] } },
-    { name: 'Totem', noun: 'Totem', note: 'Three parts stacked one on another, the face at the top.', body: { v: 0, e: 2, m: [{ r: [1.1, 1, 1, 1, 1, 1.1, 1, 0.9, 0.9, 1] }, { r: ROUND, s: 0.85, on: 0, at: 90, d: 0.8 }, { r: ROUND, s: 0.7, on: 1, at: 90, d: 0.8 }] } },
     { name: 'Twin Bells', noun: 'Twin', note: 'A small middle with a big round body out on each side.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.95, on: 0, at: -8, d: 1.0, pr: 1 }] } },
     { name: 'Bell', noun: 'Bell', note: 'A dome, wide and full above, cut short below.', body: { v: 0, e: 0, m: [{ r: [1.3, 1.0, 0.65, 0.65, 1.0, 1.3, 1.25, 1.15, 1.15, 1.25] }] } },
     { name: 'Nodder', noun: 'Nodder', note: 'A round body, the head carried forward on a neck, a small rump behind.', body: { v: 1, e: 1, m: [{ r: ROUND }, { r: ROUND, s: 0.62, on: 0, at: 48, d: 1.3 }, { r: ROUND, s: 0.5, on: 0, at: 190, d: 0.8 }] } },
     { name: 'Pear', noun: 'Pearling', note: 'Narrow above and full below, like a ripe pear.', body: { v: 0, e: 0, m: [{ r: [1.1, 1.25, 1.2, 1.2, 1.25, 1.1, 0.85, 0.8, 0.8, 0.85] }] } },
     { name: 'Clover', noun: 'Clover', note: 'A body of three soft lobes.', body: { v: 0, e: 0, m: [{ r: ROUND, lb: 3, la: 0.2 }] } },
-    { name: 'Crown Bearer', noun: 'Crownling', note: 'A stout body with a small star set on its head.', body: { v: 0, e: 0, m: [{ r: [1.15, 1.1, 1, 1, 1.1, 1.15, 1, 0.9, 0.9, 1] }, { r: ROUND, s: 0.42, on: 0, at: 90, d: 0.95, lb: 5, la: 0.24 }] } },
+    // the proportions of a loved character: a big head with a big face, a small body beneath it
+    { plush: true, name: 'Bean Baby', noun: 'Beanling', note: 'A big round head on a small round body.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.66, on: 0, at: 270, d: 0.82 }] } },
+    { plush: true, name: 'Plush Cub', noun: 'Cub', note: 'A big head with two round ears and a small body.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.68, on: 0, at: 270, d: 0.8 }, { r: ROUND, s: 0.34, on: 0, at: 55, d: 0.95, pr: 1 }] } },
+    { plush: true, name: 'Little Hero', noun: 'Hero', note: 'A big head, a small pear body and two round mitts.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: [1, 1.1, 1.15, 1.15, 1.1, 1, 0.92, 0.9, 0.9, 0.92], s: 0.74, on: 0, at: 270, d: 0.8 }, { r: ROUND, s: 0.3, on: 1, at: 345, d: 0.95, pr: 1 }] } },
+    { plush: true, name: 'Pudgy', noun: 'Pudge', note: 'A fat round body with a face almost as big as itself.', body: { v: 0, e: 1, m: [{ r: [1, 1.1, 1.15, 1.15, 1.1, 1, 0.95, 0.92, 0.92, 0.95] }, { r: ROUND, s: 0.86, on: 0, at: 90, d: 0.7 }] } },
+    { plush: true, name: 'Sleepy Bun', noun: 'Bun', note: 'A wide soft bun of a head over a tiny body.', body: { v: 0, e: 0, m: [{ r: [1.2, 1.05, 0.95, 0.95, 1.05, 1.2, 1.05, 0.95, 0.95, 1.05] }, { r: ROUND, s: 0.55, on: 0, at: 270, d: 0.78 }] } },
   ];
   G.offlinePlan = function () {
     const r = G.rand, W = G.W, have = W ? W.plans.map(function (p) { return p.name; }) : [];
     let pick = null;
+    // the stock leans to the plush ones: a big face over a small soft body, with the face settings that go with it
+    const pool = r() < 0.65 ? OWN.filter(function (c) { return c.plush; }) : OWN;
+    for (let t = 0; t < 12 && !pick; t++) { const c = pool[Math.floor(r() * pool.length)]; if (have.indexOf(c.name) < 0) pick = c; }
     for (let t = 0; t < 10 && !pick; t++) { const c = OWN[Math.floor(r() * OWN.length)]; if (have.indexOf(c.name) < 0) pick = c; }
     if (!pick) return null;
     // the same idea never comes out the same twice
     const b = JSON.parse(JSON.stringify(pick.body));
     for (let i = 0; i < b.m.length; i++) { const q = b.m[i]; q.r = q.r.map(function (v) { return v * (0.93 + r() * 0.14); }); if (i) { q.s *= 0.88 + r() * 0.24; q.d = (q.d || 1) * (0.92 + r() * 0.16); } }
-    return { name: pick.name, noun: pick.noun, note: pick.note, because: '', body: b, by: '' };
+    return { name: pick.name, noun: pick.noun, note: pick.note, because: '', body: b, by: '', face: pick.plush ? PLUSH_FACE : null };
   };
   /** a plain animal of this shape, to show it */
   G.planDemo = function (p, hue) {

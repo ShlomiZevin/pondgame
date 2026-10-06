@@ -105,6 +105,9 @@ node tools/div-test.js 200 11,23,57      # how many different bodies share one p
 node tools/long-test.js 350 11,23        # do bodies keep advancing over a long run
 node tools/fork-test.js 11               # the same pond with different things thrown in
 node tools/form-test.js 120 3            # a general look at what evolved
+node tools/evo-test.js 150 11,23         # does beauty rise, no AI (the game's own taste)
+node tools/oracle-test.js 340 11,23 4    # a long run with a stand-in watcher: does quality hold, how varied is the pond
+node tools/react-test.js 11              # does the pond answer cold, heat, dark, hunters, poison
 ```
 
 Browser checks that save screenshots into `scripts/` (the dev server must be running; needs Chrome and the

@@ -238,7 +238,9 @@
     const note = function (kind, i, text, big) { muts.push({ kind: kind, i: i, text: text, big: !!big }); };
     const press = G.W && G.W.press ? G.W.press : null;
     // nudge traits
-    if (r() < m * 2) { g.t[0] += n() * 1.1; note('t', 0, 'size', false); }
+    // size answers the pond: danger favours bigger bodies, hunger and thin air smaller ones; chance does the rest
+    if (r() < m * 2) { g.t[0] += n() * 1.1 + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
+    if (press && Math.abs(press.size) > 0.2 && r() < 0.06 * Math.abs(press.size) * wild) { const up = press.size > 0; g.t[0] = Math.max(5, g.t[0] * (up ? 1.12 : 0.9)); note('t', 0, (up ? 'grew bigger, ' : 'grew smaller, ') + (press.sizeWhy || 'to suit the pond'), true); }
     if (r() < m * 2) { g.t[1] += n() * 0.07; note('t', 1, 'speed', false); }
     if (r() < m * 2.5) { g.t[4] = (g.t[4] || 0.12) + n() * 0.14; note('t', 4, 'temper', false); }
     for (let i = 0; i < 15; i++) {

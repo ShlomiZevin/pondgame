@@ -103,3 +103,44 @@ drawing · `30_world.js` the loop (`makeCreature`, `startSpring`, `endAutumn`, `
 watcher · `lib/ai.js` prompts (`WATCH_SYSTEM`, `JUDGE_SYSTEM`, `PLAN_SYSTEM`, `DESIGN_SYSTEM`) · `scripts/rise.js` the
 test · `scripts/taste.js`, `taste-fit.js` the training · `game/tools/evo-test.js` the same test without a browser or AI.
 The game's working copy is `plaxzy-creator/local-games/primordia/`; `npm run pull-game` copies it here.
+
+## Round 2 (2026-10-06): towards Pixar-like creatures
+
+What changed, and what was measured. The owner's goal: lovable, whole, Pixar-like creatures, by the genetic algorithm, with the AI as the watcher at a cost of cents to tens of cents at 64×.
+
+**Genes (21_form.js, 21b_body.js).** New face and proportion genes on the form: `eg` eye gap, `ey` eye height, `ep` pupil, `bl` blush, `sm` smile. Eye size (`es`) can now reach 0.9 and head size (`hd`) 2.5. They mutate, cross over with the eyes and mouth groups, are packed after the body (old saves load with defaults) and are drawn in `22_portrait.js` (`face()`, `F._pupil`). A new mass now buds below the face more often than above it (a body under a head, not a hat).
+
+**Taste (21c_taste.js).** 11 features appended to the beauty surrogate (`eyeBig, eyeLow, eyeSet, pupil, smile, blush, headBig, round, stubby, tidy, spiky`) with hand-set priors. The surrogate now has 63 weights; `scripts/taste-fit.js` and `taste-data.json` still hold the old 52 columns, so refitting needs the new features added to the data first.
+
+**The watcher (48_judge.js, lib/ai.js `WATCH_SYSTEM`).** Beauty is now explicitly "how Pixar-like" (big head, small body, big glossy wide-set low eyes, small mouth, soft shapes, bold silhouette, stubby limbs, few colours, one touch of character). It also names ONE gene change per creature from a fixed list (`F.NUDGES`, now 26 entries including `eyes_apart`, `eyes_lower`, `pupils_bigger`, `blush`, `bigger_head`, `smaller_body`, `legs`, `arms`). The advice goes three ways: to the creature's own children, to its species, and into a pond-wide pool (`W.advice`, last 40 generations) that any child may draw from, so one look steers the whole pond. Sheets hold up to 16 creatures.
+
+**Honest selection (30_world.js `charmOf`, 48_judge.js).** A creature nobody has looked at is held back towards the pond's average of what the watcher really said (the more guesses stand between it and a look, the more), which removes the winner's curse. After every look the pond's taste is replayed over the last 160 real marks (3 passes), so its guesses keep up with the watcher.
+
+**Cost control.** The watcher looks every 5 s while it is cheap, then 9 s, 16 s, 60 s as its own spending passes 35%, 70% and 100% of `G.WATCH_BUDGET` ($0.30 a session). This holds for any model: on Terra the first version of this round (fixed 5 s) cost $0.70–0.80 by generation 300.
+
+**Size and response (44_pressure.js, 20_genome.js).** `W.press.size`: danger (kills, fights, things that eat creatures) favours bigger bodies, scarce food, thin air and heat smaller ones; mutation leans that way and says why ("grew bigger, to be too big to bite"). In `tools/react-test.js` three hunters took mean size from 13.7 to 22 in 45 generations, with colour camouflage and armour as before. Size only changes between generations (no growth within a life).
+
+**Stock shapes (45_plans.js).** Added Bean Baby, Plush Cub, Little Hero, Pudgy, Sleepy Bun (big face mass, small body below). Removed Tuft Bearer, Star Body, Halo and Totem.
+
+**Measured** (`scripts/rise.js`, live Sonnet watcher, blind Sonnet judge, one run each so read as indications; 'beauty' is now the Pixar-aware mark):
+
+| run | blind beauty gen 4 → ~25 → ~60 → ~120 → ~200 | blind whole at ~200 | AI cost |
+|---|---|---|---|
+| cute1 (genes + prompt) | 1.0 → 4.5 → 6.2 → 4.5 → 4.3 | 2.8 | $0.14 |
+| cute2 (+ replay, faster looks) | 1.0 → 5.2 → 4.3 → 5.2 → 4.8 | 2.8 | $0.10 |
+| cute3 (+ pond-wide advice, legs/arms, 16 per sheet) | 1.0 → 5.0 → 4.7 → 5.3 → 5.8 | 3.6 | $0.14 |
+| cute4 (+ bud below, stock shapes) | 1.0 → 3.0 → 5.7 → 4.0 → 4.7 | 3.7 | $0.13 |
+
+Earlier runs of the same test (table above, older prompt) read 5.3–7.3 beauty and 3.7–5.0 whole at the end; this round did not beat those numbers, but the judge is also stricter now (it asks for Pixar-likeness), so they are not directly comparable. This round is therefore not proven better by the numbers alone; the pictures are clearly different. What is visible: big-eyed, round, small creatures with ears, wings and stubby feet; the pond answers hunters and cold.
+
+**Still not there.** Wholeness stays near 3–4 (the judge wants head, torso, arms and legs reading as one standing person or animal; the painter and the three-mass body only just allow that). Spikes and wings from pond pressures (a swordfish, say) cost beauty and still win some ponds. At 64× the watcher sees only a few percent of the creatures, so the advice pool and the replayed taste do most of the work. Ideas not tried: a standing-character body (torso with neck, shoulders, hips and limbs with joints) as a body vocabulary; softer drawing of spikes; evolution paced by looking (generations gated on marks).
+
+### Round 2b (same day): holding the gains over a long run
+
+The owner's pond (Terra) peaked, then beauty and whole fell and it collapsed into one finned look by generation 338. `tools/oracle-test.js` reproduces this without paying: a stand-in watcher with a hidden Pixar-like taste marks 16 creatures every few generations. Baseline: true beauty 9.0 at gen 69 down to 4.6 at gen 345 (seed 23), while the pond "believed" 10/10 throughout. Cause: the pond's belief hit the 10/10 ceiling, so selection could not tell good from better and drifted. Fixes: (1) `F.beauty` has a soft ceiling instead of a clamp (order among the best is kept); (2) a hall of fame (`W.hall`, 8 distinct best creatures the watcher really saw) from which 1–2 children a spring are born, crossed with a good survivor; (3) the prompt and priors punish added parts (fins, wings, horns, spikes) harder: the owner prefers a plain round plush with a huge face (`scripts/cute.js` gallery); (4) the watcher now looks at ONE creature per species (the one the pond thinks best), skips a species looked at in the last 6 generations, and makes no call when fewer than four kinds are due. Oracle run after: 7.7 → 8.6 (seed 11), 7.1 → 9.0 → 6.8 (seed 23, wobbles but does not collapse). Live blind judge (Sonnet, 300 generations): beauty 4.2, 4.5, 3.8, 5.0, then 6.4 at gen 300 ("huge glossy eyes, pink plush, simple"), whole 4.0; the AI spent $0.17 in all.
+
+Costs from `data/books__all.json` (all kinds of call, all time): Haiku $0.0027 a call, Terra $0.0067, Sonnet $0.0084. The watcher is the only call made repeatedly; it is limited by the clock (5, 9, 16 then 60 s as it spends) and by `G.WATCH_BUDGET` ($0.30 a session).
+
+### Round 2c: variety, and steering towards the owner's favourite look
+
+The owner's Haiku pond at gen 304 was lovable (big-eyed frogs) but all one green kind, and he prefers the plain plush look of `scripts/cute.js` (round head over round body, huge glossy eyes, stubby feet). Changes: (1) advice from the watcher now goes only to look-alikes (nearest advice in feature space), not the whole pond, and heirlooms from the hall of fame are crossed with the survivor nearest to them, so lineages are refreshed rather than blended into one; (2) a `sig` taste feature and a rewritten prompt reward ONE or TWO real-animal signature features (horns, fins, ears, shell, tail, coat, markings), call bare blobs bland and more than three clutter, and ask for variety; (3) the judging sheet now starts with a row of four starred REFERENCE characters (`G.referenceForms`, the hand-set plush look) that stand for a 9, and the prompt asks how close each numbered creature comes to being as lovable as the stars, in its own way (about 30% more image per call); (4) the stock plush shapes carry face settings (`face` on a plan: big eyes, rosy cheeks, smile, big head) that come with them when a child adopts the shape, and the stock leans 65% to them. `tools/oracle-test.js` now reports diversity (effective number of look-alike kinds and colours). Live run (Sonnet watcher, blind Sonnet judge, 300 generations, $0.16): beauty 5.0, 4.2, 4.5, then 6.5 at gen 301, whole 4.3, with horned, eared, winged and tendrilled kinds side by side.

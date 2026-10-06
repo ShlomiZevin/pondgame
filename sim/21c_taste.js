@@ -10,7 +10,9 @@
   const F = G.form, clamp = G.clamp;
   const NAMES = ['eyes0', 'eyes1', 'eyes2', 'eyes3', 'eyeSize', 'eyeStalk', 'face', 'm2', 'm3', 'pairs', 'hollow', 'lobed', 'stalk', 'side', 'faceAway', 'tall', 'wide', 'plump', 'busy', 'busy2',
     'legs', 'arms', 'fins', 'spikes', 'tentacles', 'feelers', 'plates', 'frills', 'horns', 'designs', 'wrap', 'tail', 'beak', 'jaws', 'sucker', 'whiskers', 'scales', 'fur', 'feathers', 'marked', 'stripes', 'spots',
-    'shell', 'crest', 'glow', 'venom', 'sat', 'lit', 'contrast', 'longest', 'nested', 'bare'];
+    'shell', 'crest', 'glow', 'venom', 'sat', 'lit', 'contrast', 'longest', 'nested', 'bare',
+    // what makes a face lovable (the baby schema the eye responds to): big wide-set low eyes, big soft pupils, a smile, a big head on a small body, round outlines, stubby limbs, a tidy body, no spikes
+    'eyeBig', 'eyeLow', 'eyeSet', 'pupil', 'smile', 'blush', 'headBig', 'round', 'stubby', 'tidy', 'spiky', 'sig'];
   F.LOOKS = NAMES;
   /** what can be seen on a body, as numbers (each about 0..1) */
   F.looks = function (f) {
@@ -22,10 +24,22 @@
       clamp(bm.tall - 1, 0, 1), clamp(bm.asp - 1, 0, 1), (plump - 0.55) / 1.05, busy / 10, busy * busy / 100,
       stands, has[0] && !stands ? 1 : 0, has[1], has[2], has[3], has[4], has[5], has[6], has[7], Math.min(2, dsg) / 2, wrap, f.tk ? 1 : 0, f.mk === 1 ? 1 : 0, f.mk === 2 ? 1 : 0, f.mk === 3 ? 1 : 0, f.mk === 4 ? 1 : 0,
       f.coat === 1 ? 1 : 0, f.coat === 2 ? 1 : 0, f.coat === 3 ? 1 : 0, f.pat ? 1 : 0, f.pat === 1 ? 1 : 0, f.pat === 2 ? 1 : 0, f.shell > 0.25 ? 1 : 0, f.crest > 0.25 ? 1 : 0, f.glow > 0.3 ? 1 : 0, f.venom > 0.3 ? 1 : 0,
-      (f.sat - 52) / 36, (f.lit - 52) / 20, Math.abs(f.hue2) / 180, clamp(longest / 2.2, 0, 1), c.nested ? 1 : 0, f.rules.length === 0 && bm.n === 1 ? 1 : 0];
+      (f.sat - 52) / 36, (f.lit - 52) / 20, Math.abs(f.hue2) / 180, clamp(longest / 2.2, 0, 1), c.nested ? 1 : 0, f.rules.length === 0 && bm.n === 1 ? 1 : 0].concat(F.cuteLooks(f, bm, busy));
+  };
+  /** the proportions and face of a body as numbers (each 0..1) */
+  F.cuteLooks = function (f, bm, busy) {
+    const M = f.bd.m, en = Math.min(f.en, 2) / 2, ne = f.en > 0 ? 1 : 0;
+    let mm = 0; for (let i = 0; i < M.length; i++) { let lo = 9, hi = 0; for (let j = 0; j < M.length * 0 + M[i].r.length; j++) { lo = Math.min(lo, M[i].r[j]); hi = Math.max(hi, M[i].r[j]); } mm += lo / hi; } mm /= M.length;
+    let sq = 0, tot = 0; for (let i = 0; i < M.length; i++) { const a = M[i].s * M[i].s * (M[i].pr ? 2 : 1); tot += a; if (i === f.bd.e) sq = a; }
+    let ln = 0, nl = 0, sp = 0; const sg = {}; for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on >= 0) continue; if (q.k === 0) { ln += q.l; nl++; } if (q.k === 2) sp++; if (q.k === 7 || q.k === 1 || q.k === 3 || q.k === 6 || q.k === 8) sg[q.k] = 1; }
+    // signature features: real-animal parts (horns, fins, tentacles, frills, an invented part), a tail, a shell, ears (a pair of masses), a coat, markings. One or two make a character; none is bland, more than three is clutter
+    if (f.tk) sg.t = 1; if (f.shell > 0.25) sg.s = 1; if (f.coat) sg.c = 1; if (f.pat) sg.p = 1; if (bm.pairs) sg.e = 1; const ns = Object.keys(sg).length;
+    return [clamp((f.es - 0.34) / 0.4, 0, 1) * en, ne * clamp(0.3 + (0.14 - f.ey) / 0.3, 0, 1), f.en === 2 ? 1 - Math.min(1, Math.abs(f.eg - 0.55) / 0.25) : 0, ne * clamp((f.ep - 0.4) / 0.3, 0, 1), clamp(f.sm, 0, 1), clamp(f.bl, 0, 1),
+      clamp(((M.length > 1 ? sq / tot : 0.5) - 0.3) / 0.4, 0, 1) * 0.6 + 0.4 * clamp((f.hd - 1) / 1.2, 0, 1), clamp((mm - 0.6) / 0.4, 0, 1) * (bm.lobed ? 0.5 : 1), nl ? 1 - clamp((ln / nl - 0.6) / 1.2, 0, 1) : 0.5,
+      busy <= 5.5 ? 1 : Math.max(0, 1 - (busy - 5.5) * 0.3), Math.min(1, (sp + (f.crest > 0.25 ? 1 : 0)) * 0.5), ns === 0 ? 0 : ns <= 2 ? 1 : ns === 3 ? 0.5 : 0];
   };
   // the taste every pond starts with: fitted to the AI's grades of pictures (b: the grade of a body with nothing to see on it)
-  F.TASTE0 = { b: 0.5325, w: [-0.121, 0.0073, 0.1, 0.0137, 0.0313, -0.0019, 0.0136, -0.0162, 0, -0.0364, 0.0033, -0.0094, -0.0631, -0.0881, 0.0249, -0.032, 0.0358, 0.0729, -0.0435, -0.0798, 0.0204, 0.0382, -0.0008, -0.0684, -0.0479, 0.0371, 0.0085, -0.0465, 0.0284, -0.0495, -0.0495, -0.0101, 0.0078, -0.0422, -0.0125, 0.0211, -0.0124, -0.035, -0.0414, -0.0141, -0.0058, 0.0454, -0.0249, 0.032, -0.0437, -0.026, 0.0027, 0.0081, -0.0341, 0.0177, 0.0058, -0.1911], n: 294 };      // fitted 2026-10-06 to 294 graded pictures; held-out correlation 0.59
+  F.TASTE0 = { b: 0.5325, w: [-0.121, 0.0073, 0.1, 0.0137, 0.0313, -0.0019, 0.0136, -0.0162, 0, -0.0364, 0.0033, -0.0094, -0.0631, -0.0881, 0.0249, -0.032, 0.0358, 0.0729, -0.0435, -0.0798, 0.0204, 0.0382, -0.0008, -0.0684, -0.0479, 0.0371, 0.0085, -0.0465, 0.0284, -0.0495, -0.0495, -0.0101, 0.0078, -0.0422, -0.0125, 0.0211, -0.0124, -0.035, -0.0414, -0.0141, -0.0058, 0.0454, -0.0249, 0.032, -0.0437, -0.026, 0.0027, 0.0081, -0.0341, 0.0177, 0.0058, -0.1911, 0.16, 0.03, 0.04, 0.03, 0.04, 0.02, 0.1, 0.08, 0.06, 0.1, -0.09, 0.07], n: 294 };      // fitted 2026-10-06 to 294 graded pictures; held-out correlation 0.59
   F.newTaste = function () { return { b: F.TASTE0.b, w: F.TASTE0.w.slice(), n: 0 }; };
   F.fixTaste = function (t) {
     if (!t || !Array.isArray(t.w) || t.w.length !== NAMES.length || !isFinite(+t.b)) return null;
@@ -37,11 +51,12 @@
     T = T || F.TASTE0;
     const x = F.looks(f); let s = T.b;
     for (let i = 0; i < x.length; i++) s += T.w[i] * x[i];
-    return clamp(s, 0, 1);
+    // a soft ceiling, not a wall: two good bodies stay in order instead of both scoring the top mark
+    return s < 0 ? 0 : s < 0.8 ? s : 0.8 + 0.2 * Math.tanh((s - 0.8) / 0.2);
   };
   /** the eye graded this body: the taste is corrected a little towards what it said */
-  F.learn = function (T, f, grade, rate) {
-    const x = F.looks(f); let s = T.b;
+  F.learn = function (T, f, grade, rate, x0) {
+    const x = x0 || F.looks(f); let s = T.b;
     for (let i = 0; i < x.length; i++) s += T.w[i] * x[i];
     const err = clamp(grade, 0, 1) - s, k = rate === undefined ? 0.06 : rate;
     T.b += k * err * 0.5;

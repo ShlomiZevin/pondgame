@@ -28,7 +28,7 @@
   /** Measured once a generation. part[k] and fx[name] are extra weights; c[i] tilts a chemistry gene; list is for people (and the AI). */
   G.measurePressures = function () {
     const W = G.W;
-    const P = { part: new Array(9).fill(0), fx: {}, c: new Array(15).fill(0), list: [] };
+    const P = { part: new Array(9).fill(0), fx: {}, c: new Array(15).fill(0), list: [], size: 0, sizeWhy: '' };
     const fx = function (k, v) { P.fx[k] = (P.fx[k] || 0) + v; };
     const temp = W.set.temp + (W.mods.length ? G.modSum('temp') : 0);
     if (temp < -0.25) { fx('cold', 3); P.c[7] += 1; P.list.push('the water is cold'); }
@@ -39,12 +39,16 @@
     if (W.lastStats && W.cre.length && (W.lastStats.gasp || 0) > W.lastStats.breaths * 0.2) { P.o2 = 2; P.list.push('the water is thin on oxygen (fins and frills breathe better; small bodies need less)'); }
     if (light > 1.2) { fx('photo', 2.5); P.list.push('there is plenty of light'); }
     if (W.mods.length && G.modSum('poison') > 0.1) { fx('poison', 4); P.c[8] += 2; P.list.push('the whole pond is poisoned'); }
+    // size: a hunter takes only prey well under its own size, so danger makes a bigger body a likelier thing to stumble on; hunger, heat and thin air favour small bodies
+    if (W.lastStats && (W.lastStats.killed > 5 || W.lastStats.fights > 12)) { P.size += 1; P.sizeWhy = 'to be too big to bite'; }
+    if (W.lastStats && W.lastStats.protShort > W.cre.length * 0.3 && P.size <= 0) { P.size -= 0.5; P.sizeWhy = 'to need less food'; }
     if (W.lastStats && W.lastStats.killed > 5) { fx('armor', 2); fx('spike', 1.5); fx('toxin', 1.5); fx('speed', 1); P.part[3] += 1.5; P.part[2] += 1; P.part[6] += 1; P.list.push('hunters are about'); }
     if (W.lastStats && W.lastStats.fights > 12) { fx('armor', 2); fx('speed', 1.5); fx('spike', 1); P.part[3] += 1.5; P.part[1] += 1; P.list.push('a violent kind is attacking the others'); }
     for (let i = 0; i < W.zones.length; i++) {
       const z = W.zones[i], p = z.p;
       if (G.isBad(z)) {
         const w = WEAK[z.weak];
+        if ((p.eats || 0) + (p.deadly || 0) > 0.2) { P.size += 0.8; P.sizeWhy = 'to be too big for ' + z.word + ' to swallow'; }
         P.part[w.part] += 2.5; fx(w.id === 'bite' ? 'eat' : w.id, 2.5);
         P.c[9 + z.sig] += 1;
         P.list.push(z.word + ' is hurting them (it is weak to ' + w.text + ')');
@@ -65,6 +69,10 @@
       if (left[t] > 25 && eaters[t] < W.cre.length * 0.3) { P.c[t] += 1.5; P.digest = t; if (P.list.length < 6) P.list.push('there is ' + names[t] + ' food that few can eat'); }
     }
     if (W.lastStats && W.lastStats.protShort > W.cre.length * 0.3) { P.c[0] += 1.5; P.part[0] += 1; P.list.push('protein is short: elaborate bodies cannot build children on algae alone (scraps and meat are rich)'); }
+    if (W.cre.length && W.food.length < 40) { P.size -= 0.8; P.sizeWhy = 'to need less food'; }
+    if (P.o2) { P.size -= 0.6; P.sizeWhy = 'to need less air'; }
+    if (temp > 0.25) { P.size -= 0.3; if (!P.sizeWhy) P.sizeWhy = 'to shed heat'; }
+    P.size = clamp(P.size, -1.5, 2);
     if (W.cre.length && W.food.length < 40) { fx('eat', 1.5); fx('sense', 1.5); P.part[4] += 1; P.list.push('food is scarce'); }
     // the visible answers: a coat, a build, eyes, a colour
     const B = P.body = { coat: -1, plump: 0, eyes: 0, hue: -1 };

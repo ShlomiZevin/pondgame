@@ -142,7 +142,7 @@
     if (M.length >= MAXM) return false;
     const par = Math.floor(r() * M.length), src = M[par], pr = r() < 0.32 ? 1 : 0;
     const rr = src.r.map(function (v) { return 1 + (v - 1) * (r() < 0.5 ? 1 : 0.3) + (r() - 0.5) * 0.12; });
-    M.push(mass({ r: rr, s: 0.42 + r() * 0.55, on: par, at: bd.v ? r() * TAU - PI : pr ? (r() - 0.5) * 2 : (r() < 0.62 ? -PI / 2 : PI / 2), d: 0.6 + r() * 0.75, pr: pr, lb: r() < 0.15 ? 3 + Math.floor(r() * 5) : 0, la: 0.12 }));
+    M.push(mass({ r: rr, s: 0.42 + r() * 0.55, on: par, at: bd.v ? r() * TAU - PI : pr ? (r() - 0.5) * 2 : (r() < 0.35 ? -PI / 2 : PI / 2), d: 0.6 + r() * 0.75, pr: pr, lb: r() < 0.15 ? 3 + Math.floor(r() * 5) : 0, la: 0.12 }));
     if (note) note(pr ? 'a pair of new parts budded from its body' : 'a new part budded from its body', true);
     return true;
   };
