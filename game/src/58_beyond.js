@@ -1,6 +1,6 @@
 // ── Beyond the pond ──
 // The pond has no wall round it. At its sides and its floor the water simply goes on, into a mist nobody has been through:
-// far lights wink in it, and now and then something very large passes. When the pond grows (57_grow) it is this mist that
+// far lights wink in it. When the pond grows (57_grow) it is this mist that
 // draws back, and what was hidden becomes water to live in. Drawn over the pond, in the pond's own measure.
 (function () {
   'use strict';
@@ -32,14 +32,6 @@
       const x = side === 0 ? in_ : side === 1 ? ww - in_ : u * ww, y = side === 2 ? wh - in_ : top + u * (wh - top);
       ctx.beginPath(); ctx.arc(x, y, 2.2 + 3.2 * tw, 0, TAU); ctx.fillStyle = 'hsla(' + (170 + (i * 47) % 120) + ',80%,78%,' + (0.2 + 0.6 * tw) + ')'; ctx.fill();
     }
-    // and, every so often, something very large goes by out there
-    { const period = 70, k = Math.floor(t / period), u = (t % period) / 26; if (u < 1) { const side = k % 3, dir = k % 2 ? 1 : -1, len = B * 2.6, q = dir > 0 ? u : 1 - u, a = Math.sin(u * 3.1416) * 0.5;
-        const x = side === 0 ? B * 0.22 : side === 1 ? ww - B * 0.22 : -len + q * (ww + len * 2), y = side === 2 ? wh - B * 0.22 : top - len + q * (wh - top + len * 2), vert = side !== 2;
-        ctx.save(); ctx.translate(x, y); if (vert) ctx.rotate(1.5708); ctx.scale(dir, 1);
-        ctx.fillStyle = 'rgba(2,8,14,' + a + ')'; ctx.beginPath(); ctx.ellipse(0, 0, len * 0.5, B * 0.2, 0, 0, TAU); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(-len * 0.45, 0); ctx.lineTo(-len * 0.72, -B * 0.22); ctx.lineTo(-len * 0.72, B * 0.22); ctx.closePath(); ctx.fill();      // a tail
-        ctx.beginPath(); ctx.arc(len * 0.36, -B * 0.04, B * 0.028, 0, TAU); ctx.fillStyle = 'rgba(190,240,255,' + a * 1.3 + ')'; ctx.fill();                    // an eye
-        ctx.restore(); } }
     // the mist has just drawn back: its edge shines for a moment
     if (pulse > 0.01) { ctx.strokeStyle = 'rgba(190,235,255,' + 0.55 * pulse + ')'; ctx.lineWidth = 6 + 26 * (1 - pulse); ctx.beginPath(); ctx.moveTo(B, top); ctx.lineTo(B, wh - B); ctx.lineTo(ww - B, wh - B); ctx.lineTo(ww - B, top); ctx.stroke(); pulse = Math.max(0, pulse - 0.006); }
     ctx.restore();
