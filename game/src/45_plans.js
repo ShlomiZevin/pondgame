@@ -118,10 +118,10 @@
     if (!W || W.title || gen < 4 || gen % 9 !== 4) return;
     const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
     if (!live) { const p = G.offlinePlan(); if (p) G.addPlan(p); return; }
-    if (busy || !G.ai.allow('plan')) { if (!busy && W.plans.length < 2) { const p = G.offlinePlan(); if (p) G.addPlan(p); } return; }
+    if (busy || !G.ai.allow('plan')) return;          // not now: with an AI, nothing is taken from the stock
     busy = true;
     const info = G.worldBrief(); info.have = W.plans.map(function (p) { return p.name; });
-    const own = function () { const o = G.offlinePlan(); if (o) G.addPlan(o); };
+    const own = function () { /* with an AI, nothing is taken from the stock */ };
     G.ai.ask('plan', info).then(function (raw) {
       const p = raw ? G.cleanPlan(raw) : null;
       if (G.W !== W) { busy = false; return; }

@@ -223,8 +223,8 @@ function createApp(opts = {}) {
       return send(res, 200, await ai.skin(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr }));
     }
     if (route === 'POST /api/ai/event') {
-      const body = await readJson(req, 2000);
-      const r = await ai.event(body.text, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr });
+      const body = await readJson(req, 12000);
+      const r = await ai.event(body.auto ? '' : body.text, { model: body.model, auto: !!body.auto, pond: body.pond, canGenerate: () => limiter.take(who), onError: logErr });
       return send(res, r.error === 'refused' ? 422 : r.error === 'empty' ? 400 : r.error ? 503 : 200, r);
     }
     if (route === 'POST /api/ai/story') {

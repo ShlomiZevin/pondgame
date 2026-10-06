@@ -157,14 +157,31 @@
     const stale = gen - (W.staleGen || gen), since = gen - (W.natureGen || 0);
     if (since < 14) return;
     if (G.rand() < 0.045 + (stale > 25 ? 0.12 : 0) + (since > 45 ? 0.2 : 0)) {
-      const ev = G.offlineEvent(NATURE[Math.floor(G.rand() * NATURE.length)]);
+      const stock = function () { return G.offlineEvent(NATURE[Math.floor(G.rand() * NATURE.length)]); };
+      const run = function (ev) {
       if (!ev) return;
       ev.kill.share = Math.min(ev.kill.share, 0.25);                // nature shakes the pond; it does not empty it
+      if (ev.strikes) ev.strikes.kill = Math.min(ev.strikes.kill, 0.5);
+      if (ev.fields) for (let i = 0; i < ev.fields.length; i++) { ev.fields[i].kill = Math.min(ev.fields[i].kill, 0.35); if (ev.fields[i].shape === 'all' || ev.fields[i].shape === 'half') { ev.fields[i].kill = Math.min(ev.fields[i].kill, 0.08); ev.fields[i].hurt = Math.min(ev.fields[i].hurt, 0.4); } }
       ev.note = (ev.note ? ev.note + ' ' : '') + 'Nobody caused it: it is the pond\'s own weather.';
       ev.nature = true;
       W.natureGen = gen;
       if (stale > 25) { ev.mutate = Math.max(ev.mutate, 2.2); ev.duration = Math.max(ev.duration, 70); W.staleGen = gen; }
       G.runEvent(ev);
+      };
+      // With an AI to ask, what the pond does to itself is INVENTED: it is told what lives here, what was dropped in, what has
+      // happened lately and whether life has gone stale, and makes up what comes next. Nothing is picked from a list.
+      const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available() && G.host && G.host.ready;
+      if (!live) { run(stock()); return; }
+      if (W.natureBusy || !G.ai.allow('nature')) return;                // not now: it is tried again next generation
+      W.natureBusy = true; W.natureGen = gen;
+      const pond = G.worldBrief ? G.worldBrief() : {}; pond.stale = stale > 25 ? 'the same kind has ruled for ' + stale + ' generations: shake things up' : ''; pond.generation = gen; pond.alive = W.cre.length;
+      G.host.call('ai.event', { auto: 1, pond: pond, model: G.ai.model || undefined }, 70000).then(function (r) {
+        W.natureBusy = false; G.ai.tally('nature', r && r.source, r && r.usd);
+        if (G.W !== W) return;
+        const ev = r && r.event ? G.cleanEvent(r.event, '') : null;
+        if (ev) run(ev); else W.natureGen = gen - 10;
+      }, function () { W.natureBusy = false; if (G.W === W) W.natureGen = gen - 10; });
     }
   };
   G.offlineEvent = function (text) {

@@ -194,13 +194,13 @@
     if (!W || W.title || gen < 6 || gen % 7 !== 3) return;
     const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
     if (!live) { const d = G.offlineDesign(); if (d) G.addDesign(d); return; }
-    if (busy || !G.ai.allow('design')) { if (!busy && W.designs.length < 2) { const d = G.offlineDesign(); if (d) G.addDesign(d); } return; }
+    if (busy || !G.ai.allow('design')) return;          // not now: with an AI, nothing is taken from the stock
     busy = true;
     // the AI is shown the pond: what was dropped in, what is killing, who lives here and how they were graded, which ideas caught on
     const info = G.worldBrief();
     info.admired = G.form.fashionText(W.fashion);
     info.have = W.designs.map(function (d) { return d.name; }).concat(['leg', 'fin', 'spike', 'tentacle', 'feeler', 'armour plate', 'frill', 'horn']);
-    const own = function () { const o = G.offlineDesign(); if (o) G.addDesign(o); };
+    const own = function () { /* with an AI, nothing is taken from the stock: the next idea comes at the next asking */ };
     G.ai.ask('design', info).then(function (raw) {
       const d = raw ? G.cleanDesign(raw) : null;
       if (G.W !== W) { busy = false; return; }

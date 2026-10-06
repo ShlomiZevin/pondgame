@@ -4222,8 +4222,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     model: '',           // the player's choice ('' = the server's default)
     // automatic calls (organs, the story, mutation ideas) are limited by wall-clock time and a session budget,
     // so the cost is the same whether the pond runs at 1x or 64x, for a minute or a day
-    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 40000, check: 3000, watch: 5000, marvel: 12000, design: 50000, paint: 22000, plan: 55000 },
-    caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 45, check: 36, watch: 500, marvel: 40, design: 18, paint: 16, plan: 18 },
+    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 40000, check: 3000, watch: 5000, marvel: 12000, nature: 120000, design: 50000, paint: 22000, plan: 55000 },
+    caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 45, check: 36, watch: 500, marvel: 40, nature: 60, design: 18, paint: 16, plan: 18 },
     used: {}, lastAt: {},
     // what this session has asked the server for: { kind: { asked, fresh } }. "fresh" = a model really ran;
     // the rest came from the server's library of earlier decisions and cost nothing.
@@ -4234,7 +4234,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     // every answer that came from a server is written down: what it was for, whether a model really ran, and what it cost
     ledger: [],          // this session, newest last: { at, kind, paid, usd }
     life: {},            // this pond since it began (kept in its save): { kind: { asked, fresh, usd } }
-    LABEL: { thing: 'Things you typed', event: 'World events you typed', organ: 'New organs', story: 'Story chapters', ideas: 'Mutation ideas', judge: 'The eye for beauty: grading the creatures by looking at them', check: 'The eye for beauty: looking over new ideas', watch: 'The watcher: looking at living creatures and grading them', marvel: 'Rare marvels: inventing a gift for a lucky creature', design: 'New kinds of body part', plan: 'New shapes of body', paint: 'Painted creatures (Leonardo)', sound: 'Sounds (Leonardo)' },
+    LABEL: { thing: 'Things you typed', event: 'World events you typed', nature: 'What the pond does by itself (invented events)', organ: 'New organs', story: 'Story chapters', ideas: 'Mutation ideas', judge: 'The eye for beauty: grading the creatures by looking at them', check: 'The eye for beauty: looking over new ideas', watch: 'The watcher: looking at living creatures and grading them', marvel: 'Rare marvels: inventing a gift for a lucky creature', design: 'New kinds of body part', plan: 'New shapes of body', paint: 'Painted creatures (Leonardo)', sound: 'Sounds (Leonardo)' },
     tally: function (kind, source, usd) {
       const c = G.ai.count[kind] || (G.ai.count[kind] = { asked: 0, fresh: 0, usd: 0 });
       c.asked++;
@@ -4761,7 +4761,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
     if (!live) { G.addOrgan(G.offlineOrgan()); return; }
     // the AI invents an organ now and then; in between, the game's own imagination fills in
-    if (busy || !G.ai.allow('organ')) { if (!busy) G.addOrgan(G.offlineOrgan()); return; }
+    if (busy || !G.ai.allow('organ')) return;          // not now: with an AI, nothing is taken from the stock
     busy = true;
     const info = {
       gen: gen,
@@ -4771,7 +4771,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       water: { temperature: W.set.temp, light: W.set.light, food: W.set.bloom },
       have: W.organs.map(function (o) { return o.name; }),
     };
-    G.ai.ask('organ', info).then(function (o) { busy = false; if (G.W === W && o) G.addOrgan(o); }, function () { busy = false; if (G.W === W) G.addOrgan(G.offlineOrgan()); });
+    G.ai.ask('organ', info).then(function (o) { busy = false; if (G.W === W && o) G.addOrgan(o); }, function () { busy = false; });
   };
 })();
 
@@ -4973,13 +4973,13 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (!W || W.title || gen < 6 || gen % 7 !== 3) return;
     const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
     if (!live) { const d = G.offlineDesign(); if (d) G.addDesign(d); return; }
-    if (busy || !G.ai.allow('design')) { if (!busy && W.designs.length < 2) { const d = G.offlineDesign(); if (d) G.addDesign(d); } return; }
+    if (busy || !G.ai.allow('design')) return;          // not now: with an AI, nothing is taken from the stock
     busy = true;
     // the AI is shown the pond: what was dropped in, what is killing, who lives here and how they were graded, which ideas caught on
     const info = G.worldBrief();
     info.admired = G.form.fashionText(W.fashion);
     info.have = W.designs.map(function (d) { return d.name; }).concat(['leg', 'fin', 'spike', 'tentacle', 'feeler', 'armour plate', 'frill', 'horn']);
-    const own = function () { const o = G.offlineDesign(); if (o) G.addDesign(o); };
+    const own = function () { /* with an AI, nothing is taken from the stock: the next idea comes at the next asking */ };
     G.ai.ask('design', info).then(function (raw) {
       const d = raw ? G.cleanDesign(raw) : null;
       if (G.W !== W) { busy = false; return; }
@@ -5122,10 +5122,10 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (!W || W.title || gen < 4 || gen % 9 !== 4) return;
     const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
     if (!live) { const p = G.offlinePlan(); if (p) G.addPlan(p); return; }
-    if (busy || !G.ai.allow('plan')) { if (!busy && W.plans.length < 2) { const p = G.offlinePlan(); if (p) G.addPlan(p); } return; }
+    if (busy || !G.ai.allow('plan')) return;          // not now: with an AI, nothing is taken from the stock
     busy = true;
     const info = G.worldBrief(); info.have = W.plans.map(function (p) { return p.name; });
-    const own = function () { const o = G.offlinePlan(); if (o) G.addPlan(o); };
+    const own = function () { /* with an AI, nothing is taken from the stock */ };
     G.ai.ask('plan', info).then(function (raw) {
       const p = raw ? G.cleanPlan(raw) : null;
       if (G.W !== W) { busy = false; return; }
@@ -5307,14 +5307,31 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const stale = gen - (W.staleGen || gen), since = gen - (W.natureGen || 0);
     if (since < 14) return;
     if (G.rand() < 0.045 + (stale > 25 ? 0.12 : 0) + (since > 45 ? 0.2 : 0)) {
-      const ev = G.offlineEvent(NATURE[Math.floor(G.rand() * NATURE.length)]);
+      const stock = function () { return G.offlineEvent(NATURE[Math.floor(G.rand() * NATURE.length)]); };
+      const run = function (ev) {
       if (!ev) return;
       ev.kill.share = Math.min(ev.kill.share, 0.25);                // nature shakes the pond; it does not empty it
+      if (ev.strikes) ev.strikes.kill = Math.min(ev.strikes.kill, 0.5);
+      if (ev.fields) for (let i = 0; i < ev.fields.length; i++) { ev.fields[i].kill = Math.min(ev.fields[i].kill, 0.35); if (ev.fields[i].shape === 'all' || ev.fields[i].shape === 'half') { ev.fields[i].kill = Math.min(ev.fields[i].kill, 0.08); ev.fields[i].hurt = Math.min(ev.fields[i].hurt, 0.4); } }
       ev.note = (ev.note ? ev.note + ' ' : '') + 'Nobody caused it: it is the pond\'s own weather.';
       ev.nature = true;
       W.natureGen = gen;
       if (stale > 25) { ev.mutate = Math.max(ev.mutate, 2.2); ev.duration = Math.max(ev.duration, 70); W.staleGen = gen; }
       G.runEvent(ev);
+      };
+      // With an AI to ask, what the pond does to itself is INVENTED: it is told what lives here, what was dropped in, what has
+      // happened lately and whether life has gone stale, and makes up what comes next. Nothing is picked from a list.
+      const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available() && G.host && G.host.ready;
+      if (!live) { run(stock()); return; }
+      if (W.natureBusy || !G.ai.allow('nature')) return;                // not now: it is tried again next generation
+      W.natureBusy = true; W.natureGen = gen;
+      const pond = G.worldBrief ? G.worldBrief() : {}; pond.stale = stale > 25 ? 'the same kind has ruled for ' + stale + ' generations: shake things up' : ''; pond.generation = gen; pond.alive = W.cre.length;
+      G.host.call('ai.event', { auto: 1, pond: pond, model: G.ai.model || undefined }, 70000).then(function (r) {
+        W.natureBusy = false; G.ai.tally('nature', r && r.source, r && r.usd);
+        if (G.W !== W) return;
+        const ev = r && r.event ? G.cleanEvent(r.event, '') : null;
+        if (ev) run(ev); else W.natureGen = gen - 10;
+      }, function () { W.natureBusy = false; if (G.W === W) W.natureGen = gen - 10; });
     }
   };
   G.offlineEvent = function (text) {

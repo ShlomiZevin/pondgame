@@ -125,7 +125,7 @@
     const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
     if (!live) { G.addOrgan(G.offlineOrgan()); return; }
     // the AI invents an organ now and then; in between, the game's own imagination fills in
-    if (busy || !G.ai.allow('organ')) { if (!busy) G.addOrgan(G.offlineOrgan()); return; }
+    if (busy || !G.ai.allow('organ')) return;          // not now: with an AI, nothing is taken from the stock
     busy = true;
     const info = {
       gen: gen,
@@ -135,6 +135,6 @@
       water: { temperature: W.set.temp, light: W.set.light, food: W.set.bloom },
       have: W.organs.map(function (o) { return o.name; }),
     };
-    G.ai.ask('organ', info).then(function (o) { busy = false; if (G.W === W && o) G.addOrgan(o); }, function () { busy = false; if (G.W === W) G.addOrgan(G.offlineOrgan()); });
+    G.ai.ask('organ', info).then(function (o) { busy = false; if (G.W === W && o) G.addOrgan(o); }, function () { busy = false; });
   };
 })();

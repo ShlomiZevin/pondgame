@@ -330,8 +330,8 @@
     model: '',           // the player's choice ('' = the server's default)
     // automatic calls (organs, the story, mutation ideas) are limited by wall-clock time and a session budget,
     // so the cost is the same whether the pond runs at 1x or 64x, for a minute or a day
-    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 40000, check: 3000, watch: 5000, marvel: 12000, design: 50000, paint: 22000, plan: 55000 },
-    caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 45, check: 36, watch: 500, marvel: 40, design: 18, paint: 16, plan: 18 },
+    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 40000, check: 3000, watch: 5000, marvel: 12000, nature: 120000, design: 50000, paint: 22000, plan: 55000 },
+    caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 45, check: 36, watch: 500, marvel: 40, nature: 60, design: 18, paint: 16, plan: 18 },
     used: {}, lastAt: {},
     // what this session has asked the server for: { kind: { asked, fresh } }. "fresh" = a model really ran;
     // the rest came from the server's library of earlier decisions and cost nothing.
@@ -342,7 +342,7 @@
     // every answer that came from a server is written down: what it was for, whether a model really ran, and what it cost
     ledger: [],          // this session, newest last: { at, kind, paid, usd }
     life: {},            // this pond since it began (kept in its save): { kind: { asked, fresh, usd } }
-    LABEL: { thing: 'Things you typed', event: 'World events you typed', organ: 'New organs', story: 'Story chapters', ideas: 'Mutation ideas', judge: 'The eye for beauty: grading the creatures by looking at them', check: 'The eye for beauty: looking over new ideas', watch: 'The watcher: looking at living creatures and grading them', marvel: 'Rare marvels: inventing a gift for a lucky creature', design: 'New kinds of body part', plan: 'New shapes of body', paint: 'Painted creatures (Leonardo)', sound: 'Sounds (Leonardo)' },
+    LABEL: { thing: 'Things you typed', event: 'World events you typed', nature: 'What the pond does by itself (invented events)', organ: 'New organs', story: 'Story chapters', ideas: 'Mutation ideas', judge: 'The eye for beauty: grading the creatures by looking at them', check: 'The eye for beauty: looking over new ideas', watch: 'The watcher: looking at living creatures and grading them', marvel: 'Rare marvels: inventing a gift for a lucky creature', design: 'New kinds of body part', plan: 'New shapes of body', paint: 'Painted creatures (Leonardo)', sound: 'Sounds (Leonardo)' },
     tally: function (kind, source, usd) {
       const c = G.ai.count[kind] || (G.ai.count[kind] = { asked: 0, fresh: 0, usd: 0 });
       c.asked++;
