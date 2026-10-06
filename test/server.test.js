@@ -177,7 +177,7 @@ test('marvels: the model invents one, and the server keeps it fair', async () =>
   assert.ok(m.name.indexOf('<') < 0 && m.sp === 'voice' && m.glyph === 'star');
   const sum = Object.values(m.fx).reduce((s, v) => s + Math.abs(v), 0);
   assert.ok(sum <= 1.41 && m.fx.speed <= 0.6, 'effects are capped: ' + sum);
-  assert.ok(m.words.every((w) => w.length <= 14 && w.indexOf('<') < 0) && m.words.length <= 8);
+  assert.ok(m.words.every((w) => w.length <= 30 && w.indexOf('<') < 0) && m.words.length <= 8);
   assert.ok(m.hue >= 0 && m.hue < 360);
   const none = await createAi({ store: createStore(tmpDir()), callModel: null, offline }).marvel({ have: [] });
   assert.equal(none.marvel, null);

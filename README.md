@@ -209,3 +209,20 @@ creature); merging friends' ponds so their creatures breed; creatures leaving th
 
 See [ALGORITHM.md](ALGORITHM.md): the goal, how the loop works today, what was measured with a blind judge, what does
 not work yet, and ideas not tried. Read it before changing fitness, breeding or the watcher.
+
+## Added on 2026-10-06 and 07: the goal, things drawn as what they are, free world events, invented marvels
+
+| file | what it holds |
+|---|---|
+| `game/src/64_wish.js`, `lib/wish.js` | **The goal of the game.** The pond wishes for one creature at a time; the AI writes the wish, judges from a picture how close the living kinds are, and on fulfilment records a Legend and dreams a harder one. `POST /api/wish` (`op: get / check / done`), kept per player. |
+| `game/src/42_figure.js` | A typed thing is **drawn by the AI as what it is** (an SVG in named parts with pivots) and moved as a puppet. `POST /api/ai/figure`, kept per word. The drawing is made during "imagining", before the thing can be placed. |
+| `game/src/53_fields.js` | **World events said freely**: regions (line, band, circle, ring, half, all) of some stuff (ice, fire, water, rock, plant, toxic, light, dark, magic) that are solid, hurt, kill, slow, pull, push or feed, aimed, drifting, arriving in stages; and strikes from above. Wraps `G.step`; does not edit the simulation. |
+| `game/src/52_weather.js` | Events are **seen**: the strike splash, lasting weather (sixteen kinds), and a strip naming what is in force. |
+| `game/src/46b_marvels.js`, `50b_marveldraw.js` | **Marvels** (a super-rare gift on one creature). With an AI they are always invented for that creature and pond: free powers (an aura or a pulse of some stuff doing things to someone), a sign the AI draws, lines it says. The nine built-in ones are only for when no AI can be asked. |
+| `game/src/46c_voice.js` | A marvel that talks is **heard**: `POST /api/ai/voice` has its line spoken by Leonardo `dialogue-v3` and keeps it per line. |
+
+Costs measured (one real call each unless said): a figure about $0.04–0.06 (Sonnet); a wish $0.004 and a wish check $0.0035 (Sonnet); a staged event about $0.02 (Sonnet); a marvel $0.012 (Sonnet); **a spoken line $0.13** (`dialogue-v3`; Leonardo's other speech model `seed-audio-1.0` was $0.48 a line). The game allows ten new spoken lines a session; a line already made is free for everyone.
+
+Scripts: `wish.js`, `figures.js`, `addflow.js`, `disaster.js`, `weather.js`, `keep.js`, `marvel-live.js` (each drives the real game and saves screenshots).
+
+Not verified: the spoken lines were generated and returned as audio but nobody has listened to them; whether the game's sound player honours the playback speed that gives each creature its own pitch is untested.

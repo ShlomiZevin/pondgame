@@ -380,7 +380,7 @@
     if (item) item.age = ('Marvel · ' + def.name).slice(0, 70);
     if (G.sfx) G.sfx('discovery');
     if (G.select) G.select(c); if (G.focusOn) G.focusOn(c.x, c.y, 2.4);
-    if (G.banner) G.banner('★ A MARVEL', 'Creature #' + c.id + ' was born with ' + def.name + '. ' + def.wonder + (item ? ' It is kept in your collection (BOOK).' : ''), 12000);
+    if (G.banner) G.banner('★ A MARVEL', 'Creature #' + c.id + ' was born with ' + def.name + '. ' + def.wonder + (def.why ? ' (' + def.why + ')' : '') + (item ? ' It is kept in your collection (BOOK).' : ''), 12000);
     if (G.log) G.log('disc', 'A marvel: ' + def.name, 'Creature #' + c.id + '. ' + def.wonder);
     if (G.markDirty) G.markDirty();
   });
@@ -570,7 +570,7 @@
       '<div class="irows"><div id="iE"></div><div id="iAge"></div><div id="iPar" style="grid-column:span 2"></div><div class="meter"><i id="iEb"></i></div></div>' +
       '<div class="imut" id="imut"></div>' +
       '<details><summary>Genes and brain</summary><canvas id="istrip" width="560" height="80"></canvas><canvas id="ibrain" width="560" height="184" style="margin-top:6px"></canvas></details>' +
-      '<style>#iacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}#iacts .btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:0 4px;font-size:10px;letter-spacing:.06em;white-space:nowrap}#iacts .btn svg{width:14px;height:14px;flex:none;margin:0}#iacts .btn i{font-style:normal;font-size:14px;line-height:1}#iacts #ikeep i{color:var(--gold)}#iacts #ibreed i{color:var(--rose)}</style>' +
+      '<style>#inspector .ihead{flex-direction:column;align-items:center;text-align:center;position:relative;gap:0}#inspector .ihead canvas{width:150px;height:150px;margin:-14px 0 -10px}#inspector .ihead>div{width:100%}#inspector .ihead b{font-size:15px}#inspector .x{position:absolute;top:-6px;right:-6px;margin:0}#isub{text-align:left;margin-top:5px}#iacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}#iacts .btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:0 4px;font-size:10px;letter-spacing:.06em;white-space:nowrap}#iacts .btn svg{width:14px;height:14px;flex:none;margin:0}#iacts .btn i{font-style:normal;font-size:14px;line-height:1}#iacts #ikeep i{color:var(--gold)}#iacts #ibreed i{color:var(--rose)}</style>' +
       '<div id="iacts"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond."><i>★</i>KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection."><i>♥</i>BREED</button><button class="btn sm" id="itree" title="Its family tree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide" title="Its kind, in the Book of Life">' + ICON.book + 'KIND</button></div>';
     $('iclose').onclick = function () { G.select(null); };
     $('isub').onclick = function () { this.classList.toggle('open'); };

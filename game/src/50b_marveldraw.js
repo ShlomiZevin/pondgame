@@ -26,6 +26,9 @@
     ctx.restore();
   };
 
+  // the sign the AI drew for a marvel, as a picture (made once)
+  const EM = {};
+  G.marvelEmblem = function (mv) { if (!mv || !mv.emblem || typeof Image === 'undefined') return null; const k = mv.id + ':' + mv.name; let e = EM[k]; if (e === undefined) { e = EM[k] = null; const im = new Image(); im.onload = function () { EM[k] = im; }; im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(mv.emblem); } return e; };
   /** drawn after the creature itself: (x, y) is where it stands, r its radius on screen */
   G.drawMarvel = function (ctx, c, x, y, r, t, alpha) {
     const mv = c.ph.mv; if (!mv) return;
@@ -51,7 +54,13 @@
     // its sign floats beside the head, clear of the face, with a little halo
     { const bob = Math.sin(t * 2.2 + id) * r * 0.07, gx = x + r * 1.0, gy = top + r * 0.2 + bob, gs = r * (c.luckT > 0 ? 0.5 : 0.32);
       ctx.globalCompositeOperation = 'lighter'; const hg = ctx.createRadialGradient(gx, gy, gs * 0.2, gx, gy, gs * 2.2); hg.addColorStop(0, hsl(hue, 95, 70, 0.45)); hg.addColorStop(1, hsl(hue, 95, 70, 0)); ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(gx, gy, gs * 2.2, 0, TAU); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
-      G.glyph(ctx, c.luckT > 0 ? 'clover' : mv.glyph, gx, gy, gs, hue, t); }
+      const em = c.luckT > 0 ? null : G.marvelEmblem(mv);
+      if (em) ctx.drawImage(em, gx - gs * 1.5, gy - gs * 1.5, gs * 3, gs * 3); else G.glyph(ctx, c.luckT > 0 ? 'clover' : mv.glyph, gx, gy, gs, hue, t); }
+    // its powers: how far an aura reaches, a pulse going out, a bolt at what it struck
+    { const k = r / Math.max(6, c.ph.r), P = mv.powers || [], PH = { ice: 195, fire: 18, water: 208, rock: 32, plant: 118, toxic: 95, light: 50, dark: 255, magic: 282 };
+      for (let i = 0; i < P.length; i++) if (P[i].kind === 'aura') { const R = (50 + 120 * P[i].reach) * k; ctx.globalAlpha = alpha * (0.2 + 0.08 * Math.sin(t * 2 + i)); ctx.strokeStyle = hsl(PH[P[i].stuff], 90, 70, 1); ctx.lineWidth = 2; ctx.setLineDash([5, 9]); ctx.lineDashOffset = -t * 14; ctx.beginPath(); ctx.arc(x, cy, R, 0, TAU); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = alpha; }
+      if (c.pulse) { const p = c.pulse.t / 0.9; ctx.strokeStyle = hsl(c.pulse.hue, 95, 72, 0.85 * p); ctx.lineWidth = Math.max(2, r * 0.16) * p + 1; ctx.beginPath(); ctx.arc(x, cy, c.pulse.R * k * (1 - p * 0.85), 0, TAU); ctx.stroke(); }
+      if (c.zap) { const zx = x + (c.zap.x - c.x) * k, zy = cy + (c.zap.y - c.y) * k, p = c.zap.t / 0.45; ctx.strokeStyle = hsl(c.zap.hue, 100, 85, p); ctx.lineWidth = 3; ctx.shadowColor = hsl(c.zap.hue, 100, 70, 1); ctx.shadowBlur = 12; ctx.beginPath(); ctx.moveTo(x, cy); for (let j = 1; j < 5; j++) ctx.lineTo(x + (zx - x) * j / 5 + Math.sin(j * 9 + t * 60) * r * 0.3, cy + (zy - cy) * j / 5 + Math.cos(j * 7 + t * 50) * r * 0.3); ctx.lineTo(zx, zy); ctx.stroke(); ctx.shadowBlur = 0; } }
     // speech: only when it can be read
     if (c.say && G.speed <= 16) {
       const fs = Math.max(11, Math.min(20, r * 0.5)); ctx.font = '700 ' + Math.round(fs) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';

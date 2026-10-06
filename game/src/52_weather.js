@@ -119,7 +119,7 @@
     if (N.light < -0.05) { const k = Math.min(1, -N.light); const g = ctx.createRadialGradient(W_ / 2, H_ / 2, Math.min(W_, H_) * (0.42 - 0.2 * k), W_ / 2, H_ / 2, Math.max(W_, H_) * 0.7); g.addColorStop(0, 'rgba(3,4,14,' + 0.12 * k + ')'); g.addColorStop(1, 'rgba(3,4,14,' + (0.55 + 0.35 * k) + ')'); ctx.fillStyle = g; ctx.fillRect(0, 0, W_, H_); }
     if (N.light > 0.05) { ctx.fillStyle = 'rgba(255,250,205,' + (0.06 + 0.1 * Math.min(1, N.light)) + ')'; ctx.fillRect(0, 0, W_, H_); }
     if (N.poison > 0.05) { const k = Math.min(1, N.poison * 2); ctx.fillStyle = rgba(COL.poison, 0.1 + 0.14 * k + 0.02 * Math.sin(t * 2)); ctx.fillRect(0, 0, W_, H_); if (Math.random() < dt * (10 + 22 * k)) spawn('poison', 1); }
-    if (N.food < 0.95) { ctx.fillStyle = 'rgba(120,120,125,' + (0.1 + 0.25 * (1 - N.food)) + ')'; ctx.fillRect(0, 0, W_, H_); }
+    if (N.food < 0.95) { ctx.fillStyle = 'rgba(120,120,125,' + (0.04 + 0.12 * (1 - N.food)) + ')'; ctx.fillRect(0, 0, W_, H_); }
     if (N.food > 1.05 && Math.random() < dt * 14) spawn('feast', 1);
     if (N.mutate > 1.05) { ctx.fillStyle = rgba(COL.mutate, 0.05 + 0.03 * Math.sin(t * 2.4)); ctx.fillRect(0, 0, W_, H_); if (Math.random() < dt * 22) spawn('mutate', 1); }
     if (fl && Math.random() < dt * 60) spawn('flood', 1);

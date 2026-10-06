@@ -21,7 +21,18 @@
     { id: 8, name: 'Heart of Spring', wonder: 'Every spring it has more children than anyone.', sp: 'fertile', glyph: 'sun', hue: 58, fx: { eat: 0.2 } },
     { id: 9, name: "Titan's Heart", wonder: 'It grew far bigger than its kind has ever been.', sp: 'titan', glyph: 'crown', hue: 30, fx: { armor: 0.3, eat: 0.2 } },
   ];
-  G.MARVELS = BUILT;
+  G.MARVELS = BUILT;      // only for when no AI can be asked (a test, the server's catch-up): in play every marvel is invented
+  const STUFF = ['ice', 'fire', 'water', 'rock', 'plant', 'toxic', 'light', 'dark', 'magic'], PHUE = { ice: 195, fire: 18, water: 208, rock: 32, plant: 118, toxic: 95, light: 50, dark: 255, magic: 282 };
+  const VOICES = ['sweet', 'bright', 'cheeky', 'gruff', 'wise', 'tiny'];
+  /** a power: an AURA that is always about it, or a PULSE it lets off every so often; of some stuff; doing things to someone */
+  const cleanPower = function (q) {
+    if (!q || typeof q !== 'object') return null;
+    const n = function (v, a, b) { v = +v; return isFinite(v) ? clamp(v, a, b) : 0; };
+    const p = { kind: q.kind === 'pulse' ? 'pulse' : 'aura', stuff: STUFF.indexOf(q.stuff) >= 0 ? q.stuff : 'magic', reach: n(q.reach, 0.2, 1) || 0.5, to: ['hunters', 'others', 'kin', 'all'].indexOf(q.to) >= 0 ? q.to : 'hunters', every: n(q.every, 2, 30) || 8,
+      hurt: n(q.hurt, 0, 1), slow: n(q.slow, 0, 1), pull: n(q.pull, -1, 1), heal: n(q.heal, 0, 1), feed: n(q.feed, 0, 1), tag: Math.round(n(q.tag, 0, 5)), strike: n(q.strike, 0, 1) };
+    if (p.to === 'kin' || p.to === 'all') { p.hurt = p.to === 'kin' ? 0 : Math.min(p.hurt, 0.4); p.strike = p.to === 'kin' ? 0 : p.strike; }      // it does not turn on its own
+    return p.hurt + p.slow + Math.abs(p.pull) + p.heal + p.feed + p.strike > 0.05 ? p : null;
+  };
 
   G.marvelOf = function (id) {
     id = id | 0; if (!id) return null;
@@ -40,9 +51,12 @@
     const f = raw.fx && typeof raw.fx === 'object' ? raw.fx : {}, fx = {}; let sum = 0;
     for (let i = 0; i < G.FX.length; i++) { const k = G.FX[i]; let v = +f[k]; if (!isFinite(v)) v = 0; fx[k] = k === 'speed' ? clamp(v, -0.5, 0.6) : clamp(v, 0, 0.9); sum += Math.abs(fx[k]); }
     if (sum > 1.4) for (let i = 0; i < G.FX.length; i++) fx[G.FX[i]] *= 1.4 / sum;
-    if (sum < 0.1 && !sp) fx.glow = 0.4;
-    const words = Array.isArray(raw.words) ? raw.words.map(function (w) { return String(w).replace(/[^A-Za-z!?' .\-]/g, '').trim().slice(0, 14); }).filter(Boolean).slice(0, 8) : [];
-    return { name: name, wonder: wonder, sp: sp, glyph: GLYPHS.indexOf(raw.glyph) >= 0 ? raw.glyph : 'star', hue: (((+raw.hue || 50) % 360) + 360) % 360, fx: fx, words: sp === 'voice' ? (words.length ? words : WORDS) : [], by: String(raw.by || raw.model || '').slice(0, 60) };
+    const words = Array.isArray(raw.words) ? raw.words.map(function (w) { return String(w).replace(/[^A-Za-z!?', .\-]/g, '').trim().slice(0, 30); }).filter(Boolean).slice(0, 6) : [];
+    const powers = []; if (Array.isArray(raw.powers)) for (let i = 0; i < raw.powers.length && powers.length < 3; i++) { const p = cleanPower(raw.powers[i]); if (p) powers.push(p); }
+    const v = raw.voice && typeof raw.voice === 'object' ? raw.voice : {}, emblem = typeof raw.emblem === 'string' && raw.emblem.length < 6200 && /^<svg[\s>]/.test(raw.emblem) && !/<script|javascript:|onload|href/i.test(raw.emblem) ? raw.emblem : '';
+    if (sum < 0.1 && !sp && !powers.length && !words.length) fx.glow = 0.4;
+    return { name: name, wonder: wonder, sp: sp, glyph: GLYPHS.indexOf(raw.glyph) >= 0 ? raw.glyph : 'star', hue: (((+raw.hue || 50) % 360) + 360) % 360, fx: fx, powers: powers, words: words.length ? words : sp === 'voice' ? WORDS : [],
+      voice: { tone: VOICES.indexOf(v.tone) >= 0 ? v.tone : 'bright', speed: isFinite(+v.speed) ? clamp(+v.speed, 0.7, 1.7) : 1.25 }, emblem: emblem, why: String(raw.why || '').replace(/[<>]/g, '').slice(0, 100), by: String(raw.by || raw.model || '').slice(0, 60) };
   };
   /** an invented marvel becomes part of this pond (so its creatures can pass it on); returns its id */
   G.addMarvelDef = function (raw) {
@@ -84,19 +98,21 @@
     const W = G.W, c = chooseCreature(); if (!c) return;
     const M = W.mv = W.mv || { gen0: 0, rt0: G.rt || 0, n: 0 };
     M.gen0 = W.gen; M.rt0 = G.rt || 0;           // the clock starts again whatever comes of the asking
-    const give = function (def) { if (!def || c.dead) { def = BUILT[Math.floor(G.rand() * BUILT.length)]; } finish(c, def); };
-    if (forceId) { give(G.marvelOf(forceId)); return; }
     const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
+    // with an AI to ask, a marvel is always invented: if it cannot be just now, none comes yet (it is tried again soon), never a stock one
+    const give = function (def) { if (c.dead) return; if (!def) { if (live) { M.gen0 = W.gen - 34; return; } def = BUILT[Math.floor(G.rand() * BUILT.length)]; } finish(c, def); };
+    if (forceId) { give(G.marvelOf(forceId)); return; }
     // about half the time, when there is an AI, it invents this pond's marvel; otherwise one of the built-in ones, not one seen lately
-    if (live && G.rand() < 0.5 && G.ai.allow('marvel')) {
+    if (live && G.ai.allow('marvel')) {
       busy = true;
-      const info = G.worldBrief ? G.worldBrief() : {}; info.creature = G.form.facts(c.g.f).slice(0, 8).join('; '); info.have = BUILT.map(function (b) { return b.name; }).concat((W.marvelX || []).map(function (x) { return x.name; }));
+      const info = G.worldBrief ? G.worldBrief() : {}; info.creature = G.form.facts(c.g.f).slice(0, 8).join('; '); info.have = BUILT.map(function (b) { return b.name; }).concat((W.marvelX || []).map(function (x) { return x.name; })); info.kind = G.form.kind(c.g.f).full;
       G.ai.ask('marvel', info).then(function (raw) {
         busy = false; if (G.W !== W) return;
         const id = raw ? G.addMarvelDef(raw) : 0; give(id ? G.marvelOf(id) : null);
       }, function () { busy = false; if (G.W === W) give(null); });
       return;
     }
+    if (live) { M.gen0 = W.gen - 34; return; }
     const recent = W.marvelRecent = W.marvelRecent || []; let def = null;
     for (let t = 0; t < 8 && !def; t++) { const d = BUILT[Math.floor(G.rand() * BUILT.length)]; if (recent.indexOf(d.id) < 0) def = d; }
     give(def || BUILT[0]);
@@ -138,16 +154,45 @@
     } else if (sp === 'heal') {
       c.healCool = (c.healCool || 0) - dt;
       if (c.healCool <= 0) { c.healCool = 1.3; c.healPulse = 0.9; near(95, function (o) { if (o.E < o.ph.Emax) { o.E = Math.min(o.ph.Emax, o.E + 3 + 0.02 * o.ph.Emax); o.mend = 1; } }); }
-    } else if (sp === 'voice') {
+    }
+    if (ph.mv.words && ph.mv.words.length) {
       c.sayCool = (c.sayCool || 2 + G.rand() * 4) - dt;
       if (c.sayCool <= 0) {
-        c.sayCool = 6 + G.rand() * 9;
-        const w = ph.mv.words && ph.mv.words.length ? ph.mv.words : WORDS, inp = c.inp;
+        c.sayCool = 7 + G.rand() * 10;
+        const w = ph.mv.words, inp = c.inp;
         let word = w[(G.rand() * w.length) | 0];
-        if (inp && Math.max(inp[5], inp[6]) > 0.45 && G.rand() < 0.7) word = 'run!'; else if (inp && Math.max(inp[1], inp[2]) > 0.5 && G.rand() < 0.5) word = 'food!';
-        c.say = { w: word, t: 2.6 };
+        if (inp && Math.max(inp[5], inp[6]) > 0.45 && G.rand() < 0.5) word = 'Run!'; else if (inp && Math.max(inp[1], inp[2]) > 0.5 && G.rand() < 0.25) word = 'Food!';
+        c.say = { w: word, t: 3 };
+        G.emit('say', c, word);
       }
     }
+    const P = ph.mv.powers;
+    if (c.pulse) { c.pulse.t -= dt; if (c.pulse.t <= 0) c.pulse = null; }
+    if (P && P.length) {
+      c.pwAcc = (c.pwAcc || 0) + dt;
+      if (c.pwAcc >= 0.3) {
+        const da = c.pwAcc; c.pwAcc = 0; c.pwCool = c.pwCool || [];
+        for (let i = 0; i < P.length; i++) {
+          const p = P[i], R = 50 + 120 * p.reach;
+          const hit = function (o) { return p.to === 'all' || (p.to === 'kin' ? o.sp === c.sp : p.to === 'others' ? o.sp !== c.sp : (o.ph.r >= ph.r * 1.15 && o.ph.dig[ph.tag] >= 0.2) || (o.ph.aggro > 0.38 && o.sp !== c.sp)); };
+          if (p.kind === 'aura') {
+            near(R, function (o, dx, dy) { if (!hit(o)) return; if (p.hurt) o.E -= p.hurt * 10 * da * (1 - o.ph.defense * 0.5); if (p.heal && o.E < o.ph.Emax) { o.E = Math.min(o.ph.Emax, o.E + p.heal * 7 * da); o.mend = 1; } if (p.slow) { const k = 1 - p.slow * 0.5; o.vx *= k; o.vy *= k; } if (p.pull) { const d = Math.sqrt(dx * dx + dy * dy) || 1; o.vx -= dx / d * p.pull * 60 * da; o.vy -= dy / d * p.pull * 60 * da; } });
+            if (p.feed && G.spawnFood && G.rand() < p.feed * 0.25 * da) { const a = G.rand() * 6.2832, d = G.rand() * R * 0.7; G.spawnFood(W, clamp(c.x + Math.cos(a) * d, 8, W.ww - 8), clamp(c.y + Math.sin(a) * d, 8, W.wh - 8), p.tag); }
+          } else {
+            c.pwCool[i] = (c.pwCool[i] === undefined ? p.every * G.rand() : c.pwCool[i]) - da;
+            if (c.pwCool[i] > 0) continue;
+            let any = !!p.feed, tgt = null, td = 1e9;
+            near(R, function (o, dx, dy) { if (!hit(o)) return; any = true; const d2 = dx * dx + dy * dy; if (d2 < td) { td = d2; tgt = o; } });
+            if (!any) { c.pwCool[i] = 1; continue; }                      // nobody it is meant for is near: it waits
+            c.pwCool[i] = p.every; c.pulse = { t: 0.9, R: R, hue: PHUE[p.stuff] };
+            near(R, function (o, dx, dy) { if (!hit(o)) return; if (p.hurt) { o.E -= p.hurt * 22 * (1 - o.ph.defense * 0.5); o.flash = 1; } if (p.heal && o.E < o.ph.Emax) { o.E = Math.min(o.ph.Emax, o.E + p.heal * 24); o.mend = 1; } if (p.pull) { const d = Math.sqrt(dx * dx + dy * dy) || 1; o.vx -= dx / d * p.pull * 150; o.vy -= dy / d * p.pull * 150; } if (p.slow) { o.vx *= 1 - p.slow; o.vy *= 1 - p.slow; } });
+            if (p.strike && tgt) { tgt.E -= 34 * p.strike * (1 - tgt.ph.defense * 0.5); tgt.flash = 1; c.zap = { x: tgt.x, y: tgt.y, t: 0.45, hue: PHUE[p.stuff] }; if (tgt.E <= 0 && G.killCreature) { W.stats.killed++; G.killCreature(tgt, 'fought', c); } }
+            if (p.feed && G.spawnFood) for (let k = 0; k < Math.round(1 + p.feed * 4); k++) { const a = G.rand() * 6.2832, d = G.rand() * R * 0.6; G.spawnFood(W, clamp(c.x + Math.cos(a) * d, 8, W.ww - 8), clamp(c.y + Math.sin(a) * d, 8, W.wh - 8), p.tag); }
+          }
+        }
+      }
+    }
+    if (c.zap) { c.zap.t -= dt; if (c.zap.t <= 0) c.zap = null; }
   };
   /** luck: danger sometimes misses (called as a creature is about to die) */
   /** is this creature one of the line of the marvel that was just given (looked after for a few generations)? */

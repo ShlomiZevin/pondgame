@@ -4222,8 +4222,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     model: '',           // the player's choice ('' = the server's default)
     // automatic calls (organs, the story, mutation ideas) are limited by wall-clock time and a session budget,
     // so the cost is the same whether the pond runs at 1x or 64x, for a minute or a day
-    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 40000, check: 3000, watch: 5000, marvel: 20000, design: 50000, paint: 22000, plan: 55000 },
-    caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 45, check: 36, watch: 500, marvel: 8, design: 18, paint: 16, plan: 18 },
+    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 40000, check: 3000, watch: 5000, marvel: 12000, design: 50000, paint: 22000, plan: 55000 },
+    caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 45, check: 36, watch: 500, marvel: 40, design: 18, paint: 16, plan: 18 },
     used: {}, lastAt: {},
     // what this session has asked the server for: { kind: { asked, fresh } }. "fresh" = a model really ran;
     // the rest came from the server's library of earlier decisions and cost nothing.
@@ -5353,7 +5353,18 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     { id: 8, name: 'Heart of Spring', wonder: 'Every spring it has more children than anyone.', sp: 'fertile', glyph: 'sun', hue: 58, fx: { eat: 0.2 } },
     { id: 9, name: "Titan's Heart", wonder: 'It grew far bigger than its kind has ever been.', sp: 'titan', glyph: 'crown', hue: 30, fx: { armor: 0.3, eat: 0.2 } },
   ];
-  G.MARVELS = BUILT;
+  G.MARVELS = BUILT;      // only for when no AI can be asked (a test, the server's catch-up): in play every marvel is invented
+  const STUFF = ['ice', 'fire', 'water', 'rock', 'plant', 'toxic', 'light', 'dark', 'magic'], PHUE = { ice: 195, fire: 18, water: 208, rock: 32, plant: 118, toxic: 95, light: 50, dark: 255, magic: 282 };
+  const VOICES = ['sweet', 'bright', 'cheeky', 'gruff', 'wise', 'tiny'];
+  /** a power: an AURA that is always about it, or a PULSE it lets off every so often; of some stuff; doing things to someone */
+  const cleanPower = function (q) {
+    if (!q || typeof q !== 'object') return null;
+    const n = function (v, a, b) { v = +v; return isFinite(v) ? clamp(v, a, b) : 0; };
+    const p = { kind: q.kind === 'pulse' ? 'pulse' : 'aura', stuff: STUFF.indexOf(q.stuff) >= 0 ? q.stuff : 'magic', reach: n(q.reach, 0.2, 1) || 0.5, to: ['hunters', 'others', 'kin', 'all'].indexOf(q.to) >= 0 ? q.to : 'hunters', every: n(q.every, 2, 30) || 8,
+      hurt: n(q.hurt, 0, 1), slow: n(q.slow, 0, 1), pull: n(q.pull, -1, 1), heal: n(q.heal, 0, 1), feed: n(q.feed, 0, 1), tag: Math.round(n(q.tag, 0, 5)), strike: n(q.strike, 0, 1) };
+    if (p.to === 'kin' || p.to === 'all') { p.hurt = p.to === 'kin' ? 0 : Math.min(p.hurt, 0.4); p.strike = p.to === 'kin' ? 0 : p.strike; }      // it does not turn on its own
+    return p.hurt + p.slow + Math.abs(p.pull) + p.heal + p.feed + p.strike > 0.05 ? p : null;
+  };
 
   G.marvelOf = function (id) {
     id = id | 0; if (!id) return null;
@@ -5372,9 +5383,12 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const f = raw.fx && typeof raw.fx === 'object' ? raw.fx : {}, fx = {}; let sum = 0;
     for (let i = 0; i < G.FX.length; i++) { const k = G.FX[i]; let v = +f[k]; if (!isFinite(v)) v = 0; fx[k] = k === 'speed' ? clamp(v, -0.5, 0.6) : clamp(v, 0, 0.9); sum += Math.abs(fx[k]); }
     if (sum > 1.4) for (let i = 0; i < G.FX.length; i++) fx[G.FX[i]] *= 1.4 / sum;
-    if (sum < 0.1 && !sp) fx.glow = 0.4;
-    const words = Array.isArray(raw.words) ? raw.words.map(function (w) { return String(w).replace(/[^A-Za-z!?' .\-]/g, '').trim().slice(0, 14); }).filter(Boolean).slice(0, 8) : [];
-    return { name: name, wonder: wonder, sp: sp, glyph: GLYPHS.indexOf(raw.glyph) >= 0 ? raw.glyph : 'star', hue: (((+raw.hue || 50) % 360) + 360) % 360, fx: fx, words: sp === 'voice' ? (words.length ? words : WORDS) : [], by: String(raw.by || raw.model || '').slice(0, 60) };
+    const words = Array.isArray(raw.words) ? raw.words.map(function (w) { return String(w).replace(/[^A-Za-z!?', .\-]/g, '').trim().slice(0, 30); }).filter(Boolean).slice(0, 6) : [];
+    const powers = []; if (Array.isArray(raw.powers)) for (let i = 0; i < raw.powers.length && powers.length < 3; i++) { const p = cleanPower(raw.powers[i]); if (p) powers.push(p); }
+    const v = raw.voice && typeof raw.voice === 'object' ? raw.voice : {}, emblem = typeof raw.emblem === 'string' && raw.emblem.length < 6200 && /^<svg[\s>]/.test(raw.emblem) && !/<script|javascript:|onload|href/i.test(raw.emblem) ? raw.emblem : '';
+    if (sum < 0.1 && !sp && !powers.length && !words.length) fx.glow = 0.4;
+    return { name: name, wonder: wonder, sp: sp, glyph: GLYPHS.indexOf(raw.glyph) >= 0 ? raw.glyph : 'star', hue: (((+raw.hue || 50) % 360) + 360) % 360, fx: fx, powers: powers, words: words.length ? words : sp === 'voice' ? WORDS : [],
+      voice: { tone: VOICES.indexOf(v.tone) >= 0 ? v.tone : 'bright', speed: isFinite(+v.speed) ? clamp(+v.speed, 0.7, 1.7) : 1.25 }, emblem: emblem, why: String(raw.why || '').replace(/[<>]/g, '').slice(0, 100), by: String(raw.by || raw.model || '').slice(0, 60) };
   };
   /** an invented marvel becomes part of this pond (so its creatures can pass it on); returns its id */
   G.addMarvelDef = function (raw) {
@@ -5416,19 +5430,21 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const W = G.W, c = chooseCreature(); if (!c) return;
     const M = W.mv = W.mv || { gen0: 0, rt0: G.rt || 0, n: 0 };
     M.gen0 = W.gen; M.rt0 = G.rt || 0;           // the clock starts again whatever comes of the asking
-    const give = function (def) { if (!def || c.dead) { def = BUILT[Math.floor(G.rand() * BUILT.length)]; } finish(c, def); };
-    if (forceId) { give(G.marvelOf(forceId)); return; }
     const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
+    // with an AI to ask, a marvel is always invented: if it cannot be just now, none comes yet (it is tried again soon), never a stock one
+    const give = function (def) { if (c.dead) return; if (!def) { if (live) { M.gen0 = W.gen - 34; return; } def = BUILT[Math.floor(G.rand() * BUILT.length)]; } finish(c, def); };
+    if (forceId) { give(G.marvelOf(forceId)); return; }
     // about half the time, when there is an AI, it invents this pond's marvel; otherwise one of the built-in ones, not one seen lately
-    if (live && G.rand() < 0.5 && G.ai.allow('marvel')) {
+    if (live && G.ai.allow('marvel')) {
       busy = true;
-      const info = G.worldBrief ? G.worldBrief() : {}; info.creature = G.form.facts(c.g.f).slice(0, 8).join('; '); info.have = BUILT.map(function (b) { return b.name; }).concat((W.marvelX || []).map(function (x) { return x.name; }));
+      const info = G.worldBrief ? G.worldBrief() : {}; info.creature = G.form.facts(c.g.f).slice(0, 8).join('; '); info.have = BUILT.map(function (b) { return b.name; }).concat((W.marvelX || []).map(function (x) { return x.name; })); info.kind = G.form.kind(c.g.f).full;
       G.ai.ask('marvel', info).then(function (raw) {
         busy = false; if (G.W !== W) return;
         const id = raw ? G.addMarvelDef(raw) : 0; give(id ? G.marvelOf(id) : null);
       }, function () { busy = false; if (G.W === W) give(null); });
       return;
     }
+    if (live) { M.gen0 = W.gen - 34; return; }
     const recent = W.marvelRecent = W.marvelRecent || []; let def = null;
     for (let t = 0; t < 8 && !def; t++) { const d = BUILT[Math.floor(G.rand() * BUILT.length)]; if (recent.indexOf(d.id) < 0) def = d; }
     give(def || BUILT[0]);
@@ -5470,16 +5486,45 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     } else if (sp === 'heal') {
       c.healCool = (c.healCool || 0) - dt;
       if (c.healCool <= 0) { c.healCool = 1.3; c.healPulse = 0.9; near(95, function (o) { if (o.E < o.ph.Emax) { o.E = Math.min(o.ph.Emax, o.E + 3 + 0.02 * o.ph.Emax); o.mend = 1; } }); }
-    } else if (sp === 'voice') {
+    }
+    if (ph.mv.words && ph.mv.words.length) {
       c.sayCool = (c.sayCool || 2 + G.rand() * 4) - dt;
       if (c.sayCool <= 0) {
-        c.sayCool = 6 + G.rand() * 9;
-        const w = ph.mv.words && ph.mv.words.length ? ph.mv.words : WORDS, inp = c.inp;
+        c.sayCool = 7 + G.rand() * 10;
+        const w = ph.mv.words, inp = c.inp;
         let word = w[(G.rand() * w.length) | 0];
-        if (inp && Math.max(inp[5], inp[6]) > 0.45 && G.rand() < 0.7) word = 'run!'; else if (inp && Math.max(inp[1], inp[2]) > 0.5 && G.rand() < 0.5) word = 'food!';
-        c.say = { w: word, t: 2.6 };
+        if (inp && Math.max(inp[5], inp[6]) > 0.45 && G.rand() < 0.5) word = 'Run!'; else if (inp && Math.max(inp[1], inp[2]) > 0.5 && G.rand() < 0.25) word = 'Food!';
+        c.say = { w: word, t: 3 };
+        G.emit('say', c, word);
       }
     }
+    const P = ph.mv.powers;
+    if (c.pulse) { c.pulse.t -= dt; if (c.pulse.t <= 0) c.pulse = null; }
+    if (P && P.length) {
+      c.pwAcc = (c.pwAcc || 0) + dt;
+      if (c.pwAcc >= 0.3) {
+        const da = c.pwAcc; c.pwAcc = 0; c.pwCool = c.pwCool || [];
+        for (let i = 0; i < P.length; i++) {
+          const p = P[i], R = 50 + 120 * p.reach;
+          const hit = function (o) { return p.to === 'all' || (p.to === 'kin' ? o.sp === c.sp : p.to === 'others' ? o.sp !== c.sp : (o.ph.r >= ph.r * 1.15 && o.ph.dig[ph.tag] >= 0.2) || (o.ph.aggro > 0.38 && o.sp !== c.sp)); };
+          if (p.kind === 'aura') {
+            near(R, function (o, dx, dy) { if (!hit(o)) return; if (p.hurt) o.E -= p.hurt * 10 * da * (1 - o.ph.defense * 0.5); if (p.heal && o.E < o.ph.Emax) { o.E = Math.min(o.ph.Emax, o.E + p.heal * 7 * da); o.mend = 1; } if (p.slow) { const k = 1 - p.slow * 0.5; o.vx *= k; o.vy *= k; } if (p.pull) { const d = Math.sqrt(dx * dx + dy * dy) || 1; o.vx -= dx / d * p.pull * 60 * da; o.vy -= dy / d * p.pull * 60 * da; } });
+            if (p.feed && G.spawnFood && G.rand() < p.feed * 0.25 * da) { const a = G.rand() * 6.2832, d = G.rand() * R * 0.7; G.spawnFood(W, clamp(c.x + Math.cos(a) * d, 8, W.ww - 8), clamp(c.y + Math.sin(a) * d, 8, W.wh - 8), p.tag); }
+          } else {
+            c.pwCool[i] = (c.pwCool[i] === undefined ? p.every * G.rand() : c.pwCool[i]) - da;
+            if (c.pwCool[i] > 0) continue;
+            let any = !!p.feed, tgt = null, td = 1e9;
+            near(R, function (o, dx, dy) { if (!hit(o)) return; any = true; const d2 = dx * dx + dy * dy; if (d2 < td) { td = d2; tgt = o; } });
+            if (!any) { c.pwCool[i] = 1; continue; }                      // nobody it is meant for is near: it waits
+            c.pwCool[i] = p.every; c.pulse = { t: 0.9, R: R, hue: PHUE[p.stuff] };
+            near(R, function (o, dx, dy) { if (!hit(o)) return; if (p.hurt) { o.E -= p.hurt * 22 * (1 - o.ph.defense * 0.5); o.flash = 1; } if (p.heal && o.E < o.ph.Emax) { o.E = Math.min(o.ph.Emax, o.E + p.heal * 24); o.mend = 1; } if (p.pull) { const d = Math.sqrt(dx * dx + dy * dy) || 1; o.vx -= dx / d * p.pull * 150; o.vy -= dy / d * p.pull * 150; } if (p.slow) { o.vx *= 1 - p.slow; o.vy *= 1 - p.slow; } });
+            if (p.strike && tgt) { tgt.E -= 34 * p.strike * (1 - tgt.ph.defense * 0.5); tgt.flash = 1; c.zap = { x: tgt.x, y: tgt.y, t: 0.45, hue: PHUE[p.stuff] }; if (tgt.E <= 0 && G.killCreature) { W.stats.killed++; G.killCreature(tgt, 'fought', c); } }
+            if (p.feed && G.spawnFood) for (let k = 0; k < Math.round(1 + p.feed * 4); k++) { const a = G.rand() * 6.2832, d = G.rand() * R * 0.6; G.spawnFood(W, clamp(c.x + Math.cos(a) * d, 8, W.ww - 8), clamp(c.y + Math.sin(a) * d, 8, W.wh - 8), p.tag); }
+          }
+        }
+      }
+    }
+    if (c.zap) { c.zap.t -= dt; if (c.zap.t <= 0) c.zap = null; }
   };
   /** luck: danger sometimes misses (called as a creature is about to die) */
   /** is this creature one of the line of the marvel that was just given (looked after for a few generations)? */
@@ -5489,6 +5534,37 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     c.luckUsed = true; c.E = Math.max(c.E, c.ph.Emax * 0.45); c.doomed = false; c.flash = 1; c.luckT = 1.4;
     return true;
   };
+})();
+
+</script>
+<script data-part="46c_voice">
+// ── A creature that talks is heard ──
+// When a marvel speaks, its line appears over its head; here it is also SPOKEN. The words go to the server, which has them said by
+// a speech model in the tone the marvel was given, and keeps the sound for good, so a line is paid for once. The creature's own
+// pace makes the voice its own: quick and high for something small, slow and low for something big. Speech is dear, so only a
+// few new lines are made in a session; lines already made are free.
+(function () {
+  'use strict';
+  if (G.ai) { G.ai.gaps.voice = 2500; G.ai.caps.voice = 10; G.ai.LABEL.voice = 'Creatures speaking aloud (Leonardo)'; }
+  const made = {};           // line → 'asked' | 'ready' | 'none'
+  let lastPlay = 0;
+  const now = function () { return typeof performance !== 'undefined' ? performance.now() : Date.now(); };
+  G.on('say', function (c, word) {
+    if (G.mode !== 'play' || G.speed > 4 || !window.PXS || !G.host || !G.host.ready || !G.host.caps || !G.host.caps.ai || G.ai.sound === false) return;
+    const mv = c.ph && c.ph.mv; if (!mv) return;
+    const tone = (mv.voice && mv.voice.tone) || 'bright', speed = (mv.voice && mv.voice.speed) || 1.25, key = 'say:' + tone + ':' + String(word).toLowerCase();
+    const play = function () { if (now() - lastPlay < 1800) return; lastPlay = now(); try { PXS.play(key, { speed: speed, rate: speed, volume: 0.9 }); } catch (e) { console.error(e); } };
+    if (made[key] === 'ready') { play(); return; }
+    if (made[key]) return;
+    if (!G.ai.allow('voice')) return;
+    made[key] = 'asked';
+    G.host.call('ai.voice', { text: word, tone: tone }, 60000).then(function (r) {
+      G.ai.tally('voice', r && (r.source === 'leonardo' ? 'leonardo' : r.source), r && r.usd);
+      if (!r || !r.sound || !/^audio\/(mpeg|wav|ogg|mp4)$/.test(r.sound.mime) || typeof r.sound.b64 !== 'string' || r.sound.b64.length > 600000) { made[key] = 'none'; return; }
+      const def = {}; def[key] = 'data:' + r.sound.mime + ';base64,' + r.sound.b64;
+      try { PXS.define(def); made[key] = 'ready'; if (c.say && !c.dead) play(); } catch (e) { made[key] = 'none'; console.error(e); }
+    }, function () { made[key] = 'none'; });
+  });
 })();
 
 </script>
@@ -6891,6 +6967,9 @@ G.addSystem({
     ctx.restore();
   };
 
+  // the sign the AI drew for a marvel, as a picture (made once)
+  const EM = {};
+  G.marvelEmblem = function (mv) { if (!mv || !mv.emblem || typeof Image === 'undefined') return null; const k = mv.id + ':' + mv.name; let e = EM[k]; if (e === undefined) { e = EM[k] = null; const im = new Image(); im.onload = function () { EM[k] = im; }; im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(mv.emblem); } return e; };
   /** drawn after the creature itself: (x, y) is where it stands, r its radius on screen */
   G.drawMarvel = function (ctx, c, x, y, r, t, alpha) {
     const mv = c.ph.mv; if (!mv) return;
@@ -6916,7 +6995,13 @@ G.addSystem({
     // its sign floats beside the head, clear of the face, with a little halo
     { const bob = Math.sin(t * 2.2 + id) * r * 0.07, gx = x + r * 1.0, gy = top + r * 0.2 + bob, gs = r * (c.luckT > 0 ? 0.5 : 0.32);
       ctx.globalCompositeOperation = 'lighter'; const hg = ctx.createRadialGradient(gx, gy, gs * 0.2, gx, gy, gs * 2.2); hg.addColorStop(0, hsl(hue, 95, 70, 0.45)); hg.addColorStop(1, hsl(hue, 95, 70, 0)); ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(gx, gy, gs * 2.2, 0, TAU); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
-      G.glyph(ctx, c.luckT > 0 ? 'clover' : mv.glyph, gx, gy, gs, hue, t); }
+      const em = c.luckT > 0 ? null : G.marvelEmblem(mv);
+      if (em) ctx.drawImage(em, gx - gs * 1.5, gy - gs * 1.5, gs * 3, gs * 3); else G.glyph(ctx, c.luckT > 0 ? 'clover' : mv.glyph, gx, gy, gs, hue, t); }
+    // its powers: how far an aura reaches, a pulse going out, a bolt at what it struck
+    { const k = r / Math.max(6, c.ph.r), P = mv.powers || [], PH = { ice: 195, fire: 18, water: 208, rock: 32, plant: 118, toxic: 95, light: 50, dark: 255, magic: 282 };
+      for (let i = 0; i < P.length; i++) if (P[i].kind === 'aura') { const R = (50 + 120 * P[i].reach) * k; ctx.globalAlpha = alpha * (0.2 + 0.08 * Math.sin(t * 2 + i)); ctx.strokeStyle = hsl(PH[P[i].stuff], 90, 70, 1); ctx.lineWidth = 2; ctx.setLineDash([5, 9]); ctx.lineDashOffset = -t * 14; ctx.beginPath(); ctx.arc(x, cy, R, 0, TAU); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = alpha; }
+      if (c.pulse) { const p = c.pulse.t / 0.9; ctx.strokeStyle = hsl(c.pulse.hue, 95, 72, 0.85 * p); ctx.lineWidth = Math.max(2, r * 0.16) * p + 1; ctx.beginPath(); ctx.arc(x, cy, c.pulse.R * k * (1 - p * 0.85), 0, TAU); ctx.stroke(); }
+      if (c.zap) { const zx = x + (c.zap.x - c.x) * k, zy = cy + (c.zap.y - c.y) * k, p = c.zap.t / 0.45; ctx.strokeStyle = hsl(c.zap.hue, 100, 85, p); ctx.lineWidth = 3; ctx.shadowColor = hsl(c.zap.hue, 100, 70, 1); ctx.shadowBlur = 12; ctx.beginPath(); ctx.moveTo(x, cy); for (let j = 1; j < 5; j++) ctx.lineTo(x + (zx - x) * j / 5 + Math.sin(j * 9 + t * 60) * r * 0.3, cy + (zy - cy) * j / 5 + Math.cos(j * 7 + t * 50) * r * 0.3); ctx.lineTo(zx, zy); ctx.stroke(); ctx.shadowBlur = 0; } }
     // speech: only when it can be read
     if (c.say && G.speed <= 16) {
       const fs = Math.max(11, Math.min(20, r * 0.5)); ctx.font = '700 ' + Math.round(fs) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -7053,7 +7138,7 @@ G.addSystem({
     if (N.light < -0.05) { const k = Math.min(1, -N.light); const g = ctx.createRadialGradient(W_ / 2, H_ / 2, Math.min(W_, H_) * (0.42 - 0.2 * k), W_ / 2, H_ / 2, Math.max(W_, H_) * 0.7); g.addColorStop(0, 'rgba(3,4,14,' + 0.12 * k + ')'); g.addColorStop(1, 'rgba(3,4,14,' + (0.55 + 0.35 * k) + ')'); ctx.fillStyle = g; ctx.fillRect(0, 0, W_, H_); }
     if (N.light > 0.05) { ctx.fillStyle = 'rgba(255,250,205,' + (0.06 + 0.1 * Math.min(1, N.light)) + ')'; ctx.fillRect(0, 0, W_, H_); }
     if (N.poison > 0.05) { const k = Math.min(1, N.poison * 2); ctx.fillStyle = rgba(COL.poison, 0.1 + 0.14 * k + 0.02 * Math.sin(t * 2)); ctx.fillRect(0, 0, W_, H_); if (Math.random() < dt * (10 + 22 * k)) spawn('poison', 1); }
-    if (N.food < 0.95) { ctx.fillStyle = 'rgba(120,120,125,' + (0.1 + 0.25 * (1 - N.food)) + ')'; ctx.fillRect(0, 0, W_, H_); }
+    if (N.food < 0.95) { ctx.fillStyle = 'rgba(120,120,125,' + (0.04 + 0.12 * (1 - N.food)) + ')'; ctx.fillRect(0, 0, W_, H_); }
     if (N.food > 1.05 && Math.random() < dt * 14) spawn('feast', 1);
     if (N.mutate > 1.05) { ctx.fillStyle = rgba(COL.mutate, 0.05 + 0.03 * Math.sin(t * 2.4)); ctx.fillRect(0, 0, W_, H_); if (Math.random() < dt * 22) spawn('mutate', 1); }
     if (fl && Math.random() < dt * 60) spawn('flood', 1);
@@ -7847,7 +7932,7 @@ G.addSystem({
     if (item) item.age = ('Marvel · ' + def.name).slice(0, 70);
     if (G.sfx) G.sfx('discovery');
     if (G.select) G.select(c); if (G.focusOn) G.focusOn(c.x, c.y, 2.4);
-    if (G.banner) G.banner('★ A MARVEL', 'Creature #' + c.id + ' was born with ' + def.name + '. ' + def.wonder + (item ? ' It is kept in your collection (BOOK).' : ''), 12000);
+    if (G.banner) G.banner('★ A MARVEL', 'Creature #' + c.id + ' was born with ' + def.name + '. ' + def.wonder + (def.why ? ' (' + def.why + ')' : '') + (item ? ' It is kept in your collection (BOOK).' : ''), 12000);
     if (G.log) G.log('disc', 'A marvel: ' + def.name, 'Creature #' + c.id + '. ' + def.wonder);
     if (G.markDirty) G.markDirty();
   });
@@ -8037,7 +8122,7 @@ G.addSystem({
       '<div class="irows"><div id="iE"></div><div id="iAge"></div><div id="iPar" style="grid-column:span 2"></div><div class="meter"><i id="iEb"></i></div></div>' +
       '<div class="imut" id="imut"></div>' +
       '<details><summary>Genes and brain</summary><canvas id="istrip" width="560" height="80"></canvas><canvas id="ibrain" width="560" height="184" style="margin-top:6px"></canvas></details>' +
-      '<style>#iacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}#iacts .btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:0 4px;font-size:10px;letter-spacing:.06em;white-space:nowrap}#iacts .btn svg{width:14px;height:14px;flex:none;margin:0}#iacts .btn i{font-style:normal;font-size:14px;line-height:1}#iacts #ikeep i{color:var(--gold)}#iacts #ibreed i{color:var(--rose)}</style>' +
+      '<style>#inspector .ihead{flex-direction:column;align-items:center;text-align:center;position:relative;gap:0}#inspector .ihead canvas{width:150px;height:150px;margin:-14px 0 -10px}#inspector .ihead>div{width:100%}#inspector .ihead b{font-size:15px}#inspector .x{position:absolute;top:-6px;right:-6px;margin:0}#isub{text-align:left;margin-top:5px}#iacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}#iacts .btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:0 4px;font-size:10px;letter-spacing:.06em;white-space:nowrap}#iacts .btn svg{width:14px;height:14px;flex:none;margin:0}#iacts .btn i{font-style:normal;font-size:14px;line-height:1}#iacts #ikeep i{color:var(--gold)}#iacts #ibreed i{color:var(--rose)}</style>' +
       '<div id="iacts"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond."><i>★</i>KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection."><i>♥</i>BREED</button><button class="btn sm" id="itree" title="Its family tree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide" title="Its kind, in the Book of Life">' + ICON.book + 'KIND</button></div>';
     $('iclose').onclick = function () { G.select(null); };
     $('isub').onclick = function () { this.classList.toggle('open'); };
@@ -9472,7 +9557,7 @@ G.addSystem({
       cre: [], species: [], fossils: [],
       organs: (W.organs || []).map(function (o) { return { id: o.id, name: o.name, note: o.note, svg: o.svg && o.svg.length < 1500 ? o.svg : '', fx: o.fx, digest: o.digest, hue: Math.round(o.hue), by: o.by, gen: o.gen }; }),
       nextOrgan: W.nextOrgan || 1,
-      marvelX: (W.marvelX || []).map(function (m) { return { id: m.id, name: m.name, wonder: m.wonder, sp: m.sp, glyph: m.glyph, hue: Math.round(m.hue), fx: m.fx, words: m.words, by: m.by, gen: m.gen }; }),
+      marvelX: (W.marvelX || []).map(function (m) { return { id: m.id, name: m.name, wonder: m.wonder, sp: m.sp, glyph: m.glyph, hue: Math.round(m.hue), fx: m.fx, words: m.words, powers: m.powers || [], voice: m.voice, emblem: m.emblem && m.emblem.length < 3500 ? m.emblem : '', why: m.why || '', by: m.by, gen: m.gen }; }),
       nextMarvel: W.nextMarvel || 100, marvelRecent: (W.marvelRecent || []).slice(-4), mvState: W.mv ? { gen0: W.mv.gen0 | 0, n: W.mv.n | 0 } : null,
       designs: (W.designs || []).map(function (d) { return { id: d.id, name: d.name, adj: d.adj, note: d.note, place: d.place, motion: d.motion, colour: d.colour, pts: d.pts, smooth: d.smooth, ribs: d.ribs, dots: d.dots, fx: d.fx, by: d.by, gen: d.gen }; }), nextDesign: W.nextDesign || 1,
       col: G.collection, colD: G.keptDesigns, colP: G.keptPlans, fields: G.packFields ? G.packFields() : [], plans: W.plans || [], nextPlan: W.nextPlan || 1, museLog: W.museLog || [],

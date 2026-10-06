@@ -13,6 +13,7 @@
 //   POST /api/ai/event   { text }            → { event }       free text → something that happens
 //   POST /api/ai/story   { measured facts }  → { story }       what changed and why, in plain words
 //   POST /api/ai/paint   { sig, build, facts, colours, world } → { paint }  a painting of a kind of creature (only with LEONARDO_API_KEY)
+//   POST /api/ai/voice   { text, tone }      → { sound }       a line spoken aloud for a creature that talks (Leonardo dialogue-v3, kept per line)
 //   POST /api/ai/sound   { word, note }      → { sound }       a sound for a thing (only with LEONARDO_API_KEY)
 //   GET  /api/pond                           → { save, report } the player's pond, advanced to now
 //   PUT  /api/pond       { save }            → { ok }          store the player's pond
@@ -158,6 +159,14 @@ function createApp(opts = {}) {
       if (!word) return send(res, 400, { error: 'empty' });
       if (ai.refused(word)) return send(res, 422, { error: 'refused' });
       const r = await sounds.forWord(word, body.note, { canGenerate: () => soundLimiter.take(who), onError: (e) => console.error('sound failed:', e.message) });
+      return send(res, r.error ? (r.error === 'no_sound' ? 404 : 503) : 200, r);
+    }
+    if (route === 'POST /api/ai/voice') {      // a creature that talks: its line, spoken aloud
+      const body = await readJson(req, 2000);
+      const text = String(body.text || '').trim().slice(0, 40);
+      if (!text) return send(res, 400, { error: 'empty' });
+      if (ai.refused(text)) return send(res, 422, { error: 'refused' });
+      const r = await sounds.speak(text, String(body.tone || ''), { canGenerate: () => soundLimiter.take(who), onError: (e) => console.error('speech failed:', e.message) });
       return send(res, r.error ? (r.error === 'no_sound' ? 404 : 503) : 200, r);
     }
     if (route === 'POST /api/ai/thing') {
