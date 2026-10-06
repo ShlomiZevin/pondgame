@@ -84,7 +84,9 @@
     if (!on) { sig = ''; return; }
     // it sits under the "pond versus" card when that is showing
     const vs = document.getElementById('versus');
-    if (window.innerWidth > 720) box.style.top = (vs && !vs.classList.contains('hide') ? Math.round(vs.getBoundingClientRect().bottom) + 8 : 236) + 'px'; else box.style.top = '';
+    const se = document.getElementById('season'); let under = se && !se.classList.contains('hide') ? Math.round(se.getBoundingClientRect().bottom) : 224;      // under the season card, however tall its text has made it
+    if (vs && !vs.classList.contains('hide')) under = Math.max(under, Math.round(vs.getBoundingClientRect().bottom));
+    if (window.innerWidth > 720) box.style.top = (under + 12) + 'px'; else box.style.top = '';
     const by = {}, order = [];
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i], mv = c.ph && c.ph.mv; if (!mv || c.dead) continue; if (!by[mv.id]) { by[mv.id] = { d: mv, n: 0 }; order.push(mv.id); } by[mv.id].n++; }
     const d = W.deed, dn = d ? W.cre.filter(function (c) { return c.deedId === d.id && !c.dead; }).length : 0;
