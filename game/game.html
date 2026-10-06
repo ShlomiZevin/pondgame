@@ -8999,7 +8999,7 @@ G.addSystem({
     if (!on) return;
     if (S.busy || !S.cur) { box.classList.remove('open'); S.open = false; box.innerHTML = '<div class="wk"><span>✦ The wish of the pond</span></div><div class="wdream"><span class="wdot"></span>' + (S.asked === 'another' ? 'The pond is dreaming of something else…' : S.asked === 'next' ? 'The pond is dreaming its next wish…' : 'The pond is dreaming…') + '</div>'; return; }
     const b = S.best, pct = b ? Math.round(b.close * 10) : 0;
-    box.innerHTML = '<div class="wk"><span>✦ The pond wishes for · level ' + S.level + '</span><span>' + (S.legends.length ? S.legends.length + (S.legends.length === 1 ? ' legend' : ' legends') : '') + '</span></div>' +
+    box.innerHTML = '<div class="wk"><span>✦ The pond wishes for · level ' + S.level + '</span><span>' + (S.legends.length ? '★ ' + S.legends.length + (S.legends.length === 1 ? ' wish granted' : ' wishes granted') : '') + '</span></div>' +
       '<div class="wt">' + esc(S.cur.title) + '</div>' +
       '<div class="wbar"><i style="width:' + pct + '%"></i><b></b></div>' +
       '<div class="wsub"><small>' + (b ? 'Closest so far: <b style="color:#f6d365">' + b.close + ' of 10</b>' + (b.name ? ' (' + esc(b.name) + ')' : '') + '. ' + esc(b.why) + '.' : 'Nobody has been looked at yet. The pond looks every half a minute.') + '</small></div>' +
