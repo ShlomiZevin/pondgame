@@ -13,7 +13,7 @@
   const ready = {};          // word → figure, shared by every thing of that word in this session
   // the player's own words for a thing ("a human knight with a sword"), kept beside the short name the pond gave it ("Knight")
   const typed = {};
-  if (G.ai && G.ai.ask) { const ask0 = G.ai.ask; G.ai.ask = function (task, input, schema) { const p = ask0.call(G.ai, task, input, schema); if (task === 'thing' && typeof input === 'string') p.then(function (info) { if (info && info.name) typed[String(info.name).toLowerCase()] = input.slice(0, 120); }, function () {}); return p; }; }
+  if (G.ai && G.ai.ask) { const ask0 = G.ai.ask; G.ai.ask = function (task, input, schema) { const p = ask0.call(G.ai, task, input, schema); if (task === 'thing' && typeof input === 'string') p.then(function (info) { if (info && info.name) typed[String(info.name).toLowerCase()] = input.slice(0, 120); }, function () {}); if (task === 'event' && typeof input === 'string') p.then(function (ev) { if (ev && ev.thing && ev.thing.name) typed[String(ev.thing.name).toLowerCase()] = input.slice(0, 120); }, function () {}); return p; }; }
 
   // the drawing, cut into its parts: each becomes a picture of its own
   function build(fig, done) {
@@ -43,24 +43,34 @@
 
   /** the whole drawing of a thing by its name, once it has arrived (for menus and cards) */
   G.figurePic = function (name) { const f = ready[String(name || '').toLowerCase()]; return f ? f.svg : ''; };
-  /** the drawing of this thing, if it is a being and its drawing has arrived; asks for it the first time */
+  const none = {}, pending = {};      // names that have no shape of their own; drawings on their way
+  const can = function () { return !!(G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.provider === 'server'); };
+  /** The drawing of a thing by its name: a promise of the cut-up figure, or of null when it has no shape of its own or cannot be drawn.
+   *  Asked once per name; whoever asks again while it is on its way gets the same promise. info: { name, note, hue, wall } */
+  G.figureFor = function (info, typedText) {
+    const key = String((info && info.name) || '').toLowerCase();
+    if (!key) return Promise.resolve(null);
+    if (ready[key]) return Promise.resolve(ready[key]);
+    if (none[key] || !can()) return Promise.resolve(null);
+    if (pending[key]) return pending[key];
+    if (!G.ai.allow('figure')) return Promise.resolve(null);
+    if (typedText) typed[key] = String(typedText).slice(0, 120);
+    const p = pending[key] = G.host.call('ai.figure', { word: info.name, typed: typed[key] || info.name, note: info.note || '', hue: Math.round(info.hue || 200), kind: info.wall ? 'wall' : '' }, 260000).then(function (r) {
+      G.ai.tally('figure', r && r.source, r && r.usd);
+      if (!r || !r.figure || typeof r.figure.svg !== 'string' || !r.figure.svg || r.figure.svg.length > 46000) { delete pending[key]; if (r && r.source !== 'none') none[key] = 1; return null; }
+      return new Promise(function (res) { build(r.figure, function (f) { delete pending[key]; if (f) { ready[key] = f; G.emit('figure', key); } else none[key] = 1; res(f); }); });
+    }, function () { delete pending[key]; return null; });
+    return p;
+  };
+  /** the drawing of this thing in the pond, if it has one; asks for it if nobody has yet (a thing loaded from a save, or left by an event) */
   G.figureOf = function (z) {
     if (z._fig !== undefined) return z._fig;
-    if (z.p && z.p.vault > 0.2) return (z._fig = null);        // a wall is drawn as a wall
     const key = String(z.word || '').toLowerCase();
-    if (ready[key]) return (z._fig = ready[key]);
-    if (z._figAsked) return null;
-    if (!(G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.provider === 'server')) return null;
-    if (!G.ai.allow('figure')) return null;
-    z._figAsked = true;
-    G.host.call('ai.figure', { word: z.word, typed: typed[key] || z.word, note: z.note || '', hue: Math.round(z.hue) }, 260000).then(function (r) {
-      G.ai.tally('figure', r && r.source, r && r.usd);
-      if (!r || !r.figure || typeof r.figure.svg !== 'string' || r.figure.svg.length > 46000) { z._fig = null; return; }
-      build(r.figure, function (f) { z._fig = f; if (f) { ready[key] = f; z._figSvg = f.svg; G.emit('figure', z); } });
-    }, function () { z._figAsked = false; z._figFail = (z._figFail || 0) + 1; if (z._figFail > 1) z._fig = null; });
+    if (ready[key]) { z._figSvg = ready[key].svg; return (z._fig = ready[key]); }
+    if (none[key]) return (z._fig = null);
+    if (!z._figAsked && can()) { z._figAsked = true; G.figureFor({ name: z.word, note: z.note, hue: z.hue, wall: z.p && z.p.vault > 0.2 }).then(function (f) { if (f) { z._fig = f; z._figSvg = f.svg; } else if (none[key]) z._fig = null; else z._figAsked = false; }); }
     return null;
   };
-
   /** draw the being with its feet at the origin, one unit to a unit of its drawing (it is 240 tall). t: time; z: the thing */
   G.drawFigure = function (ctx, f, z, t) {
     const moves = z.p && z.p.moves > 0.15, walk = moves ? 1 : 0.3, strike = Math.max(0, Math.min(1, z.bite || 0));

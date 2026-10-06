@@ -237,16 +237,28 @@
       const w = inp.value.trim();
       if (!w) return;
       G.sfx('click');
-      $('thing').innerHTML = '<div class="thingcard">Thinking about <b>' + escapeHtml(w) + '</b>…</div>';
+      const open = function () { return UI.popName === 'add' && $('thing'); };
+      const dots = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-right:8px;animation:wishp 1s ease-in-out infinite"></span>';
+      const making = function (text) { let m = $('making'); if (!text) { if (m) m.classList.add('hide'); return; } if (!m) { m = el('div', 'glass', '', $('ui')); m.id = 'making'; m.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:124px;z-index:7;padding:8px 14px;border-radius:999px;font-size:12px;pointer-events:none;white-space:nowrap;max-width:calc(100vw - 28px);overflow:hidden;text-overflow:ellipsis'; } m.classList.remove('hide'); m.innerHTML = dots + text; };
+      if (open()) $('thing').innerHTML = '<div class="thingcard">' + dots + 'Imagining <b>' + escapeHtml(w) + '</b>…</div>';
+      making('Imagining <b>' + escapeHtml(w) + '</b>…');
       G.ai.ask('thing', w).then(function (info) {
-        if (UI.popName !== 'add') return;
         const by = info.source === 'ai' || info.source === 'cache' ? (G.ai.labelOf(info.model) || 'the server') : '';
-        $('thing').innerHTML = '<div class="thingcard">' + (info.svg ? '<img alt="" width="56" height="56" style="float:right;margin-left:8px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(info.svg) + '">' : '') + '<b>' + escapeHtml(info.name) + '</b><br>' + escapeHtml(info.note) + (by ? '<br><small>imagined by ' + escapeHtml(by) + '</small>' : '') + '</div>';
-        G.beginPlacing(info);
-        closePopSoon();
+        const card = function (state) { const pic = (G.figurePic && G.figurePic(info.name)) || info.svg; return '<div class="thingcard">' + (pic ? '<img alt="" width="64" height="72" style="float:right;margin-left:8px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pic) + '">' : '') + '<b>' + escapeHtml(info.name) + '</b><br>' + escapeHtml(info.note) + (by ? '<br><small>imagined by ' + escapeHtml(by) + '</small>' : '') + (state ? '<br><small style="color:var(--gold)">' + dots + state + '</small>' : '') + '</div>'; };
+        // its picture is drawn before it can be placed: what goes into the pond is the real thing, never a stand-in
+        if (open()) $('thing').innerHTML = card('Drawing it… this takes up to a minute the first time.');
+        making('Drawing <b>' + escapeHtml(info.name) + '</b>… you can close this window, it will be ready in a moment.');
+        const fin = function () {
+          making('');
+          if (open()) { $('thing').innerHTML = card(''); G.beginPlacing(info); closePopSoon(); }
+          else { G.beginPlacing(info); if (G.toast) G.toast('<b style="color:var(--gold)">' + escapeHtml(info.name) + ' is ready.</b><br>' + (G.touch ? 'Tap' : 'Click') + ' the pond to drop it.'); G.sfx('discovery'); }
+        };
+        const wall = info.props && info.props.vault > 0.2;
+        (G.figureFor ? G.figureFor({ name: info.name, note: info.note, hue: info.hue, wall: wall }, w) : Promise.resolve(null)).then(fin, fin);
       }, function (err) {
-        if (UI.popName !== 'add') return;
-        $('thing').innerHTML = '<div class="thingcard">' + (err && err.refused ? 'The pond cannot take that word. Try another.' : 'The pond could not make sense of that. Try again.') + '</div>';
+        making('');
+        const msg = err && err.refused ? 'The pond cannot take that word. Try another.' : 'The pond could not make sense of that. Try again.';
+        if (open()) $('thing').innerHTML = '<div class="thingcard">' + msg + '</div>'; else if (G.toast) G.toast(msg);
       });
     };
     $('wordGo').onclick = submit;

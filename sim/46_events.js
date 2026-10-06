@@ -41,10 +41,10 @@
       gift: raw.gift && typeof raw.gift === 'object' && GIFTS.indexOf(String(raw.gift.trait).toLowerCase()) >= 0 ? { trait: String(raw.gift.trait).toLowerCase(), share: n(raw.gift.share, 0.05, 1, 0.5) } : null,
       water: raw.water && typeof raw.water === 'object' ? { oxygen: n(raw.water.oxygen, -1, 1, 0), murk: n(raw.water.murk, -1, 1, 0), rich: n(raw.water.rich, -1, 1, 0), warm: n(raw.water.warm, -1, 1, 0) } : null,
       admire: GIFTS.indexOf(String(raw.admire || '').toLowerCase()) >= 0 ? String(raw.admire).toLowerCase() : '',
-      fx: ['snow', 'bubbles', 'embers', 'spores', 'rain', 'stars'].indexOf(raw.fx) >= 0 ? raw.fx : '',
+      fx: ['snow', 'bubbles', 'embers', 'spores', 'rain', 'stars', 'ash', 'petals', 'leaves', 'sparks', 'fog', 'meteors', 'lightning', 'hail', 'sand', 'feathers'].indexOf(raw.fx) >= 0 ? raw.fx : '',
     };
     ev.food = Math.max(0.3, ev.food);
-    if (ev.thing && ev.thing.props && ev.thing.props.vault > 0.2) { ev.kill.share = 0; ev.food = Math.max(1, ev.food); ev.temp = 0; ev.light = Math.max(0, ev.light); }
+    if (ev.thing && ev.thing.props && ev.thing.props.vault > 0.2) { ev.kill.share = 0; ev.food = Math.max(1, ev.food); ev.temp = clamp(ev.temp, -0.45, 0.45); ev.light = Math.max(-0.3, ev.light); }      // a wall of ice is cold, a wall of fire is hot: but mildly, since it already locks the food away
     // what fills the water while it lasts, if nobody said
     if (!ev.fx) ev.fx = ev.poison > 0.2 ? 'spores' : ev.temp < -0.3 ? 'snow' : ev.temp > 0.3 ? 'embers' : ev.light < -0.3 ? 'stars' : ev.current > 0.4 ? 'rain' : ev.mutate > 1.5 ? 'stars' : ev.food > 1.5 || ev.feed.count > 60 ? 'spores' : '';
     const does = ev.poison > 0.05 || ev.kill.share > 0.02 || Math.abs(ev.temp) > 0.05 || Math.abs(ev.light) > 0.05 || Math.abs(ev.food - 1) > 0.05 || ev.mutate > 1.05 || ev.current > 0.05 || ev.feed.count > 0 || ev.thing || ev.gift || ev.admire || (ev.water && Math.abs(ev.water.oxygen) + Math.abs(ev.water.murk) + Math.abs(ev.water.rich) + Math.abs(ev.water.warm) > 0.05);

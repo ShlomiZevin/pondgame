@@ -19,6 +19,7 @@
       '#wxnow{position:fixed;left:50%;transform:translateX(-50%);top:14px;z-index:2;display:flex;flex-wrap:wrap;justify-content:center;gap:6px;width:min(560px,calc(100vw - 28px));pointer-events:none}' +
       '#wxnow .wx{display:flex;align-items:center;gap:8px;padding:5px 12px 6px;border-radius:14px;background:rgba(9,28,40,.86);border:1px solid rgba(246,211,101,.45);font:600 11.5px system-ui,sans-serif;color:#cfe8ff;box-shadow:0 4px 18px rgba(0,0,0,.35)}' +
       '#wxnow .wx b{color:#fff;font-weight:700}#wxnow .wx i{font-style:normal;color:#f6d365}#wxnow .wx .bar{width:46px;height:5px;border-radius:3px;background:rgba(207,232,255,.18);overflow:hidden}#wxnow .wx .bar u{display:block;height:100%;background:#f6d365}' +
+      '@keyframes wishp{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1.15)}}' +
       '@media (min-width:721px){body.wxon #banner.show{transform:translate(-50%,150px) !important}}' +
       '@media (max-width:720px){#wxnow{top:auto;bottom:160px}}@media (max-height:560px){#wxnow{display:none}}';
     document.head.appendChild(st);
@@ -34,13 +35,14 @@
 
   // what is in force right now, added up
   function now() {
-    const W = G.W, o = { temp: 0, light: 0, poison: 0, food: 1, mutate: 1, list: [] };
+    const W = G.W, o = { temp: 0, light: 0, poison: 0, food: 1, mutate: 1, list: [], fx: {} };
     if (!W || !W.mods) return o;
     for (let i = 0; i < W.mods.length; i++) {
       const m = W.mods[i], left = m.until - W.t; if (!(left > 0)) continue;
+      if (m.fx) o.fx[m.fx] = 1;
       o.temp += m.temp || 0; o.light += m.light || 0; o.poison += m.poison || 0; o.food *= m.food || 1; o.mutate = Math.max(o.mutate, m.mutate || 1);
       const key = m.name + '|' + Math.round(m.until); if (!seen[key]) seen[key] = left;
-      o.list.push({ name: m.name, left: left, of: seen[key], does: words(m) });
+      o.list.push({ name: m.name, left: left, of: seen[key], does: [words(m), m.fx || ''].filter(Boolean).join(' · ') });
     }
     return o;
   }
@@ -62,6 +64,25 @@
   const COL = { cold: [170, 215, 255], heat: [255, 140, 60], poison: [110, 220, 70], dark: [20, 20, 45], death: [255, 80, 100], flood: [90, 170, 255], mutate: [200, 110, 255], feast: [120, 240, 150], famine: [150, 150, 150], wonder: [246, 211, 101] };
   const rgba = function (c, a) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; };
 
+  const FX = {
+    snow: [[255, 255, 255], 'top', 40, 110, 1.5, 4.5, 'dot', 60], hail: [[225, 240, 255], 'top', 420, 620, 2.5, 4.5, 'dot', 55], rain: [[170, 210, 255], 'top', 720, 980, 14, 26, 'streak', 110],
+    ash: [[165, 160, 155], 'top', 18, 55, 1.5, 3.5, 'dot', 45], petals: [[255, 165, 205], 'top', 30, 75, 3, 5.5, 'leaf', 26], leaves: [[235, 160, 60], 'top', 40, 95, 3.5, 6, 'leaf', 22], feathers: [[245, 245, 235], 'top', 20, 50, 4, 7, 'leaf', 16],
+    embers: [[255, 150, 60], 'bottom', 50, 140, 1.5, 3.5, 'dot', 45], bubbles: [[170, 225, 255], 'bottom', 30, 85, 3, 9, 'ring', 26], spores: [[150, 235, 120], 'any', 6, 22, 1.5, 3.5, 'dot', 30],
+    sparks: [[255, 230, 90], 'any', 60, 200, 1, 2.5, 'dot', 60], stars: [[255, 240, 180], 'any', 0, 4, 1, 3, 'twinkle', 26], sand: [[225, 195, 130], 'side', 300, 520, 1, 2.5, 'dot', 120],
+    fog: [[220, 230, 240], 'side', 12, 34, 70, 150, 'cloud', 2.2], meteors: [[255, 205, 130], 'top', 520, 760, 26, 46, 'streak', 5], lightning: [[240, 245, 255], 'any', 0, 0, 0, 0, 'bolt', 0.35],
+  };
+  function spawnFx(name, n) {
+    const d = FX[name]; if (!d) return;
+    for (let i = 0; i < n && parts.length < 240; i++) {
+      const sp = d[2] + Math.random() * (d[3] - d[2]), p = { k: 'fx', fx: name, c: d[0], draw: d[6], x: Math.random() * W_, y: Math.random() * H_, vx: 0, vy: 0, r: d[4] + Math.random() * (d[5] - d[4]), life: 1, a: Math.random() * TAU };
+      if (d[1] === 'top') { p.y = -20; p.vy = sp; p.vx = name === 'meteors' ? -sp * 0.6 : name === 'rain' || name === 'hail' ? -sp * 0.12 : 0; if (name === 'meteors') p.x = Math.random() * W_ * 1.4; }
+      else if (d[1] === 'bottom') { p.y = H_ + 12; p.vy = -sp; }
+      else if (d[1] === 'side') { p.x = -p.r - 10; p.vx = sp; p.vy = (Math.random() - 0.5) * sp * 0.12; }
+      else { const a = Math.random() * TAU; p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp; p.life = name === 'sparks' ? 0.5 : 1.6 + Math.random() * 1.5; }
+      if (d[6] === 'bolt') { p.life = 0.22; p.pts = [[p.x, 0]]; let x = p.x, y = 0; while (y < H_ * (0.5 + Math.random() * 0.4)) { x += (Math.random() - 0.5) * 90; y += 30 + Math.random() * 50; p.pts.push([x, y]); } }
+      parts.push(p);
+    }
+  }
   function spawn(kind, n, burst) {
     for (let i = 0; i < n && parts.length < 190; i++) {
       const p = { k: kind, x: Math.random() * W_, y: 0, vx: 0, vy: 0, r: 2, life: 1, a: Math.random() * TAU };
@@ -81,7 +102,7 @@
     if (!cv) return;
     const dt = Math.min(0.05, (ts - last) / 1000 || 0.016); last = ts;
     const on = G.mode === 'play' && G.W && !G.W.title;
-    const N = on ? now() : { temp: 0, light: 0, poison: 0, food: 1, mutate: 1, list: [] };
+    const N = on ? now() : { temp: 0, light: 0, poison: 0, food: 1, mutate: 1, list: [], fx: {} };
     const fl = on && G.W.flood && G.W.flood.t > 0 ? G.W.flood : null;
     const active = on && (N.list.length || fl || splash || parts.length);
     if (!active) { if (!cleared) { ctx.clearRect(0, 0, W_, H_); cleared = true; } return; }
@@ -102,10 +123,25 @@
     if (N.food > 1.05 && Math.random() < dt * 14) spawn('feast', 1);
     if (N.mutate > 1.05) { ctx.fillStyle = rgba(COL.mutate, 0.05 + 0.03 * Math.sin(t * 2.4)); ctx.fillRect(0, 0, W_, H_); if (Math.random() < dt * 22) spawn('mutate', 1); }
     if (fl && Math.random() < dt * 60) spawn('flood', 1);
+    for (const name in N.fx) { const d = FX[name]; if (d && Math.random() < dt * d[7]) spawnFx(name, 1); }
     // ── what drifts in it ──
     const fa = fl ? Math.atan2(fl.fy, fl.fx) : 0;
     for (let i = parts.length - 1; i >= 0; i--) {
       const p = parts[i];
+      if (p.k === 'fx') {
+        p.x += (p.vx + (p.draw === 'leaf' || p.fx === 'snow' || p.fx === 'ash' ? Math.sin(t * 1.6 + p.a) * 26 : 0)) * dt; p.y += p.vy * dt;
+        if (p.draw === 'twinkle' || p.draw === 'bolt' || p.fx === 'sparks' || p.fx === 'spores') p.life -= dt * (p.draw === 'bolt' ? 1 : 0.6);
+        const al = Math.max(0, Math.min(1, p.life));
+        if (p.draw === 'streak') { const m = Math.hypot(p.vx, p.vy) || 1; ctx.strokeStyle = rgba(p.c, p.fx === 'meteors' ? 0.9 : 0.5); ctx.lineWidth = p.fx === 'meteors' ? 3 : 1.6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx / m * p.r, p.y - p.vy / m * p.r); ctx.stroke(); if (p.fx === 'meteors') { ctx.fillStyle = 'rgba(255,255,240,.95)'; ctx.beginPath(); ctx.arc(p.x, p.y, 3.2, 0, TAU); ctx.fill(); } }
+        else if (p.draw === 'ring') { ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.strokeStyle = rgba(p.c, 0.7); ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = rgba(p.c, 0.12); ctx.fill(); }
+        else if (p.draw === 'leaf') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(Math.sin(t * 2 + p.a) * 1.1 + p.a); ctx.beginPath(); ctx.ellipse(0, 0, p.r, p.r * 0.45, 0, 0, TAU); ctx.fillStyle = rgba(p.c, 0.85); ctx.fill(); ctx.restore(); }
+        else if (p.draw === 'twinkle') { const tw = 0.5 + 0.5 * Math.sin(t * 5 + p.a * 3); ctx.fillStyle = rgba(p.c, al * tw); ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (0.6 + tw), 0, TAU); ctx.fill(); }
+        else if (p.draw === 'cloud') { const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r); g.addColorStop(0, rgba(p.c, 0.16)); g.addColorStop(1, rgba(p.c, 0)); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill(); }
+        else if (p.draw === 'bolt') { ctx.fillStyle = 'rgba(235,240,255,' + al * 0.5 + ')'; ctx.fillRect(0, 0, W_, H_); ctx.strokeStyle = 'rgba(255,255,255,' + Math.min(1, al * 4) + ')'; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.shadowColor = '#bcd4ff'; ctx.shadowBlur = 18; ctx.beginPath(); for (let q = 0; q < p.pts.length; q++) { if (q) ctx.lineTo(p.pts[q][0], p.pts[q][1]); else ctx.moveTo(p.pts[q][0], p.pts[q][1]); } ctx.stroke(); ctx.shadowBlur = 0; }
+        else { ctx.fillStyle = rgba(p.c, al * 0.9); ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill(); }
+        if (p.life <= 0 || p.y < -160 || p.y > H_ + 160 || p.x < -260 || p.x > W_ + 260) parts.splice(i, 1);
+        continue;
+      }
       if (p.k === 'flood') { p.x += Math.cos(fa) * 900 * dt; p.y += Math.sin(fa) * 900 * dt; p.life -= dt * 1.4; ctx.strokeStyle = 'rgba(200,230,255,' + Math.max(0, p.life) * 0.5 + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - Math.cos(fa) * p.r, p.y - Math.sin(fa) * p.r); ctx.stroke(); }
       else {
         p.x += (p.vx + Math.sin(t * 1.5 + p.a) * 14) * dt; p.y += p.vy * dt; if (p.k === 'mutate' || p.k === 'wonder' || p.k === 'death') p.life -= dt * 0.7;
@@ -151,7 +187,8 @@
     setup();
     const kind = kindOf(ev);
     splash = { name: String(ev.name || 'Something happened'), does: words(ev) || (ev.kill && ev.kill.share > 0.02 ? 'many are taken' : ev.gift ? 'bodies change at once' : ev.admire ? 'taste changes' : ev.thing ? 'something arrives' : ''), kind: kind, t0: performance.now() };
-    spawn(kind === 'famine' || kind === 'dark' ? 'wonder' : kind, 70, true);
+    if (ev.fx && FX[ev.fx]) { for (let i = 0; i < 60; i++) { spawnFx(ev.fx, 1); const p = parts[parts.length - 1]; if (p && p.draw !== 'bolt') { p.x = Math.random() * W_; p.y = Math.random() * H_; } } }
+    else spawn(kind === 'famine' || kind === 'dark' ? 'wonder' : kind, 70, true);
   });
   setup();
   requestAnimationFrame(frame);
