@@ -17,8 +17,10 @@
       cre: [], species: [], fossils: [],
       organs: (W.organs || []).map(function (o) { return { id: o.id, name: o.name, note: o.note, svg: o.svg && o.svg.length < 1500 ? o.svg : '', fx: o.fx, digest: o.digest, hue: Math.round(o.hue), by: o.by, gen: o.gen }; }),
       nextOrgan: W.nextOrgan || 1,
+      marvelX: (W.marvelX || []).map(function (m) { return { id: m.id, name: m.name, wonder: m.wonder, sp: m.sp, glyph: m.glyph, hue: Math.round(m.hue), fx: m.fx, words: m.words, by: m.by, gen: m.gen }; }),
+      nextMarvel: W.nextMarvel || 100, marvelRecent: (W.marvelRecent || []).slice(-4), mvState: W.mv ? { gen0: W.mv.gen0 | 0, n: W.mv.n | 0 } : null,
       designs: (W.designs || []).map(function (d) { return { id: d.id, name: d.name, adj: d.adj, note: d.note, place: d.place, motion: d.motion, colour: d.colour, pts: d.pts, smooth: d.smooth, ribs: d.ribs, dots: d.dots, fx: d.fx, by: d.by, gen: d.gen }; }), nextDesign: W.nextDesign || 1,
-      col: G.collection, colD: G.keptDesigns, colP: G.keptPlans, plans: W.plans || [], nextPlan: W.nextPlan || 1, museLog: W.museLog || [],
+      col: G.collection, colD: G.keptDesigns, colP: G.keptPlans, fields: G.packFields ? G.packFields() : [], plans: W.plans || [], nextPlan: W.nextPlan || 1, museLog: W.museLog || [],
       env: W.env, ages: (W.ages || []).slice(-24), hue0: Math.round(W.hue0 || 0), fashion: W.fashion, fashionGen: W.fashionGen | 0, taste: W.taste,
       story: (W.story || []).slice(-12), events: (W.events || []).slice(-12),
       history: (W.history || []).slice(-90), evShelf: (W.evShelf || []).slice(-10).map(function (e) { const c = JSON.parse(JSON.stringify(e)); if (c.thing) c.thing.svg = ''; return c; }),
@@ -107,12 +109,13 @@
     W.plans = [];
     if (Array.isArray(d.plans)) d.plans.slice(0, 8).forEach(function (q) { const o = G.cleanPlan(q); if (!o) return; o.id = Math.floor(num(q.id, 1, 1e6, 1)); o.gen = num(q.gen, 0, 1e6, 0); if (!W.plans.some(function (x) { return x.id === o.id; })) W.plans.push(o); });
     W.museLog = Array.isArray(d.museLog) ? d.museLog.slice(-10).map(function (m) { return { g: num(m && m.g, 0, 1e6, 0), name: String(m && m.name || '').replace(/[<>]/g, '').slice(0, 30), what: String(m && m.what || '').replace(/[<>]/g, '').slice(0, 90) }; }) : [];
+    if (G.unpackFields) G.unpackFields(d.fields);
     W.nextPlan = Math.max(Math.floor(num(d.nextPlan, 1, 1e6, 1)), W.plans.reduce(function (m, o) { return Math.max(m, o.id + 1); }, 1));
     // what the player has kept comes first of all: its kinds of part are needed to rebuild anything that carries them
     G.keptDesigns = [];
     if (Array.isArray(d.colD)) d.colD.slice(0, 24).forEach(function (q) { const o = G.cleanDesign(q); if (!o) return; o.id = Math.floor(num(q.id, 100000, 999999, 100000)); if (!G.keptDesigns.some(function (x) { return x.id === o.id; })) G.keptDesigns.push(o); });
     G.collection = [];
-    if (Array.isArray(d.col)) d.col.slice(-16).forEach(function (q) { if (!q || !Array.isArray(q.g) || !G.unpackGenome(q.g)) return; G.collection.push({ name: String(q.name || 'Creature').replace(/[<>]/g, '').slice(0, 44), kind: String(q.kind || '').replace(/[<>]/g, '').slice(0, 50), age: String(q.age || '').replace(/[<>]/g, '').slice(0, 70), gen: num(q.gen, 0, 1e6, 0), g: q.g }); });
+    if (Array.isArray(d.col)) d.col.slice(-16).forEach(function (q) { if (!q || !Array.isArray(q.g) || !G.unpackGenome(q.g)) return; G.collection.push({ name: String(q.name || 'Creature').replace(/[<>]/g, '').slice(0, 44), kind: String(q.kind || '').replace(/[<>]/g, '').slice(0, 50), age: String(q.age || '').replace(/[<>]/g, '').slice(0, 70), gen: num(q.gen, 0, 1e6, 0), g: q.g, mv: q.mv && typeof q.mv === 'object' ? q.mv : undefined }); });
     // the pond's own kinds of part first: every body is measured and drawn with them
     W.designs = [];
     if (Array.isArray(d.designs)) d.designs.slice(0, 8).forEach(function (q) { const o = G.cleanDesign(q); if (!o) return; o.id = Math.floor(num(q.id, 1, 1e6, 1)); o.gen = num(q.gen, 0, 1e6, 0); if (!W.designs.some(function (x) { return x.id === o.id; })) W.designs.push(o); });
@@ -149,6 +152,10 @@
       o.id = Math.floor(num(q.id, 1, 1e6, 1)); o.gen = Math.floor(num(q.gen, 0, 1e6, 0));
       if (!W.organs.some(function (x) { return x.id === o.id; })) W.organs.push(o);
     });
+    if (Array.isArray(d.marvelX) && G.cleanMarvel) { W.marvelX = []; d.marvelX.slice(0, 14).forEach(function (q) { const m = G.cleanMarvel(q); if (!m) return; m.id = Math.floor(num(q.id, 100, 1e6, 100)); m.gen = Math.floor(num(q.gen, 0, 1e6, 0)); if (!W.marvelX.some(function (x) { return x.id === m.id; })) W.marvelX.push(m); }); }
+    W.nextMarvel = Math.max(Math.floor(num(d.nextMarvel, 100, 1e6, 100)), (W.marvelX || []).reduce(function (m, o) { return Math.max(m, o.id + 1); }, 100));
+    if (Array.isArray(d.marvelRecent)) W.marvelRecent = d.marvelRecent.slice(-4).map(Number).filter(isFinite);
+    if (d.mvState && typeof d.mvState === 'object') W.mv = { gen0: Math.floor(num(d.mvState.gen0, 0, 1e7, 0)), rt0: G.rt || 0, n: Math.floor(num(d.mvState.n, 0, 1e5, 0)) };
     W.nextOrgan = Math.max(Math.floor(num(d.nextOrgan, 1, 1e6, 1)), W.organs.reduce(function (m, o) { return Math.max(m, o.id + 1); }, 1));
     if (Array.isArray(d.story)) W.story = d.story.filter(function (s) { return s && typeof s.text === 'string'; }).slice(-12).map(function (s) { return { title: String(s.title || '').slice(0, 44), text: s.text.slice(0, 340), by: String(s.by || '').slice(0, 60), gen: num(s.gen, 0, 1e6, 0) }; });
     if (Array.isArray(d.events)) W.events = d.events.filter(function (e) { return e && typeof e.name === 'string'; }).slice(-12).map(function (e) { return { g: num(e.g, 0, 1e6, 0), name: e.name.slice(0, 30), note: String(e.note || '').slice(0, 140) }; });

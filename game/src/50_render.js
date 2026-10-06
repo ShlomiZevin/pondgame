@@ -584,6 +584,7 @@ function drawCharacter(ctx, c, x, y, scale, t, opt) {
   else if (opt.live) G.form.portrait(ctx, f, t + id * 0.37, { lx: lx, ly: ly, sleep: still });
   else G.form.pDraw(ctx, f, { lx: lx, ly: ly, lid: lid, wide: scared }, still ? id * 0.37 : c._lp);
   ctx.restore();
+  if (ph.mv && G.drawMarvel) G.drawMarvel(ctx, c, x, y, r, t, alpha);      // a marvel: aura, sparks, its sign, and what it is doing
   // what it is going through, said with one small sign over its head
   if (G.speed <= 8 && alpha > 0.5 && !opt.noSigns) {
     const hy = y - hop - r * 254 / R.SIDE * 0.92, sign = scared ? '!' : c.pois > 0.3 ? 'x_x' : c.chill > 0.05 ? '*brr*' : c.hot > 0.05 ? '~phew~' : c.gasp > 0.7 && id % 4 === 0 ? 'o O' : still ? 'z z' : '';
@@ -915,6 +916,7 @@ G.addSystem({
     drawHazardWashes();
     drawFood();
     drawAddedThings();
+    if (G.drawFields) G.drawFields(G.ctx);
     drawCreatures();
     drawThingCaptions();
     drawEffects();
