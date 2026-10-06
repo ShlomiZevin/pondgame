@@ -45,11 +45,14 @@
     }, function () { asking = false; });
     return true;
   };
-  // once a generation: perhaps somebody takes something into their head
-  { let rt0 = -1, idle = 0; setInterval(function () { const W = G.W, rt = G.rt || 0; if (!W || W.title || G.mode !== 'play' || rt === rt0) { rt0 = rt; return; } const d = Math.min(20, Math.max(0, rt - rt0)); rt0 = rt;      // only time really played counts
-    if (W.deed || asking) { idle = 0; return; } idle += d;
-    if (idle < 150 || W.gen < 5 || W.cre.length < 14) return;
-    if (G.rand() < 0.5 && G.deedAsk()) idle = 0; }, 10000); }
+  // once a generation: perhaps somebody takes something into their head. By generations, not by the clock: never within 25 of the last plan, then a chance that grows
+  // each generation (a plan about every 30 on average); and only while it can be watched (not when time runs at full speed).
+  G.on('scored', function () {
+    const W = G.W; if (!W || W.title || G.mode !== 'play' || W.deed || asking || G.speed > 16 || W.gen < 5 || W.cre.length < 14) return;
+    const since = W.gen - (W.lastDeedGen === undefined ? 0 : W.lastDeedGen);
+    if (since < 25 || G.rand() >= Math.min(0.9, 0.1 + 0.015 * (since - 25))) return;
+    if (G.deedAsk()) W.lastDeedGen = W.gen;
+  });
 
   function begin(raw) {
     const W = G.W, sp = spByName(raw.kind) || W.species.filter(function (s) { return !s.extinct && s.n > 0; }).sort(function (a, b) { return b.n - a.n; })[0];

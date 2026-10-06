@@ -74,17 +74,15 @@
   // Two things make one likelier, and both grow the longer there has been none: the generations that have passed (a fast pond lives many in a minute) and the
   // real minutes of play (a slow pond lives few). Chance for this generation = 1 - exp(-(hazard per generation + hazard per minute x minutes since the last check)).
   // About one every 3 minutes at 64x, and every 15 minutes at 1x, and never none for long.
-  G.marvelChance = function (since, mins, dtMin) { return 1 - Math.exp(-(0.0004 + 0.00003 * since + (0.004 + 0.006 * mins) * (dtMin || 0))); };
+  G.marvelChance = function (since) { return 1 - Math.exp(-(0.002 + 0.00012 * since)); };      // by generations: never within 40 of the last, about one in 90 on average, and never long without
   let busy = false;
   G.marvelTick = function (gen) {
     const W = G.W; if (!W || W.title) return;
-    const M = W.mv = W.mv || { gen0: 0, rt0: G.rt || 0, n: 0 };
-    const dtMin = M.rtLast === undefined ? 0 : Math.max(0, Math.min(2, ((G.rt || 0) - M.rtLast) / 60)); M.rtLast = G.rt || 0;      // minutes of play since the last check (a pause or a closed tab does not count)
+    const M = W.mv = W.mv || { gen0: 0, n: 0 };      // minutes of play since the last check (a pause or a closed tab does not count)
     // how common each marvel is now: a marvel that has taken over the pond fades (see mutation), so it stays something special
     { const sh = W.mvShare = {}, cn = W.mvCount = {}, n = Math.max(1, W.cre.length); W.mvPend = {}; for (let i = 0; i < W.cre.length; i++) { const k = W.cre[i].g.mv; if (k) { sh[k] = (sh[k] || 0) + 1 / n; cn[k] = (cn[k] || 0) + 1; } } }
-    const mins = ((G.rt || 0) - M.rt0) / 60;
-    if (gen < 6 || W.cre.length < 16 || busy || mins < (M.n ? 3 : 2.2)) return;
-    const p = 1 - Math.exp(-(0.15 + dtMin * 1.4));
+    if (gen < 20 || W.cre.length < 16 || busy || gen - M.gen0 < 40) return;
+    const p = G.marvelChance(gen - M.gen0);
     if (G.rand() >= p && !(G.marvelForce)) return;
     G.grantMarvel();
   };
@@ -99,11 +97,11 @@
   }
   G.grantMarvel = function (forceId) {
     const W = G.W; let c = chooseCreature(); if (!c) return;
-    const M = W.mv = W.mv || { gen0: 0, rt0: G.rt || 0, n: 0 };
-    M.gen0 = W.gen; M.rt0 = G.rt || 0;           // the clock starts again whatever comes of the asking
+    const M = W.mv = W.mv || { gen0: 0, n: 0 };
+    M.gen0 = W.gen;           // the count starts again whatever comes of the asking
     const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
     // with an AI to ask, a marvel is always invented: if it cannot be just now, none comes yet (it is tried again soon), never a stock one
-    const give = function (def) { if (c.dead || c.g.mv) c = chooseCreature(); if (!c) return; if (!def) { if (live) { M.rt0 = (G.rt || 0) - 150; return; } def = BUILT[Math.floor(G.rand() * BUILT.length)]; } finish(c, def); };
+    const give = function (def) { if (c.dead || c.g.mv) c = chooseCreature(); if (!c) return; if (!def) { if (live) { M.gen0 = W.gen - 25; return; } def = BUILT[Math.floor(G.rand() * BUILT.length)]; } finish(c, def); };
     if (forceId) { give(G.marvelOf(forceId)); return; }
     // about half the time, when there is an AI, it invents this pond's marvel; otherwise one of the built-in ones, not one seen lately
     if (live && G.ai.allow('marvel')) {
@@ -115,7 +113,7 @@
       }, function () { busy = false; if (G.W === W) give(null); });
       return;
     }
-    if (live) { M.rt0 = (G.rt || 0) - 150; return; }
+    if (live) { M.gen0 = W.gen - 25; return; }
     const recent = W.marvelRecent = W.marvelRecent || []; let def = null;
     for (let t = 0; t < 8 && !def; t++) { const d = BUILT[Math.floor(G.rand() * BUILT.length)]; if (recent.indexOf(d.id) < 0) def = d; }
     give(def || BUILT[0]);

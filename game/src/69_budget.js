@@ -5,13 +5,14 @@
 //   a marvel: about 1.2 cents                                                                 at least 2 min apart
 //   the pond's own event: about 1.7 cents                                                     at least 5 min apart
 //   the wish, looked at: about 0.35 cents                                                     once a minute
-// All of them keep real time, so an hour costs the same at any speed: about a dollar and a quarter if everything fires as often as it may.
+// Plans and marvels are spaced by GENERATIONS (what happens in a pond is measured in generations), so these gaps only stop two being asked for at once;
+// the rest keep real time.
 (function () {
   'use strict';
   if (!G.ai) return;
   const g = G.ai.gaps, c = G.ai.caps;
-  g.deed = 90000; c.deed = 40;
-  g.marvel = 120000;
+  g.deed = 8000; c.deed = 40;      // plans and marvels are spaced by GENERATIONS (see 54_deeds.js and 46b_marvels.js); this only stops two being asked for at once
+  g.marvel = 8000;
   g.nature = 300000;
   g.wishcheck = 60000;
 })();

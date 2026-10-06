@@ -3,12 +3,10 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 global.window = globalThis; globalThis.addEventListener = () => {};
 const src = path.join(__dirname, '..', 'src');
 for (const f of ['10_core.js', '20_genome.js', '21_form.js', '21b_body.js', '21c_taste.js', '30_world.js', '40_words.js', '41_look.js', '43_why.js', '44_pressure.js', '45_organs.js', '45_parts.js', '45_plans.js', '46_events.js', '46b_marvels.js', '47_story.js', '48_judge.js', '49_eras.js']) vm.runInThisContext(fs.readFileSync(path.join(src, f), 'utf8'), { filename: f });
-// 1. how long until one: simulate the chance for a pond at 64x (about one generation a second) and at 1x (about one a minute)
-function wait(gensPerMin) { const out = []; for (let t = 0; t < 4000; t++) { let g = 40; for (;;) { g++; const mins = g / gensPerMin; if (Math.random() < G.marvelChance(g - 40, (g - 40) / gensPerMin, 1 / gensPerMin)) break; if (g > 5000) break; } out.push(g); } out.sort((a, b) => a - b); return { median: out[2000], p10: out[400], p90: out[3600] }; }
-const fast = wait(60), slow = wait(1);
-fast.median -= 40; slow.median -= 40; fast.p10 -= 40; fast.p90 -= 40; slow.p10 -= 40; slow.p90 -= 40;
-console.log('64x (about 60 generations a minute): median ' + fast.median + ' generations (' + (fast.median / 60).toFixed(1) + ' min), 10% by ' + (fast.p10 / 60).toFixed(1) + ' min, 90% by ' + (fast.p90 / 60).toFixed(1) + ' min');
-console.log(' 1x (about 1 generation a minute): median ' + slow.median + ' generations (' + slow.median + ' min), 10% by ' + slow.p10 + ' min, 90% by ' + slow.p90 + ' min');
+// 1. how many generations until one (by generations only: never within 40 of the last)
+function wait() { const out = []; for (let t = 0; t < 4000; t++) { let since = 40; for (;;) { since++; if (Math.random() < G.marvelChance(since)) break; if (since > 5000) break; } out.push(since); } out.sort((x, y) => x - y); return { median: out[2000], p10: out[400], p90: out[3600] }; }
+const w = wait();
+console.log('a marvel: median ' + w.median + ' generations after the last, 10% by ' + w.p10 + ', 90% by ' + w.p90 + ' (at 64x about 60 generations a minute, at 1x about one a minute)');
 // 2. every built-in marvel, granted to a creature in a living pond, for 60 generations
 let bad = 0;
 for (const mv of G.MARVELS) {
