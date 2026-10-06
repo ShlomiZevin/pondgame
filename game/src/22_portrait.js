@@ -62,8 +62,8 @@
       const BD = G.body, bd = f.bd, PI = Math.PI, LS = BD.lay(f, null), L0 = BD.lay(f, B), I = L0.I, gnd = BD.ground(LS);
       const xs = Math.pow(plump, 0.4);
       const legOn = {}, armOn = {};
-      for (let i = 0; i < legs.length; i++) for (let a = legs[i].a; a <= legs[i].b && a < f.n; a += legs[i].e) { if (gnd[a]) { if (!legOn[a]) legOn[a] = legs[i]; } else if (!armOn[a]) armOn[a] = legs[i]; }
-      let stands = false, legL = 0; for (const a in legOn) { stands = true; legL = Math.max(legL, 16 + 18 * Math.min(1.6, legOn[a].l)); }
+      for (let i = 0; i < legs.length; i++) for (let a = legs[i].a; a <= legs[i].b && a < f.n; a += legs[i].e) { if (gnd[a] && !legOn[a]) legOn[a] = legs[i]; else if (!armOn[a]) armOn[a] = legs[i]; }
+      let stands = false, legL = 0; for (const a in legOn) { stands = true; legL = Math.max(legL, 10 + 11 * Math.min(1.6, legOn[a].l)); }
       const hover = stands ? 0 : 30;
       const bw = Math.max(0.6, (LS.x1 - LS.x0) * xs), bh = Math.max(0.6, LS.y1 - LS.y0);
       const Sc = Math.min(50, 222 / bw, (208 - legL - hover) / bh);
@@ -122,7 +122,7 @@
           ctx.save(); ctx.translate(cx, top[1] + (q.k === 7 ? 9 : 5) * k); ctx.scale(k, k); if (q.k === 7) hornsAt(0, 0, px(o) * xs * 0.42 / k, q); else feelersAt(0, 0, px(o) * xs * 0.3 / k, q, bd.v ? 1 : 0); ctx.restore();
         } } }
       { const Rf = px(fm), hr = Math.min(clamp(Rf * 0.78 * Math.pow(f.hd, 0.5), 13, 54), Rf * 0.96) * Math.min(1, xs + 0.1);
-        face(X(fm.x) + (bd.v ? Rf * xs * 0.18 : 0), Y(fm.y) + Rf * (f.shell > 0.25 && fm === I[0] ? 0.2 : 0.03), hr, bd.v, false); }
+        face(X(fm.x) + (bd.v ? Rf * xs * 0.18 : 0), Y(fm.y) + Rf * (f.shell > 0.25 && fm === I[0] ? 0.26 : 0.13), hr, bd.v, false); }
       return;
 
       function finOn(o, q, k, sds, ri) {
@@ -206,7 +206,7 @@
       // the nucleus; with an eye gene it is an eyespot that looks about
       const nx = Rm * 0.12, ny = cy + Rm * 0.02, nr = Rm * (0.3 + 0.12 * f.es);
       if (f.en > 0) eyeAt(nx, ny, nr, true);
-      else { ctx.beginPath(); ctx.arc(nx, ny, nr, 0, TAU); ctx.fillStyle = hsl(f.hue + f.hue2, 55, 30, 0.85); ctx.fill(); ctx.strokeStyle = hsl(f.hue + f.hue2, 70, 70, 0.8); ctx.lineWidth = 2; ctx.stroke(); ctx.beginPath(); ctx.arc(nx - nr * 0.3, ny - nr * 0.3, nr * 0.25, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fill(); }
+      else { const wb = Math.sin(B(1.3)) * 0.08; ctx.beginPath(); ctx.ellipse(nx - Rm * 0.2, ny + Rm * 0.12, nr * 0.95, nr * (0.68 + wb), 0.5, 0, TAU); ctx.fillStyle = hsl(f.hue + f.hue2, 45, 72, 0.4); ctx.fill(); for (let i = 0; i < 5; i++) { const a = i * 1.26 + 0.4; ctx.beginPath(); ctx.arc(nx - Rm * 0.2 + Math.cos(a) * nr * 0.4, ny + Rm * 0.12 + Math.sin(a) * nr * 0.28, 1.8, 0, TAU); ctx.fillStyle = hsl(f.hue + f.hue2, 50, 50, 0.45); ctx.fill(); } }
       lights([[-Rm * 0.5, cy + Rm * 0.3], [Rm * 0.45, cy - Rm * 0.35]]);
       return;
     }
@@ -423,18 +423,18 @@
     }
     // fill the current path with lit skin, then its markings inside it, then the outline (again() re-traces the path)
     function skin(x, y, w, h, again, spine) {
-      const g = ctx.createLinearGradient(0, y, 0, y + h);
-      g.addColorStop(0, col.light); g.addColorStop(0.45, col.body); g.addColorStop(1, col.dark);
+      const g = ctx.createRadialGradient(x + w * 0.36, y + h * 0.28, 2, x + w * 0.5, y + h * 0.5, Math.max(w, h) * 0.78);
+      g.addColorStop(0, col.light); g.addColorStop(0.5, col.body); g.addColorStop(1, col.dark);
       ctx.fillStyle = g; ctx.fill();
       ctx.save(); ctx.clip();
       ctx.fillStyle = col.mark; ctx.strokeStyle = col.mark;
       const step = 12 + f.psc * 16, along = spine && !upright;      // markings follow the body: across an upright one, along one that lies flat
       if (f.pat === 1) { ctx.globalAlpha = 0.8; if (along) for (let a = 0.5; a < f.n * 2 + 2; a++) { const p = station(hs + (1 - hs) * a / (f.n * 2 + 2)); ctx.beginPath(); ctx.moveTo(p.x + p.nx * p.w * 1.1 * backSign - 4, p.y + p.ny * p.w * 1.1 * backSign); ctx.quadraticCurveTo(p.x - 9, p.y, p.x - p.nx * p.w * 0.2 * backSign - 3, p.y - p.ny * p.w * 0.2 * backSign); ctx.lineTo(p.x - p.nx * p.w * 0.2 * backSign + 4, p.y - p.ny * p.w * 0.2 * backSign); ctx.quadraticCurveTo(p.x, p.y, p.x + p.nx * p.w * 1.1 * backSign + 4, p.y + p.ny * p.w * 1.1 * backSign); ctx.closePath(); ctx.fill(); } else for (let yy = y + (spine ? Hr * 2.1 : step * 0.5); yy < y + h; yy += step) { ctx.beginPath(); ctx.moveTo(x - 4, yy); ctx.quadraticCurveTo(x + w / 2, yy + 9, x + w + 4, yy); ctx.lineTo(x + w + 4, yy + step * 0.42); ctx.quadraticCurveTo(x + w / 2, yy + 9 + step * 0.42, x - 4, yy + step * 0.42); ctx.closePath(); ctx.fill(); } }
-      else if (f.pat === 2) { ctx.globalAlpha = 0.8; for (let i = 0; i < 18; i++) { ctx.beginPath(); ctx.arc(x + rr() * w, y + rr() * h * (along ? 0.6 : 1), 3 + f.psc * 7 * (0.5 + rr()), 0, TAU); ctx.fill(); } }
+      else if (f.pat === 2) { ctx.globalAlpha = 0.8; for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.arc(x + rr() * w, y + rr() * h * (along ? 0.6 : 1), 3 + f.psc * 7 * (0.5 + rr()), 0, TAU); ctx.fill(); } }
       else if (f.pat === 4) { ctx.globalAlpha = 0.75; ctx.lineWidth = 3.4 + f.psc * 3; for (let i = 0; i < 3; i++) { const p = spine ? station(hs + (1 - hs) * (0.22 + i * 0.24)) : { x: x + w * (0.3 + i * 0.2), y: y + h * 0.5, w: h * 0.4 }; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(6, p.w * 0.5), 0, TAU); ctx.stroke(); ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2, p.w * 0.18), 0, TAU); ctx.fill(); } }      // eye-spots
       else if (f.pat === 5) { ctx.globalAlpha = 0.85; const p = spine ? station(hs + (1 - hs) * 0.45) : { x: x + w / 2, y: y + h / 2, w: h * 0.4, nx: 0, ny: -1 }; ctx.beginPath(); if (along) ctx.ellipse(p.x + p.nx * p.w * 0.7 * backSign, p.y + p.ny * p.w * 0.7 * backSign, L * (0.16 + f.psc * 0.12), p.w * 0.85, 0, 0, TAU); else ctx.ellipse(p.x, spine ? p.y : y + h * 0.15, spine ? p.w * 1.6 : w * 0.6, spine ? Lb * (0.14 + f.psc * 0.12) : h * 0.3, 0, 0, TAU); ctx.fill(); }
       if (f.pat === 3 || f.coat === 1) { ctx.globalAlpha = 0.5; ctx.fillStyle = '#fff'; ctx.beginPath(); if (along) { const p = station(hs + (1 - hs) * 0.45); ctx.ellipse(p.x, p.y - p.ny * p.w * 0.7 * backSign, Lb * 0.4, p.w * 0.55, 0, 0, TAU); } else ctx.ellipse(x + w / 2, y + h * (spine ? 0.68 : 0.7), w * 0.3, h * (spine ? 0.24 : 0.25), 0, 0, TAU); ctx.fill(); }      // a pale belly
-      if (f.coat === 1) { ctx.globalAlpha = 0.34; ctx.strokeStyle = INK; ctx.lineWidth = 1.5; let row = 0; for (let yy = y + 4; yy < y + h; yy += 9, row++) for (let xx = x + (row % 2) * 7; xx < x + w; xx += 14) { if (spine && Math.hypot(xx - H.x, yy - H.y) < Hr * 1.05) continue; ctx.beginPath(); ctx.arc(xx, yy, 7, 0.2, 2.94); ctx.stroke(); } }
+      if (f.coat === 1) { ctx.globalAlpha = 0.18; ctx.strokeStyle = INK; ctx.lineWidth = 1.5; let row = 0; for (let yy = y + 4; yy < y + h; yy += 9, row++) for (let xx = x + (row % 2) * 7; xx < x + w; xx += 14) { if (spine && Math.hypot(xx - H.x, yy - H.y) < Hr * 1.05) continue; ctx.beginPath(); ctx.arc(xx, yy, 7, 0.2, 2.94); ctx.stroke(); } }
       if (spine) for (let i = 0; i < plates.length; i++) { const q = plates[i]; ctx.globalAlpha = 0.9; ctx.fillStyle = col.limb; for (let a = q.a; a <= q.b && a < f.n; a += q.e) { const p = station(segU(a)); ctx.beginPath(); ctx.ellipse(p.x, p.y, along ? (1 - hs) * L / f.n * 0.42 : p.w * 1.05, along ? p.w * 1.05 : (1 - hs) * L / f.n * 0.42, 0, 0, TAU); ctx.fill(); ctx.globalAlpha = 0.45; ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke(); ctx.globalAlpha = 0.9; } }
       if (spine && f.n > 2) { ctx.globalAlpha = 0.12; ctx.strokeStyle = INK; ctx.lineWidth = 2; for (let a = 1; a < Math.min(f.n, 9); a++) { const p = station(hs + (1 - hs) * a / Math.min(f.n, 9)); ctx.beginPath(); ctx.moveTo(p.x + p.nx * p.w, p.y + p.ny * p.w); ctx.quadraticCurveTo(p.x + p.dx * 6, p.y + p.dy * 6, p.x - p.nx * p.w, p.y - p.ny * p.w); ctx.stroke(); } }
       // light falls from above: a sheen along the top, the wet shine of something that lives in water
@@ -461,8 +461,7 @@
       if (o.collect) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4); o.collect.push([ex, ey, r]); return; }
       if (lid) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(col.dark, 2.4); ctx.beginPath(); ctx.moveTo(ex - r * 0.7, ey); ctx.quadraticCurveTo(ex, ey + r * 0.6, ex + r * 0.7, ey); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); return; }
       ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4);
-      ctx.beginPath(); ctx.arc(ex + lx * r * 0.28, ey + ly * r * 0.28, r * 0.62, 0, TAU); ctx.fillStyle = INK; ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex + lx * r * 0.28 - r * 0.22, ey + ly * r * 0.28 - r * 0.26, r * 0.26, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(ex + lx * r * 0.28 + r * 0.22, ey + ly * r * 0.28 + r * 0.2, r * 0.11, 0, TAU); ctx.fill();
+      F._pupil(ctx, ex, ey, r, lx, ly, hsl(f.hue + f.hue2, 68, 44, 1), INK, 0.46);
     }
     // the face. side 0: it looks straight at you. side 1: its head points to the right; you see the eye on this side
     function face(x, y, hr, side, isStar) {
@@ -482,8 +481,16 @@
     }
   };
 
+  /** the living part of an eye: iris, pupil, two lights, and the soft shade of the upper lid */
+  F._pupil = function (ctx, ex, ey, r, lx, ly, iris, ink, pup) {
+    const px = ex + lx * r * 0.2, py = ey + ly * r * 0.2 + r * 0.04;
+    ctx.beginPath(); ctx.arc(px, py, r * 0.74, 0, TAU); ctx.fillStyle = iris; ctx.fill();
+    ctx.beginPath(); ctx.arc(px, py, r * pup, 0, TAU); ctx.fillStyle = ink; ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px - r * 0.26, py - r * 0.3, r * 0.24, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(px + r * 0.24, py + r * 0.26, r * 0.1, 0, TAU); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(ex, ey, r * 0.98, 0, TAU); ctx.clip(); ctx.fillStyle = 'rgba(7,18,31,0.16)'; ctx.beginPath(); ctx.ellipse(ex, ey - r * 0.95, r * 1.25, r * 0.62, 0, 0, TAU); ctx.fill(); ctx.restore();
+  };
   // ── the character, kept as a short loop of moving frames: so a whole pond of them moves, every part, and stays cheap ──
-  const PW = 170, PT = 190, PB = 160, PPX = 0.46, K = 6;        // the box a character is drawn in, pixels per unit, and frames in its loop
+  const PW = 170, PT = 190, PB = 160, PPX = 0.46, K = 8;        // the box a character is drawn in, pixels per unit, and frames in its loop
   const kept = {}; let keptN = 0, madeAt = -1, made = 0;
   function frame(f, i) {
     const cv = document.createElement('canvas'); cv.width = Math.ceil(PW * 2 * PPX); cv.height = Math.ceil((PT + PB) * PPX);
@@ -498,26 +505,26 @@
     if (s) { s.used = G.rt || 0; return s; }
     if (keptN > 150) { const now = G.rt || 0; for (const k in kept) if (now - kept[k].used > 3) { delete kept[k]; keptN--; } if (keptN > 230) { for (const k in kept) delete kept[k]; keptN = 0; } }
     s = kept[key] = { fr: [frame(f, 0)], ink: '', dark: '', build: F.build(f), used: G.rt || 0 }; keptN++;
-    s.ink = F._ink(); s.dark = F._colours(f).dark;
+    s.ink = F._ink(); s.dark = F._colours(f).dark; s.iris = 'hsl(' + Math.round((((f.hue + f.hue2) % 360) + 360) % 360) + ',68%,44%)';
     return s;
   };
   /** the kept character at the origin at this point of its loop (phase 0..1), then its eyes, alive. mood: { lx, ly, lid 0..1, wide } */
   F.pDraw = function (ctx, f, mood, phase) {
     const s = F.pSprite(f);
-    let i = Math.floor((((phase || 0) % 1) + 1) % 1 * K) % K;
+    const pos = (((phase || 0) % 1) + 1) % 1 * K; let i = Math.floor(pos) % K; const mix = pos - Math.floor(pos);
     if (!s.fr[i]) {
       // a few new frames a tick at most, so a pond full of newborns never stalls; until its frame exists, the nearest one is shown
       if (madeAt !== G.rt) { madeAt = G.rt; made = 0; }
       if (made < 3) { made++; s.fr[i] = frame(f, i); } else { let j = i; while (j > 0 && !s.fr[j]) j--; i = j; }
     }
-    const fr = s.fr[i];
+    const fr = s.fr[i], nx = s.fr[(i + 1) % K];
     ctx.drawImage(fr.cv, -PW, -PT, PW * 2, PT + PB);
+    if (nx && mix > 0.08) { const ga = ctx.globalAlpha; ctx.globalAlpha = ga * mix; ctx.drawImage(nx.cv, -PW, -PT, PW * 2, PT + PB); ctx.globalAlpha = ga; }
     const lx = mood.lx || 0, ly = mood.ly || 0, pup = mood.wide ? 0.42 : 0.62;
     for (let q = 0; q < fr.eyes.length; q++) {
       const e = fr.eyes[q], r = e[2];
       if (mood.lid >= 1) { ctx.beginPath(); ctx.arc(e[0], e[1], r, 0, TAU); ctx.fillStyle = s.dark; ctx.fill(); ctx.strokeStyle = s.ink; ctx.lineWidth = 2.4; ctx.stroke(); ctx.beginPath(); ctx.moveTo(e[0] - r * 0.7, e[1]); ctx.quadraticCurveTo(e[0], e[1] + r * 0.6, e[0] + r * 0.7, e[1]); ctx.stroke(); continue; }
-      ctx.beginPath(); ctx.arc(e[0] + lx * r * 0.28, e[1] + ly * r * 0.28, r * pup, 0, TAU); ctx.fillStyle = s.ink; ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(e[0] + lx * r * 0.28 - r * 0.22, e[1] + ly * r * 0.28 - r * 0.26, r * 0.24, 0, TAU); ctx.fill();
+      F._pupil(ctx, e[0], e[1], r, lx, ly, s.iris, s.ink, mood.wide ? 0.3 : 0.46);
       if (mood.lid > 0) { ctx.save(); ctx.beginPath(); ctx.arc(e[0], e[1], r * 1.02, 0, TAU); ctx.clip(); ctx.fillStyle = s.dark; ctx.fillRect(e[0] - r * 1.1, e[1] - r * 1.1, r * 2.2, r * 2.2 * mood.lid * 0.75); ctx.restore(); }      // heavy lids: tired, or sick
     }
     return s;

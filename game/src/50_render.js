@@ -548,8 +548,12 @@ function drawCharacter(ctx, c, x, y, scale, t, opt) {
   c.fc = c.fc === undefined ? (vx >= 0 ? 1 : -1) : c.fc + ((vx > 0.2 ? 1 : vx < -0.2 ? -1 : c.fc > 0 ? 1 : -1) - c.fc) * 0.18;      // turning round takes a moment
   const spc = c.sp ? spOf(G.W, c.sp) : null, paint = G.ai.drawn ? null : (G.paintOf ? G.paintOf(c, spc) : null);
   const walks = G.form.walks(c.g.f._b || (c.g.f._b = G.form.build(c.g.f)), c.g.f);
-  const still = c.asleep, hopT = t * (4.5 + 5 * sp) + id, hop = still ? 0 : walks ? Math.abs(Math.sin(hopT)) * r * (0.06 + 0.3 * sp) : (0.5 + 0.5 * Math.sin(t * 1.7 + id)) * r * 0.5;
-  const land = still ? 1 : walks ? 1 - Math.abs(Math.sin(hopT)) : 0;          // 1 at the moment a walker touches down: it squashes there
+  const still = c.asleep, dtv = c._vt === undefined ? 0 : Math.max(0, Math.min(0.1, t - c._vt)); c._vt = t;
+  c._sp = c._sp === undefined ? sp : c._sp + (sp - c._sp) * Math.min(1, dtv * 3);
+  const sp2 = c._sp;
+  c._hop = (c._hop === undefined ? id : c._hop) + dtv * (2.6 + 3 * sp2); c._lp = (c._lp === undefined ? id * 0.37 : c._lp) + dtv * (0.4 + 0.45 * sp2);
+  const hopT = c._hop, step = 0.5 - 0.5 * Math.cos(hopT * 2), hop = still ? 0 : walks ? step * Math.min(r * (0.05 + 0.2 * sp2), 9 + 6 * sp2) : (0.5 + 0.5 * Math.sin(t * 1.7 + id)) * Math.min(r * 0.5, 14);
+  const land = still ? 1 : walks ? 1 - step : 0;          // 1 at the moment a walker touches down: it squashes there
   const shiver = c.chill > 0.05 ? Math.sin(t * 38 + id) * r * 0.035 : 0;
   const s = r / R.SIDE * (0.3 + 0.7 * pop) * (weak ? 0.92 : 1);
   ctx.save(); ctx.translate(x + shiver, y); ctx.globalAlpha = alpha * (weak ? 0.8 : 1);
@@ -557,9 +561,9 @@ function drawCharacter(ctx, c, x, y, scale, t, opt) {
   ctx.fillStyle = 'rgba(4,12,20,0.3)'; ctx.beginPath(); ctx.ellipse(0, r * 0.1, r * (0.85 - 0.25 * hop / (r * 0.4 + 1)), r * 0.24, 0, 0, 6.2832); ctx.fill();
   if (ph.lamp > 0.3 || c.eatFlash > 0.2) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= (0.25 * Math.min(1, ph.lamp) * (0.5 + 0.5 * (c.glow || 0)) + 0.25 * Math.max(0, c.eatFlash || 0)) * (opt.crowd || 1); const hs = r * 3; ctx.drawImage(haloSprite(ph.hue), -hs, -hs - r * 1.2, hs * 2, hs * 2); ctx.restore(); }
   ctx.translate(0, -hop);
-  const sq = still ? 0.06 : 0.1 * Math.pow(land, 3) * (0.4 + sp), turn = Math.max(0.5, Math.abs(c.fc)) * (c.fc >= 0 ? 1 : -1);
+  const sq = still ? 0.06 : 0.06 * Math.pow(land, 3) * (0.4 + sp2), turn = Math.max(0.5, Math.abs(c.fc)) * (c.fc >= 0 ? 1 : -1);
   ctx.scale(turn * (1 + sq), 1 - sq);
-  ctx.rotate(still ? (walks ? 0.9 : 0.25) : walks ? 0.04 + 0.16 * sp + Math.sin(hopT * 0.5) * 0.03 : G.clamp(Math.sin(c.ang || 0) * 0.45, -0.45, 0.45) * (0.3 + 0.7 * sp) + Math.sin(t * 2.3 + id) * 0.04);      // a walker leans into its speed; a swimmer points where it is going; asleep, it droops
+  ctx.rotate(still ? (walks ? 0.9 : 0.25) : walks ? 0.03 + 0.12 * sp2 + Math.sin(hopT) * 0.02 : G.clamp(Math.sin(c.ang || 0) * 0.45, -0.45, 0.45) * (0.3 + 0.7 * sp2) + Math.sin(t * 2.3 + id) * 0.04);      // a walker leans into its speed; a swimmer points where it is going; asleep, it droops
   ctx.scale(s, s); ctx.translate(0, -104);                                       // its feet are at 104 in portrait units
   // where it looks: at what it is after, else it glances about
   let lx = Math.cos(t * 0.7 + id) * 0.6, ly = 0.15 + Math.sin(t * 0.9 + id * 1.3) * 0.4;
@@ -569,7 +573,7 @@ function drawCharacter(ctx, c, x, y, scale, t, opt) {
   const lid = still || blink ? 1 : c.pois > 0.3 || c.gasp > 0.3 || weak ? 0.55 : c.tired > 0.75 ? 0.4 : 0;
   if (paint) { const k = 250 / Math.max(paint.w, paint.h), bottom = walks ? 108 : 86; drawPaintMoving(ctx, paint, c.g.f._b, -paint.w * k / 2, bottom - paint.h * k, paint.w * k, paint.h * k, t, id, sp, still); }      // the AI's painting of its kind, moving the way its build moves
   else if (opt.live) G.form.portrait(ctx, f, t + id * 0.37, { lx: lx, ly: ly, sleep: still });
-  else G.form.pDraw(ctx, f, { lx: lx, ly: ly, lid: lid, wide: scared }, still ? id * 0.37 : t * (0.42 + 0.5 * sp) + id * 0.37);
+  else G.form.pDraw(ctx, f, { lx: lx, ly: ly, lid: lid, wide: scared }, still ? id * 0.37 : c._lp);
   ctx.restore();
   // what it is going through, said with one small sign over its head
   if (G.speed <= 8 && alpha > 0.5 && !opt.noSigns) {
@@ -750,7 +754,7 @@ function drawCreatures() {
   if (s && !s.dead) {
     ctx.save();
     ctx.strokeStyle = G.rgba(PAL.frost, 0.8); ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.lineDashOffset = -t * 20;
-    ctx.beginPath(); ctx.arc(s.rx || s.x, s.ry || s.y, s.ph.r * (1.1 + 0.8 * s.ph.reach) + 2 * Math.sin(t * 4), 0, 6.2832); ctx.stroke();
+    { const rr = s.ph.r * R.VIS; ctx.beginPath(); ctx.arc(s.rx || s.x, (s.ry || s.y) - rr * 1.25, rr * 2.1 + 2 * Math.sin(t * 4), 0, 6.2832); ctx.stroke(); }
     ctx.restore();
   }
 }

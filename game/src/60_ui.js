@@ -41,7 +41,7 @@
   const SEASON_INFO = [
     { name: 'SPRING', step: 'Breed · Mutate', title: 'SPRING · BREED + MUTATE', text: 'The fittest parents have children, and mates choose the most charming. Genes are copied, mixed and sometimes changed.' },
     { name: 'SUMMER', step: 'Test', title: 'SUMMER · TEST', text: 'Life is the test: creatures hunt for food, flee and try to stay alive.' },
-    { name: 'AUTUMN', step: 'Score', title: 'AUTUMN · SCORE', text: 'Fitness is the energy a creature has stored. The bars are the scores; the best creatures glow.' },
+    { name: 'AUTUMN', step: 'Score', title: 'AUTUMN · SCORE', text: 'Fitness is how nice to the eye and how whole a creature is, once it has eaten well enough. The bars are the scores; the best creatures glow.' },
     { name: 'WINTER', step: 'Select', title: 'WINTER · SELECT', text: 'The lowest scores fade away. Only the fit stay to breed in spring.' },
   ];
 
@@ -68,7 +68,7 @@
     const p = el('div', 'glass hide', '', ui); p.id = 'panel';
     p.innerHTML = '<button class="phead" id="panelToggle" aria-label="Evolution panel">EVOLUTION<span id="phSum"></span>' + ICON.chev + '</button>' +
       '<div class="pbody"><div id="era" style="margin-bottom:10px"></div><div class="stats"><div><b id="stGen">1</b><small>Gen</small></div><div><b id="stPop">0</b><small>Alive</small></div><div><b id="stSp">1</b><small>Species</small></div><div><b id="stFit">0.00</b><small>Fitness</small></div></div>' +
-      '<div class="tabs" id="gtabs"><button data-m="fit" class="on">FITNESS</button><button data-m="skill">SKILL</button><button data-m="pop">POP</button><button data-m="genes">GENES</button></div>' +
+      '<div class="tabs" id="gtabs"><button data-m="look" class="on">BEAUTY</button><button data-m="whole">WHOLE</button><button data-m="fit">FITNESS</button><button data-m="skill">SKILL</button><button data-m="pop">POP</button><button data-m="genes">GENES</button></div>' +
       '<canvas id="graph" width="560" height="184"></canvas><div class="gnote" id="gnote"></div><button class="gnote" id="aiLine" style="min-height:0;color:var(--gold);background:none;border:0;padding:0;font:inherit;font-size:11px;line-height:1.3;text-align:left;cursor:pointer;text-decoration:underline dotted;display:block" title="See what each kind of AI use cost"></button><div class="ilabel">What changed</div><div class="log" id="mutLog"></div></div>';
     refs.panel = p;
     if (window.innerWidth < 720) p.classList.add('min');
@@ -78,7 +78,7 @@
       for (let j = 0; j < tabs.length; j++) tabs[j].classList.remove('on');
       this.classList.add('on'); UI.metric = this.dataset.m; drawGraph(true); G.sfx('click');
     };
-    UI.metric = 'fit';
+    UI.metric = 'look';
 
     // toolbar
     const tb = el('div', 'glass hide', '', ui); tb.id = 'toolbar';
@@ -404,14 +404,16 @@
 
   // ── graph ──
   const METRICS = {
-    fit: { label: 'Fitness = how full a creature\'s energy tank is at autumn. Fuller tanks survive winter and have more children.', get: function (h) { return h.avg; }, fmt: function (v) { return v.toFixed(2); }, min: 0, max: 1 },
+    whole: { label: 'Whole: how much of a whole, full creature they are, out of 10: from a cell (1), through a ball with a face (3) and a simple critter (5), to a full character with head, body, legs and arms (9). The average; the dashed line is the most whole one alive.', get: function (h) { return (h.whole || 0) * 10; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 },
+    look: { label: 'Beauty: how nice to the eye the creatures of this pond are, out of 10 (the average; the dashed line is the nicest one alive). This is what the pond evolves towards.', get: function (h) { return (h.look || 0) * 10; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 },
+    fit: { label: 'Fitness = how nice to the eye and how whole a creature is, for those that have eaten well enough (half a tank). Higher scores survive winter and have more children.', get: function (h) { return h.avg; }, fmt: function (v) { return v.toFixed(2); }, min: 0, max: 1 },
     skill: { label: 'Skill: food eaten per creature each generation', get: function (h) { return h.intake; }, fmt: function (v) { return v.toFixed(0); }, min: 0 },
     pop: { label: 'How many creatures were alive at autumn', get: function (h) { return h.pop; }, fmt: function (v) { return v.toFixed(0); }, min: 0 },
     genes: { label: 'Genome size: parts, wires and brain cells per creature', get: function (h) { return h.genes; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
   };
   function drawGraph(force) {
     const W = G.W, cv = $('graph'); if (!cv || !W) return;
-    const m = METRICS[UI.metric || 'fit'];
+    const m = METRICS[UI.metric || 'look'];
     const ctx = cv.getContext('2d');
     const w = cv.width, h = cv.height, hist = W.hist;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -430,9 +432,9 @@
     const Y = function (v) { return h - pad - (h - pad * 2) * ((v - lo) / (hi - lo)); };
     ctx.strokeStyle = G.rgba(PAL.frost, 0.1); ctx.lineWidth = 1;
     for (let i = 0; i < 4; i++) { const y = pad + (h - pad * 2) * i / 3; ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w - pad, y); ctx.stroke(); }
-    if (UI.metric === 'fit') {
+    if (UI.metric === 'fit' || UI.metric === 'look' || UI.metric === 'whole') {
       ctx.strokeStyle = G.rgba(PAL.gold, 0.45); ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
-      ctx.beginPath(); hist.forEach(function (q, i) { const x = X(i), y = Y(q.best); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); hist.forEach(function (q, i) { const x = X(i), y = Y(UI.metric === 'look' ? (q.lookTop || 0) * 10 : UI.metric === 'whole' ? (q.wholeTop || 0) * 10 : q.best); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]);
     }
     const g = ctx.createLinearGradient(0, 0, 0, h);
     g.addColorStop(0, G.rgba(PAL.algae, 0.38)); g.addColorStop(1, G.rgba(PAL.algae, 0));
@@ -541,12 +543,13 @@
   function buildInspector(ui) {
     const i = el('div', 'glass hide', '', ui); i.id = 'inspector';
     i.innerHTML = '<div class="ihead"><canvas id="iprev" width="208" height="208"></canvas><div><b id="iname"></b><small id="isub"></small></div><button class="x" id="iclose" aria-label="Close">' + ICON.close + '</button></div>' +
-      '<div class="ilabel">Genome</div><canvas id="istrip" width="560" height="80"></canvas>' +
+      '<div id="ifit" style="font-size:11.5px;line-height:1.4"></div>' +
       '<div class="irows"><div id="iE"></div><div id="iAge"></div><div id="iPar" style="grid-column:span 2"></div><div class="meter"><i id="iEb"></i></div></div>' +
-      '<div class="ilabel">Brain</div><canvas id="ibrain" width="560" height="184"></canvas><div class="imut" id="imut"></div>' +
-      '<div class="ilabel">Fitness</div><div id="ifit" style="font-size:11.5px;line-height:1.4"></div>' +
+      '<div class="imut" id="imut"></div>' +
+      '<details><summary>Genes and brain</summary><canvas id="istrip" width="560" height="80"></canvas><canvas id="ibrain" width="560" height="184" style="margin-top:6px"></canvas></details>' +
       '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond.">★ KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection.">♥ BREED</button><button class="btn sm" id="itree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide">' + ICON.book + 'SPECIES</button></div>';
     $('iclose').onclick = function () { G.select(null); };
+    $('isub').onclick = function () { this.classList.toggle('open'); };
     $('itree').onclick = function () { G.sfx('click'); G.openTree(); };
     $('ibreed').onclick = function () { const c = G.R.sel; if (!c) return; G.sfx('click'); if (!G.collection.length) { G.banner('Nothing to breed it with yet', 'First ★ KEEP a creature you like (from this pond or another). Then choose it here to breed the two.', 5200); return; } UI.breedWith = c.id; UI.guideTab = 'coll'; G.openGuide(); };
     $('ikeep').onclick = function () { const c = G.R.sel; if (!c) return; const it = G.keep(c); if (it) { G.sfx('discovery'); G.banner('Kept in your collection', it.name + ', a ' + it.kind.toLowerCase() + '. Find it in the Book of Life under COLLECTION; you can release it into any pond.', 5200); } };
@@ -699,8 +702,18 @@
       $('iE').innerHTML = 'Energy <b>' + Math.round(c.E) + '</b> / ' + Math.round(c.ph.Emax) + ' · Protein <b>' + Math.round(c.P || 0) + '</b> (a child takes ' + Math.round(c.ph.Emax * G.K.repro * c.ph.pneed) + ')' + (c.asleep ? ' · <b style="color:var(--frost)">asleep</b>' : c.tired > 0.7 ? ' · tired' : '');
       $('iAge').innerHTML = 'Age <b>' + c.age + '</b> · children <b>' + c.off + '</b>';
       const kids = Math.max(0, Math.min(3, Math.floor((c.E - G.K.keep * c.ph.Emax) / (G.K.repro * c.ph.Emax))));
-      $('ifit').innerHTML = 'Score <b>' + Math.max(0, f).toFixed(2) + '</b>: the share of its energy tank that is full. ' + (c.doomed ? '<span style="color:var(--rose)">Too low: it fades this winter.</span>' : f < 0.1 ? '<span style="color:var(--rose)">In danger of fading this winter.</span>' : 'With this much it could have <b>' + kids + '</b> ' + (kids === 1 ? 'child' : 'children') + ' in spring.') + ' It burns <b>' + c.ph.upkeep.toFixed(2) + '</b> energy a second just to exist.' +
-        ((c.g.t[4] || 0) > 0.38 ? '<br><span style="color:var(--rose)">Violent (temper ' + c.g.t[4].toFixed(2) + '): it attacks other kinds.</span>' : '') + '<br>' + (sp && sp.judge ? 'Beauty <b style="color:var(--gold)">' + Math.round(sp.judge.score * 10) + '/10</b>' + (sp.judge.est ? ' (its parent kind\'s grade; not looked at yet)' : '') + ': <i>' + escapeHtml(sp.judge.why || '') + '</i>' + (sp.loved ? ' You kept one of its kind: it is loved.' : '') + '<br>' : '') + 'Charm <b>' + G.charmOf(c).toFixed(2) + '</b>: ' + (c.snub ? '<span style="color:var(--rose)">among the ugliest in the pond: nobody chose it as a mate this spring, so it left no children.</span>' : G.charmOf(c) > 0.55 ? 'admired; mates choose it gladly.' : G.charmOf(c) < 0.3 ? 'plain by this pond\'s taste; it may be passed over.' : 'pleasant enough to find a mate.');
+      {
+        const be = c.ph.charm, wh0 = c.g.f.bd ? G.form.whole(c.g.f) : { v: 0.5, has: [], lacks: [] }, wh = { v: c.ph.whole === undefined ? wh0.v : c.ph.whole, has: wh0.has, lacks: wh0.lacks }, bw = c.g.f.bd ? G.form.beautyWhy(c.g.f, G.W.taste) : { up: [], down: [] };
+        const row = function (name, v, col) { return '<span>' + name + '</span><span class="bar"><i style="width:' + Math.round(Math.max(0, Math.min(1, v)) * 100) + '%' + (col ? ';background:' + col : '') + '"></i></span><b>' + (v * 10).toFixed(1) + '</b>'; };
+        const nice = function (L) { return L.map(function (k) { return k.replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase(); }).join(', '); };
+        $('ifit').innerHTML = '<div class="igrade">' + row('Beauty', be) + row('Whole', wh.v) + row('Fed', Math.max(0, f), 'var(--algae)') + '</div>' +
+          '<small>' + (c.real ? '<b style="color:var(--gold)">The watcher looked at it:</b> <i>' + escapeHtml(c.real.why || 'no comment') + '</i>' : G.W.eyeN ? 'Not looked at yet: these marks are its parents\' marks, adjusted for how it differs.' : 'No watcher here: these marks are the pond\'s own guess.') + '</small>' +
+          '<small>' + (c.doomed ? '<span style="color:var(--rose)">Its score is too low: it fades this winter.</span> ' : c.snub ? '<span style="color:var(--rose)">Among the plainest: nobody chose it as a mate this spring.</span> ' : kids ? 'It could have <b>' + kids + '</b> ' + (kids === 1 ? 'child' : 'children') + ' in spring. ' : '') +
+          (bw.up.length ? 'Nice: ' + nice(bw.up) + '. ' : '') + (bw.down.length ? 'Holds it back: ' + nice(bw.down) + '. ' : '') + '</small>' +
+          (wh.lacks.length ? '<small>To be a whole creature it still lacks: ' + wh.lacks.join('; ') + '.</small>' : '') +
+          (sp && sp.loved ? '<small>You kept one of its kind: it is loved.</small>' : '') +
+          ((c.g.t[4] || 0) > 0.38 ? '<small style="color:var(--rose)">Violent: it attacks other kinds.</small>' : '');
+      }
       const bar = $('iEb');
       bar.style.width = (Math.max(0, Math.min(1, f)) * 100).toFixed(0) + '%';
       bar.style.background = f > 0.6 ? PAL.algae : f > 0.3 ? PAL.gold : PAL.rose;

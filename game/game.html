@@ -72,7 +72,8 @@ small { color: rgba(207,232,255,.7); }
 .stats div { background: rgba(7,18,31,.4); border-radius: 10px; padding: 6px 4px; text-align: center; border: 1px solid rgba(207,232,255,.1); }
 .stats b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(51,214,166,.4); }
 .stats small { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
-.tabs { display: flex; gap: 5px; margin-bottom: 6px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+#gtabs button { flex: 1 1 30%; min-width: 0; }
 .tabs button { flex: 1; min-height: 32px; border-radius: 999px; border: 1px solid rgba(207,232,255,.18); background: rgba(7,18,31,.4); color: rgba(207,232,255,.75); font: 700 9.5px system-ui, sans-serif; letter-spacing: .1em; cursor: pointer; }
 .tabs button.on { border-color: var(--algae); color: #fff; box-shadow: 0 0 12px rgba(51,214,166,.35); }
 #graph { width: 100%; height: 92px; display: block; border-radius: 10px; background: rgba(7,18,31,.4); }
@@ -135,9 +136,15 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 #versus { position: fixed; left: 14px; top: 236px; width: min(300px, calc(100vw - 28px)); padding: 9px 12px; z-index: 2; }
 @media (max-width: 720px) { #versus { top: auto; bottom: 78px; left: 7px; width: min(280px, calc(100vw - 14px)); } }
 @media (max-height: 560px) { #versus { display: none; } }
-#zoom { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 999px; z-index: 2; }
+#zoom { position: fixed; left: 14px; bottom: 84px; display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 999px; z-index: 2; }
 #zoom .btn { min-width: 40px; min-height: 40px; padding: 0; font-size: 18px; letter-spacing: 0; }
-@media (max-width: 720px) { #zoom { top: 232px; transform: none; right: 7px; } }
+@media (max-width: 720px) { #zoom { left: auto; bottom: auto; top: 232px; right: 7px; } }
+#inspector { max-height: calc(100vh - 28px); overflow-y: auto; }
+#isub { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+#isub.open { display: block; }
+#inspector details { margin-top: 6px; } #inspector summary { cursor: pointer; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--frost); opacity: .75; padding: 4px 0; }
+.igrade { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; align-items: center; font-size: 12px; margin: 6px 0 4px; } .igrade .bar { height: 7px; border-radius: 4px; background: rgba(207,232,255,.14); overflow: hidden; } .igrade .bar i { display: block; height: 100%; border-radius: 4px; background: var(--gold); } .igrade b { color: var(--gold); }
+#ifit small { display: block; opacity: .8; line-height: 1.35; margin-top: 2px; }
 #banner { position: fixed; left: 50%; top: 14px; transform: translate(-50%, -140%); padding: 12px 22px; text-align: center; font-weight: 700; letter-spacing: .04em; transition: transform .6s cubic-bezier(.2,.9,.3,1.2); max-width: min(600px, calc(100vw - 28px)); font-size: 14px; line-height: 1.35; z-index: 8; border-color: rgba(246,211,101,.7); box-shadow: 0 0 36px rgba(246,211,101,.35), inset 0 0 24px rgba(246,211,101,.15); }
 #banner.show { transform: translate(-50%, 78px); }
 #banner small { display: block; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); margin-bottom: 2px; font-size: 10px; }
@@ -449,7 +456,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     repro: 0.30,          // child costs this fraction of the parent's max energy
     keep: 0.12,           // parent keeps at least this much after breeding
     capBase: 150,
-    speciesTH: 1.4,
+    speciesTH: 1.65,
     maxAge: 3,
     foodDigestMin: 0.2,
   });
@@ -598,7 +605,9 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     ph.warm = ph.res[1] >= 0.55;
     ph.plump = plump;                 // cold-proof life does not slow down in winter
     // charm: how well the body fits what all life finds pleasing, and what THIS pond admires
-    ph.charm = clamp(FM.taste(f, G.W ? G.W.fashion : null, cn) * 1.15, 0, 1);
+    // how nice it is to the eye: by this pond's learned taste (a free body), or the old measure (anything else)
+    ph.charm = f.bd && FM.beauty ? FM.beauty(f, G.W ? G.W.taste : null) : clamp(FM.taste(f, G.W ? G.W.fashion : null, cn) * 1.15, 0, 1);
+    ph.whole = f.bd && FM.whole ? FM.whole(f).v : 0.5;      // how whole a creature it is
     ph.rc = r * (1 + 0.22 * Math.max(0, Math.max(ext.half, ext.wide) * ds / r - 1));
     ph.aggro = t[4] || 0;
     ph.forage = [0.5 + 1.0 * A.reach, 0.5 + 1.0 * A.agility, 0.85, 0.5 + 1.0 * A.senses, 0.45 + 1.1 * A.attack, 0.5 + 1.0 * A.speed];      // how well this body gathers each colour of food
@@ -609,6 +618,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     let digSum = 0; for (let i = 0; i < 6; i++) digSum += c[i];
     let tolSum = 0; for (let i = 9; i < 15; i++) tolSum += c[i] || 0;
     up += 0.035 * digSum + 0.02 * (c[6] + c[7] + c[8]) + 0.022 * tolSum + 0.0035 * g.w.length + 0.012 * g.h;
+    if (f.bd) up += r10 * 0.05 * Math.max(0, G.body.busy(f) - 6);
     ph.upkeep = up;
     // compile the brain: wires grouped by target (hidden 0..h-1, then outputs)
     const nt = g.h + NOUT;
@@ -886,13 +896,14 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       q.on = q.on === undefined || q.on === null ? -1 : q.on | 0;
       if (q.on >= 0) { const par = q.on < i ? f.rules[q.on] : null; if (!par || !CHAIN[par.k] || q.k === 5 || (par.on >= 0 && f.rules[par.on].on >= 0)) q.on = -1; }
     }
-    f.en = clamp(f.en | 0, f.bd && (f.bd.m.length > 1 || f.rules.length > 2) ? 1 : 0, 3); f.es = num(f.es, 0.2, 0.62, 0.34); f.ek = num(f.ek, 0, 1.2, 0);
+    f.en = clamp(f.en | 0, f.bd && (f.bd.m.length > 1 || f.rules.length > 2) ? 1 : 0, 3); f.es = num(f.es, f.bd ? 0.34 : 0.2, 0.62, 0.4); f.ek = num(f.ek, 0, 1.2, 0);
     f.mk = clamp(f.mk | 0, 0, 4); f.ms = num(f.ms, 0.14, 0.7, 0.25); f.tk = clamp(f.tk | 0, 0, 4); f.ts = num(f.ts, 0.3, 1.5, 0.6);
     f.hue = ((num(f.hue, -1e6, 1e6, 200) % 360) + 360) % 360; f.hue2 = num(f.hue2, -180, 180, 90); if (Math.abs(f.hue2) < 40) f.hue2 = f.hue2 < 0 ? -40 : 40;
     f.sat = num(f.sat, 52, 88, 70); f.lit = num(f.lit, 52, 72, 62); f.pat = clamp(f.pat | 0, 0, 5); f.psc = num(f.psc, 0.15, 1, 0.5);
     f.crest = num(f.crest, 0, 1, 0); f.shell = num(f.shell, 0, 1, 0); f.glow = num(f.glow, 0, 1, 0); f.venom = num(f.venom, 0, 1, 0); f.seed = (f.seed | 0) || 1;
     f.hd = num(f.hd, 0.7, 1.9, 1); f.nk = num(f.nk, 0, 0.7, 0); f.coat = clamp(f.coat | 0, 0, 3);
     f.hx = num(f.hx, 0.72, 1.45, 1); f.hq = num(f.hq, 1.5, 4, 2); f.pl = Math.max(0, f.pl | 0);
+    if (f.bd) while (f.rules.length > 4) dropRule(f, f.rules.length - 1);
     delete f._k; delete f._b;
     return f;
   };
@@ -913,13 +924,22 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   /** mutate a form in place. m: chance of a nudge per gene; wild: the world's mutation slider; press: what the pond is up against; note(text, big) */
   F.mutate = function (f, m, wild, press, note) {
     const r = G.rand, n = G.randn;
+    if (f.bd) { const busy = G.body.busy(f); if (busy > 6.5 && r() < Math.min(0.6, 0.14 * (busy - 6.5)) * wild) {
+      const roll = r();
+      if (roll < 0.5 && f.rules.length) { const i = Math.floor(r() * f.rules.length); note('shed its ' + KMANY[f.rules[i].k] + ': a simpler body', true); dropRule(f, i); }
+      else if (roll < 0.7 && G.body.drop(f, null)) note('lost a part of its body: a simpler shape', true);
+      else if (roll < 0.8 && f.pat) { f.pat = 0; note('its markings faded to plain skin', true); }
+      else if (roll < 0.88 && f.crest > 0.25) { f.crest = 0; note('lost its crest', true); }
+      else if (roll < 0.94 && f.en > 2) { f.en = 2; note('lost an eye: two now', true); }
+      else if (f.rules.length) { const q = f.rules[Math.floor(r() * f.rules.length)]; if (q.b > q.a) { q.b = q.a; note(KMANY[q.k] + ' now grow from one place only', true); } }
+    } }
     // a change of structure: at most one a birth
-    if (r() < 0.16 * wild) {
+    if (r() < (f.bd ? 0.07 : 0.16) * wild) {
       const roll = r();
       if (roll < 0.13) { if (f.bd) G.body.bud(f, note); else if (f.n < MAXN) { f.n++; note('body grew to ' + f.n + ' segments', true); } }
       else if (roll < 0.17) { if (f.bd) G.body.drop(f, note); else if (f.n > 1) { f.n--; note('body shrank to ' + f.n + (f.n === 1 ? ' segment' : ' segments'), true); } }
       else if (roll < 0.33) {
-        if (f.rules.length < MAXR) {
+        if (f.rules.length < (f.bd ? 4 : MAXR)) {
           // what sprouts next leans towards what the pond is up against
           const w = [1, 1, 1, 1, 1, 1, 1, 1], pp = press ? press.part : null;
           if (press && press.o2) { w[1] += press.o2; w[6] += press.o2 * 1.5; w[3] += press.o2 * 0.5; }
@@ -934,7 +954,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       }
       else if (roll < 0.38) { if (f.rules.length) { const i = Math.floor(r() * f.rules.length); note('lost its ' + KMANY[f.rules[i].k], true); dropRule(f, i); } }
       else if (roll < 0.46) {
-        if (f.rules.length && f.rules.length < MAXR) {
+        if (f.rules.length && f.rules.length < (f.bd ? 4 : MAXR)) {
           const src = f.rules[Math.floor(r() * f.rules.length)], c = cpRule(src);
           c.a = src.a + (r() < 0.5 ? 1 : -1);
           c.b = c.a; if (r() < 0.5) c.k = Math.floor(r() * 8);
@@ -955,12 +975,12 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       else { f.hue += 60 + r() * 240; note('a new colour', true); }
     }
     // a limb grows a joint: a copy of itself sprouts from its own tip (an arm gets a forearm, a forearm a hand)
-    if (f.rules.length < MAXR && r() < 0.03 * wild) {
+    if (f.rules.length < (f.bd ? 4 : MAXR) && r() < 0.03 * wild) {
       const ok = []; for (let i = 0; i < f.rules.length; i++) { const p = f.rules[i]; if (CHAIN[p.k] && !(p.on >= 0 && f.rules[p.on].on >= 0) && !f.rules.some(function (x) { return x.on === i; })) ok.push(i); }
       if (ok.length) { const pi = ok[Math.floor(r() * ok.length)], c = cpRule(f.rules[pi]); c.on = pi; c.l *= 0.7; c.w *= 0.85; c.g = (r() - 0.5) * 1.2; if (c.k === 0) c.t = 1 + Math.floor(r() * 3); f.rules.push(c); note('its ' + KMANY[c.k] + ' grew a joint: a part on a part', true); }
     }
     // a child of a new colour: rare, but it is how a pond comes to hold several colours
-    if (r() < 0.03 * wild) { f.hue += 50 + r() * 260; if (r() < 0.5) f.hue2 = (r() < 0.5 ? -1 : 1) * (40 + r() * 140); note('was born a new colour', true); }
+    if (r() < (f.bd ? 0.012 : 0.03) * wild) { f.hue += 50 + r() * 260; if (r() < 0.5) f.hue2 = (r() < 0.5 ? -1 : 1) * (40 + r() * 140); note('was born a new colour', true); }
     // a whole new way of carrying the body: one of the builds this pond has been given
     // a shape of body imagined for this pond: now and then a child is born some way towards one of them
     if (f.bd) { const pls = G.W && G.W.plans ? G.W.plans : []; if (pls.length && r() < 0.014 * wild) { const p = pls[Math.floor(r() * pls.length)]; if (p.id !== f.pl && p.bd) { G.body.adopt(f, p.bd, 0.65 + r() * 0.35); f.pl = p.id; note('its body took a new shape: the ' + p.name.toLowerCase() + (p.because ? ' (' + p.because + ')' : ''), true); } } }
@@ -976,7 +996,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       const d = dsl[Math.floor(r() * dsl.length)];
       if (!f.rules.some(function (q) { return q.k === 8 && q.t === d.id; })) {
         const q = newRule(f.n, 8); q.t = d.id; if (d.place === 'head') { q.a = 0; q.b = 0; q.e = 1; }
-        if (f.rules.length < MAXR) f.rules.push(q); else { const at = Math.floor(r() * f.rules.length); dropRule(f, at); f.rules.push(q); }
+        if (f.rules.length < (f.bd ? 4 : MAXR)) f.rules.push(q); else { let at = Math.floor(r() * f.rules.length); for (let t = 0; t < 4 && f.rules[at].k === 8; t++) at = Math.floor(r() * f.rules.length); dropRule(f, at); f.rules.push(q); }
         note('grew a ' + d.name.toLowerCase(), true);
       }
     }
@@ -992,15 +1012,15 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const pp = press ? press.part : null;
     if (pp) {
       const hit = function (i) { return pp[i] > 0 && r() < 0.055 * wild * Math.min(2.5, pp[i]); };
-      if (hit(2) && !has(f, 2) && !has(f, 7) && f.rules.length < MAXR) { const k = r() < 0.6 ? 2 : 7; f.rules.push(newRule(f.n, k)); note('grew ' + KMANY[k], true); }
+      if (hit(2) && !has(f, 2) && !has(f, 7) && f.rules.length < (f.bd ? 4 : MAXR)) { const k = r() < 0.6 ? 2 : 7; f.rules.push(newRule(f.n, k)); note('grew ' + KMANY[k], true); }
       if (hit(3) && f.shell < 1) { f.shell = clamp(f.shell + 0.4, 0, 1); note('grew a shell', true); }
       if (hit(6) && f.venom < 1) { f.venom = clamp(f.venom + 0.5, 0, 1); note('grew poison glands', true); }
       if (hit(5) && f.glow < 1) { f.glow = clamp(f.glow + 0.5, 0, 1); note('began to glow', true); }
       if (hit(4) && f.en < 2) { f.en++; note('grew an eye (' + f.en + ' now)', true); }
       if (hit(0) && f.mk !== 2) { f.mk = 2; note('grew jaws', true); }
-      if (hit(1) && !has(f, 1) && f.rules.length < MAXR) { f.rules.push(newRule(f.n, 1)); note('grew fins', true); }
+      if (hit(1) && !has(f, 1) && f.rules.length < (f.bd ? 4 : MAXR)) { f.rules.push(newRule(f.n, 1)); note('grew fins', true); }
       if (hit(7) && !f.tk && f.n > 1) { f.tk = 1 + Math.floor(r() * 2); note('grew a tail', true); }
-      if (hit(8) && !has(f, 3) && f.rules.length < MAXR) { f.rules.push(newRule(f.n, 3)); note('grew tentacles', true); }
+      if (hit(8) && !has(f, 3) && f.rules.length < (f.bd ? 4 : MAXR)) { f.rules.push(newRule(f.n, 3)); note('grew tentacles', true); }
     }
     // and a little drift in the numbers
     let drift = false;
@@ -1144,7 +1164,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     // the whole body together: a few kinds of growth that suit each other, none of them dwarfing the body they grow from
     let longest = 0; for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k !== 5) longest = Math.max(longest, f.rules[i].l);
     const harmony = (c.kinds <= 3 ? 1 : c.kinds === 4 ? 0.5 : 0.15) * (longest * 1.25 > L * 0.9 + 0.8 ? 0.5 : 1);
-    const base = 0.24 * face + 0.1 * big + 0.18 * shape + 0.14 * prop + 0.14 * tidy + 0.14 * harmony + 0.06 * clamp(Math.abs(f.hue2) / 90, 0.4, 1);
+    let base = 0.24 * face + 0.1 * big + 0.18 * shape + 0.14 * prop + 0.14 * tidy + 0.14 * harmony + 0.06 * clamp(Math.abs(f.hue2) / 90, 0.4, 1);
+    if (f.bd) { const busy = G.body.busy(f), clean = busy < 2.5 ? 0.45 : busy <= 6 ? 1 : Math.max(0, 1 - (busy - 6) * 0.22), eyes = f.en === 0 ? 0 : f.en === 2 ? 1 : f.en === 1 ? 0.85 : 0.45; let sig = 0; for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k === 8) sig++; base = 0.2 * eyes + 0.14 * big + 0.42 * clean + 0.08 * (longest > 1.7 ? 0.4 : 1) + 0.08 * clamp(Math.abs(f.hue2) / 90, 0.4, 1) + (sig === 1 || sig === 2 ? 0.08 : 0); }
     if (!X) return base;
     let grow = 0;
     for (let i = 0; i < f.rules.length; i++) grow += f.rules[i].k === 8 ? 0.6 : X.like[f.rules[i].k];      // something never seen before turns heads
@@ -1626,7 +1647,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 // measured from the shape that results.
 (function () {
   'use strict';
-  const clamp = G.clamp, PI = Math.PI, TAU = PI * 2, K = 10, MAXM = 5;
+  const clamp = G.clamp, PI = Math.PI, TAU = PI * 2, K = 10, MAXM = 3;      // three masses at most: a body is one clear idea, not a heap
   const B = G.body = { K: K, MAXM: MAXM };
   const num = function (v, lo, hi, d) { v = +v; return isFinite(v) ? clamp(v, lo, hi) : d; };
   const mass = function (o) { const q = { r: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], s: 1, on: -1, at: -PI / 2, d: 1, pr: 0, h: 0, lb: 0, la: 0 }; if (o) for (const k in o) q[k] = o[k]; return q; };
@@ -1665,7 +1686,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       kids[i] = 0; if (i) kids[q.on]++;
     }
     // no more than nine shapes in all, however the pairs multiply
-    { const cnt = []; let tot = 0; for (let i = 0; i < M.length; i++) { cnt[i] = (i ? cnt[M[i].on] : 1) * (M[i].pr ? 2 : 1); tot += cnt[i]; if (tot > 9) { M[i].pr = 0; cnt[i] = i ? cnt[M[i].on] : 1; tot -= cnt[i]; } } }
+    { const cnt = []; let tot = 0; for (let i = 0; i < M.length; i++) { cnt[i] = (i ? cnt[M[i].on] : 1) * (M[i].pr ? 2 : 1); tot += cnt[i]; if (tot > 5) { M[i].pr = 0; cnt[i] = i ? cnt[M[i].on] : 1; tot -= cnt[i]; } } }
     bd.e = clamp(bd.e | 0, 0, M.length - 1); if (M[bd.e].pr || M[bd.e].s < 0.55) bd.e = 0;
     for (let i = 0; i < M.length; i++) if (kids[i] || i === bd.e) M[i].h = 0;        // only a bare outer part can be a ring
     f.n = M.length; f.sym = 0; f.pl = f.pl | 0;
@@ -1688,7 +1709,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       for (let k = 0; k < n0; k++) {
         const p = I[k]; if (p.i !== q.on) continue;
         const put = function (mir, far) {
-          if (I.length >= 10) return;
+          if (I.length >= 6) return;
           const a = q.at + sway, ang = mir ? PI - a : a, Rp = B.rad(p.m, ang, p.mir) * p.s, Rc = B.rad(q, ang + PI, mir) * q.s, dist = (Rp + Rc) * (0.35 + 0.55 * q.d) * spring;
           I.push({ i: i, m: q, x: p.x + Math.cos(ang) * dist + (far ? -0.17 : 0), y: p.y + Math.sin(ang) * dist + (far ? -0.1 : 0), s: q.s, mir: mir, far: far || p.far, par: p, a: ang, stalk: dist > (Rp + Rc) * 0.96 });
         };
@@ -1733,6 +1754,14 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       high: clamp((L.y1 - faceY) / Math.max(0.5, h), 0, 1),          // how high the face is carried
       key: (bd.v ? 's' : 'f') + bd.m.length + (pairs ? 'p' : '') + cls + (lobed ? 'L' : '') + (hollow ? 'O' : '') });
   };
+  /** how much there is to look at on this body: its shapes, each kind of growth and where it repeats, its coat and markings. Past about seven it is a muddle. */
+  B.busy = function (f) {
+    let n = 0; const M = f.bd.m, cnt = [];
+    for (let i = 0; i < M.length; i++) { cnt[i] = (i ? cnt[M[i].on] : 1) * (M[i].pr ? 2 : 1); n += i ? (M[i].pr ? 1.5 : 1) : 1; if (M[i].lb && M[i].la > 0.1) n += 0.5; if (M[i].h) n += 0.5; }
+    for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; n += q.on >= 0 ? 0.6 : q.k === 8 ? 0.6 : 1 + 0.5 * Math.max(0, Math.floor((Math.min(q.b, f.n - 1) - q.a) / q.e)); }
+    n += (f.pat ? 0.7 : 0) + (f.coat ? 0.7 : 0) + (f.shell > 0.25 ? 1 : 0) + (f.crest > 0.25 ? 0.7 : 0) + (f.tk ? 0.7 : 0) + (f.en >= 3 ? 1 : 0) + (f.ek > 0.25 ? 0.5 : 0) + (f.venom > 0.3 ? 0.3 : 0);
+    return n;
+  };
   /** the body in a few plain words */
   B.words = function (f) {
     const bd = f.bd, m = B.measure(f), n = bd.m.length, t = [];
@@ -1771,7 +1800,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   /** chance reshapes a body. m: chance of a nudge per gene; wild: the world's mutation slider */
   B.mutate = function (f, m, wild, note) {
     const r = G.rand, n = G.randn, bd = f.bd, M = bd.m;
-    if (r() < 0.085 * wild) {
+    if (r() < 0.04 * wild) {
       const roll = r(), pick = function () { return M.length > 1 ? M[1 + Math.floor(r() * (M.length - 1))] : null; };
       if (roll < 0.34) B.bud(f, note);
       else if (roll < 0.44) B.drop(f, note);
@@ -1783,7 +1812,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       else { const ok = []; for (let i = 0; i < M.length; i++) if (!M[i].pr && i !== bd.e) ok.push(i); if (ok.length) { bd.e = ok[Math.floor(r() * ok.length)]; note('its face moved to another part of its body', true); } }
     }
     // an outline is pushed out or pressed in at one place, and its neighbours follow
-    if (r() < 0.2 * wild) { const q = M[Math.floor(r() * M.length)], i = Math.floor(r() * K), a = (r() < 0.5 ? 1 : -1) * (0.12 + r() * 0.26); q.r[i] += a; q.r[(i + 1) % K] += a * 0.55; q.r[(i + K - 1) % K] += a * 0.55; note('body shape', false); }
+    if (r() < 0.14 * wild) { const q = M[Math.floor(r() * M.length)], i = Math.floor(r() * K), a = (r() < 0.5 ? 1 : -1) * (0.08 + r() * 0.16); q.r[i] += a; q.r[(i + 1) % K] += a * 0.55; q.r[(i + K - 1) % K] += a * 0.55; note('body shape', false); }
     let drift = false;
     for (let i = 0; i < M.length; i++) {
       const q = M[i];
@@ -1855,6 +1884,94 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 })();
 
 </script>
+<script data-part="21c_taste">
+// ── Beauty, measured for every creature, every generation ──
+// The game's fitness is "nice to the eye". The AI is the eye, but it cannot look at every newborn. So the pond LEARNS the
+// eye's taste: a body is described by what can be seen on it (its eyes, its masses, how much there is to look at, its
+// growths, coat, markings and colours), and a scoring function turns that into a grade from 0 to 1. The function was fitted
+// to grades the AI gave to pictures of many creatures (see scripts/taste.js on the server), and it goes on learning: every
+// time the AI grades creatures in this pond, the function is corrected towards what it said. So each pond's taste drifts its
+// own way, and every creature has a grade the moment it is born.
+(function () {
+  'use strict';
+  const F = G.form, clamp = G.clamp;
+  const NAMES = ['eyes0', 'eyes1', 'eyes2', 'eyes3', 'eyeSize', 'eyeStalk', 'face', 'm2', 'm3', 'pairs', 'hollow', 'lobed', 'stalk', 'side', 'faceAway', 'tall', 'wide', 'plump', 'busy', 'busy2',
+    'legs', 'arms', 'fins', 'spikes', 'tentacles', 'feelers', 'plates', 'frills', 'horns', 'designs', 'wrap', 'tail', 'beak', 'jaws', 'sucker', 'whiskers', 'scales', 'fur', 'feathers', 'marked', 'stripes', 'spots',
+    'shell', 'crest', 'glow', 'venom', 'sat', 'lit', 'contrast', 'longest', 'nested', 'bare'];
+  F.LOOKS = NAMES;
+  /** what can be seen on a body, as numbers (each about 0..1) */
+  F.looks = function (f) {
+    const c = F.counts(f), bm = G.body.measure(f), busy = G.body.busy(f), has = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let longest = 0, dsg = 0, wrap = 0;
+    for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on >= 0) continue; has[q.k] = 1; if (q.k !== 5 && q.k !== 8) longest = Math.max(longest, q.l); if (q.k === 8) { dsg++; const d = F._dsg(q); if (d && d.place === 'wrap') wrap = 1; } }
+    const stands = G.body.stands(f) ? 1 : 0, plump = clamp((f.prof[1] + f.prof[2] + f.prof[3]) / 3, 0.55, 1.6);
+    return [f.en === 0 ? 1 : 0, f.en === 1 ? 1 : 0, f.en === 2 ? 1 : 0, f.en >= 3 ? 1 : 0, (f.es - 0.34) / 0.28, f.ek > 0.25 ? 1 : 0, clamp((f.hd - 0.7) / 1.2, 0, 1), bm.n === 2 ? 1 : 0, bm.n >= 3 ? 1 : 0, Math.min(1, bm.pairs), bm.hollow ? 1 : 0, bm.lobed ? 1 : 0, bm.stalks ? 1 : 0, f.bd.v ? 1 : 0, f.bd.e ? 1 : 0,
+      clamp(bm.tall - 1, 0, 1), clamp(bm.asp - 1, 0, 1), (plump - 0.55) / 1.05, busy / 10, busy * busy / 100,
+      stands, has[0] && !stands ? 1 : 0, has[1], has[2], has[3], has[4], has[5], has[6], has[7], Math.min(2, dsg) / 2, wrap, f.tk ? 1 : 0, f.mk === 1 ? 1 : 0, f.mk === 2 ? 1 : 0, f.mk === 3 ? 1 : 0, f.mk === 4 ? 1 : 0,
+      f.coat === 1 ? 1 : 0, f.coat === 2 ? 1 : 0, f.coat === 3 ? 1 : 0, f.pat ? 1 : 0, f.pat === 1 ? 1 : 0, f.pat === 2 ? 1 : 0, f.shell > 0.25 ? 1 : 0, f.crest > 0.25 ? 1 : 0, f.glow > 0.3 ? 1 : 0, f.venom > 0.3 ? 1 : 0,
+      (f.sat - 52) / 36, (f.lit - 52) / 20, Math.abs(f.hue2) / 180, clamp(longest / 2.2, 0, 1), c.nested ? 1 : 0, f.rules.length === 0 && bm.n === 1 ? 1 : 0];
+  };
+  // the taste every pond starts with: fitted to the AI's grades of pictures (b: the grade of a body with nothing to see on it)
+  F.TASTE0 = { b: 0.5325, w: [-0.121, 0.0073, 0.1, 0.0137, 0.0313, -0.0019, 0.0136, -0.0162, 0, -0.0364, 0.0033, -0.0094, -0.0631, -0.0881, 0.0249, -0.032, 0.0358, 0.0729, -0.0435, -0.0798, 0.0204, 0.0382, -0.0008, -0.0684, -0.0479, 0.0371, 0.0085, -0.0465, 0.0284, -0.0495, -0.0495, -0.0101, 0.0078, -0.0422, -0.0125, 0.0211, -0.0124, -0.035, -0.0414, -0.0141, -0.0058, 0.0454, -0.0249, 0.032, -0.0437, -0.026, 0.0027, 0.0081, -0.0341, 0.0177, 0.0058, -0.1911], n: 294 };      // fitted 2026-10-06 to 294 graded pictures; held-out correlation 0.59
+  F.newTaste = function () { return { b: F.TASTE0.b, w: F.TASTE0.w.slice(), n: 0 }; };
+  F.fixTaste = function (t) {
+    if (!t || !Array.isArray(t.w) || t.w.length !== NAMES.length || !isFinite(+t.b)) return null;
+    return { b: clamp(+t.b, -2, 2), w: t.w.map(function (v) { v = +v; return isFinite(v) ? clamp(v, -3, 3) : 0; }), n: Math.max(0, t.n | 0) };
+  };
+  /** how nice this body is to the eye, 0..1, by a taste (a pond's own, or the one all ponds start with) */
+  F.beauty = function (f, T) {
+    if (!f.bd) return 0.4;
+    T = T || F.TASTE0;
+    const x = F.looks(f); let s = T.b;
+    for (let i = 0; i < x.length; i++) s += T.w[i] * x[i];
+    return clamp(s, 0, 1);
+  };
+  /** the eye graded this body: the taste is corrected a little towards what it said */
+  F.learn = function (T, f, grade, rate) {
+    const x = F.looks(f); let s = T.b;
+    for (let i = 0; i < x.length; i++) s += T.w[i] * x[i];
+    const err = clamp(grade, 0, 1) - s, k = rate === undefined ? 0.06 : rate;
+    T.b += k * err * 0.5;
+    for (let i = 0; i < x.length; i++) T.w[i] += k * err * x[i] * 0.5;
+    T.n++;
+    return err;
+  };
+  /** How WHOLE a creature is, 0..1: does it read as a complete animal, or as a blob with things on it?
+   *  A whole creature has a face (two eyes and a mouth), a body, a way of getting about, a pair of arms or wings, something that finishes it
+   *  (a tail, ears, a crest, horns), a skin of its own (a coat or markings), and nothing odd left hanging. Returns { v, has: [...], lacks: [...] } */
+  F.whole = function (f) {
+    if (!f.bd) return { v: 0.3, has: [], lacks: [] };
+    const BD = G.body, bm = BD.measure(f), L = BD.lay(f, null), gnd = BD.ground(L), M = f.bd.m, has = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let legs = 0, arms = 0, sideDsg = 0; const legOn = {};
+    for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on >= 0) continue; has[q.k] = 1; if (q.k === 8) { const d = F._dsg(q); if (d && d.place === 'sides') sideDsg = 1; } if (q.k === 0) for (let m = q.a; m <= q.b && m < f.n; m += q.e) { if (gnd[m] && !legOn[m]) { legOn[m] = 1; legs = 1; } else arms = 1; } }
+    // a head apart from a body: the face on a mass of its own, with a body mass at least as big to carry it
+    let torso = 0; for (let i = 0; i < M.length; i++) if (i !== f.bd.e && !M[i].pr) torso = Math.max(torso, M[i].s);
+    const head = M.length >= 2 && torso >= M[f.bd.e].s * 0.8 ? 1 : M.length >= 2 && torso > 0 ? 0.5 : 0;
+    const P = [
+      ['a face (two eyes)', 0.12, f.en === 2 ? 1 : f.en ? 0.6 : 0],
+      ['a mouth of its own', 0.03, f.mk ? 1 : 0],
+      ['a head set apart from a body', 0.23, head],
+      ['legs to stand and walk on', 0.22, legs ? 1 : has[1] || has[3] || f.tk ? 0.25 : 0],
+      ['arms or hands', 0.17, arms ? 1 : has[1] || sideDsg ? 0.25 : 0],
+      ['an upright, standing build', 0.07, legs && bm.tall > 1.05 ? 1 : legs ? 0.4 : 0],
+      ['something that finishes it (a tail, ears, a crest or horns)', 0.03, f.tk || has[7] || has[4] || f.crest > 0.25 || bm.pairs ? 1 : 0],
+      ['a skin of its own (a coat or markings)', 0.03, f.coat || f.pat ? 1 : 0],
+    ];
+    let v = 0.1 - (bm.hollow ? 0.04 : 0) - (bm.stalks ? 0.03 : 0); const got = [], lacks = [];
+    for (let i = 0; i < P.length; i++) { v += P[i][1] * P[i][2]; if (P[i][2] >= 0.9) got.push(P[i][0]); else if (P[i][1] >= 0.1 || P[i][2] === 0) lacks.push(P[i][0]); }
+    return { v: clamp(v, 0, 1), has: got, lacks: lacks };
+  };
+  /** what counts for most in a grade, in words: the three things that lift this body most and the three that pull it down */
+  F.beautyWhy = function (f, T) {
+    T = T || F.TASTE0;
+    const x = F.looks(f), L = [];
+    for (let i = 0; i < x.length; i++) if (Math.abs(T.w[i] * x[i]) > 0.015) L.push([NAMES[i], T.w[i] * x[i]]);
+    L.sort(function (a, b) { return b[1] - a[1]; });
+    return { up: L.filter(function (q) { return q[1] > 0; }).slice(0, 3).map(function (q) { return q[0]; }), down: L.filter(function (q) { return q[1] < 0; }).slice(-3).reverse().map(function (q) { return q[0]; }) };
+  };
+})();
+
+</script>
 <script data-part="portrait">
 // ── The character: the same genes, seen as you would meet the animal in the water ──
 // Nothing here is one template. The genes decide the BUILD, and each build is grown from the same genes in its own way:
@@ -1920,8 +2037,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       const BD = G.body, bd = f.bd, PI = Math.PI, LS = BD.lay(f, null), L0 = BD.lay(f, B), I = L0.I, gnd = BD.ground(LS);
       const xs = Math.pow(plump, 0.4);
       const legOn = {}, armOn = {};
-      for (let i = 0; i < legs.length; i++) for (let a = legs[i].a; a <= legs[i].b && a < f.n; a += legs[i].e) { if (gnd[a]) { if (!legOn[a]) legOn[a] = legs[i]; } else if (!armOn[a]) armOn[a] = legs[i]; }
-      let stands = false, legL = 0; for (const a in legOn) { stands = true; legL = Math.max(legL, 16 + 18 * Math.min(1.6, legOn[a].l)); }
+      for (let i = 0; i < legs.length; i++) for (let a = legs[i].a; a <= legs[i].b && a < f.n; a += legs[i].e) { if (gnd[a] && !legOn[a]) legOn[a] = legs[i]; else if (!armOn[a]) armOn[a] = legs[i]; }
+      let stands = false, legL = 0; for (const a in legOn) { stands = true; legL = Math.max(legL, 10 + 11 * Math.min(1.6, legOn[a].l)); }
       const hover = stands ? 0 : 30;
       const bw = Math.max(0.6, (LS.x1 - LS.x0) * xs), bh = Math.max(0.6, LS.y1 - LS.y0);
       const Sc = Math.min(50, 222 / bw, (208 - legL - hover) / bh);
@@ -1980,7 +2097,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
           ctx.save(); ctx.translate(cx, top[1] + (q.k === 7 ? 9 : 5) * k); ctx.scale(k, k); if (q.k === 7) hornsAt(0, 0, px(o) * xs * 0.42 / k, q); else feelersAt(0, 0, px(o) * xs * 0.3 / k, q, bd.v ? 1 : 0); ctx.restore();
         } } }
       { const Rf = px(fm), hr = Math.min(clamp(Rf * 0.78 * Math.pow(f.hd, 0.5), 13, 54), Rf * 0.96) * Math.min(1, xs + 0.1);
-        face(X(fm.x) + (bd.v ? Rf * xs * 0.18 : 0), Y(fm.y) + Rf * (f.shell > 0.25 && fm === I[0] ? 0.2 : 0.03), hr, bd.v, false); }
+        face(X(fm.x) + (bd.v ? Rf * xs * 0.18 : 0), Y(fm.y) + Rf * (f.shell > 0.25 && fm === I[0] ? 0.26 : 0.13), hr, bd.v, false); }
       return;
 
       function finOn(o, q, k, sds, ri) {
@@ -2064,7 +2181,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       // the nucleus; with an eye gene it is an eyespot that looks about
       const nx = Rm * 0.12, ny = cy + Rm * 0.02, nr = Rm * (0.3 + 0.12 * f.es);
       if (f.en > 0) eyeAt(nx, ny, nr, true);
-      else { ctx.beginPath(); ctx.arc(nx, ny, nr, 0, TAU); ctx.fillStyle = hsl(f.hue + f.hue2, 55, 30, 0.85); ctx.fill(); ctx.strokeStyle = hsl(f.hue + f.hue2, 70, 70, 0.8); ctx.lineWidth = 2; ctx.stroke(); ctx.beginPath(); ctx.arc(nx - nr * 0.3, ny - nr * 0.3, nr * 0.25, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fill(); }
+      else { const wb = Math.sin(B(1.3)) * 0.08; ctx.beginPath(); ctx.ellipse(nx - Rm * 0.2, ny + Rm * 0.12, nr * 0.95, nr * (0.68 + wb), 0.5, 0, TAU); ctx.fillStyle = hsl(f.hue + f.hue2, 45, 72, 0.4); ctx.fill(); for (let i = 0; i < 5; i++) { const a = i * 1.26 + 0.4; ctx.beginPath(); ctx.arc(nx - Rm * 0.2 + Math.cos(a) * nr * 0.4, ny + Rm * 0.12 + Math.sin(a) * nr * 0.28, 1.8, 0, TAU); ctx.fillStyle = hsl(f.hue + f.hue2, 50, 50, 0.45); ctx.fill(); } }
       lights([[-Rm * 0.5, cy + Rm * 0.3], [Rm * 0.45, cy - Rm * 0.35]]);
       return;
     }
@@ -2281,18 +2398,18 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     }
     // fill the current path with lit skin, then its markings inside it, then the outline (again() re-traces the path)
     function skin(x, y, w, h, again, spine) {
-      const g = ctx.createLinearGradient(0, y, 0, y + h);
-      g.addColorStop(0, col.light); g.addColorStop(0.45, col.body); g.addColorStop(1, col.dark);
+      const g = ctx.createRadialGradient(x + w * 0.36, y + h * 0.28, 2, x + w * 0.5, y + h * 0.5, Math.max(w, h) * 0.78);
+      g.addColorStop(0, col.light); g.addColorStop(0.5, col.body); g.addColorStop(1, col.dark);
       ctx.fillStyle = g; ctx.fill();
       ctx.save(); ctx.clip();
       ctx.fillStyle = col.mark; ctx.strokeStyle = col.mark;
       const step = 12 + f.psc * 16, along = spine && !upright;      // markings follow the body: across an upright one, along one that lies flat
       if (f.pat === 1) { ctx.globalAlpha = 0.8; if (along) for (let a = 0.5; a < f.n * 2 + 2; a++) { const p = station(hs + (1 - hs) * a / (f.n * 2 + 2)); ctx.beginPath(); ctx.moveTo(p.x + p.nx * p.w * 1.1 * backSign - 4, p.y + p.ny * p.w * 1.1 * backSign); ctx.quadraticCurveTo(p.x - 9, p.y, p.x - p.nx * p.w * 0.2 * backSign - 3, p.y - p.ny * p.w * 0.2 * backSign); ctx.lineTo(p.x - p.nx * p.w * 0.2 * backSign + 4, p.y - p.ny * p.w * 0.2 * backSign); ctx.quadraticCurveTo(p.x, p.y, p.x + p.nx * p.w * 1.1 * backSign + 4, p.y + p.ny * p.w * 1.1 * backSign); ctx.closePath(); ctx.fill(); } else for (let yy = y + (spine ? Hr * 2.1 : step * 0.5); yy < y + h; yy += step) { ctx.beginPath(); ctx.moveTo(x - 4, yy); ctx.quadraticCurveTo(x + w / 2, yy + 9, x + w + 4, yy); ctx.lineTo(x + w + 4, yy + step * 0.42); ctx.quadraticCurveTo(x + w / 2, yy + 9 + step * 0.42, x - 4, yy + step * 0.42); ctx.closePath(); ctx.fill(); } }
-      else if (f.pat === 2) { ctx.globalAlpha = 0.8; for (let i = 0; i < 18; i++) { ctx.beginPath(); ctx.arc(x + rr() * w, y + rr() * h * (along ? 0.6 : 1), 3 + f.psc * 7 * (0.5 + rr()), 0, TAU); ctx.fill(); } }
+      else if (f.pat === 2) { ctx.globalAlpha = 0.8; for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.arc(x + rr() * w, y + rr() * h * (along ? 0.6 : 1), 3 + f.psc * 7 * (0.5 + rr()), 0, TAU); ctx.fill(); } }
       else if (f.pat === 4) { ctx.globalAlpha = 0.75; ctx.lineWidth = 3.4 + f.psc * 3; for (let i = 0; i < 3; i++) { const p = spine ? station(hs + (1 - hs) * (0.22 + i * 0.24)) : { x: x + w * (0.3 + i * 0.2), y: y + h * 0.5, w: h * 0.4 }; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(6, p.w * 0.5), 0, TAU); ctx.stroke(); ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2, p.w * 0.18), 0, TAU); ctx.fill(); } }      // eye-spots
       else if (f.pat === 5) { ctx.globalAlpha = 0.85; const p = spine ? station(hs + (1 - hs) * 0.45) : { x: x + w / 2, y: y + h / 2, w: h * 0.4, nx: 0, ny: -1 }; ctx.beginPath(); if (along) ctx.ellipse(p.x + p.nx * p.w * 0.7 * backSign, p.y + p.ny * p.w * 0.7 * backSign, L * (0.16 + f.psc * 0.12), p.w * 0.85, 0, 0, TAU); else ctx.ellipse(p.x, spine ? p.y : y + h * 0.15, spine ? p.w * 1.6 : w * 0.6, spine ? Lb * (0.14 + f.psc * 0.12) : h * 0.3, 0, 0, TAU); ctx.fill(); }
       if (f.pat === 3 || f.coat === 1) { ctx.globalAlpha = 0.5; ctx.fillStyle = '#fff'; ctx.beginPath(); if (along) { const p = station(hs + (1 - hs) * 0.45); ctx.ellipse(p.x, p.y - p.ny * p.w * 0.7 * backSign, Lb * 0.4, p.w * 0.55, 0, 0, TAU); } else ctx.ellipse(x + w / 2, y + h * (spine ? 0.68 : 0.7), w * 0.3, h * (spine ? 0.24 : 0.25), 0, 0, TAU); ctx.fill(); }      // a pale belly
-      if (f.coat === 1) { ctx.globalAlpha = 0.34; ctx.strokeStyle = INK; ctx.lineWidth = 1.5; let row = 0; for (let yy = y + 4; yy < y + h; yy += 9, row++) for (let xx = x + (row % 2) * 7; xx < x + w; xx += 14) { if (spine && Math.hypot(xx - H.x, yy - H.y) < Hr * 1.05) continue; ctx.beginPath(); ctx.arc(xx, yy, 7, 0.2, 2.94); ctx.stroke(); } }
+      if (f.coat === 1) { ctx.globalAlpha = 0.18; ctx.strokeStyle = INK; ctx.lineWidth = 1.5; let row = 0; for (let yy = y + 4; yy < y + h; yy += 9, row++) for (let xx = x + (row % 2) * 7; xx < x + w; xx += 14) { if (spine && Math.hypot(xx - H.x, yy - H.y) < Hr * 1.05) continue; ctx.beginPath(); ctx.arc(xx, yy, 7, 0.2, 2.94); ctx.stroke(); } }
       if (spine) for (let i = 0; i < plates.length; i++) { const q = plates[i]; ctx.globalAlpha = 0.9; ctx.fillStyle = col.limb; for (let a = q.a; a <= q.b && a < f.n; a += q.e) { const p = station(segU(a)); ctx.beginPath(); ctx.ellipse(p.x, p.y, along ? (1 - hs) * L / f.n * 0.42 : p.w * 1.05, along ? p.w * 1.05 : (1 - hs) * L / f.n * 0.42, 0, 0, TAU); ctx.fill(); ctx.globalAlpha = 0.45; ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke(); ctx.globalAlpha = 0.9; } }
       if (spine && f.n > 2) { ctx.globalAlpha = 0.12; ctx.strokeStyle = INK; ctx.lineWidth = 2; for (let a = 1; a < Math.min(f.n, 9); a++) { const p = station(hs + (1 - hs) * a / Math.min(f.n, 9)); ctx.beginPath(); ctx.moveTo(p.x + p.nx * p.w, p.y + p.ny * p.w); ctx.quadraticCurveTo(p.x + p.dx * 6, p.y + p.dy * 6, p.x - p.nx * p.w, p.y - p.ny * p.w); ctx.stroke(); } }
       // light falls from above: a sheen along the top, the wet shine of something that lives in water
@@ -2319,8 +2436,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       if (o.collect) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4); o.collect.push([ex, ey, r]); return; }
       if (lid) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(col.dark, 2.4); ctx.beginPath(); ctx.moveTo(ex - r * 0.7, ey); ctx.quadraticCurveTo(ex, ey + r * 0.6, ex + r * 0.7, ey); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); return; }
       ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4);
-      ctx.beginPath(); ctx.arc(ex + lx * r * 0.28, ey + ly * r * 0.28, r * 0.62, 0, TAU); ctx.fillStyle = INK; ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex + lx * r * 0.28 - r * 0.22, ey + ly * r * 0.28 - r * 0.26, r * 0.26, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(ex + lx * r * 0.28 + r * 0.22, ey + ly * r * 0.28 + r * 0.2, r * 0.11, 0, TAU); ctx.fill();
+      F._pupil(ctx, ex, ey, r, lx, ly, hsl(f.hue + f.hue2, 68, 44, 1), INK, 0.46);
     }
     // the face. side 0: it looks straight at you. side 1: its head points to the right; you see the eye on this side
     function face(x, y, hr, side, isStar) {
@@ -2340,8 +2456,16 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     }
   };
 
+  /** the living part of an eye: iris, pupil, two lights, and the soft shade of the upper lid */
+  F._pupil = function (ctx, ex, ey, r, lx, ly, iris, ink, pup) {
+    const px = ex + lx * r * 0.2, py = ey + ly * r * 0.2 + r * 0.04;
+    ctx.beginPath(); ctx.arc(px, py, r * 0.74, 0, TAU); ctx.fillStyle = iris; ctx.fill();
+    ctx.beginPath(); ctx.arc(px, py, r * pup, 0, TAU); ctx.fillStyle = ink; ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px - r * 0.26, py - r * 0.3, r * 0.24, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(px + r * 0.24, py + r * 0.26, r * 0.1, 0, TAU); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(ex, ey, r * 0.98, 0, TAU); ctx.clip(); ctx.fillStyle = 'rgba(7,18,31,0.16)'; ctx.beginPath(); ctx.ellipse(ex, ey - r * 0.95, r * 1.25, r * 0.62, 0, 0, TAU); ctx.fill(); ctx.restore();
+  };
   // ── the character, kept as a short loop of moving frames: so a whole pond of them moves, every part, and stays cheap ──
-  const PW = 170, PT = 190, PB = 160, PPX = 0.46, K = 6;        // the box a character is drawn in, pixels per unit, and frames in its loop
+  const PW = 170, PT = 190, PB = 160, PPX = 0.46, K = 8;        // the box a character is drawn in, pixels per unit, and frames in its loop
   const kept = {}; let keptN = 0, madeAt = -1, made = 0;
   function frame(f, i) {
     const cv = document.createElement('canvas'); cv.width = Math.ceil(PW * 2 * PPX); cv.height = Math.ceil((PT + PB) * PPX);
@@ -2356,26 +2480,26 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (s) { s.used = G.rt || 0; return s; }
     if (keptN > 150) { const now = G.rt || 0; for (const k in kept) if (now - kept[k].used > 3) { delete kept[k]; keptN--; } if (keptN > 230) { for (const k in kept) delete kept[k]; keptN = 0; } }
     s = kept[key] = { fr: [frame(f, 0)], ink: '', dark: '', build: F.build(f), used: G.rt || 0 }; keptN++;
-    s.ink = F._ink(); s.dark = F._colours(f).dark;
+    s.ink = F._ink(); s.dark = F._colours(f).dark; s.iris = 'hsl(' + Math.round((((f.hue + f.hue2) % 360) + 360) % 360) + ',68%,44%)';
     return s;
   };
   /** the kept character at the origin at this point of its loop (phase 0..1), then its eyes, alive. mood: { lx, ly, lid 0..1, wide } */
   F.pDraw = function (ctx, f, mood, phase) {
     const s = F.pSprite(f);
-    let i = Math.floor((((phase || 0) % 1) + 1) % 1 * K) % K;
+    const pos = (((phase || 0) % 1) + 1) % 1 * K; let i = Math.floor(pos) % K; const mix = pos - Math.floor(pos);
     if (!s.fr[i]) {
       // a few new frames a tick at most, so a pond full of newborns never stalls; until its frame exists, the nearest one is shown
       if (madeAt !== G.rt) { madeAt = G.rt; made = 0; }
       if (made < 3) { made++; s.fr[i] = frame(f, i); } else { let j = i; while (j > 0 && !s.fr[j]) j--; i = j; }
     }
-    const fr = s.fr[i];
+    const fr = s.fr[i], nx = s.fr[(i + 1) % K];
     ctx.drawImage(fr.cv, -PW, -PT, PW * 2, PT + PB);
+    if (nx && mix > 0.08) { const ga = ctx.globalAlpha; ctx.globalAlpha = ga * mix; ctx.drawImage(nx.cv, -PW, -PT, PW * 2, PT + PB); ctx.globalAlpha = ga; }
     const lx = mood.lx || 0, ly = mood.ly || 0, pup = mood.wide ? 0.42 : 0.62;
     for (let q = 0; q < fr.eyes.length; q++) {
       const e = fr.eyes[q], r = e[2];
       if (mood.lid >= 1) { ctx.beginPath(); ctx.arc(e[0], e[1], r, 0, TAU); ctx.fillStyle = s.dark; ctx.fill(); ctx.strokeStyle = s.ink; ctx.lineWidth = 2.4; ctx.stroke(); ctx.beginPath(); ctx.moveTo(e[0] - r * 0.7, e[1]); ctx.quadraticCurveTo(e[0], e[1] + r * 0.6, e[0] + r * 0.7, e[1]); ctx.stroke(); continue; }
-      ctx.beginPath(); ctx.arc(e[0] + lx * r * 0.28, e[1] + ly * r * 0.28, r * pup, 0, TAU); ctx.fillStyle = s.ink; ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(e[0] + lx * r * 0.28 - r * 0.22, e[1] + ly * r * 0.28 - r * 0.26, r * 0.24, 0, TAU); ctx.fill();
+      F._pupil(ctx, e[0], e[1], r, lx, ly, s.iris, s.ink, mood.wide ? 0.3 : 0.46);
       if (mood.lid > 0) { ctx.save(); ctx.beginPath(); ctx.arc(e[0], e[1], r * 1.02, 0, TAU); ctx.clip(); ctx.fillStyle = s.dark; ctx.fillRect(e[0] - r * 1.1, e[1] - r * 1.1, r * 2.2, r * 2.2 * mood.lid * 0.75); ctx.restore(); }      // heavy lids: tired, or sick
     }
     return s;
@@ -2444,6 +2568,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     G.seed(W.seed);
     W.hue0 = G.rand() * 360;                 // every pond's first life has its own colour
     W.fashion = G.form.newFashion();         // and its own idea of beauty
+    W.taste = G.form.newTaste();             // which it goes on learning from the eye that watches it
     // and its own water. o2: oxygen; murk: how fast light dies with depth; rich: how much food grows; warm: base temperature;
     // green: how much of the shallows' food is plain green algae; deep: the food that only the deep grows; hue: the colour of the water
     W.env = { mix: [G.rr(0.6, 1.5), G.rr(0.5, 1.5), G.rr(0.8, 1.4), G.rr(0.5, 1.5), G.rr(0.5, 1.5), G.rr(0.5, 1.5)], o2: G.rr(0.6, 1.25), murk: G.rand(), rich: G.rr(0.75, 1.35), warm: G.rr(-0.22, 0.22), green: G.rr(0.55, 0.9), deep: G.ri(3, 5), hue: G.rr(150, 235) };
@@ -2489,6 +2614,18 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     };
     c.out[0] = 0.5;
     c.snap = null;
+    // How nice to the eye and how whole it is. Where a watcher is at work, a newborn is taken to be like its parents as the watcher saw
+    // them, moved a little by how its own genes differ from theirs; then the watcher looks at it and its marks are its own.
+    if (genome.f.bd) {
+      const FM = G.form, T = W.taste, mb = ph.charm, mw = ph.whole, A = parentA && parentA.eb !== undefined && parentA.g ? parentA : null, B = parentB && parentB.eb !== undefined && parentB.g ? parentB : A;
+      const hit = W.eyeSeen ? W.eyeSeen[FM.key(genome.f)] : null;
+      if (hit) { c.real = { b: hit.b, w: hit.w, why: hit.why || '', gen: W.gen }; c.eb = hit.b; c.ew = hit.w; c.st = 0; }
+      else if (A && (W.eyeN || (W.eyeBank && W.eyeBank.length))) { c.eb = clamp((A.eb + B.eb) / 2 + 0.5 * (mb - (FM.beauty(A.g.f, T) + FM.beauty(B.g.f, T)) / 2), 0, 1); c.ew = clamp((A.ew + B.ew) / 2 + 0.5 * (mw - (FM.whole(A.g.f).v + FM.whole(B.g.f).v) / 2), 0, 1); c.st = Math.min(A.st || 0, B.st || 0) + 1; }
+      else { c.eb = mb; c.ew = mw; c.st = 3; }
+      // and it is held against the creatures the watcher has really looked at: the more it resembles some of them, the more their marks count
+      if (!hit && W.eyeBank && W.eyeBank.length) { const fv = c.fv = G.features(genome); let sw = 0, sb = 0, sh = 0; for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i], d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; sb += wt * q.b; sh += wt * q.w; } if (sw > 0.15) { const k = Math.min(0.85, sw / (sw + 0.6)); c.eb += k * (sb / sw - c.eb); c.ew += k * (sh / sw - c.ew); c.st = Math.min(c.st, 1); } }
+      ph.charm = c.eb; ph.whole = c.ew;
+    }
     return c;
   };
   G.snapOf = function (c, extra) {
@@ -3152,11 +3289,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       const median = bs[bs.length >> 1];
       // looks alone decide who is passed over: the whole finished body, all its parts together. The ugliest quarter find no mate and leave no children.
       const looks = surv.map(G.charmOf).sort(function (a, b) { return a - b; });
-      const ugly = looks[Math.floor(looks.length * 0.25)], mid = looks[looks.length >> 1];
+      const ugly = looks[Math.floor(looks.length * 0.33)], mid = looks[looks.length >> 1], nice = looks[Math.floor(looks.length * 0.67)];
       for (let i = 0; i < plan.length; i++) {
         const bq = beauty(plan[i].p), lk = G.charmOf(plan[i].p);
         if (lk <= ugly && lk < mid * 0.97) { W.stats.snubbed++; plan[i].n = G.rand() < 0.08 ? 1 : 0; plan[i].p.snub = true; }
-        else { plan[i].p.snub = false; if (bq > median * 1.2 && plan[i].n < 3 && plan[i].p.E > plan[i].p.ph.Emax * 0.3) plan[i].n++; }
+        else { plan[i].p.snub = false; if (lk >= nice) { if (plan[i].n < 3 && plan[i].p.E > plan[i].p.ph.Emax * 0.3) plan[i].n++; } else if (plan[i].n > 1) plan[i].n = 1; }
       }
     }
     // too many for the pond: only the fittest parents may breed
@@ -3210,7 +3347,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   G.charmOf = function (c) {
     const s = c.sp ? G.speciesById(c.sp) : null;
     // the grade the eye for beauty gave its kind is most of it; its own body's fit to the pond's taste is the rest. What the player kept is loved outright.
-    const v = s && s.judge ? 0.3 * c.ph.charm + 0.7 * s.judge.score : c.ph.charm;
+    // a grade counts for what it is next to the other grades in this pond: so a generous judge and a strict one select alike
+    const v = 0.5 * c.ph.charm + 0.5 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);
     return s && s.loved ? Math.max(v, 0.92) : v;
   };
 
@@ -3225,7 +3363,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         if (!p.fv) p.fv = G.features(p.g);
         if (!o.fv) o.fv = G.features(o.g);
         // of the compatible ones nearby, the most charming and healthy is chosen
-        if (G.fdist(p.fv, o.fv) < 1.7) { const b = 0.6 * G.charmOf(o) + 0.4 * clamp(o.E / o.ph.Emax, 0, 1) + (G.kindOf(o.g).kind === G.kindOf(p.g).kind ? 1 : 0) + (Math.abs(((o.g.f.hue - p.g.f.hue + 540) % 360) - 180) < 35 ? 0.6 : 0); if (!best || b > bd2) { best = o; bd2 = b; } }
+        if (G.fdist(p.fv, o.fv) < 1.7) { const b = 2.2 * G.charmOf(o) + 0.3 * clamp(o.E / o.ph.Emax, 0, 1) + (G.kindOf(o.g).kind === G.kindOf(p.g).kind ? 1 : 0) + (Math.abs(((o.g.f.hue - p.g.f.hue + 540) % 360) - 180) < 35 ? 0.6 : 0); if (!best || b > bd2) { best = o; bd2 = b; } }
       }
     }
     return best;
@@ -3255,7 +3393,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     let sum = 0, best = 0, bestC = null, genes = 0, intake = 0;
     for (let i = 0; i < cre.length; i++) {
       const c = cre[i];
-      c.fit = clamp(c.E / c.ph.Emax, 0, 1);
+      c.fed = clamp(c.E / c.ph.Emax, 0, 1);
+      c.fit = clamp(c.fed / 0.5, 0, 1) * (0.15 + 0.85 * G.charmOf(c));          // fed well enough (half a tank is plenty), times how nice to the eye and how whole it is
       sum += c.fit; genes += c.g.f.n + c.g.f.rules.length + c.g.p.length + c.g.w.length + c.g.h;
       intake += c.intake;
       if (c.fit > best) { best = c.fit; bestC = c; }
@@ -3265,7 +3404,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const nb = Math.max(1, Math.round(sorted.length * 0.1));
     for (let i = 0; i < nb && i < sorted.length; i++) sorted[i].best = true;
     const n = cre.length || 1;
-    W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0 });
+    let looksSum = 0, looksTop = 0, wholeSum = 0, wholeTop = 0; for (let i = 0; i < cre.length; i++) { const v = cre[i].ph.charm, wv = cre[i].ph.whole || 0; looksSum += v; if (v > looksTop) looksTop = v; wholeSum += wv; if (wv > wholeTop) wholeTop = wv; }
+    W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop });
     if (W.hist.length > 600) W.hist.shift();
     G.updateSpecies();
     G.scanDiscoveries();
@@ -3291,11 +3431,12 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const share = {}, shapes = {}, hues = [0, 0, 0, 0, 0, 0];
     for (let i = 0; i < cre.length; i++) { const c = cre[i], k = G.kindOf(c.g).kind; c.kd = k; share[k] = (share[k] || 0) + 1; c.shp = G.shapeOf(c.g); shapes[c.shp] = (shapes[c.shp] || 0) + 1; c.hb = G.hueOf(c.g); hues[c.hb]++; }
     // who lasts the winter: the well fed, the rare, and the good-looking (the pond is kind to what is admired)
-    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.55 * hues[cre[i].hb] / cre.length) * (0.74 + 0.52 * G.charmOf(cre[i]));
+    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.55 * hues[cre[i].hb] / cre.length) ;
     let topK = '', topN = 0; for (const k in share) if (share[k] > topN) { topN = share[k]; topK = k; }
     const crowd = topN / Math.max(1, cre.length);
     let sick = 0;
-    if (crowd > 0.5 && cre.length > 30) { const pr = (crowd - 0.5) * 0.9; for (let i = 0; i < cre.length; i++) if (cre[i].kd === topK && G.rand() < pr) { cre[i].sel = -1; cre[i].sick = true; sick++; } }
+    { const ap = cre.map(G.charmOf).sort(function (a, b) { return b - a; }), cut = ap[Math.floor(ap.length * 0.15)] || 1; for (let i = 0; i < cre.length; i++) { cre[i].elite = cre.length >= 12 && G.charmOf(cre[i]) >= cut && cre[i].fed > 0.2; if (cre[i].elite) cre[i].sel += 1; } }
+    if (crowd > 0.5 && cre.length > 30) { const pr = (crowd - 0.5) * 0.9; for (let i = 0; i < cre.length; i++) if (cre[i].kd === topK && !cre[i].elite && G.rand() < pr) { cre[i].sel = -1; cre[i].sick = true; sick++; } }
     if (sick > 4 && (W.gen - (W.sickGen || 0)) > 6) { W.sickGen = W.gen; W.discLog.push({ key: 'sick' + W.gen, text: 'A sickness is going round the ' + topK.toLowerCase() + 's: there are so many of them (' + Math.round(crowd * 100) + '% of the pond) that it spreads easily. ' + sick + ' will not see spring. The rarer kinds are hardly touched.', gen: W.gen }); G.emit('sickness', topK, sick, crowd); }
     const sorted = cre.slice().sort(function (a, b) { return a.sel - b.sel; });
     const room = Math.round(cap * 0.8);
@@ -3922,7 +4063,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         if (task === 'story') return G.host.call('ai.story', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('story', r.source, r.usd); return r.story; });
         if (task === 'plan') return G.host.call('ai.plan', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('plan', r.source, r.usd); return r.plan; });
         if (task === 'design') return G.host.call('ai.design', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('design', r.source, r.usd); return r.design; });
-        if (task === 'judge') return G.host.call('ai.judge', Object.assign({}, input, { model: G.ai.model || undefined }), 70000).then(function (r) { G.ai.tally(input.kind === 'check' ? 'check' : 'judge', r.source, r.usd); return r.judge; });
+        if (task === 'judge') return G.host.call('ai.judge', Object.assign({}, input, { model: G.ai.model || undefined }), 70000).then(function (r) { G.ai.tally(input.kind === 'check' ? 'check' : input.kind === 'watch' ? 'watch' : 'judge', r.source, r.usd); return r.judge; });
         if (task === 'organ') return G.host.call('ai.organ', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('organ', r.source, r.usd); return r.organ; });
       }
       if (window.Plaxzy && window.Plaxzy.ai && typeof window.Plaxzy.ai.ask === 'function') {
@@ -3939,8 +4080,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     model: '',           // the player's choice ('' = the server's default)
     // automatic calls (organs, the story, mutation ideas) are limited by wall-clock time and a session budget,
     // so the cost is the same whether the pond runs at 1x or 64x, for a minute or a day
-    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 40000, check: 3000, design: 50000, paint: 22000, plan: 55000 },
-    caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 45, check: 36, design: 18, paint: 16, plan: 18 },
+    gaps: { organ: 40000, story: 45000, 'mutation-ideas': 120000, sound: 8000, judge: 40000, check: 3000, watch: 9000, design: 50000, paint: 22000, plan: 55000 },
+    caps: { organ: 30, story: 40, 'mutation-ideas': 20, sound: 15, judge: 45, check: 36, watch: 500, design: 18, paint: 16, plan: 18 },
     used: {}, lastAt: {},
     // what this session has asked the server for: { kind: { asked, fresh } }. "fresh" = a model really ran;
     // the rest came from the server's library of earlier decisions and cost nothing.
@@ -3951,7 +4092,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     // every answer that came from a server is written down: what it was for, whether a model really ran, and what it cost
     ledger: [],          // this session, newest last: { at, kind, paid, usd }
     life: {},            // this pond since it began (kept in its save): { kind: { asked, fresh, usd } }
-    LABEL: { thing: 'Things you typed', event: 'World events you typed', organ: 'New organs', story: 'Story chapters', ideas: 'Mutation ideas', judge: 'The eye for beauty: grading the creatures by looking at them', check: 'The eye for beauty: looking over new ideas', design: 'New kinds of body part', plan: 'New shapes of body', paint: 'Painted creatures (Leonardo)', sound: 'Sounds (Leonardo)' },
+    LABEL: { thing: 'Things you typed', event: 'World events you typed', organ: 'New organs', story: 'Story chapters', ideas: 'Mutation ideas', judge: 'The eye for beauty: grading the creatures by looking at them', check: 'The eye for beauty: looking over new ideas', watch: 'The watcher: looking at living creatures and grading them', design: 'New kinds of body part', plan: 'New shapes of body', paint: 'Painted creatures (Leonardo)', sound: 'Sounds (Leonardo)' },
     tally: function (kind, source, usd) {
       const c = G.ai.count[kind] || (G.ai.count[kind] = { asked: 0, fresh: 0, usd: 0 });
       c.asked++;
@@ -5054,15 +5195,16 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   };
 
   /** the creatures drawn side by side, numbered, as a picture the AI can look at (base64 JPEG), or null where nothing can be drawn */
-  G.sheet = function (forms) {
+  G.sheet = function (forms, o) {
     if (typeof document === 'undefined' || !forms.length) return null;
-    const n = forms.length, cols = n <= 2 ? n : n <= 4 ? 2 : 3, rows = Math.ceil(n / cols), CW = 226, CH = 232;
+    o = o || {};
+    const n = forms.length, cols = o.cols || (n <= 2 ? n : n <= 4 ? 2 : 3), rows = Math.ceil(n / cols), CW = o.cw || 226, CH = o.ch || 232, SC = o.sc || 0.62;
     const cv = document.createElement('canvas'); cv.width = cols * CW; cv.height = rows * CH;
     const ctx = cv.getContext('2d');
     ctx.fillStyle = '#0d2f3d'; ctx.fillRect(0, 0, cv.width, cv.height);
     for (let i = 0; i < n; i++) {
       const x = (i % cols) * CW, y = Math.floor(i / cols) * CH;
-      ctx.save(); ctx.translate(x + CW / 2, y + 190 * 0.62 + 6); ctx.scale(0.62, 0.62);
+      ctx.save(); ctx.translate(x + CW / 2, y + 190 * SC + 6); ctx.scale(SC, SC);
       try { G.form.portrait(ctx, forms[i], 1.3 + i, {}); } catch (e) { console.error(e); }
       ctx.restore();
       ctx.fillStyle = 'rgba(7,18,31,0.85)'; ctx.beginPath(); ctx.arc(x + 22, y + 22, 15, 0, 6.2832); ctx.fill();
@@ -5094,6 +5236,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   // once a generation: at most one question, about several kinds on one sheet, and only when the budget allows
   G.judgeTick = function (gen) {
     const W = G.W;
+    if (G.watchTick) return;                    // the watcher grades living creatures one by one instead
     if (!W || W.title || busy || !live()) return;
     // who needs a grade: established kinds never graded, or ones whose body has changed since
     const kinds = W.species.filter(function (s) { return !s.extinct && s.n >= 4 && s.rep && gen - s.born >= 1; }).sort(function (a, b) { return b.n - a.n; });
@@ -5109,10 +5252,60 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         if (!s || s.extinct || !s.rep) continue;
         s.judge = { score: scores[i].score, why: scores[i].why, fix: scores[i].fix, gen: W.gen, fv: G.form.features(s.rep.f) };
         G.emit('judged', s);
+        if (W.taste && s.rep.f.bd) G.form.learn(W.taste, s.rep.f, scores[i].score, 0.05);
       }
+      G.judgeMean();
+      if (W.taste) for (let i = 0; i < W.cre.length; i++) if (W.cre[i].g.f.bd) W.cre[i].ph.charm = G.form.beauty(W.cre[i].g.f, W.taste);
     }, function () { busy = false; });
   };
-  G.on('new-pond', function () { busy = false; });
+  /** the middle of the grades of the kinds alive now: a grade is weighed against this */
+  G.judgeMean = function () { const W = G.W; if (!W) return; let s = 0, n = 0; for (let i = 0; i < W.species.length; i++) { const q = W.species[i]; if (!q.extinct && q.judge && q.n > 0) { s += q.judge.score * q.n; n += q.n; } } W.jMean = n ? s / n : undefined; };
+  G.on('scored', function () { G.judgeMean(); });
+  // ── the watcher ──
+  // Every few seconds it is shown a sheet of living creatures nobody has looked at yet: first those whose marks are oldest guesses, and
+  // those the pond believes are its best (a guess must be checked before it is bred from). Its marks become those creatures' own.
+  let watching = false;
+  const c01 = function (v) { v = +v; return isFinite(v) ? G.clamp(v, 0, 1) : NaN; };
+  G.eyeGrade = function (c, g) { c.real = { b: g.b, w: g.w, why: g.why || '', gen: G.W.gen }; c.eb = g.b; c.ew = g.w; c.st = 0; c.ph.charm = g.b; c.ph.whole = g.w; };
+  G.watchPick = function (max) {
+    const W = G.W, L = [], seen = W.eyeSeen || {};
+    for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.real || !c.g.f.bd) continue; const hit = seen[G.form.key(c.g.f)]; if (hit) { G.eyeGrade(c, hit); continue; } L.push(c); }
+    L.sort(function (a, b) { return ((b.st || 0) * 0.5 + 6 * G.charmOf(b)) - ((a.st || 0) * 0.5 + 6 * G.charmOf(a)); });
+    const out = [], kinds = {};
+    for (let i = 0; i < L.length && out.length < max; i++) { const k = G.shapeOf(L[i].g) + '|' + G.hueOf(L[i].g); if (kinds[k] >= 3) continue; kinds[k] = (kinds[k] || 0) + 1; out.push(L[i]); }
+    return out;
+  };
+  G.watchTick = function () {
+    const W = G.W;
+    if (!W || W.title || watching || !live() || W.cre.length < 4) return;
+    const picks = G.watchPick(12);
+    if (picks.length < 4 || !G.ai.allow('watch')) return;
+    const img = G.sheet(picks.map(function (c) { return c.g.f; }), { cw: 176, ch: 182, sc: 0.48, cols: 4 });
+    if (!img) return;
+    watching = true;
+    G.ai.ask('judge', { image: img, mime: 'image/jpeg', lean: 1, count: picks.length, kind: 'watch' }).then(function (res) {
+      watching = false;
+      if (G.W !== W || !res || !Array.isArray(res.scores)) return;
+      if (!W.eyeSeen || (W.eyeKeys || 0) > 700) { W.eyeSeen = {}; W.eyeKeys = 0; }
+      let n = 0;
+      for (let i = 0; i < res.scores.length; i++) {
+        const s = res.scores[i], c = picks[(s.id | 0) - 1], g = { b: c01(s.score), w: c01(s.whole), why: String(s.why || '').replace(/[<>]/g, '').slice(0, 70) };
+        if (!c || isNaN(g.b) || isNaN(g.w)) continue;
+        W.eyeSeen[G.form.key(c.g.f)] = g; W.eyeKeys++; n++;
+        if (!c.dead) G.eyeGrade(c, g);
+        // the look is remembered, and every living creature that resembles this one is moved towards what the watcher said of it
+        { const fv = c.fv || G.features(c.g); (W.eyeBank = W.eyeBank || []).push({ fv: fv, b: g.b, w: g.w }); if (W.eyeBank.length > 160) W.eyeBank.shift();
+          for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x === c || x.real || x.dead || !x.g.f.bd || x.eb === undefined) continue; const d = G.fdist(fv, x.fv || (x.fv = G.features(x.g))), wt = Math.exp(-d * d); if (wt < 0.05) continue; x.eb += 0.8 * wt * (g.b - x.eb); x.ew += 0.8 * wt * (g.w - x.ew); x.st = Math.min(x.st || 0, 1); x.ph.charm = x.eb; x.ph.whole = x.ew; } }
+        if (W.taste) G.form.learn(W.taste, c.g.f, g.b, 0.03);          // the pond's own guess is corrected by every look
+        const sp = c.sp ? G.speciesById(c.sp) : null;
+        if (sp && (!sp.judge || sp.judge.est || g.b + g.w >= sp.judge.score + (sp.judge.whole || 0) - 0.05 || W.gen - sp.judge.gen > 5)) sp.judge = { score: g.b, whole: g.w, why: g.why, gen: W.gen, fv: sp.fv ? sp.fv.slice() : [] };
+      }
+      W.eyeN = (W.eyeN || 0) + n;
+      G.emit('watched', n);
+    }, function () { watching = false; });
+  };
+  if (typeof document !== 'undefined' && typeof setInterval === 'function') setInterval(function () { try { G.watchTick(); } catch (e) { console.error(e); } }, 2000);
+  G.on('new-pond', function () { busy = false; watching = false; });
 })();
 
 </script>
@@ -5835,8 +6028,12 @@ function drawCharacter(ctx, c, x, y, scale, t, opt) {
   c.fc = c.fc === undefined ? (vx >= 0 ? 1 : -1) : c.fc + ((vx > 0.2 ? 1 : vx < -0.2 ? -1 : c.fc > 0 ? 1 : -1) - c.fc) * 0.18;      // turning round takes a moment
   const spc = c.sp ? spOf(G.W, c.sp) : null, paint = G.ai.drawn ? null : (G.paintOf ? G.paintOf(c, spc) : null);
   const walks = G.form.walks(c.g.f._b || (c.g.f._b = G.form.build(c.g.f)), c.g.f);
-  const still = c.asleep, hopT = t * (4.5 + 5 * sp) + id, hop = still ? 0 : walks ? Math.abs(Math.sin(hopT)) * r * (0.06 + 0.3 * sp) : (0.5 + 0.5 * Math.sin(t * 1.7 + id)) * r * 0.5;
-  const land = still ? 1 : walks ? 1 - Math.abs(Math.sin(hopT)) : 0;          // 1 at the moment a walker touches down: it squashes there
+  const still = c.asleep, dtv = c._vt === undefined ? 0 : Math.max(0, Math.min(0.1, t - c._vt)); c._vt = t;
+  c._sp = c._sp === undefined ? sp : c._sp + (sp - c._sp) * Math.min(1, dtv * 3);
+  const sp2 = c._sp;
+  c._hop = (c._hop === undefined ? id : c._hop) + dtv * (2.6 + 3 * sp2); c._lp = (c._lp === undefined ? id * 0.37 : c._lp) + dtv * (0.4 + 0.45 * sp2);
+  const hopT = c._hop, step = 0.5 - 0.5 * Math.cos(hopT * 2), hop = still ? 0 : walks ? step * Math.min(r * (0.05 + 0.2 * sp2), 9 + 6 * sp2) : (0.5 + 0.5 * Math.sin(t * 1.7 + id)) * Math.min(r * 0.5, 14);
+  const land = still ? 1 : walks ? 1 - step : 0;          // 1 at the moment a walker touches down: it squashes there
   const shiver = c.chill > 0.05 ? Math.sin(t * 38 + id) * r * 0.035 : 0;
   const s = r / R.SIDE * (0.3 + 0.7 * pop) * (weak ? 0.92 : 1);
   ctx.save(); ctx.translate(x + shiver, y); ctx.globalAlpha = alpha * (weak ? 0.8 : 1);
@@ -5844,9 +6041,9 @@ function drawCharacter(ctx, c, x, y, scale, t, opt) {
   ctx.fillStyle = 'rgba(4,12,20,0.3)'; ctx.beginPath(); ctx.ellipse(0, r * 0.1, r * (0.85 - 0.25 * hop / (r * 0.4 + 1)), r * 0.24, 0, 0, 6.2832); ctx.fill();
   if (ph.lamp > 0.3 || c.eatFlash > 0.2) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= (0.25 * Math.min(1, ph.lamp) * (0.5 + 0.5 * (c.glow || 0)) + 0.25 * Math.max(0, c.eatFlash || 0)) * (opt.crowd || 1); const hs = r * 3; ctx.drawImage(haloSprite(ph.hue), -hs, -hs - r * 1.2, hs * 2, hs * 2); ctx.restore(); }
   ctx.translate(0, -hop);
-  const sq = still ? 0.06 : 0.1 * Math.pow(land, 3) * (0.4 + sp), turn = Math.max(0.5, Math.abs(c.fc)) * (c.fc >= 0 ? 1 : -1);
+  const sq = still ? 0.06 : 0.06 * Math.pow(land, 3) * (0.4 + sp2), turn = Math.max(0.5, Math.abs(c.fc)) * (c.fc >= 0 ? 1 : -1);
   ctx.scale(turn * (1 + sq), 1 - sq);
-  ctx.rotate(still ? (walks ? 0.9 : 0.25) : walks ? 0.04 + 0.16 * sp + Math.sin(hopT * 0.5) * 0.03 : G.clamp(Math.sin(c.ang || 0) * 0.45, -0.45, 0.45) * (0.3 + 0.7 * sp) + Math.sin(t * 2.3 + id) * 0.04);      // a walker leans into its speed; a swimmer points where it is going; asleep, it droops
+  ctx.rotate(still ? (walks ? 0.9 : 0.25) : walks ? 0.03 + 0.12 * sp2 + Math.sin(hopT) * 0.02 : G.clamp(Math.sin(c.ang || 0) * 0.45, -0.45, 0.45) * (0.3 + 0.7 * sp2) + Math.sin(t * 2.3 + id) * 0.04);      // a walker leans into its speed; a swimmer points where it is going; asleep, it droops
   ctx.scale(s, s); ctx.translate(0, -104);                                       // its feet are at 104 in portrait units
   // where it looks: at what it is after, else it glances about
   let lx = Math.cos(t * 0.7 + id) * 0.6, ly = 0.15 + Math.sin(t * 0.9 + id * 1.3) * 0.4;
@@ -5856,7 +6053,7 @@ function drawCharacter(ctx, c, x, y, scale, t, opt) {
   const lid = still || blink ? 1 : c.pois > 0.3 || c.gasp > 0.3 || weak ? 0.55 : c.tired > 0.75 ? 0.4 : 0;
   if (paint) { const k = 250 / Math.max(paint.w, paint.h), bottom = walks ? 108 : 86; drawPaintMoving(ctx, paint, c.g.f._b, -paint.w * k / 2, bottom - paint.h * k, paint.w * k, paint.h * k, t, id, sp, still); }      // the AI's painting of its kind, moving the way its build moves
   else if (opt.live) G.form.portrait(ctx, f, t + id * 0.37, { lx: lx, ly: ly, sleep: still });
-  else G.form.pDraw(ctx, f, { lx: lx, ly: ly, lid: lid, wide: scared }, still ? id * 0.37 : t * (0.42 + 0.5 * sp) + id * 0.37);
+  else G.form.pDraw(ctx, f, { lx: lx, ly: ly, lid: lid, wide: scared }, still ? id * 0.37 : c._lp);
   ctx.restore();
   // what it is going through, said with one small sign over its head
   if (G.speed <= 8 && alpha > 0.5 && !opt.noSigns) {
@@ -6037,7 +6234,7 @@ function drawCreatures() {
   if (s && !s.dead) {
     ctx.save();
     ctx.strokeStyle = G.rgba(PAL.frost, 0.8); ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.lineDashOffset = -t * 20;
-    ctx.beginPath(); ctx.arc(s.rx || s.x, s.ry || s.y, s.ph.r * (1.1 + 0.8 * s.ph.reach) + 2 * Math.sin(t * 4), 0, 6.2832); ctx.stroke();
+    { const rr = s.ph.r * R.VIS; ctx.beginPath(); ctx.arc(s.rx || s.x, (s.ry || s.y) - rr * 1.25, rr * 2.1 + 2 * Math.sin(t * 4), 0, 6.2832); ctx.stroke(); }
     ctx.restore();
   }
 }
@@ -6330,7 +6527,7 @@ G.addSystem({
   const SEASON_INFO = [
     { name: 'SPRING', step: 'Breed · Mutate', title: 'SPRING · BREED + MUTATE', text: 'The fittest parents have children, and mates choose the most charming. Genes are copied, mixed and sometimes changed.' },
     { name: 'SUMMER', step: 'Test', title: 'SUMMER · TEST', text: 'Life is the test: creatures hunt for food, flee and try to stay alive.' },
-    { name: 'AUTUMN', step: 'Score', title: 'AUTUMN · SCORE', text: 'Fitness is the energy a creature has stored. The bars are the scores; the best creatures glow.' },
+    { name: 'AUTUMN', step: 'Score', title: 'AUTUMN · SCORE', text: 'Fitness is how nice to the eye and how whole a creature is, once it has eaten well enough. The bars are the scores; the best creatures glow.' },
     { name: 'WINTER', step: 'Select', title: 'WINTER · SELECT', text: 'The lowest scores fade away. Only the fit stay to breed in spring.' },
   ];
 
@@ -6357,7 +6554,7 @@ G.addSystem({
     const p = el('div', 'glass hide', '', ui); p.id = 'panel';
     p.innerHTML = '<button class="phead" id="panelToggle" aria-label="Evolution panel">EVOLUTION<span id="phSum"></span>' + ICON.chev + '</button>' +
       '<div class="pbody"><div id="era" style="margin-bottom:10px"></div><div class="stats"><div><b id="stGen">1</b><small>Gen</small></div><div><b id="stPop">0</b><small>Alive</small></div><div><b id="stSp">1</b><small>Species</small></div><div><b id="stFit">0.00</b><small>Fitness</small></div></div>' +
-      '<div class="tabs" id="gtabs"><button data-m="fit" class="on">FITNESS</button><button data-m="skill">SKILL</button><button data-m="pop">POP</button><button data-m="genes">GENES</button></div>' +
+      '<div class="tabs" id="gtabs"><button data-m="look" class="on">BEAUTY</button><button data-m="whole">WHOLE</button><button data-m="fit">FITNESS</button><button data-m="skill">SKILL</button><button data-m="pop">POP</button><button data-m="genes">GENES</button></div>' +
       '<canvas id="graph" width="560" height="184"></canvas><div class="gnote" id="gnote"></div><button class="gnote" id="aiLine" style="min-height:0;color:var(--gold);background:none;border:0;padding:0;font:inherit;font-size:11px;line-height:1.3;text-align:left;cursor:pointer;text-decoration:underline dotted;display:block" title="See what each kind of AI use cost"></button><div class="ilabel">What changed</div><div class="log" id="mutLog"></div></div>';
     refs.panel = p;
     if (window.innerWidth < 720) p.classList.add('min');
@@ -6367,7 +6564,7 @@ G.addSystem({
       for (let j = 0; j < tabs.length; j++) tabs[j].classList.remove('on');
       this.classList.add('on'); UI.metric = this.dataset.m; drawGraph(true); G.sfx('click');
     };
-    UI.metric = 'fit';
+    UI.metric = 'look';
 
     // toolbar
     const tb = el('div', 'glass hide', '', ui); tb.id = 'toolbar';
@@ -6693,14 +6890,16 @@ G.addSystem({
 
   // ── graph ──
   const METRICS = {
-    fit: { label: 'Fitness = how full a creature\'s energy tank is at autumn. Fuller tanks survive winter and have more children.', get: function (h) { return h.avg; }, fmt: function (v) { return v.toFixed(2); }, min: 0, max: 1 },
+    whole: { label: 'Whole: how much of a whole, full creature they are, out of 10: from a cell (1), through a ball with a face (3) and a simple critter (5), to a full character with head, body, legs and arms (9). The average; the dashed line is the most whole one alive.', get: function (h) { return (h.whole || 0) * 10; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 },
+    look: { label: 'Beauty: how nice to the eye the creatures of this pond are, out of 10 (the average; the dashed line is the nicest one alive). This is what the pond evolves towards.', get: function (h) { return (h.look || 0) * 10; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 },
+    fit: { label: 'Fitness = how nice to the eye and how whole a creature is, for those that have eaten well enough (half a tank). Higher scores survive winter and have more children.', get: function (h) { return h.avg; }, fmt: function (v) { return v.toFixed(2); }, min: 0, max: 1 },
     skill: { label: 'Skill: food eaten per creature each generation', get: function (h) { return h.intake; }, fmt: function (v) { return v.toFixed(0); }, min: 0 },
     pop: { label: 'How many creatures were alive at autumn', get: function (h) { return h.pop; }, fmt: function (v) { return v.toFixed(0); }, min: 0 },
     genes: { label: 'Genome size: parts, wires and brain cells per creature', get: function (h) { return h.genes; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
   };
   function drawGraph(force) {
     const W = G.W, cv = $('graph'); if (!cv || !W) return;
-    const m = METRICS[UI.metric || 'fit'];
+    const m = METRICS[UI.metric || 'look'];
     const ctx = cv.getContext('2d');
     const w = cv.width, h = cv.height, hist = W.hist;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -6719,9 +6918,9 @@ G.addSystem({
     const Y = function (v) { return h - pad - (h - pad * 2) * ((v - lo) / (hi - lo)); };
     ctx.strokeStyle = G.rgba(PAL.frost, 0.1); ctx.lineWidth = 1;
     for (let i = 0; i < 4; i++) { const y = pad + (h - pad * 2) * i / 3; ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w - pad, y); ctx.stroke(); }
-    if (UI.metric === 'fit') {
+    if (UI.metric === 'fit' || UI.metric === 'look' || UI.metric === 'whole') {
       ctx.strokeStyle = G.rgba(PAL.gold, 0.45); ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
-      ctx.beginPath(); hist.forEach(function (q, i) { const x = X(i), y = Y(q.best); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); hist.forEach(function (q, i) { const x = X(i), y = Y(UI.metric === 'look' ? (q.lookTop || 0) * 10 : UI.metric === 'whole' ? (q.wholeTop || 0) * 10 : q.best); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]);
     }
     const g = ctx.createLinearGradient(0, 0, 0, h);
     g.addColorStop(0, G.rgba(PAL.algae, 0.38)); g.addColorStop(1, G.rgba(PAL.algae, 0));
@@ -6830,12 +7029,13 @@ G.addSystem({
   function buildInspector(ui) {
     const i = el('div', 'glass hide', '', ui); i.id = 'inspector';
     i.innerHTML = '<div class="ihead"><canvas id="iprev" width="208" height="208"></canvas><div><b id="iname"></b><small id="isub"></small></div><button class="x" id="iclose" aria-label="Close">' + ICON.close + '</button></div>' +
-      '<div class="ilabel">Genome</div><canvas id="istrip" width="560" height="80"></canvas>' +
+      '<div id="ifit" style="font-size:11.5px;line-height:1.4"></div>' +
       '<div class="irows"><div id="iE"></div><div id="iAge"></div><div id="iPar" style="grid-column:span 2"></div><div class="meter"><i id="iEb"></i></div></div>' +
-      '<div class="ilabel">Brain</div><canvas id="ibrain" width="560" height="184"></canvas><div class="imut" id="imut"></div>' +
-      '<div class="ilabel">Fitness</div><div id="ifit" style="font-size:11.5px;line-height:1.4"></div>' +
+      '<div class="imut" id="imut"></div>' +
+      '<details><summary>Genes and brain</summary><canvas id="istrip" width="560" height="80"></canvas><canvas id="ibrain" width="560" height="184" style="margin-top:6px"></canvas></details>' +
       '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond.">★ KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection.">♥ BREED</button><button class="btn sm" id="itree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide">' + ICON.book + 'SPECIES</button></div>';
     $('iclose').onclick = function () { G.select(null); };
+    $('isub').onclick = function () { this.classList.toggle('open'); };
     $('itree').onclick = function () { G.sfx('click'); G.openTree(); };
     $('ibreed').onclick = function () { const c = G.R.sel; if (!c) return; G.sfx('click'); if (!G.collection.length) { G.banner('Nothing to breed it with yet', 'First ★ KEEP a creature you like (from this pond or another). Then choose it here to breed the two.', 5200); return; } UI.breedWith = c.id; UI.guideTab = 'coll'; G.openGuide(); };
     $('ikeep').onclick = function () { const c = G.R.sel; if (!c) return; const it = G.keep(c); if (it) { G.sfx('discovery'); G.banner('Kept in your collection', it.name + ', a ' + it.kind.toLowerCase() + '. Find it in the Book of Life under COLLECTION; you can release it into any pond.', 5200); } };
@@ -6988,8 +7188,18 @@ G.addSystem({
       $('iE').innerHTML = 'Energy <b>' + Math.round(c.E) + '</b> / ' + Math.round(c.ph.Emax) + ' · Protein <b>' + Math.round(c.P || 0) + '</b> (a child takes ' + Math.round(c.ph.Emax * G.K.repro * c.ph.pneed) + ')' + (c.asleep ? ' · <b style="color:var(--frost)">asleep</b>' : c.tired > 0.7 ? ' · tired' : '');
       $('iAge').innerHTML = 'Age <b>' + c.age + '</b> · children <b>' + c.off + '</b>';
       const kids = Math.max(0, Math.min(3, Math.floor((c.E - G.K.keep * c.ph.Emax) / (G.K.repro * c.ph.Emax))));
-      $('ifit').innerHTML = 'Score <b>' + Math.max(0, f).toFixed(2) + '</b>: the share of its energy tank that is full. ' + (c.doomed ? '<span style="color:var(--rose)">Too low: it fades this winter.</span>' : f < 0.1 ? '<span style="color:var(--rose)">In danger of fading this winter.</span>' : 'With this much it could have <b>' + kids + '</b> ' + (kids === 1 ? 'child' : 'children') + ' in spring.') + ' It burns <b>' + c.ph.upkeep.toFixed(2) + '</b> energy a second just to exist.' +
-        ((c.g.t[4] || 0) > 0.38 ? '<br><span style="color:var(--rose)">Violent (temper ' + c.g.t[4].toFixed(2) + '): it attacks other kinds.</span>' : '') + '<br>' + (sp && sp.judge ? 'Beauty <b style="color:var(--gold)">' + Math.round(sp.judge.score * 10) + '/10</b>' + (sp.judge.est ? ' (its parent kind\'s grade; not looked at yet)' : '') + ': <i>' + escapeHtml(sp.judge.why || '') + '</i>' + (sp.loved ? ' You kept one of its kind: it is loved.' : '') + '<br>' : '') + 'Charm <b>' + G.charmOf(c).toFixed(2) + '</b>: ' + (c.snub ? '<span style="color:var(--rose)">among the ugliest in the pond: nobody chose it as a mate this spring, so it left no children.</span>' : G.charmOf(c) > 0.55 ? 'admired; mates choose it gladly.' : G.charmOf(c) < 0.3 ? 'plain by this pond\'s taste; it may be passed over.' : 'pleasant enough to find a mate.');
+      {
+        const be = c.ph.charm, wh0 = c.g.f.bd ? G.form.whole(c.g.f) : { v: 0.5, has: [], lacks: [] }, wh = { v: c.ph.whole === undefined ? wh0.v : c.ph.whole, has: wh0.has, lacks: wh0.lacks }, bw = c.g.f.bd ? G.form.beautyWhy(c.g.f, G.W.taste) : { up: [], down: [] };
+        const row = function (name, v, col) { return '<span>' + name + '</span><span class="bar"><i style="width:' + Math.round(Math.max(0, Math.min(1, v)) * 100) + '%' + (col ? ';background:' + col : '') + '"></i></span><b>' + (v * 10).toFixed(1) + '</b>'; };
+        const nice = function (L) { return L.map(function (k) { return k.replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase(); }).join(', '); };
+        $('ifit').innerHTML = '<div class="igrade">' + row('Beauty', be) + row('Whole', wh.v) + row('Fed', Math.max(0, f), 'var(--algae)') + '</div>' +
+          '<small>' + (c.real ? '<b style="color:var(--gold)">The watcher looked at it:</b> <i>' + escapeHtml(c.real.why || 'no comment') + '</i>' : G.W.eyeN ? 'Not looked at yet: these marks are its parents\' marks, adjusted for how it differs.' : 'No watcher here: these marks are the pond\'s own guess.') + '</small>' +
+          '<small>' + (c.doomed ? '<span style="color:var(--rose)">Its score is too low: it fades this winter.</span> ' : c.snub ? '<span style="color:var(--rose)">Among the plainest: nobody chose it as a mate this spring.</span> ' : kids ? 'It could have <b>' + kids + '</b> ' + (kids === 1 ? 'child' : 'children') + ' in spring. ' : '') +
+          (bw.up.length ? 'Nice: ' + nice(bw.up) + '. ' : '') + (bw.down.length ? 'Holds it back: ' + nice(bw.down) + '. ' : '') + '</small>' +
+          (wh.lacks.length ? '<small>To be a whole creature it still lacks: ' + wh.lacks.join('; ') + '.</small>' : '') +
+          (sp && sp.loved ? '<small>You kept one of its kind: it is loved.</small>' : '') +
+          ((c.g.t[4] || 0) > 0.38 ? '<small style="color:var(--rose)">Violent: it attacks other kinds.</small>' : '');
+      }
       const bar = $('iEb');
       bar.style.width = (Math.max(0, Math.min(1, f)) * 100).toFixed(0) + '%';
       bar.style.background = f > 0.6 ? PAL.algae : f > 0.3 ? PAL.gold : PAL.rose;
@@ -8097,7 +8307,7 @@ G.addSystem({
       nextOrgan: W.nextOrgan || 1,
       designs: (W.designs || []).map(function (d) { return { id: d.id, name: d.name, adj: d.adj, note: d.note, place: d.place, motion: d.motion, colour: d.colour, pts: d.pts, smooth: d.smooth, ribs: d.ribs, dots: d.dots, fx: d.fx, by: d.by, gen: d.gen }; }), nextDesign: W.nextDesign || 1,
       col: G.collection, colD: G.keptDesigns, colP: G.keptPlans, plans: W.plans || [], nextPlan: W.nextPlan || 1, museLog: W.museLog || [],
-      env: W.env, ages: (W.ages || []).slice(-24), hue0: Math.round(W.hue0 || 0), fashion: W.fashion, fashionGen: W.fashionGen | 0,
+      env: W.env, ages: (W.ages || []).slice(-24), hue0: Math.round(W.hue0 || 0), fashion: W.fashion, fashionGen: W.fashionGen | 0, taste: W.taste,
       story: (W.story || []).slice(-12), events: (W.events || []).slice(-12),
       history: (W.history || []).slice(-90), evShelf: (W.evShelf || []).slice(-10).map(function (e) { const c = JSON.parse(JSON.stringify(e)); if (c.thing) c.thing.svg = ''; return c; }),
       shelf: (W.shelf || []).slice(-12).map(function (t) { return Object.assign({}, t, { svg: t.svg && t.svg.length < 1500 ? t.svg : '' }); }),
@@ -8110,7 +8320,7 @@ G.addSystem({
     const maxC = Math.min(sorted.length, 110);
     for (let i = 0; i < maxC; i++) {
       const c = sorted[i];
-      out.cre.push([G.packGenome(c.g), Math.round(c.x), Math.round(c.y), Math.round(c.E), c.age, c.sp, c.born]);
+      out.cre.push([G.packGenome(c.g), Math.round(c.x), Math.round(c.y), Math.round(c.E), c.age, c.sp, c.born, c.eb === undefined ? -1 : +c.eb.toFixed(2), c.ew === undefined ? -1 : +c.ew.toFixed(2), c.real ? 1 : 0, c.real ? c.real.why : '']);
     }
     const sp = W.species.filter(function (s) { return s.rep; }).sort(function (a, b) { return (b.extinct ? 0 : 1) - (a.extinct ? 0 : 1) || b.peak - a.peak; }).slice(0, 26);
     sp.forEach(function (s) { out.species.push([s.id, s.name, s.born, s.parent, s.extinct ? s.diedGen || 1 : 0, s.peak, s.kills || 0, Math.round(s.hue), G.packGenome(s.rep), s.hist.slice(-40), s.judge && !s.extinct ? { score: +s.judge.score.toFixed(2), why: s.judge.why, gen: s.judge.gen, fix: s.judge.fix || '', loved: s.loved ? 1 : 0 } : s.loved ? { loved: 1 } : null]); });
@@ -8197,6 +8407,7 @@ G.addSystem({
     W.nextDesign = Math.max(Math.floor(num(d.nextDesign, 1, 1e6, 1)), W.designs.reduce(function (m, o) { return Math.max(m, o.id + 1); }, 1));
     if (G.form.clearCache && typeof document !== 'undefined') G.form.clearCache();
     W.hue0 = num(d.hue0, 0, 360, W.hue0); W.fashionGen = Math.floor(num(d.fashionGen, 0, 1e6, 0));
+    W.taste = G.form.fixTaste(d.taste) || G.form.newTaste();
     W.fashion = G.form.fixFashion(d.fashion) || W.fashion;       // before any creature is rebuilt: charm is judged by this pond's taste
     W.ages = (Array.isArray(d.ages) ? d.ages : []).filter(function (a) { return a && typeof a.name === 'string' && typeof a.kind === 'string'; }).slice(-24).map(function (a) { return { name: a.name.replace(/[<>]/g, '').slice(0, 70), kind: a.kind.replace(/[<>]/g, '').slice(0, 40), gen: num(a.gen, 0, 1e6, 1), share: num(a.share, 0, 1, 0), why: String(a.why || '').replace(/[<>]/g, '').slice(0, 240), g: Array.isArray(a.g) ? a.g : null }; });
     if (G.ai) { G.ai.life = {}; if (d.spend && typeof d.spend === 'object') for (const k in d.spend) if (k.length < 20 && d.spend[k]) G.ai.life[k] = { asked: Math.floor(num(d.spend[k].asked, 0, 1e7, 0)), fresh: Math.floor(num(d.spend[k].fresh, 0, 1e7, 0)), usd: num(d.spend[k].usd, 0, 1e6, 0) }; }
@@ -8252,6 +8463,7 @@ G.addSystem({
       const c = G.makeCreature(g, null, null, []);
       c.x = num(r[1], 5, W.ww - 5, W.ww / 2); c.y = num(r[2], 5, W.wh - 5, W.wh / 2); c.px = c.x; c.py = c.y;
       c.E = num(r[3], 1, c.ph.Emax, c.ph.Emax * 0.5); c.age = Math.floor(num(r[4], 0, 20, 0)); c.sp = Math.floor(num(r[5], 0, 1e6, 0)); c.born = Math.floor(num(r[6], 0, 1e6, 1));
+      if (r[7] >= 0 && r[8] >= 0) { c.eb = num(r[7], 0, 1, 0.3); c.ew = num(r[8], 0, 1, 0.3); c.st = r[9] ? 0 : 2; if (r[9]) c.real = { b: c.eb, w: c.ew, why: String(r[10] || '').replace(/[<>]/g, '').slice(0, 70), gen: c.born }; c.ph.charm = c.eb; c.ph.whole = c.ew; W.eyeN = (W.eyeN || 0) + (r[9] ? 1 : 0); }
       c.snap = G.snapOf(c);
       W.cre.push(c);
     });

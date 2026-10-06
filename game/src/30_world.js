@@ -57,6 +57,7 @@
     G.seed(W.seed);
     W.hue0 = G.rand() * 360;                 // every pond's first life has its own colour
     W.fashion = G.form.newFashion();         // and its own idea of beauty
+    W.taste = G.form.newTaste();             // which it goes on learning from the eye that watches it
     // and its own water. o2: oxygen; murk: how fast light dies with depth; rich: how much food grows; warm: base temperature;
     // green: how much of the shallows' food is plain green algae; deep: the food that only the deep grows; hue: the colour of the water
     W.env = { mix: [G.rr(0.6, 1.5), G.rr(0.5, 1.5), G.rr(0.8, 1.4), G.rr(0.5, 1.5), G.rr(0.5, 1.5), G.rr(0.5, 1.5)], o2: G.rr(0.6, 1.25), murk: G.rand(), rich: G.rr(0.75, 1.35), warm: G.rr(-0.22, 0.22), green: G.rr(0.55, 0.9), deep: G.ri(3, 5), hue: G.rr(150, 235) };
@@ -102,6 +103,18 @@
     };
     c.out[0] = 0.5;
     c.snap = null;
+    // How nice to the eye and how whole it is. Where a watcher is at work, a newborn is taken to be like its parents as the watcher saw
+    // them, moved a little by how its own genes differ from theirs; then the watcher looks at it and its marks are its own.
+    if (genome.f.bd) {
+      const FM = G.form, T = W.taste, mb = ph.charm, mw = ph.whole, A = parentA && parentA.eb !== undefined && parentA.g ? parentA : null, B = parentB && parentB.eb !== undefined && parentB.g ? parentB : A;
+      const hit = W.eyeSeen ? W.eyeSeen[FM.key(genome.f)] : null;
+      if (hit) { c.real = { b: hit.b, w: hit.w, why: hit.why || '', gen: W.gen }; c.eb = hit.b; c.ew = hit.w; c.st = 0; }
+      else if (A && (W.eyeN || (W.eyeBank && W.eyeBank.length))) { c.eb = clamp((A.eb + B.eb) / 2 + 0.5 * (mb - (FM.beauty(A.g.f, T) + FM.beauty(B.g.f, T)) / 2), 0, 1); c.ew = clamp((A.ew + B.ew) / 2 + 0.5 * (mw - (FM.whole(A.g.f).v + FM.whole(B.g.f).v) / 2), 0, 1); c.st = Math.min(A.st || 0, B.st || 0) + 1; }
+      else { c.eb = mb; c.ew = mw; c.st = 3; }
+      // and it is held against the creatures the watcher has really looked at: the more it resembles some of them, the more their marks count
+      if (!hit && W.eyeBank && W.eyeBank.length) { const fv = c.fv = G.features(genome); let sw = 0, sb = 0, sh = 0; for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i], d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; sb += wt * q.b; sh += wt * q.w; } if (sw > 0.15) { const k = Math.min(0.85, sw / (sw + 0.6)); c.eb += k * (sb / sw - c.eb); c.ew += k * (sh / sw - c.ew); c.st = Math.min(c.st, 1); } }
+      ph.charm = c.eb; ph.whole = c.ew;
+    }
     return c;
   };
   G.snapOf = function (c, extra) {
@@ -765,11 +778,11 @@
       const median = bs[bs.length >> 1];
       // looks alone decide who is passed over: the whole finished body, all its parts together. The ugliest quarter find no mate and leave no children.
       const looks = surv.map(G.charmOf).sort(function (a, b) { return a - b; });
-      const ugly = looks[Math.floor(looks.length * 0.25)], mid = looks[looks.length >> 1];
+      const ugly = looks[Math.floor(looks.length * 0.33)], mid = looks[looks.length >> 1], nice = looks[Math.floor(looks.length * 0.67)];
       for (let i = 0; i < plan.length; i++) {
         const bq = beauty(plan[i].p), lk = G.charmOf(plan[i].p);
         if (lk <= ugly && lk < mid * 0.97) { W.stats.snubbed++; plan[i].n = G.rand() < 0.08 ? 1 : 0; plan[i].p.snub = true; }
-        else { plan[i].p.snub = false; if (bq > median * 1.2 && plan[i].n < 3 && plan[i].p.E > plan[i].p.ph.Emax * 0.3) plan[i].n++; }
+        else { plan[i].p.snub = false; if (lk >= nice) { if (plan[i].n < 3 && plan[i].p.E > plan[i].p.ph.Emax * 0.3) plan[i].n++; } else if (plan[i].n > 1) plan[i].n = 1; }
       }
     }
     // too many for the pond: only the fittest parents may breed
@@ -823,7 +836,8 @@
   G.charmOf = function (c) {
     const s = c.sp ? G.speciesById(c.sp) : null;
     // the grade the eye for beauty gave its kind is most of it; its own body's fit to the pond's taste is the rest. What the player kept is loved outright.
-    const v = s && s.judge ? 0.3 * c.ph.charm + 0.7 * s.judge.score : c.ph.charm;
+    // a grade counts for what it is next to the other grades in this pond: so a generous judge and a strict one select alike
+    const v = 0.5 * c.ph.charm + 0.5 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);
     return s && s.loved ? Math.max(v, 0.92) : v;
   };
 
@@ -838,7 +852,7 @@
         if (!p.fv) p.fv = G.features(p.g);
         if (!o.fv) o.fv = G.features(o.g);
         // of the compatible ones nearby, the most charming and healthy is chosen
-        if (G.fdist(p.fv, o.fv) < 1.7) { const b = 0.6 * G.charmOf(o) + 0.4 * clamp(o.E / o.ph.Emax, 0, 1) + (G.kindOf(o.g).kind === G.kindOf(p.g).kind ? 1 : 0) + (Math.abs(((o.g.f.hue - p.g.f.hue + 540) % 360) - 180) < 35 ? 0.6 : 0); if (!best || b > bd2) { best = o; bd2 = b; } }
+        if (G.fdist(p.fv, o.fv) < 1.7) { const b = 2.2 * G.charmOf(o) + 0.3 * clamp(o.E / o.ph.Emax, 0, 1) + (G.kindOf(o.g).kind === G.kindOf(p.g).kind ? 1 : 0) + (Math.abs(((o.g.f.hue - p.g.f.hue + 540) % 360) - 180) < 35 ? 0.6 : 0); if (!best || b > bd2) { best = o; bd2 = b; } }
       }
     }
     return best;
@@ -868,7 +882,8 @@
     let sum = 0, best = 0, bestC = null, genes = 0, intake = 0;
     for (let i = 0; i < cre.length; i++) {
       const c = cre[i];
-      c.fit = clamp(c.E / c.ph.Emax, 0, 1);
+      c.fed = clamp(c.E / c.ph.Emax, 0, 1);
+      c.fit = clamp(c.fed / 0.5, 0, 1) * (0.15 + 0.85 * G.charmOf(c));          // fed well enough (half a tank is plenty), times how nice to the eye and how whole it is
       sum += c.fit; genes += c.g.f.n + c.g.f.rules.length + c.g.p.length + c.g.w.length + c.g.h;
       intake += c.intake;
       if (c.fit > best) { best = c.fit; bestC = c; }
@@ -878,7 +893,8 @@
     const nb = Math.max(1, Math.round(sorted.length * 0.1));
     for (let i = 0; i < nb && i < sorted.length; i++) sorted[i].best = true;
     const n = cre.length || 1;
-    W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0 });
+    let looksSum = 0, looksTop = 0, wholeSum = 0, wholeTop = 0; for (let i = 0; i < cre.length; i++) { const v = cre[i].ph.charm, wv = cre[i].ph.whole || 0; looksSum += v; if (v > looksTop) looksTop = v; wholeSum += wv; if (wv > wholeTop) wholeTop = wv; }
+    W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop });
     if (W.hist.length > 600) W.hist.shift();
     G.updateSpecies();
     G.scanDiscoveries();
@@ -904,11 +920,12 @@
     const share = {}, shapes = {}, hues = [0, 0, 0, 0, 0, 0];
     for (let i = 0; i < cre.length; i++) { const c = cre[i], k = G.kindOf(c.g).kind; c.kd = k; share[k] = (share[k] || 0) + 1; c.shp = G.shapeOf(c.g); shapes[c.shp] = (shapes[c.shp] || 0) + 1; c.hb = G.hueOf(c.g); hues[c.hb]++; }
     // who lasts the winter: the well fed, the rare, and the good-looking (the pond is kind to what is admired)
-    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.55 * hues[cre[i].hb] / cre.length) * (0.74 + 0.52 * G.charmOf(cre[i]));
+    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.55 * hues[cre[i].hb] / cre.length) ;
     let topK = '', topN = 0; for (const k in share) if (share[k] > topN) { topN = share[k]; topK = k; }
     const crowd = topN / Math.max(1, cre.length);
     let sick = 0;
-    if (crowd > 0.5 && cre.length > 30) { const pr = (crowd - 0.5) * 0.9; for (let i = 0; i < cre.length; i++) if (cre[i].kd === topK && G.rand() < pr) { cre[i].sel = -1; cre[i].sick = true; sick++; } }
+    { const ap = cre.map(G.charmOf).sort(function (a, b) { return b - a; }), cut = ap[Math.floor(ap.length * 0.15)] || 1; for (let i = 0; i < cre.length; i++) { cre[i].elite = cre.length >= 12 && G.charmOf(cre[i]) >= cut && cre[i].fed > 0.2; if (cre[i].elite) cre[i].sel += 1; } }
+    if (crowd > 0.5 && cre.length > 30) { const pr = (crowd - 0.5) * 0.9; for (let i = 0; i < cre.length; i++) if (cre[i].kd === topK && !cre[i].elite && G.rand() < pr) { cre[i].sel = -1; cre[i].sick = true; sick++; } }
     if (sick > 4 && (W.gen - (W.sickGen || 0)) > 6) { W.sickGen = W.gen; W.discLog.push({ key: 'sick' + W.gen, text: 'A sickness is going round the ' + topK.toLowerCase() + 's: there are so many of them (' + Math.round(crowd * 100) + '% of the pond) that it spreads easily. ' + sick + ' will not see spring. The rarer kinds are hardly touched.', gen: W.gen }); G.emit('sickness', topK, sick, crowd); }
     const sorted = cre.slice().sort(function (a, b) { return a.sel - b.sel; });
     const room = Math.round(cap * 0.8);

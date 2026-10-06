@@ -190,3 +190,8 @@ A live pond on Haiku, four minutes at 64× (about 260 generations) with a knight
 
 Visiting other players' ponds; visitors acting in your pond (throwing something in, leaving a message, growing a
 creature); merging friends' ponds so their creatures breed; creatures leaving the pond.
+
+## The genetic algorithm: where it stands
+
+See [ALGORITHM.md](ALGORITHM.md): the goal, how the loop works today, what was measured with a blind judge, what does
+not work yet, and ideas not tried. Read it before changing fitness, breeding or the watcher.

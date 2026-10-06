@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 global.window = globalThis; globalThis.addEventListener = () => {};
 const src = path.join(__dirname, '..', 'src');
-for (const f of ['10_core.js', '20_genome.js', '21_form.js', '21b_body.js', '30_world.js', '40_words.js', '43_why.js', '44_pressure.js', '45_organs.js', '45_parts.js', '45_plans.js', '46_events.js', '47_story.js', '48_judge.js', '49_eras.js']) vm.runInThisContext(fs.readFileSync(path.join(src, f), 'utf8'), { filename: f });
+for (const f of ['10_core.js', '20_genome.js', '21_form.js', '21b_body.js', '21c_taste.js', '30_world.js', '40_words.js', '43_why.js', '44_pressure.js', '45_organs.js', '45_parts.js', '45_plans.js', '46_events.js', '47_story.js', '48_judge.js', '49_eras.js']) vm.runInThisContext(fs.readFileSync(path.join(src, f), 'utf8'), { filename: f });
 const gens = +process.argv[2] || 120, seeds = +process.argv[3] || 3, dt = +process.argv[4] || 0.1;
 for (let seed = 1; seed <= seeds; seed++) {
   G.newWorld({ seed: seed * 101 }); G.founderPond();

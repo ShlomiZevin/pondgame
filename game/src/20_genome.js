@@ -18,7 +18,7 @@
     repro: 0.30,          // child costs this fraction of the parent's max energy
     keep: 0.12,           // parent keeps at least this much after breeding
     capBase: 150,
-    speciesTH: 1.4,
+    speciesTH: 1.65,
     maxAge: 3,
     foodDigestMin: 0.2,
   });
@@ -167,7 +167,9 @@
     ph.warm = ph.res[1] >= 0.55;
     ph.plump = plump;                 // cold-proof life does not slow down in winter
     // charm: how well the body fits what all life finds pleasing, and what THIS pond admires
-    ph.charm = clamp(FM.taste(f, G.W ? G.W.fashion : null, cn) * 1.15, 0, 1);
+    // how nice it is to the eye: by this pond's learned taste (a free body), or the old measure (anything else)
+    ph.charm = f.bd && FM.beauty ? FM.beauty(f, G.W ? G.W.taste : null) : clamp(FM.taste(f, G.W ? G.W.fashion : null, cn) * 1.15, 0, 1);
+    ph.whole = f.bd && FM.whole ? FM.whole(f).v : 0.5;      // how whole a creature it is
     ph.rc = r * (1 + 0.22 * Math.max(0, Math.max(ext.half, ext.wide) * ds / r - 1));
     ph.aggro = t[4] || 0;
     ph.forage = [0.5 + 1.0 * A.reach, 0.5 + 1.0 * A.agility, 0.85, 0.5 + 1.0 * A.senses, 0.45 + 1.1 * A.attack, 0.5 + 1.0 * A.speed];      // how well this body gathers each colour of food
@@ -178,6 +180,7 @@
     let digSum = 0; for (let i = 0; i < 6; i++) digSum += c[i];
     let tolSum = 0; for (let i = 9; i < 15; i++) tolSum += c[i] || 0;
     up += 0.035 * digSum + 0.02 * (c[6] + c[7] + c[8]) + 0.022 * tolSum + 0.0035 * g.w.length + 0.012 * g.h;
+    if (f.bd) up += r10 * 0.05 * Math.max(0, G.body.busy(f) - 6);
     ph.upkeep = up;
     // compile the brain: wires grouped by target (hidden 0..h-1, then outputs)
     const nt = g.h + NOUT;

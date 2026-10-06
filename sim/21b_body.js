@@ -8,7 +8,7 @@
 // measured from the shape that results.
 (function () {
   'use strict';
-  const clamp = G.clamp, PI = Math.PI, TAU = PI * 2, K = 10, MAXM = 5;
+  const clamp = G.clamp, PI = Math.PI, TAU = PI * 2, K = 10, MAXM = 3;      // three masses at most: a body is one clear idea, not a heap
   const B = G.body = { K: K, MAXM: MAXM };
   const num = function (v, lo, hi, d) { v = +v; return isFinite(v) ? clamp(v, lo, hi) : d; };
   const mass = function (o) { const q = { r: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], s: 1, on: -1, at: -PI / 2, d: 1, pr: 0, h: 0, lb: 0, la: 0 }; if (o) for (const k in o) q[k] = o[k]; return q; };
@@ -47,7 +47,7 @@
       kids[i] = 0; if (i) kids[q.on]++;
     }
     // no more than nine shapes in all, however the pairs multiply
-    { const cnt = []; let tot = 0; for (let i = 0; i < M.length; i++) { cnt[i] = (i ? cnt[M[i].on] : 1) * (M[i].pr ? 2 : 1); tot += cnt[i]; if (tot > 9) { M[i].pr = 0; cnt[i] = i ? cnt[M[i].on] : 1; tot -= cnt[i]; } } }
+    { const cnt = []; let tot = 0; for (let i = 0; i < M.length; i++) { cnt[i] = (i ? cnt[M[i].on] : 1) * (M[i].pr ? 2 : 1); tot += cnt[i]; if (tot > 5) { M[i].pr = 0; cnt[i] = i ? cnt[M[i].on] : 1; tot -= cnt[i]; } } }
     bd.e = clamp(bd.e | 0, 0, M.length - 1); if (M[bd.e].pr || M[bd.e].s < 0.55) bd.e = 0;
     for (let i = 0; i < M.length; i++) if (kids[i] || i === bd.e) M[i].h = 0;        // only a bare outer part can be a ring
     f.n = M.length; f.sym = 0; f.pl = f.pl | 0;
@@ -70,7 +70,7 @@
       for (let k = 0; k < n0; k++) {
         const p = I[k]; if (p.i !== q.on) continue;
         const put = function (mir, far) {
-          if (I.length >= 10) return;
+          if (I.length >= 6) return;
           const a = q.at + sway, ang = mir ? PI - a : a, Rp = B.rad(p.m, ang, p.mir) * p.s, Rc = B.rad(q, ang + PI, mir) * q.s, dist = (Rp + Rc) * (0.35 + 0.55 * q.d) * spring;
           I.push({ i: i, m: q, x: p.x + Math.cos(ang) * dist + (far ? -0.17 : 0), y: p.y + Math.sin(ang) * dist + (far ? -0.1 : 0), s: q.s, mir: mir, far: far || p.far, par: p, a: ang, stalk: dist > (Rp + Rc) * 0.96 });
         };
@@ -115,6 +115,14 @@
       high: clamp((L.y1 - faceY) / Math.max(0.5, h), 0, 1),          // how high the face is carried
       key: (bd.v ? 's' : 'f') + bd.m.length + (pairs ? 'p' : '') + cls + (lobed ? 'L' : '') + (hollow ? 'O' : '') });
   };
+  /** how much there is to look at on this body: its shapes, each kind of growth and where it repeats, its coat and markings. Past about seven it is a muddle. */
+  B.busy = function (f) {
+    let n = 0; const M = f.bd.m, cnt = [];
+    for (let i = 0; i < M.length; i++) { cnt[i] = (i ? cnt[M[i].on] : 1) * (M[i].pr ? 2 : 1); n += i ? (M[i].pr ? 1.5 : 1) : 1; if (M[i].lb && M[i].la > 0.1) n += 0.5; if (M[i].h) n += 0.5; }
+    for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; n += q.on >= 0 ? 0.6 : q.k === 8 ? 0.6 : 1 + 0.5 * Math.max(0, Math.floor((Math.min(q.b, f.n - 1) - q.a) / q.e)); }
+    n += (f.pat ? 0.7 : 0) + (f.coat ? 0.7 : 0) + (f.shell > 0.25 ? 1 : 0) + (f.crest > 0.25 ? 0.7 : 0) + (f.tk ? 0.7 : 0) + (f.en >= 3 ? 1 : 0) + (f.ek > 0.25 ? 0.5 : 0) + (f.venom > 0.3 ? 0.3 : 0);
+    return n;
+  };
   /** the body in a few plain words */
   B.words = function (f) {
     const bd = f.bd, m = B.measure(f), n = bd.m.length, t = [];
@@ -153,7 +161,7 @@
   /** chance reshapes a body. m: chance of a nudge per gene; wild: the world's mutation slider */
   B.mutate = function (f, m, wild, note) {
     const r = G.rand, n = G.randn, bd = f.bd, M = bd.m;
-    if (r() < 0.085 * wild) {
+    if (r() < 0.04 * wild) {
       const roll = r(), pick = function () { return M.length > 1 ? M[1 + Math.floor(r() * (M.length - 1))] : null; };
       if (roll < 0.34) B.bud(f, note);
       else if (roll < 0.44) B.drop(f, note);
@@ -165,7 +173,7 @@
       else { const ok = []; for (let i = 0; i < M.length; i++) if (!M[i].pr && i !== bd.e) ok.push(i); if (ok.length) { bd.e = ok[Math.floor(r() * ok.length)]; note('its face moved to another part of its body', true); } }
     }
     // an outline is pushed out or pressed in at one place, and its neighbours follow
-    if (r() < 0.2 * wild) { const q = M[Math.floor(r() * M.length)], i = Math.floor(r() * K), a = (r() < 0.5 ? 1 : -1) * (0.12 + r() * 0.26); q.r[i] += a; q.r[(i + 1) % K] += a * 0.55; q.r[(i + K - 1) % K] += a * 0.55; note('body shape', false); }
+    if (r() < 0.14 * wild) { const q = M[Math.floor(r() * M.length)], i = Math.floor(r() * K), a = (r() < 0.5 ? 1 : -1) * (0.08 + r() * 0.16); q.r[i] += a; q.r[(i + 1) % K] += a * 0.55; q.r[(i + K - 1) % K] += a * 0.55; note('body shape', false); }
     let drift = false;
     for (let i = 0; i < M.length; i++) {
       const q = M[i];

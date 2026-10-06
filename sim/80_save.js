@@ -19,7 +19,7 @@
       nextOrgan: W.nextOrgan || 1,
       designs: (W.designs || []).map(function (d) { return { id: d.id, name: d.name, adj: d.adj, note: d.note, place: d.place, motion: d.motion, colour: d.colour, pts: d.pts, smooth: d.smooth, ribs: d.ribs, dots: d.dots, fx: d.fx, by: d.by, gen: d.gen }; }), nextDesign: W.nextDesign || 1,
       col: G.collection, colD: G.keptDesigns, colP: G.keptPlans, plans: W.plans || [], nextPlan: W.nextPlan || 1, museLog: W.museLog || [],
-      env: W.env, ages: (W.ages || []).slice(-24), hue0: Math.round(W.hue0 || 0), fashion: W.fashion, fashionGen: W.fashionGen | 0,
+      env: W.env, ages: (W.ages || []).slice(-24), hue0: Math.round(W.hue0 || 0), fashion: W.fashion, fashionGen: W.fashionGen | 0, taste: W.taste,
       story: (W.story || []).slice(-12), events: (W.events || []).slice(-12),
       history: (W.history || []).slice(-90), evShelf: (W.evShelf || []).slice(-10).map(function (e) { const c = JSON.parse(JSON.stringify(e)); if (c.thing) c.thing.svg = ''; return c; }),
       shelf: (W.shelf || []).slice(-12).map(function (t) { return Object.assign({}, t, { svg: t.svg && t.svg.length < 1500 ? t.svg : '' }); }),
@@ -32,7 +32,7 @@
     const maxC = Math.min(sorted.length, 110);
     for (let i = 0; i < maxC; i++) {
       const c = sorted[i];
-      out.cre.push([G.packGenome(c.g), Math.round(c.x), Math.round(c.y), Math.round(c.E), c.age, c.sp, c.born]);
+      out.cre.push([G.packGenome(c.g), Math.round(c.x), Math.round(c.y), Math.round(c.E), c.age, c.sp, c.born, c.eb === undefined ? -1 : +c.eb.toFixed(2), c.ew === undefined ? -1 : +c.ew.toFixed(2), c.real ? 1 : 0, c.real ? c.real.why : '']);
     }
     const sp = W.species.filter(function (s) { return s.rep; }).sort(function (a, b) { return (b.extinct ? 0 : 1) - (a.extinct ? 0 : 1) || b.peak - a.peak; }).slice(0, 26);
     sp.forEach(function (s) { out.species.push([s.id, s.name, s.born, s.parent, s.extinct ? s.diedGen || 1 : 0, s.peak, s.kills || 0, Math.round(s.hue), G.packGenome(s.rep), s.hist.slice(-40), s.judge && !s.extinct ? { score: +s.judge.score.toFixed(2), why: s.judge.why, gen: s.judge.gen, fix: s.judge.fix || '', loved: s.loved ? 1 : 0 } : s.loved ? { loved: 1 } : null]); });
@@ -119,6 +119,7 @@
     W.nextDesign = Math.max(Math.floor(num(d.nextDesign, 1, 1e6, 1)), W.designs.reduce(function (m, o) { return Math.max(m, o.id + 1); }, 1));
     if (G.form.clearCache && typeof document !== 'undefined') G.form.clearCache();
     W.hue0 = num(d.hue0, 0, 360, W.hue0); W.fashionGen = Math.floor(num(d.fashionGen, 0, 1e6, 0));
+    W.taste = G.form.fixTaste(d.taste) || G.form.newTaste();
     W.fashion = G.form.fixFashion(d.fashion) || W.fashion;       // before any creature is rebuilt: charm is judged by this pond's taste
     W.ages = (Array.isArray(d.ages) ? d.ages : []).filter(function (a) { return a && typeof a.name === 'string' && typeof a.kind === 'string'; }).slice(-24).map(function (a) { return { name: a.name.replace(/[<>]/g, '').slice(0, 70), kind: a.kind.replace(/[<>]/g, '').slice(0, 40), gen: num(a.gen, 0, 1e6, 1), share: num(a.share, 0, 1, 0), why: String(a.why || '').replace(/[<>]/g, '').slice(0, 240), g: Array.isArray(a.g) ? a.g : null }; });
     if (G.ai) { G.ai.life = {}; if (d.spend && typeof d.spend === 'object') for (const k in d.spend) if (k.length < 20 && d.spend[k]) G.ai.life[k] = { asked: Math.floor(num(d.spend[k].asked, 0, 1e7, 0)), fresh: Math.floor(num(d.spend[k].fresh, 0, 1e7, 0)), usd: num(d.spend[k].usd, 0, 1e6, 0) }; }
@@ -174,6 +175,7 @@
       const c = G.makeCreature(g, null, null, []);
       c.x = num(r[1], 5, W.ww - 5, W.ww / 2); c.y = num(r[2], 5, W.wh - 5, W.wh / 2); c.px = c.x; c.py = c.y;
       c.E = num(r[3], 1, c.ph.Emax, c.ph.Emax * 0.5); c.age = Math.floor(num(r[4], 0, 20, 0)); c.sp = Math.floor(num(r[5], 0, 1e6, 0)); c.born = Math.floor(num(r[6], 0, 1e6, 1));
+      if (r[7] >= 0 && r[8] >= 0) { c.eb = num(r[7], 0, 1, 0.3); c.ew = num(r[8], 0, 1, 0.3); c.st = r[9] ? 0 : 2; if (r[9]) c.real = { b: c.eb, w: c.ew, why: String(r[10] || '').replace(/[<>]/g, '').slice(0, 70), gen: c.born }; c.ph.charm = c.eb; c.ph.whole = c.ew; W.eyeN = (W.eyeN || 0) + (r[9] ? 1 : 0); }
       c.snap = G.snapOf(c);
       W.cre.push(c);
     });

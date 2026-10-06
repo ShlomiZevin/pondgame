@@ -24,15 +24,16 @@
   };
 
   /** the creatures drawn side by side, numbered, as a picture the AI can look at (base64 JPEG), or null where nothing can be drawn */
-  G.sheet = function (forms) {
+  G.sheet = function (forms, o) {
     if (typeof document === 'undefined' || !forms.length) return null;
-    const n = forms.length, cols = n <= 2 ? n : n <= 4 ? 2 : 3, rows = Math.ceil(n / cols), CW = 226, CH = 232;
+    o = o || {};
+    const n = forms.length, cols = o.cols || (n <= 2 ? n : n <= 4 ? 2 : 3), rows = Math.ceil(n / cols), CW = o.cw || 226, CH = o.ch || 232, SC = o.sc || 0.62;
     const cv = document.createElement('canvas'); cv.width = cols * CW; cv.height = rows * CH;
     const ctx = cv.getContext('2d');
     ctx.fillStyle = '#0d2f3d'; ctx.fillRect(0, 0, cv.width, cv.height);
     for (let i = 0; i < n; i++) {
       const x = (i % cols) * CW, y = Math.floor(i / cols) * CH;
-      ctx.save(); ctx.translate(x + CW / 2, y + 190 * 0.62 + 6); ctx.scale(0.62, 0.62);
+      ctx.save(); ctx.translate(x + CW / 2, y + 190 * SC + 6); ctx.scale(SC, SC);
       try { G.form.portrait(ctx, forms[i], 1.3 + i, {}); } catch (e) { console.error(e); }
       ctx.restore();
       ctx.fillStyle = 'rgba(7,18,31,0.85)'; ctx.beginPath(); ctx.arc(x + 22, y + 22, 15, 0, 6.2832); ctx.fill();
@@ -64,6 +65,7 @@
   // once a generation: at most one question, about several kinds on one sheet, and only when the budget allows
   G.judgeTick = function (gen) {
     const W = G.W;
+    if (G.watchTick) return;                    // the watcher grades living creatures one by one instead
     if (!W || W.title || busy || !live()) return;
     // who needs a grade: established kinds never graded, or ones whose body has changed since
     const kinds = W.species.filter(function (s) { return !s.extinct && s.n >= 4 && s.rep && gen - s.born >= 1; }).sort(function (a, b) { return b.n - a.n; });
@@ -79,8 +81,58 @@
         if (!s || s.extinct || !s.rep) continue;
         s.judge = { score: scores[i].score, why: scores[i].why, fix: scores[i].fix, gen: W.gen, fv: G.form.features(s.rep.f) };
         G.emit('judged', s);
+        if (W.taste && s.rep.f.bd) G.form.learn(W.taste, s.rep.f, scores[i].score, 0.05);
       }
+      G.judgeMean();
+      if (W.taste) for (let i = 0; i < W.cre.length; i++) if (W.cre[i].g.f.bd) W.cre[i].ph.charm = G.form.beauty(W.cre[i].g.f, W.taste);
     }, function () { busy = false; });
   };
-  G.on('new-pond', function () { busy = false; });
+  /** the middle of the grades of the kinds alive now: a grade is weighed against this */
+  G.judgeMean = function () { const W = G.W; if (!W) return; let s = 0, n = 0; for (let i = 0; i < W.species.length; i++) { const q = W.species[i]; if (!q.extinct && q.judge && q.n > 0) { s += q.judge.score * q.n; n += q.n; } } W.jMean = n ? s / n : undefined; };
+  G.on('scored', function () { G.judgeMean(); });
+  // ── the watcher ──
+  // Every few seconds it is shown a sheet of living creatures nobody has looked at yet: first those whose marks are oldest guesses, and
+  // those the pond believes are its best (a guess must be checked before it is bred from). Its marks become those creatures' own.
+  let watching = false;
+  const c01 = function (v) { v = +v; return isFinite(v) ? G.clamp(v, 0, 1) : NaN; };
+  G.eyeGrade = function (c, g) { c.real = { b: g.b, w: g.w, why: g.why || '', gen: G.W.gen }; c.eb = g.b; c.ew = g.w; c.st = 0; c.ph.charm = g.b; c.ph.whole = g.w; };
+  G.watchPick = function (max) {
+    const W = G.W, L = [], seen = W.eyeSeen || {};
+    for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.real || !c.g.f.bd) continue; const hit = seen[G.form.key(c.g.f)]; if (hit) { G.eyeGrade(c, hit); continue; } L.push(c); }
+    L.sort(function (a, b) { return ((b.st || 0) * 0.5 + 6 * G.charmOf(b)) - ((a.st || 0) * 0.5 + 6 * G.charmOf(a)); });
+    const out = [], kinds = {};
+    for (let i = 0; i < L.length && out.length < max; i++) { const k = G.shapeOf(L[i].g) + '|' + G.hueOf(L[i].g); if (kinds[k] >= 3) continue; kinds[k] = (kinds[k] || 0) + 1; out.push(L[i]); }
+    return out;
+  };
+  G.watchTick = function () {
+    const W = G.W;
+    if (!W || W.title || watching || !live() || W.cre.length < 4) return;
+    const picks = G.watchPick(12);
+    if (picks.length < 4 || !G.ai.allow('watch')) return;
+    const img = G.sheet(picks.map(function (c) { return c.g.f; }), { cw: 176, ch: 182, sc: 0.48, cols: 4 });
+    if (!img) return;
+    watching = true;
+    G.ai.ask('judge', { image: img, mime: 'image/jpeg', lean: 1, count: picks.length, kind: 'watch' }).then(function (res) {
+      watching = false;
+      if (G.W !== W || !res || !Array.isArray(res.scores)) return;
+      if (!W.eyeSeen || (W.eyeKeys || 0) > 700) { W.eyeSeen = {}; W.eyeKeys = 0; }
+      let n = 0;
+      for (let i = 0; i < res.scores.length; i++) {
+        const s = res.scores[i], c = picks[(s.id | 0) - 1], g = { b: c01(s.score), w: c01(s.whole), why: String(s.why || '').replace(/[<>]/g, '').slice(0, 70) };
+        if (!c || isNaN(g.b) || isNaN(g.w)) continue;
+        W.eyeSeen[G.form.key(c.g.f)] = g; W.eyeKeys++; n++;
+        if (!c.dead) G.eyeGrade(c, g);
+        // the look is remembered, and every living creature that resembles this one is moved towards what the watcher said of it
+        { const fv = c.fv || G.features(c.g); (W.eyeBank = W.eyeBank || []).push({ fv: fv, b: g.b, w: g.w }); if (W.eyeBank.length > 160) W.eyeBank.shift();
+          for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x === c || x.real || x.dead || !x.g.f.bd || x.eb === undefined) continue; const d = G.fdist(fv, x.fv || (x.fv = G.features(x.g))), wt = Math.exp(-d * d); if (wt < 0.05) continue; x.eb += 0.8 * wt * (g.b - x.eb); x.ew += 0.8 * wt * (g.w - x.ew); x.st = Math.min(x.st || 0, 1); x.ph.charm = x.eb; x.ph.whole = x.ew; } }
+        if (W.taste) G.form.learn(W.taste, c.g.f, g.b, 0.03);          // the pond's own guess is corrected by every look
+        const sp = c.sp ? G.speciesById(c.sp) : null;
+        if (sp && (!sp.judge || sp.judge.est || g.b + g.w >= sp.judge.score + (sp.judge.whole || 0) - 0.05 || W.gen - sp.judge.gen > 5)) sp.judge = { score: g.b, whole: g.w, why: g.why, gen: W.gen, fv: sp.fv ? sp.fv.slice() : [] };
+      }
+      W.eyeN = (W.eyeN || 0) + n;
+      G.emit('watched', n);
+    }, function () { watching = false; });
+  };
+  if (typeof document !== 'undefined' && typeof setInterval === 'function') setInterval(function () { try { G.watchTick(); } catch (e) { console.error(e); } }, 2000);
+  G.on('new-pond', function () { busy = false; watching = false; });
 })();

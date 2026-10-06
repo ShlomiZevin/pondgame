@@ -72,7 +72,8 @@ small { color: rgba(207,232,255,.7); }
 .stats div { background: rgba(7,18,31,.4); border-radius: 10px; padding: 6px 4px; text-align: center; border: 1px solid rgba(207,232,255,.1); }
 .stats b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(51,214,166,.4); }
 .stats small { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
-.tabs { display: flex; gap: 5px; margin-bottom: 6px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+#gtabs button { flex: 1 1 30%; min-width: 0; }
 .tabs button { flex: 1; min-height: 32px; border-radius: 999px; border: 1px solid rgba(207,232,255,.18); background: rgba(7,18,31,.4); color: rgba(207,232,255,.75); font: 700 9.5px system-ui, sans-serif; letter-spacing: .1em; cursor: pointer; }
 .tabs button.on { border-color: var(--algae); color: #fff; box-shadow: 0 0 12px rgba(51,214,166,.35); }
 #graph { width: 100%; height: 92px; display: block; border-radius: 10px; background: rgba(7,18,31,.4); }
@@ -135,9 +136,15 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 #versus { position: fixed; left: 14px; top: 236px; width: min(300px, calc(100vw - 28px)); padding: 9px 12px; z-index: 2; }
 @media (max-width: 720px) { #versus { top: auto; bottom: 78px; left: 7px; width: min(280px, calc(100vw - 14px)); } }
 @media (max-height: 560px) { #versus { display: none; } }
-#zoom { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 999px; z-index: 2; }
+#zoom { position: fixed; left: 14px; bottom: 84px; display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 999px; z-index: 2; }
 #zoom .btn { min-width: 40px; min-height: 40px; padding: 0; font-size: 18px; letter-spacing: 0; }
-@media (max-width: 720px) { #zoom { top: 232px; transform: none; right: 7px; } }
+@media (max-width: 720px) { #zoom { left: auto; bottom: auto; top: 232px; right: 7px; } }
+#inspector { max-height: calc(100vh - 28px); overflow-y: auto; }
+#isub { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+#isub.open { display: block; }
+#inspector details { margin-top: 6px; } #inspector summary { cursor: pointer; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--frost); opacity: .75; padding: 4px 0; }
+.igrade { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; align-items: center; font-size: 12px; margin: 6px 0 4px; } .igrade .bar { height: 7px; border-radius: 4px; background: rgba(207,232,255,.14); overflow: hidden; } .igrade .bar i { display: block; height: 100%; border-radius: 4px; background: var(--gold); } .igrade b { color: var(--gold); }
+#ifit small { display: block; opacity: .8; line-height: 1.35; margin-top: 2px; }
 #banner { position: fixed; left: 50%; top: 14px; transform: translate(-50%, -140%); padding: 12px 22px; text-align: center; font-weight: 700; letter-spacing: .04em; transition: transform .6s cubic-bezier(.2,.9,.3,1.2); max-width: min(600px, calc(100vw - 28px)); font-size: 14px; line-height: 1.35; z-index: 8; border-color: rgba(246,211,101,.7); box-shadow: 0 0 36px rgba(246,211,101,.35), inset 0 0 24px rgba(246,211,101,.15); }
 #banner.show { transform: translate(-50%, 78px); }
 #banner small { display: block; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); margin-bottom: 2px; font-size: 10px; }
