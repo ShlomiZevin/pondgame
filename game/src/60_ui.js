@@ -547,7 +547,8 @@
       '<div class="irows"><div id="iE"></div><div id="iAge"></div><div id="iPar" style="grid-column:span 2"></div><div class="meter"><i id="iEb"></i></div></div>' +
       '<div class="imut" id="imut"></div>' +
       '<details><summary>Genes and brain</summary><canvas id="istrip" width="560" height="80"></canvas><canvas id="ibrain" width="560" height="184" style="margin-top:6px"></canvas></details>' +
-      '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond.">★ KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection.">♥ BREED</button><button class="btn sm" id="itree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide">' + ICON.book + 'SPECIES</button></div>';
+      '<style>#iacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}#iacts .btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:0 4px;font-size:10px;letter-spacing:.06em;white-space:nowrap}#iacts .btn svg{width:14px;height:14px;flex:none;margin:0}#iacts .btn i{font-style:normal;font-size:14px;line-height:1}#iacts #ikeep i{color:var(--gold)}#iacts #ibreed i{color:var(--rose)}</style>' +
+      '<div id="iacts"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond."><i>★</i>KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection."><i>♥</i>BREED</button><button class="btn sm" id="itree" title="Its family tree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide" title="Its kind, in the Book of Life">' + ICON.book + 'KIND</button></div>';
     $('iclose').onclick = function () { G.select(null); };
     $('isub').onclick = function () { this.classList.toggle('open'); };
     $('itree').onclick = function () { G.sfx('click'); G.openTree(); };
