@@ -22,6 +22,9 @@
       '#wish .wk{font:700 9.5px system-ui,sans-serif;letter-spacing:.2em;color:#f6d365;text-transform:uppercase;display:flex;justify-content:space-between;gap:10px}' +
       '#wish .wt{font:700 15px system-ui,sans-serif;color:#fff;margin:2px 0 1px}' +
       '#wish .wbar{height:7px;border-radius:4px;background:rgba(207,232,255,.14);overflow:hidden;margin:5px 0 3px;position:relative}#wish .wbar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#33d6a6,#f6d365);transition:width .6s}#wish .wbar b{position:absolute;top:-2px;bottom:-2px;left:' + NEED * 10 + '%;width:2px;background:#fff;opacity:.7}' +
+      '#wish .wk{display:flex;justify-content:space-between;gap:10px;white-space:nowrap}#wish .wk span:last-child{letter-spacing:.06em;text-transform:none;font-size:11px;color:#ffe9a8}#wish .wt{font-size:17px !important;line-height:1.25;margin:3px 0 6px}' +
+      '#wish .wrow{display:flex;justify-content:space-between;font:600 12px system-ui,sans-serif;color:#dcecff}#wish .wrow b{color:#f6d365;font-size:13px}#wish .wrow span:last-child{color:#b9cde2;font-weight:500}' +
+      '#wish .wsub{font:500 12.5px/1.4 system-ui,sans-serif;color:#eaf4ff;white-space:normal !important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:4px}#wish.open .wsub{display:block}#wish .wsub u{text-decoration:none;font:800 9px system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#8fb2d6;margin-right:5px}' +
       '#wish .wmore{display:none;margin-top:8px;padding-top:8px;border-top:1px solid rgba(207,232,255,.14)}#wish.open .wmore{display:block}' +
       '#wish .wmore p{margin:0;font-size:12px;line-height:1.45;color:#cfe8ff;opacity:.9}#wish .wsay{font-style:italic;font-size:13px !important;color:#fff !important;opacity:1 !important}' +
       '#wish .wlab{font:700 9px system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#f6d365;opacity:.85;margin:9px 0 3px}' +
@@ -47,15 +50,17 @@
     if (!on) return;
     if (S.busy || !S.cur) { box.classList.remove('open'); S.open = false; box.innerHTML = '<div class="wk"><span>✦ The wish of the pond</span></div><div class="wdream"><span class="wdot"></span>' + (S.asked === 'another' ? 'The pond is dreaming of something else…' : S.asked === 'next' ? 'The pond is dreaming its next wish…' : 'The pond is dreaming…') + '</div>'; return; }
     const b = S.best, pct = b ? Math.round(b.close * 10) : 0;
-    box.innerHTML = '<div class="wk"><span>✦ The pond wishes for · level ' + S.level + '</span><span>' + (S.legends.length ? '★ ' + S.legends.length + (S.legends.length === 1 ? ' wish granted' : ' wishes granted') + ' · all your ponds' : '') + '</span></div>' +
+    const here = (G.W && G.W.wishN) || 0;
+    box.innerHTML = '<div class="wk"><span>✦ The pond wishes for</span><span>' + (here ? '★ ' + here + ' granted in this pond' : '') + '</span></div>' +
       '<div class="wt">' + esc(S.cur.title) + '</div>' +
+      '<div class="wrow"><span>Closest creature: <b>' + (b ? b.close : 0) + ' of 10</b></span><span>comes true at ' + NEED + '</span></div>' +
       '<div class="wbar"><i style="width:' + pct + '%"></i><b></b></div>' +
-      '<div class="wsub"><small>' + (b ? 'Closest so far: <b style="color:#f6d365">' + b.close + ' of 10</b>' + (b.name ? ' (' + esc(b.name) + ')' : '') + '. ' + esc(b.why) + '.' : 'Nobody has been looked at yet. The pond looks every half a minute.') + '</small></div>' +
+      '<div class="wsub">' + (b ? '<u>Still missing</u> ' + esc(String(b.why).replace(/\.+$/, '')) + '.' : 'Nobody has been looked at yet. The pond looks once a minute.') + '</div>' +
       '<div class="wmore"><p class="wsay">“' + esc(S.cur.text) + '”</p>' +
       '<div class="wlab">It must have</div><div class="wneeds">' + S.cur.needs.map(function (n) { return '<span class="wchip">' + esc(n) + '</span>'; }).join('') + '</div>' +
       (S.cur.hint ? '<div class="wlab">A thought</div><p>' + esc(S.cur.hint) + '</p>' : '') +
-      '<div class="wlab">How</div><p>It comes true when a living creature reaches ' + NEED + ' of 10. You steer: ADD things, cause WORLD events, ★ KEEP and ♥ BREED the ones heading the right way.</p>' +
-      (S.legends.length ? '<div class="wlab">Your legends</div><p>' + S.legends.slice(-4).reverse().map(function (l) { return esc(l.title) + (l.name ? ' (' + esc(l.name) + ')' : ''); }).join(' · ') + '</p>' : '') +
+      '<div class="wlab">How</div><p>' + (S.level > 1 ? 'This is wish number ' + S.level + ' for you; each one is a little harder than the last. ' : '') + 'It comes true when a living creature reaches ' + NEED + ' of 10. You steer: ADD things, cause WORLD events, ★ KEEP and ♥ BREED the ones heading the right way.</p>' +
+      (S.legends.length ? '<div class="wlab">Wishes you granted before, in any pond</div><p>' + S.legends.slice(-4).reverse().map(function (l) { return esc(l.title) + (l.name ? ' (' + esc(l.name) + ')' : ''); }).join(' · ') + '</p>' : '') +
       '<div class="wfoot"><button class="wbtn" id="wishAnother">A DIFFERENT WISH</button></div></div>';
   }
 
@@ -126,6 +131,7 @@
     if (W.discLog) W.discLog.push({ key: 'wish' + wish.id, text: 'A wish came true: ' + wish.title + '. ' + name + ' became a Legend. ' + story(), gen: W.gen });
     if (G.markDirty) G.markDirty();
     S.cur = null; S.best = null; S.busy = true; S.asked = 'next'; draw();
+    W.wishN = (W.wishN || 0) + 1;
     G.host.call('wish', { op: 'done', wish: wish.id, name: name, gen: W.gen, why: top.why, story: story(), pond: brief() }, 60000).then(function (r) { S.busy = false; G.ai.tally('wish', r && r.source, r && r.usd); take(r); draw(); G.emit('wish-done', wish, name); }, function () { S.busy = false; draw(); });
   }
 

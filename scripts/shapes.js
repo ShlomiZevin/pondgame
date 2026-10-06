@@ -20,6 +20,7 @@ const path = require('path');
   await fr.evaluate(() => { G.banner('Evolution invented something', 'First legs! Something can crawl and grab.'); G.banner('A body nobody has seen', 'A tall one with a sail.'); G.banner('★ A MARVEL', 'Creature #12 was born with Sail of Sweet Air. Its fuzzy sail breathes out tiny bubbles that help friends.', 12000); G.banner('The story so far', 'Long text of the story.'); });
   await page.waitForTimeout(4000);
   await page.screenshot({ path: path.join(__dirname, 'shapes.png') });
+  await fr.locator('#wish').click(); await page.waitForTimeout(700); await page.screenshot({ path: path.join(__dirname, 'wish-open.png'), clip: { x: 440, y: 0, width: 560, height: 470 } });
   console.log(errs.slice(0, 5).join('\n') || 'no errors');
   await browser.close();
 })().catch((e) => { console.error(e); process.exit(1); });
