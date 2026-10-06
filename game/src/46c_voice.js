@@ -8,7 +8,7 @@
   'use strict';
   if (typeof window === 'undefined') return;
   G.VOICE_REAL = true;
-  if (G.ai) { G.ai.gaps.voice = 300000; G.ai.caps.voice = 12; G.ai.LABEL.voice = 'Creatures speaking aloud (Leonardo: rare and short)'; }
+  if (G.ai) { G.ai.gaps.voice = 300000; G.ai.caps.voice = 12; G.ai.LABEL.voice = 'Creatures speaking aloud (Leonardo: rare and short)'; G.ai.lastAt.voice = Date.now(); }      // the first real line waits its five minutes too
   const made = {};           // key → 'ready' | 'none' | 'asked'
   let lastPlay = 0;
   const now = function () { return typeof performance !== 'undefined' ? performance.now() : Date.now(); };

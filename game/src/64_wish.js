@@ -75,7 +75,7 @@
   function fetchWish(extra) {
     if (S.busy || !live() || !G.ai.allow('wish')) return;
     S.busy = true; S.asked = extra && extra.another ? 'another' : 'first'; draw();
-    const p = { op: 'get', pond: brief() }; if (extra) for (const k in extra) p[k] = extra[k];
+    const p = { op: 'get', pond: brief(), model: G.ai.model || undefined }; if (extra) for (const k in extra) p[k] = extra[k];
     G.host.call('wish', p, 60000).then(function (r) { S.busy = false; G.ai.tally('wish', r && r.source, r && r.usd); take(r); draw(); }, function () { S.busy = false; draw(); });
   }
   function another() { if (!S.cur) return; if (G.sfx) G.sfx('click'); fetchWish({ another: 1 }); }
@@ -98,7 +98,7 @@
     if (!img) return;
     S.checking = true; S.lastKeys = sig;
     const wishId = S.cur.id;
-    G.host.call('wish', { op: 'check', image: img, mime: 'image/jpeg', count: picks.length }, 90000).then(function (r) {
+    G.host.call('wish', { op: 'check', image: img, mime: 'image/jpeg', count: picks.length, model: G.ai.model || undefined }, 90000).then(function (r) {
       S.checking = false;
       G.ai.tally('wishcheck', r && r.source, r && r.usd);
       if (G.W !== W || !S.cur || S.cur.id !== wishId || !r || !Array.isArray(r.marks)) return;
@@ -132,7 +132,7 @@
     if (G.markDirty) G.markDirty();
     S.cur = null; S.best = null; S.busy = true; S.asked = 'next'; draw();
     W.wishN = (W.wishN || 0) + 1;
-    G.host.call('wish', { op: 'done', wish: wish.id, name: name, gen: W.gen, why: top.why, story: story(), pond: brief() }, 60000).then(function (r) { S.busy = false; G.ai.tally('wish', r && r.source, r && r.usd); take(r); draw(); G.emit('wish-done', wish, name); }, function () { S.busy = false; draw(); });
+    G.host.call('wish', { op: 'done', wish: wish.id, name: name, gen: W.gen, why: top.why, story: story(), pond: brief(), model: G.ai.model || undefined }, 60000).then(function (r) { S.busy = false; G.ai.tally('wish', r && r.source, r && r.usd); take(r); draw(); G.emit('wish-done', wish, name); }, function () { S.busy = false; draw(); });
   }
 
   if (typeof document !== 'undefined' && typeof setInterval === 'function') setInterval(function () {
