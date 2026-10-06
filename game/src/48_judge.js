@@ -43,18 +43,10 @@
     }
     try { return cv.toDataURL('image/jpeg', 0.86).split(',')[1] || null; } catch (e) { return null; }
   };
-  /** the look the owner loves, as four hand-set characters: they stand in the first row of every sheet as what a 9 looks like */
+  /** the best this pond has made so far (the hall of fame: creatures the watcher really looked at), shown in the first row of a sheet for comparison. Nothing is put there by hand. */
   G.referenceForms = function () {
-    if (G._refForms) return G._refForms;
-    const R1 = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], leg = { k: 0, a: 0, b: 0, e: 1, l: 0.7, w: 0.6, j: 2, g: 0.2, c: 0, t: 3, p: 0.5, on: -1 }, ear = { k: 7, a: 1, b: 1, e: 1, l: 0.5, w: 0.5, j: 2, g: 0, c: 0, t: 0, p: 0.5, on: -1 };
-    const mk = function (hue, hd, es, eg, ey, ep, bl, sm, bs, rules) {
-      const f = G.form.cell(hue); f.hue2 = 60; f.en = 2; f.es = es; f.hd = hd; f.eg = eg; f.ey = ey; f.ep = ep; f.bl = bl; f.sm = sm; f.seed = 7 + Math.round(hue);
-      f.bd = { v: 0, e: 1, m: [{ r: R1.slice(), s: 1, on: -1, at: 0, d: 1, pr: 0, h: 0, lb: 0, la: 0 }, { r: R1.slice(), s: bs, on: 0, at: -Math.PI / 2, d: 0.85, pr: 0, h: 0, lb: 0, la: 0 }] };
-      f.rules = (rules || []).map(function (q) { return Object.assign({}, q); });
-      return G.form.fix(f);
-    };
-    const arm = { k: 0, a: 0, b: 0, e: 1, l: 0.55, w: 0.5, j: 2, g: 0.3, c: 0, t: 1, p: 0.5, on: -1 };
-    return (G._refForms = [mk(330, 1.8, 0.7, 0.56, 0.0, 0.64, 0.7, 0.8, 0.7, [leg, arm]), mk(120, 1.8, 0.7, 0.56, 0.0, 0.64, 0.7, 0.8, 0.68, [leg, arm]), mk(260, 1.8, 0.75, 0.56, 0.0, 0.66, 0.8, 0.8, 0.68, [leg, arm, ear]), mk(30, 2.0, 0.8, 0.6, -0.05, 0.7, 0.8, 0.9, 0.7, [leg, arm])]);
+    const W = G.W, H = W && W.hall ? W.hall.filter(function (h) { return h.s >= 0.55; }).sort(function (x, y) { return y.s - x.s; }).slice(0, 4) : [];
+    return H.map(function (h) { return G.form.clone(G.cloneGenome(h.g).f); });
   };
   const live = function () { return G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available(); };
   const ask = function (forms, names, extra) {
@@ -108,7 +100,7 @@
   // Every few seconds it is shown a sheet of living creatures nobody has looked at yet: first those whose marks are oldest guesses, and
   // those the pond believes are its best (a guess must be checked before it is bred from). Its marks become those creatures' own.
   let watching = false;
-  G.WATCH_BUDGET = 0.3;          // dollars a session may spend on looking at living creatures before the watcher goes quiet
+  G.WATCH_BUDGET = 0.4;          // dollars a session may spend on looking at living creatures before the watcher goes quiet
   const clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
   const c01 = function (v) { v = +v; return isFinite(v) ? G.clamp(v, 0, 1) : NaN; };
   G.eyeGrade = function (c, g) { c.real = { b: g.b, w: g.w, why: g.why || '', fix: g.fix || '', gen: G.W.gen }; c.eb = g.b; c.ew = g.w; c.st = 0; c.ph.charm = g.b; c.ph.whole = g.w; };
@@ -117,8 +109,11 @@
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.real || !c.g.f.bd) continue; const hit = seen[G.form.key(c.g.f)]; if (hit) { G.eyeGrade(c, hit); continue; } L.push(c); }
     L.sort(function (a, b) { return ((b.st || 0) * 0.5 + 6 * G.charmOf(b)) - ((a.st || 0) * 0.5 + 6 * G.charmOf(a)); });
     // one creature to a species (the one the pond thinks best: it is the one that will breed), and a species is not looked at again for a few generations
-    const out = [], kinds = {}, sl = W.spLook = W.spLook || {};
-    for (let i = 0; i < L.length && out.length < max; i++) { const c = L[i], k = c.sp ? 's' + c.sp : G.shapeOf(c.g) + '|' + G.hueOf(c.g); if (kinds[k] || (c.sp && W.gen - (sl[c.sp] === undefined ? -99 : sl[c.sp]) < 6)) continue; kinds[k] = 1; out.push(c); }
+    // most of a sheet is the best of each species (the ones that will breed); a few are ordinary creatures picked at random, so what the pond believes is tested
+    // on the creatures it actually has and not only on its favourites (a taste taught only on its favourites thinks everyone is one)
+    const nRand = Math.min(4, Math.floor(max / 3)), out = [], kinds = {}, sl = W.spLook = W.spLook || {};
+    for (let i = 0; i < L.length && out.length < max - nRand; i++) { const c = L[i], k = c.sp ? 's' + c.sp : G.shapeOf(c.g) + '|' + G.hueOf(c.g); if (kinds[k] || (c.sp && W.gen - (sl[c.sp] === undefined ? -99 : sl[c.sp]) < 6)) continue; kinds[k] = 1; out.push(c); }
+    { const rest = L.filter(function (c) { return out.indexOf(c) < 0; }), lk = {}; for (let t = 0; t < nRand * 3 && rest.length && out.length < max; t++) { const c = rest.splice((G.rand() * rest.length) | 0, 1)[0], k = G.shapeOf(c.g) + '|' + G.hueOf(c.g); if (lk[k]) continue; lk[k] = 1; out.push(c); } }
     // a pond of two or three species still gets a look: the look-alike kinds within them stand in
     if (out.length < 4) { const lk = {}; for (let i = 0; i < L.length && out.length < 5; i++) { const c = L[i], k = G.shapeOf(c.g) + '|' + G.hueOf(c.g); if (lk[k] || out.indexOf(c) >= 0) continue; lk[k] = 1; out.push(c); } }
     return out;
@@ -129,7 +124,7 @@
     const picks = G.watchPick(12);
     // the watcher's own spending slows it as it goes, whatever model it is: looking often at first, when the pond is learning what is nice,
     // then rarely. A session's looks cost about 20 to 30 cents in all (WATCH_BUDGET); once spent it looks only now and then.
-    { const sp = G.ai.count && G.ai.count.watch ? G.ai.count.watch.usd || 0 : 0, B = G.WATCH_BUDGET; G.ai.gaps.watch = sp < B * 0.35 ? 5000 : sp < B * 0.7 ? 9000 : sp < B ? 16000 : 60000; }
+    { const sp = G.ai.count && G.ai.count.watch ? G.ai.count.watch.usd || 0 : 0, B = G.WATCH_BUDGET; G.ai.gaps.watch = sp < B * 0.3 ? 2500 : sp < B * 0.6 ? 6000 : sp < B ? 12000 : 60000; }
     if (picks.length < 4 || !G.ai.allow('watch')) return;
     const refs = G.referenceForms(), img = G.sheet(refs.concat(picks.map(function (c) { return c.g.f; })), { cw: 176, ch: 182, sc: 0.48, cols: 4, refs: refs.length });
     if (!img) return;

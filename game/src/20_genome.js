@@ -108,7 +108,7 @@
   G.derive = function (g) {
     const t = g.t, c = g.c, f = g.f, FM = G.form, U = FM.U;
     const cn = FM.counts(f), A = FM.abilities(f, cn), ext = FM.extent(f), k = cn.k;
-    const r = Math.min(t[0], 13 + 4.6 * (f.n - 1));          // a longer body can be a bigger one
+    const r = Math.min(t[0], 22 + 8 * (f.n - 1));          // a body of more parts can be a bigger one; the ceiling is high, so size is limited by food and by the pond, not by a rule
     const FX = { speed: 0, sense: 0, eat: 0, armor: 0, spike: 0, toxin: 0, photo: 0, glow: 0, heat: 0, cold: 0, poison: 0 };
     const dig = [c[0], c[1], c[2], c[3], c[4], c[5]];
     let orgCost = 0;
@@ -140,7 +140,7 @@
       flag: tail ? Math.min(2, f.ts * 1.3) : 0,
       bite: bite,
       gill: Math.min(2.2, 1 + 0.1 * k[1] + 0.16 * k[6] + 0.05 * k[3]),      // the surface it breathes through
-      Emax: 90 * Math.pow(r / 10, 1.5),
+      Emax: 90 * Math.pow(r / 10, 1.62),
       tag: G.tagOfHue(f.hue),
       nseg: f.n - 1, limbs: cn.legSites, segs: [],
       reach: clamp(ext.all * ds / r, 1, 3.6),
@@ -175,7 +175,7 @@
     ph.forage = [0.5 + 1.0 * A.reach, 0.5 + 1.0 * A.agility, 0.85, 0.5 + 1.0 * A.senses, 0.45 + 1.1 * A.attack, 0.5 + 1.0 * A.speed];      // how well this body gathers each colour of food
     ph.pneed = 0.55 + 0.03 * cn.mass + 0.04 * (f.n - 1) + 0.1 * Math.max(0, f.hd - 1) + (f.coat ? 0.04 : 0);      // protein a child takes, per unit of its energy cost: elaborate bodies are dear to build
     const r10 = r / 10;
-    let up = 0.22 * Math.pow(r10, 2.3) + r10 * (0.026 * cn.mass + 0.02 * (f.n - 1) + 0.07 * f.shell + 0.02 * f.crest + 0.04 * f.glow + 0.05 * f.venom + 0.012 * f.en * (0.5 + f.es) + (f.mk === 2 ? 0.03 : 0) + (f.coat ? 0.09 : 0) + 0.035 * Math.pow(Math.max(0, f.rules.length - 3), 2) + 0.03 * Math.max(0, f.hd - 1));
+    let up = 0.22 * Math.pow(r10, 2.05) + r10 * (0.026 * cn.mass + 0.02 * (f.n - 1) + 0.07 * f.shell + 0.02 * f.crest + 0.04 * f.glow + 0.05 * f.venom + 0.012 * f.en * (0.5 + f.es) + (f.mk === 2 ? 0.03 : 0) + (f.coat ? 0.09 : 0) + 0.035 * Math.pow(Math.max(0, f.rules.length - 3), 2) + 0.03 * Math.max(0, f.hd - 1));
     up += orgCost + 0.02 * ph.aggro * r10;      // being angry is not free
     let digSum = 0; for (let i = 0; i < 6; i++) digSum += c[i];
     let tolSum = 0; for (let i = 9; i < 15; i++) tolSum += c[i] || 0;
@@ -239,7 +239,7 @@
     const press = G.W && G.W.press ? G.W.press : null;
     // nudge traits
     // size answers the pond: danger favours bigger bodies, hunger and thin air smaller ones; chance does the rest
-    if (r() < m * 2) { g.t[0] += n() * 1.1 + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
+    if (r() < m * 2) { g.t[0] += n() * 1.1 + 0.12 + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
     if (press && Math.abs(press.size) > 0.2 && r() < 0.06 * Math.abs(press.size) * wild) { const up = press.size > 0; g.t[0] = Math.max(5, g.t[0] * (up ? 1.12 : 0.9)); note('t', 0, (up ? 'grew bigger, ' : 'grew smaller, ') + (press.sizeWhy || 'to suit the pond'), true); }
     if (r() < m * 2) { g.t[1] += n() * 0.07; note('t', 1, 'speed', false); }
     if (r() < m * 2.5) { g.t[4] = (g.t[4] || 0.12) + n() * 0.14; note('t', 4, 'temper', false); }

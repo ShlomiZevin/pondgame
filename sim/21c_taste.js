@@ -12,7 +12,7 @@
     'legs', 'arms', 'fins', 'spikes', 'tentacles', 'feelers', 'plates', 'frills', 'horns', 'designs', 'wrap', 'tail', 'beak', 'jaws', 'sucker', 'whiskers', 'scales', 'fur', 'feathers', 'marked', 'stripes', 'spots',
     'shell', 'crest', 'glow', 'venom', 'sat', 'lit', 'contrast', 'longest', 'nested', 'bare',
     // what makes a face lovable (the baby schema the eye responds to): big wide-set low eyes, big soft pupils, a smile, a big head on a small body, round outlines, stubby limbs, a tidy body, no spikes
-    'eyeBig', 'eyeLow', 'eyeSet', 'pupil', 'smile', 'blush', 'headBig', 'round', 'stubby', 'tidy', 'spiky', 'sig'];
+    'eyeBig', 'eyeLow', 'eyeSet', 'pupil', 'smile', 'blush', 'headBig', 'round', 'stubby', 'tidy', 'spiky', 'sig', 'limbs', 'pose'];
   F.LOOKS = NAMES;
   /** what can be seen on a body, as numbers (each about 0..1) */
   F.looks = function (f) {
@@ -33,14 +33,15 @@
     let sq = 0, tot = 0; for (let i = 0; i < M.length; i++) { const a = M[i].s * M[i].s * (M[i].pr ? 2 : 1); tot += a; if (i === f.bd.e) sq = a; }
     let ln = 0, nl = 0, sp = 0; const sg = {}; for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on >= 0) continue; if (q.k === 0) { ln += q.l; nl++; } if (q.k === 2) sp++; if (q.k === 7 || q.k === 1 || q.k === 3 || q.k === 6 || q.k === 8) sg[q.k] = 1; }
     // signature features: real-animal parts (horns, fins, tentacles, frills, an invented part), a tail, a shell, ears (a pair of masses), a coat, markings. One or two make a character; none is bland, more than three is clutter
-    if (f.tk) sg.t = 1; if (f.shell > 0.25) sg.s = 1; if (f.coat) sg.c = 1; if (f.pat) sg.p = 1; if (bm.pairs) sg.e = 1; const ns = Object.keys(sg).length;
+    if (f.tk) sg.t = 1; if (f.shell > 0.25) sg.s = 1; if (f.coat) sg.c = 1; if (f.pat) sg.p = 1; if (f.cl) sg.k = 1; if (bm.pairs) sg.e = 1; const ns = Object.keys(sg).length;
     return [clamp((f.es - 0.34) / 0.4, 0, 1) * en, ne * clamp(0.3 + (0.14 - f.ey) / 0.3, 0, 1), f.en === 2 ? 1 - Math.min(1, Math.abs(f.eg - 0.55) / 0.25) : 0, ne * clamp((f.ep - 0.4) / 0.3, 0, 1), clamp(f.sm, 0, 1), clamp(f.bl, 0, 1),
       clamp(((M.length > 1 ? sq / tot : 0.5) - 0.3) / 0.4, 0, 1) * 0.6 + 0.4 * clamp((f.hd - 1) / 1.2, 0, 1), clamp((mm - 0.6) / 0.4, 0, 1) * (bm.lobed ? 0.5 : 1), nl ? 1 - clamp((ln / nl - 0.6) / 1.2, 0, 1) : 0.5,
-      busy <= 5.5 ? 1 : Math.max(0, 1 - (busy - 5.5) * 0.3), Math.min(1, (sp + (f.crest > 0.25 ? 1 : 0)) * 0.5), ns === 0 ? 0 : ns <= 2 ? 1 : ns === 3 ? 0.5 : 0];
+      busy <= 5.5 ? 1 : Math.max(0, 1 - (busy - 5.5) * 0.3), Math.min(1, (sp + (f.crest > 0.25 ? 1 : 0)) * 0.5), ns === 0 ? 0 : ns <= 2 ? 1 : ns === 3 ? 0.5 : 0,
+      nl >= 2 ? clamp(1 - Math.abs(f.ll * f.lw - 1.2) / 0.6, 0, 1) : nl === 1 ? 0.15 : 0, Math.min(1, Math.abs(f.st || 0) / 0.3)];
   };
   // the taste every pond starts with: fitted to the AI's grades of pictures (b: the grade of a body with nothing to see on it)
-  F.TASTE0 = { b: 0.5325, w: [-0.121, 0.0073, 0.1, 0.0137, 0.0313, -0.0019, 0.0136, -0.0162, 0, -0.0364, 0.0033, -0.0094, -0.0631, -0.0881, 0.0249, -0.032, 0.0358, 0.0729, -0.0435, -0.0798, 0.0204, 0.0382, -0.0008, -0.0684, -0.0479, 0.0371, 0.0085, -0.0465, 0.0284, -0.0495, -0.0495, -0.0101, 0.0078, -0.0422, -0.0125, 0.0211, -0.0124, -0.035, -0.0414, -0.0141, -0.0058, 0.0454, -0.0249, 0.032, -0.0437, -0.026, 0.0027, 0.0081, -0.0341, 0.0177, 0.0058, -0.1911, 0.16, 0.03, 0.04, 0.03, 0.04, 0.02, 0.1, 0.08, 0.06, 0.1, -0.09, 0.07], n: 294 };      // fitted 2026-10-06 to 294 graded pictures; held-out correlation 0.59
-  F.newTaste = function () { return { b: F.TASTE0.b, w: F.TASTE0.w.slice(), n: 0, wb: 0, ww: F.TASTE0.w.map(function () { return 0; }) }; };
+  F.TASTE0 = { b: 0.2873, w: [0, 0.0049, -0.0083, 0.0033, -0.0273, -0.0226, -0.0825, -0.0151, -0.0389, 0.0131, -0.1379, -0.0141, 0.0624, -0.0415, 0.0307, 0.0259, -0.0108, 0.0604, 0.0325, 0.0211, 0.0569, -0.0014, 0.0695, -0.0342, 0.0021, 0.0547, 0.0282, 0, 0.0411, -0.0144, 0, 0.0459, -0.0337, -0.0617, -0.0081, 0.0229, 0.0106, 0.0234, -0.0046, 0.1216, -0.0289, -0.1043, -0.0193, 0.0673, 0.0252, 0.0303, 0.0212, 0.0287, -0.0097, 0.0386, 0.0068, 0.0427, 0.0899, -0.0541, 0.0169, -0.0288, -0.0187, 0.0047, 0.1863, -0.0773, 0.0375, 0.0359, 0.0165, 0.0006, 0.0031, 0.0184], n: 237, wb: -0.4464, ww: [0, 0.0204, 0.0073, -0.0277, -0.056, -0.0261, -0.0837, -0.0906, -0.0928, 0.0642, -0.0898, -0.0291, 0.0539, -0.0547, 0.0484, -0.017, 0.0095, 0.023, 0.0121, 0.0255, 0.0169, 0.0289, 0.0417, 0.0297, 0.0013, 0.0349, -0.0218, 0, 0.0306, -0.0208, 0, -0.0055, -0.0043, -0.0624, -0.0674, 0.0774, -0.0132, 0.0069, 0.0312, 0.1242, -0.02, -0.1493, -0.0363, 0.0128, 0.0691, -0.0068, -0.0309, -0.0183, -0.0226, -0.0287, -0.0124, -0.0221, 0.0998, -0.0709, -0.0195, -0.0115, -0.0126, -0.0062, 0.1629, -0.0111, 0.0452, -0.0617, 0.0212, 0.0447, 0.035, 0.0091] };      // fitted 2026-10-06 to the AI's marks on 237 random pond creatures (beauty r 0.55 held out; whole is a correction to F.whole, r 0.62)
+  F.newTaste = function () { return { b: F.TASTE0.b, w: F.TASTE0.w.slice(), n: 0, wb: F.TASTE0.wb || 0, ww: F.TASTE0.ww ? F.TASTE0.ww.slice() : F.TASTE0.w.map(function () { return 0; }) }; };
   F.fixTaste = function (t) {
     if (!t || !Array.isArray(t.w) || t.w.length !== NAMES.length || !isFinite(+t.b)) return null;
     const ok = Array.isArray(t.ww) && t.ww.length === NAMES.length;
@@ -84,24 +85,23 @@
    *  (a tail, ears, a crest, horns), a skin of its own (a coat or markings), and nothing odd left hanging. Returns { v, has: [...], lacks: [...] } */
   F.whole = function (f) {
     if (!f.bd) return { v: 0.3, has: [], lacks: [] };
+    // Whole means complete, not any one kind of animal: a face, a way of getting about, the parts that finish a creature of its sort, a body that holds together.
+    // Nothing here names a kind: a fish, a worm, a bird or something nobody has named is as whole as a person if it has what it needs.
     const BD = G.body, bm = BD.measure(f), L = BD.lay(f, null), gnd = BD.ground(L), M = f.bd.m, has = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-    let legs = 0, arms = 0, sideDsg = 0; const legOn = {};
+    let legs = 0, arms = 0, sideDsg = 0, organs = 0; const legOn = {}, seen = {};
     for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on >= 0) continue; has[q.k] = 1; if (q.k === 8) { const d = F._dsg(q); if (d && d.place === 'sides') sideDsg = 1; } if (q.k === 0) for (let m = q.a; m <= q.b && m < f.n; m += q.e) { if (gnd[m] && !legOn[m]) { legOn[m] = 1; legs = 1; } else arms = 1; } }
-    // a head apart from a body: the face on a mass of its own, with a body mass at least as big to carry it
+    // the kinds of organ it has: each counts once, however it is used
+    const org = [['legs', legs], ['arms or hands', arms], ['fins or wings', has[1]], ['tentacles', has[3]], ['a tail', f.tk ? 1 : 0], ['a shell', f.shell > 0.25 ? 1 : 0], ['ears, horns or feelers', bm.pairs || has[7] || has[4] || f.crest > 0.25 ? 1 : 0], ['a coat, markings or clothes', f.coat || f.pat || f.cl ? 1 : 0], ['a kind of part this pond invented', has[8] ? 1 : 0]];
+    const got = [], lacks = []; for (let i = 0; i < org.length; i++) if (org[i][1]) { organs++; got.push(org[i][0]); }
+    const side = f.bd.v ? 1 : 0, face = f.en >= 2 ? 1 : f.en === 1 ? (side ? 1 : 0.6) : 0;
+    const mover = legs || has[1] || has[3] || f.tk || (side && M.length >= 3 && bm.cls === 'W') ? 1 : sideDsg ? 0.5 : 0;      // some way of getting about: legs, fins, tentacles, a tail, a long body
+    // a body of its own: a head set on a torso, or one body with a clear front and back that holds together
     let torso = 0; for (let i = 0; i < M.length; i++) if (i !== f.bd.e && !M[i].pr) torso = Math.max(torso, M[i].s);
-    const head = M.length >= 2 && torso >= M[f.bd.e].s * 0.8 ? 1 : M.length >= 2 && torso > 0 ? 0.5 : 0;
-    const P = [
-      ['a face (two eyes)', 0.12, f.en === 2 ? 1 : f.en ? 0.6 : 0],
-      ['a mouth of its own', 0.03, f.mk ? 1 : 0],
-      ['a head set apart from a body', 0.23, head],
-      ['legs to stand and walk on', 0.22, legs ? 1 : has[1] || has[3] || f.tk ? 0.25 : 0],
-      ['arms or hands', 0.17, arms ? 1 : has[1] || sideDsg ? 0.25 : 0],
-      ['an upright, standing build', 0.07, legs && bm.tall > 1.05 ? 1 : legs ? 0.4 : 0],
-      ['something that finishes it (a tail, ears, a crest or horns)', 0.03, f.tk || has[7] || has[4] || f.crest > 0.25 || bm.pairs ? 1 : 0],
-      ['a skin of its own (a coat or markings)', 0.03, f.coat || f.pat ? 1 : 0],
-    ];
-    let v = 0.1 - (bm.hollow ? 0.04 : 0) - (bm.stalks ? 0.03 : 0); const got = [], lacks = [];
-    for (let i = 0; i < P.length; i++) { v += P[i][1] * P[i][2]; if (P[i][2] >= 0.9) got.push(P[i][0]); else if (P[i][1] >= 0.1 || P[i][2] === 0) lacks.push(P[i][0]); }
+    const head = M.length >= 2 && torso >= M[f.bd.e].s * 0.8 ? 1 : M.length >= 2 && torso > 0 ? 0.6 : side && bm.asp > 1.15 ? 0.8 : 0.2;
+    const busy = BD.busy(f), tidy = busy <= 6.5 ? 1 : Math.max(0, 1 - (busy - 6.5) * 0.25);
+    const parts = [['a face (eyes)', 0.15, face], ['a mouth of its own', 0.04, f.mk || f.sm > 0.4 ? 1 : 0.3], ['a way of getting about', 0.24, mover], ['the parts that finish a creature of its sort', 0.3, Math.min(1, organs / 3.5)], ['a body of its own', 0.12, head], ['all of it holding together, nothing piled on', 0.05, tidy]];
+    let v = 0.1 - (bm.hollow ? 0.04 : 0) - (bm.stalks ? 0.03 : 0);
+    for (let i = 0; i < parts.length; i++) { v += parts[i][1] * parts[i][2]; if (parts[i][2] < 0.7) lacks.push(parts[i][0]); }
     return { v: clamp(v, 0, 1), has: got, lacks: lacks };
   };
   /** what counts for most in a grade, in words: the three things that lift this body most and the three that pull it down */

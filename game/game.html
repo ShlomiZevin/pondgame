@@ -546,7 +546,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   G.derive = function (g) {
     const t = g.t, c = g.c, f = g.f, FM = G.form, U = FM.U;
     const cn = FM.counts(f), A = FM.abilities(f, cn), ext = FM.extent(f), k = cn.k;
-    const r = Math.min(t[0], 13 + 4.6 * (f.n - 1));          // a longer body can be a bigger one
+    const r = Math.min(t[0], 22 + 8 * (f.n - 1));          // a body of more parts can be a bigger one; the ceiling is high, so size is limited by food and by the pond, not by a rule
     const FX = { speed: 0, sense: 0, eat: 0, armor: 0, spike: 0, toxin: 0, photo: 0, glow: 0, heat: 0, cold: 0, poison: 0 };
     const dig = [c[0], c[1], c[2], c[3], c[4], c[5]];
     let orgCost = 0;
@@ -578,7 +578,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       flag: tail ? Math.min(2, f.ts * 1.3) : 0,
       bite: bite,
       gill: Math.min(2.2, 1 + 0.1 * k[1] + 0.16 * k[6] + 0.05 * k[3]),      // the surface it breathes through
-      Emax: 90 * Math.pow(r / 10, 1.5),
+      Emax: 90 * Math.pow(r / 10, 1.62),
       tag: G.tagOfHue(f.hue),
       nseg: f.n - 1, limbs: cn.legSites, segs: [],
       reach: clamp(ext.all * ds / r, 1, 3.6),
@@ -613,7 +613,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     ph.forage = [0.5 + 1.0 * A.reach, 0.5 + 1.0 * A.agility, 0.85, 0.5 + 1.0 * A.senses, 0.45 + 1.1 * A.attack, 0.5 + 1.0 * A.speed];      // how well this body gathers each colour of food
     ph.pneed = 0.55 + 0.03 * cn.mass + 0.04 * (f.n - 1) + 0.1 * Math.max(0, f.hd - 1) + (f.coat ? 0.04 : 0);      // protein a child takes, per unit of its energy cost: elaborate bodies are dear to build
     const r10 = r / 10;
-    let up = 0.22 * Math.pow(r10, 2.3) + r10 * (0.026 * cn.mass + 0.02 * (f.n - 1) + 0.07 * f.shell + 0.02 * f.crest + 0.04 * f.glow + 0.05 * f.venom + 0.012 * f.en * (0.5 + f.es) + (f.mk === 2 ? 0.03 : 0) + (f.coat ? 0.09 : 0) + 0.035 * Math.pow(Math.max(0, f.rules.length - 3), 2) + 0.03 * Math.max(0, f.hd - 1));
+    let up = 0.22 * Math.pow(r10, 2.05) + r10 * (0.026 * cn.mass + 0.02 * (f.n - 1) + 0.07 * f.shell + 0.02 * f.crest + 0.04 * f.glow + 0.05 * f.venom + 0.012 * f.en * (0.5 + f.es) + (f.mk === 2 ? 0.03 : 0) + (f.coat ? 0.09 : 0) + 0.035 * Math.pow(Math.max(0, f.rules.length - 3), 2) + 0.03 * Math.max(0, f.hd - 1));
     up += orgCost + 0.02 * ph.aggro * r10;      // being angry is not free
     let digSum = 0; for (let i = 0; i < 6; i++) digSum += c[i];
     let tolSum = 0; for (let i = 9; i < 15; i++) tolSum += c[i] || 0;
@@ -677,7 +677,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const press = G.W && G.W.press ? G.W.press : null;
     // nudge traits
     // size answers the pond: danger favours bigger bodies, hunger and thin air smaller ones; chance does the rest
-    if (r() < m * 2) { g.t[0] += n() * 1.1 + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
+    if (r() < m * 2) { g.t[0] += n() * 1.1 + 0.12 + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
     if (press && Math.abs(press.size) > 0.2 && r() < 0.06 * Math.abs(press.size) * wild) { const up = press.size > 0; g.t[0] = Math.max(5, g.t[0] * (up ? 1.12 : 0.9)); note('t', 0, (up ? 'grew bigger, ' : 'grew smaller, ') + (press.sizeWhy || 'to suit the pond'), true); }
     if (r() < m * 2) { g.t[1] += n() * 0.07; note('t', 1, 'speed', false); }
     if (r() < m * 2.5) { g.t[4] = (g.t[4] || 0.12) + n() * 0.14; note('t', 4, 'temper', false); }
@@ -861,7 +861,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   F.cell = function (hue) {
     const r = G.rand;
     return { bd: G.body.cell(), sym: 0, n: 1, len: 1, prof: [1, 1, 1, 1, 1], bend: 0, rules: [], en: 0, es: 0.4, ek: 0, mk: 0, ms: 0.25, tk: 0, ts: 0.6,
-      hue: hue === undefined ? r() * 360 : hue, hue2: (r() < 0.5 ? -1 : 1) * (50 + r() * 110), sat: 62 + r() * 20, lit: 58 + r() * 8, pat: 0, psc: 0.5, crest: 0, shell: 0, glow: 0, venom: 0, hd: 1, nk: 0, coat: 0, eg: 0.5, ey: 0.14, ep: 0.46, bl: 0.4, sm: 0.5, hx: 0.85 + r() * 0.4, hq: 1.7 + r() * 1.2, pl: 0, seed: Math.floor(r() * 1e6) };
+      hue: hue === undefined ? r() * 360 : hue, hue2: (r() < 0.5 ? -1 : 1) * (50 + r() * 110), sat: 62 + r() * 20, lit: 58 + r() * 8, pat: 0, psc: 0.5, crest: 0, shell: 0, glow: 0, venom: 0, hd: 1, nk: 0, coat: 0, eg: 0.5, ey: 0.14, ep: 0.46, bl: 0.4, sm: 0.5, ll: 1, lw: 1, hs: 1, st: 0, cl: 0, hx: 0.85 + r() * 0.4, hq: 1.7 + r() * 1.2, pl: 0, seed: Math.floor(r() * 1e6) };
   };
   F.clone = function (f) {
     const o = {};
@@ -904,7 +904,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     f.sat = num(f.sat, 52, 88, 70); f.lit = num(f.lit, 52, 72, 62); f.pat = clamp(f.pat | 0, 0, 5); f.psc = num(f.psc, 0.15, 1, 0.5);
     f.crest = num(f.crest, 0, 1, 0); f.shell = num(f.shell, 0, 1, 0); f.glow = num(f.glow, 0, 1, 0); f.venom = num(f.venom, 0, 1, 0); f.seed = (f.seed | 0) || 1;
     f.hd = num(f.hd, 0.7, f.bd ? 2.5 : 1.9, 1);
-    f.eg = num(f.eg, 0.3, 0.8, 0.5); f.ey = num(f.ey, -0.2, 0.36, 0.14); f.ep = num(f.ep, 0.36, 0.78, 0.46); f.bl = num(f.bl, 0, 1, 0.4); f.sm = num(f.sm, -0.2, 1, 0.5); f.nk = num(f.nk, 0, 0.7, 0); f.coat = clamp(f.coat | 0, 0, 3);
+    f.eg = num(f.eg, 0.3, 0.8, 0.5); f.ey = num(f.ey, -0.2, 0.36, 0.14); f.ep = num(f.ep, 0.36, 0.78, 0.46); f.bl = num(f.bl, 0, 1, 0.4); f.sm = num(f.sm, -0.2, 1, 0.5);
+    f.ll = num(f.ll, 0.7, 1.4, 1); f.lw = num(f.lw, 0.85, 1.4, 1); f.hs = num(f.hs, 0.8, 1.5, 1); f.st = num(f.st, -0.35, 0.35, 0); f.cl = clamp(f.cl | 0, 0, 4); f.nk = num(f.nk, 0, 0.7, 0); f.coat = clamp(f.coat | 0, 0, 3);
     f.hx = num(f.hx, 0.72, 1.45, 1); f.hq = num(f.hq, 1.5, 4, 2); f.pl = Math.max(0, f.pl | 0);
     if (f.bd) while (f.rules.length > 4) dropRule(f, f.rules.length - 1);
     delete f._k; delete f._b;
@@ -927,7 +928,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   /** mutate a form in place. m: chance of a nudge per gene; wild: the world's mutation slider; press: what the pond is up against; note(text, big) */
   F.mutate = function (f, m, wild, press, note) {
     const r = G.rand, n = G.randn;
-    if (f.bd) { const busy = G.body.busy(f); if (busy > 6.5 && r() < Math.min(0.6, 0.14 * (busy - 6.5)) * wild) {
+    if (f.bd) { const busy = G.body.busy(f); if (busy > 6 && r() < Math.min(0.7, 0.2 * (busy - 6)) * wild) {
       const roll = r();
       if (roll < 0.5 && f.rules.length) { const i = Math.floor(r() * f.rules.length); note('shed its ' + KMANY[f.rules[i].k] + ': a simpler body', true); dropRule(f, i); }
       else if (roll < 0.7 && G.body.drop(f, null)) note('lost a part of its body: a simpler shape', true);
@@ -987,8 +988,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     // a whole new way of carrying the body: one of the builds this pond has been given
     // a shape of body imagined for this pond: now and then a child is born some way towards one of them
     if (f.bd) { const pls = G.W && G.W.plans ? G.W.plans : []; if (pls.length && r() < 0.026 * wild) { const p = pls[Math.floor(r() * pls.length)]; if (p.id !== f.pl && p.bd) { const tt = 0.65 + r() * 0.35; G.body.adopt(f, p.bd, tt); f.pl = p.id; if (p.face) for (const k in p.face) if (p.face[k] !== undefined) f[k] += (p.face[k] - f[k]) * Math.min(1, tt + 0.1);
+      if (p.tail && tt > 0.7) { f.tk = p.tail.tk; f.ts = p.tail.ts; }
+      if (p.outfit && tt > 0.7) f.cl = p.outfit;
       if (p.kit && tt > 0.7) for (let ki = 0; ki < p.kit.length; ki++) F.nudge(f, p.kit[ki], null);      /* a plush shape comes with its stubby legs and little arms */ note('its body took a new shape: the ' + p.name.toLowerCase() + (p.because ? ' (' + p.because + ')' : ''), true); } } }
     // heads, necks and coats
+    if (f.bd && r() < 0.02 * wild) { const k = r() < 0.2 ? 0 : 1 + Math.floor(r() * 4); if (k !== f.cl) { f.cl = k; note(['took off its outfit', 'put on a scarf', 'put on a belt', 'put on gloves and boots', 'grew a tuft of hair'][k], true); } }
     if (r() < 0.022 * wild) { const k = Math.floor(r() * 4); if (k !== f.coat) { f.coat = k; note(['lost its coat: bare skin again', 'grew scales', 'grew fur', 'grew feathers'][k], true); } }
     if (f.n > 1 && !f.sym && !f.bd && r() < 0.025 * wild) { const up = r() < 0.65; f.nk = clamp(f.nk + (up ? 0.25 : -0.25), 0, 0.7); note(up ? 'its neck narrowed: a head set apart from the body' : 'its neck thickened', true); }
     if (!f.bd && r() < 0.02 * wild) { f.hx = 0.72 + r() * 0.73; f.hq = 1.5 + r() * 2.5; note(f.hq > 3 ? 'its head grew square' : f.hq < 1.8 ? 'its head grew pointed' : f.hx > 1.2 ? 'its head grew wide' : f.hx < 0.85 ? 'its head grew tall' : 'its head changed shape', true); }
@@ -1033,7 +1037,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     for (let i = 0; i < 5; i++) f.prof[i] *= 1 + d() * 0.14;
     f.bend += d() * 0.05; f.hd *= 1 + d() * 0.07; f.nk += d() * 0.04; f.hx *= 1 + d() * 0.08; f.hq *= 1 + d() * 0.1;
     f.hue += d() * 12; f.hue2 += d() * 14; f.sat += d() * 5; f.lit += d() * 4;
-    f.es += d() * 0.04; f.eg += d() * 0.03; f.ey += d() * 0.04; f.ep += d() * 0.03; f.bl += d() * 0.08; f.sm += d() * 0.08; f.ek += d() * 0.12; f.ms += d() * 0.05; f.ts += d() * 0.1; f.psc += d() * 0.1;
+    f.es += d() * 0.04; f.eg += d() * 0.03; f.ey += d() * 0.04; f.ep += d() * 0.03; f.bl += d() * 0.08; f.sm += d() * 0.08; f.ll *= 1 + d() * 0.07; f.lw *= 1 + d() * 0.07; f.hs *= 1 + d() * 0.07; f.st += d() * 0.1; f.ek += d() * 0.12; f.ms += d() * 0.05; f.ts += d() * 0.1; f.psc += d() * 0.1;
     for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; q.l *= 1 + d() * 0.12; q.w *= 1 + d() * 0.1; q.g += d() * 0.15; q.c += d() * 0.15; }
     if (drift) note('body shape', false);
     if (f.bd) {
@@ -1045,7 +1049,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     return F.fix(f);
   };
   /** one change towards better looks, as the judge put it */
-  F.NUDGES = ['eyes_bigger', 'two_eyes', 'simpler', 'rounder', 'bolder_colour', 'pattern', 'plain', 'bigger_face', 'shorter_parts', 'longer_parts', 'plumper', 'slimmer', 'face_on', 'more_parts', 'fewer_masses', 'more_masses', 'smile', 'eyes_apart', 'eyes_closer', 'eyes_lower', 'pupils_bigger', 'blush', 'bigger_head', 'smaller_body', 'legs', 'arms'];
+  F.NUDGES = ['eyes_bigger', 'two_eyes', 'simpler', 'rounder', 'bolder_colour', 'pattern', 'plain', 'bigger_face', 'shorter_parts', 'longer_parts', 'plumper', 'slimmer', 'face_on', 'more_parts', 'fewer_masses', 'more_masses', 'smile', 'eyes_apart', 'eyes_closer', 'eyes_lower', 'pupils_bigger', 'blush', 'bigger_head', 'smaller_body', 'legs', 'arms', 'longer_limbs', 'thicker_limbs', 'bigger_hands', 'lean', 'dress', 'fins', 'tail'];
   F.nudge = function (f, fix, note) {
     const r = G.rand; let t = '';
     const headBigger = function (k) { const M = f.bd.m, e = f.bd.e; if (e > 0) M[e].s = Math.min(1.25, M[e].s * (1 + 0.12 * k)); else for (let i = 1; i < M.length; i++) M[i].s = Math.max(0.3, M[i].s * (1 - 0.1 * k)); };
@@ -1072,6 +1076,13 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     else if (fix === 'pupils_bigger') { f.ep += 0.05; t = 'its pupils grew, a softer look'; }
     else if (fix === 'blush') { f.bl += 0.25; t = 'its cheeks grew rosier'; }
     else if (fix === 'bigger_head') { if (f.bd && f.bd.m.length > 1) headBigger(1); f.hd += 0.15; t = 'its head grew bigger beside its body'; }
+    else if (fix === 'longer_limbs') { f.ll += 0.15; t = 'its arms and legs grew longer'; }
+    else if (fix === 'thicker_limbs') { f.lw += 0.14; t = 'its arms and legs grew sturdier'; }
+    else if (fix === 'bigger_hands') { f.hs += 0.16; t = 'its hands and feet grew bigger'; }
+    else if (fix === 'fins') { if (f.bd && f.rules.length < 4 && !has(f, 1)) { const L = G.body.lay(f, null); let at = 0; for (let i = 1; i < f.bd.m.length; i++) if (f.bd.m[i].s > f.bd.m[at].s && !f.bd.m[i].pr) at = i; f.rules.push({ k: 1, a: at, b: at, e: 1, l: 0.8, w: 0.5, j: 2, g: 0, c: 0, t: 0, p: 0.5, on: -1 }); t = 'it grew fins'; } }
+    else if (fix === 'tail') { if (!f.tk) { f.tk = 1 + Math.floor(r() * 4); f.ts = 0.7; t = 'it grew a tail'; } }
+    else if (fix === 'dress') { if (!f.cl) { f.cl = 1 + Math.floor(r() * 4); t = ['', 'it put on a scarf', 'it put on a belt', 'it put on gloves and boots', 'it grew a tuft of hair'][f.cl]; } }
+    else if (fix === 'lean') { f.st = clamp(f.st + (f.st >= 0 ? 0.1 : -0.1), -0.35, 0.35); if (Math.abs(f.st) < 0.1) f.st = (r() < 0.5 ? -1 : 1) * 0.15; t = 'it took a stance, leaning into it'; }
     else if (fix === 'legs' || fix === 'arms') {
       // stubby limbs on the mass that rests lowest (legs) and a second set on the same mass (the painter draws those as arms)
       if (f.bd && f.rules.length < 4) {
@@ -1091,6 +1102,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (r() < 0.5) g.prof = o.prof.slice();
     if (r() < 0.5) { g.en = o.en; g.es = o.es; g.ek = o.ek; g.eg = o.eg; g.ey = o.ey; g.ep = o.ep; }
     if (r() < 0.5) { g.mk = o.mk; g.ms = o.ms; g.sm = o.sm; g.bl = o.bl; }
+    if (r() < 0.5) { g.ll = o.ll; g.lw = o.lw; g.hs = o.hs; g.st = o.st; }
+    if (r() < 0.5) g.cl = o.cl;
     if (r() < 0.5) { g.tk = o.tk; g.ts = o.ts; }
     if (r() < 0.5) { g.pat = o.pat; g.psc = o.psc; }
     if (r() < 0.5) { g.hue = o.hue; g.hue2 = o.hue2; g.sat = o.sat; g.lit = o.lit; }
@@ -1281,13 +1294,13 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   const r2 = function (x) { return Math.round(x * 100) / 100; };
   F.pack = function (f) {
     return [f.sym, f.n, r2(f.len), f.prof.map(r2), r2(f.bend), f.rules.map(function (q) { return [q.k, q.a, q.b, q.e, r2(q.l), r2(q.w), q.j, r2(q.g), r2(q.c), q.t, r2(q.p), q.on === undefined ? -1 : q.on]; }),
-      f.en, r2(f.es), r2(f.ek), f.mk, r2(f.ms), f.tk, r2(f.ts), Math.round(f.hue), Math.round(f.hue2), Math.round(f.sat), Math.round(f.lit), f.pat, r2(f.psc), r2(f.crest), r2(f.shell), r2(f.glow), r2(f.venom), f.seed, r2(f.hd), r2(f.nk), f.coat, r2(f.hx), r2(f.hq), f.pl | 0, f.bd ? G.body.pack(f.bd) : 0, r2(f.eg), r2(f.ey), r2(f.ep), r2(f.bl), r2(f.sm)];
+      f.en, r2(f.es), r2(f.ek), f.mk, r2(f.ms), f.tk, r2(f.ts), Math.round(f.hue), Math.round(f.hue2), Math.round(f.sat), Math.round(f.lit), f.pat, r2(f.psc), r2(f.crest), r2(f.shell), r2(f.glow), r2(f.venom), f.seed, r2(f.hd), r2(f.nk), f.coat, r2(f.hx), r2(f.hq), f.pl | 0, f.bd ? G.body.pack(f.bd) : 0, r2(f.eg), r2(f.ey), r2(f.ep), r2(f.bl), r2(f.sm), r2(f.ll), r2(f.lw), r2(f.hs), r2(f.st), f.cl | 0];
   };
   F.unpack = function (a) {
     if (!Array.isArray(a) || a.length < 24) return null;
     return F.fix({ sym: a[0], n: a[1], len: a[2], prof: Array.isArray(a[3]) ? a[3].map(Number) : null, bend: a[4],
       rules: (Array.isArray(a[5]) ? a[5] : []).map(function (q) { return { k: q[0], a: q[1], b: q[2], e: q[3], l: q[4], w: q[5], j: q[6], g: q[7], c: q[8], t: q[9], p: q[10], on: q[11] === undefined ? -1 : q[11] }; }),
-      en: a[6], es: a[7], ek: a[8], mk: a[9], ms: a[10], tk: a[11], ts: a[12], hue: a[13], hue2: a[14], sat: a[15], lit: a[16], pat: a[17], psc: a[18], crest: a[19], shell: a[20], glow: a[21], venom: a[22], seed: a[23], hd: a[24], nk: a[25], coat: a[26], hx: a[27], hq: a[28], pl: a[29], bd: G.body.unpack(a[30]) || undefined, eg: a[31], ey: a[32], ep: a[33], bl: a[34], sm: a[35] });
+      en: a[6], es: a[7], ek: a[8], mk: a[9], ms: a[10], tk: a[11], ts: a[12], hue: a[13], hue2: a[14], sat: a[15], lit: a[16], pat: a[17], psc: a[18], crest: a[19], shell: a[20], glow: a[21], venom: a[22], seed: a[23], hd: a[24], nk: a[25], coat: a[26], hx: a[27], hq: a[28], pl: a[29], bd: G.body.unpack(a[30]) || undefined, eg: a[31], ey: a[32], ep: a[33], bl: a[34], sm: a[35], ll: a[36], lw: a[37], hs: a[38], st: a[39], cl: a[40] });
   };
   F.key = function (f) { return f._k || (f._k = JSON.stringify(F.pack(f))); };
 
@@ -1780,7 +1793,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     let n = 0; const M = f.bd.m, cnt = [];
     for (let i = 0; i < M.length; i++) { cnt[i] = (i ? cnt[M[i].on] : 1) * (M[i].pr ? 2 : 1); n += i ? (M[i].pr ? 1.5 : 1) : 1; if (M[i].lb && M[i].la > 0.1) n += 0.5; if (M[i].h) n += 0.5; }
     for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; n += q.on >= 0 ? 0.6 : q.k === 8 ? 0.6 : 1 + 0.5 * Math.max(0, Math.floor((Math.min(q.b, f.n - 1) - q.a) / q.e)); }
-    n += (f.pat ? 0.7 : 0) + (f.coat ? 0.7 : 0) + (f.shell > 0.25 ? 1 : 0) + (f.crest > 0.25 ? 0.7 : 0) + (f.tk ? 0.7 : 0) + (f.en >= 3 ? 1 : 0) + (f.ek > 0.25 ? 0.5 : 0) + (f.venom > 0.3 ? 0.3 : 0);
+    n += (f.cl ? 0.6 : 0) + (f.pat ? 0.7 : 0) + (f.coat ? 0.7 : 0) + (f.shell > 0.25 ? 1 : 0) + (f.crest > 0.25 ? 0.7 : 0) + (f.tk ? 0.7 : 0) + (f.en >= 3 ? 1 : 0) + (f.ek > 0.25 ? 0.5 : 0) + (f.venom > 0.3 ? 0.3 : 0);
     return n;
   };
   /** the body in a few plain words */
@@ -1920,7 +1933,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     'legs', 'arms', 'fins', 'spikes', 'tentacles', 'feelers', 'plates', 'frills', 'horns', 'designs', 'wrap', 'tail', 'beak', 'jaws', 'sucker', 'whiskers', 'scales', 'fur', 'feathers', 'marked', 'stripes', 'spots',
     'shell', 'crest', 'glow', 'venom', 'sat', 'lit', 'contrast', 'longest', 'nested', 'bare',
     // what makes a face lovable (the baby schema the eye responds to): big wide-set low eyes, big soft pupils, a smile, a big head on a small body, round outlines, stubby limbs, a tidy body, no spikes
-    'eyeBig', 'eyeLow', 'eyeSet', 'pupil', 'smile', 'blush', 'headBig', 'round', 'stubby', 'tidy', 'spiky', 'sig'];
+    'eyeBig', 'eyeLow', 'eyeSet', 'pupil', 'smile', 'blush', 'headBig', 'round', 'stubby', 'tidy', 'spiky', 'sig', 'limbs', 'pose'];
   F.LOOKS = NAMES;
   /** what can be seen on a body, as numbers (each about 0..1) */
   F.looks = function (f) {
@@ -1941,14 +1954,15 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     let sq = 0, tot = 0; for (let i = 0; i < M.length; i++) { const a = M[i].s * M[i].s * (M[i].pr ? 2 : 1); tot += a; if (i === f.bd.e) sq = a; }
     let ln = 0, nl = 0, sp = 0; const sg = {}; for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on >= 0) continue; if (q.k === 0) { ln += q.l; nl++; } if (q.k === 2) sp++; if (q.k === 7 || q.k === 1 || q.k === 3 || q.k === 6 || q.k === 8) sg[q.k] = 1; }
     // signature features: real-animal parts (horns, fins, tentacles, frills, an invented part), a tail, a shell, ears (a pair of masses), a coat, markings. One or two make a character; none is bland, more than three is clutter
-    if (f.tk) sg.t = 1; if (f.shell > 0.25) sg.s = 1; if (f.coat) sg.c = 1; if (f.pat) sg.p = 1; if (bm.pairs) sg.e = 1; const ns = Object.keys(sg).length;
+    if (f.tk) sg.t = 1; if (f.shell > 0.25) sg.s = 1; if (f.coat) sg.c = 1; if (f.pat) sg.p = 1; if (f.cl) sg.k = 1; if (bm.pairs) sg.e = 1; const ns = Object.keys(sg).length;
     return [clamp((f.es - 0.34) / 0.4, 0, 1) * en, ne * clamp(0.3 + (0.14 - f.ey) / 0.3, 0, 1), f.en === 2 ? 1 - Math.min(1, Math.abs(f.eg - 0.55) / 0.25) : 0, ne * clamp((f.ep - 0.4) / 0.3, 0, 1), clamp(f.sm, 0, 1), clamp(f.bl, 0, 1),
       clamp(((M.length > 1 ? sq / tot : 0.5) - 0.3) / 0.4, 0, 1) * 0.6 + 0.4 * clamp((f.hd - 1) / 1.2, 0, 1), clamp((mm - 0.6) / 0.4, 0, 1) * (bm.lobed ? 0.5 : 1), nl ? 1 - clamp((ln / nl - 0.6) / 1.2, 0, 1) : 0.5,
-      busy <= 5.5 ? 1 : Math.max(0, 1 - (busy - 5.5) * 0.3), Math.min(1, (sp + (f.crest > 0.25 ? 1 : 0)) * 0.5), ns === 0 ? 0 : ns <= 2 ? 1 : ns === 3 ? 0.5 : 0];
+      busy <= 5.5 ? 1 : Math.max(0, 1 - (busy - 5.5) * 0.3), Math.min(1, (sp + (f.crest > 0.25 ? 1 : 0)) * 0.5), ns === 0 ? 0 : ns <= 2 ? 1 : ns === 3 ? 0.5 : 0,
+      nl >= 2 ? clamp(1 - Math.abs(f.ll * f.lw - 1.2) / 0.6, 0, 1) : nl === 1 ? 0.15 : 0, Math.min(1, Math.abs(f.st || 0) / 0.3)];
   };
   // the taste every pond starts with: fitted to the AI's grades of pictures (b: the grade of a body with nothing to see on it)
-  F.TASTE0 = { b: 0.5325, w: [-0.121, 0.0073, 0.1, 0.0137, 0.0313, -0.0019, 0.0136, -0.0162, 0, -0.0364, 0.0033, -0.0094, -0.0631, -0.0881, 0.0249, -0.032, 0.0358, 0.0729, -0.0435, -0.0798, 0.0204, 0.0382, -0.0008, -0.0684, -0.0479, 0.0371, 0.0085, -0.0465, 0.0284, -0.0495, -0.0495, -0.0101, 0.0078, -0.0422, -0.0125, 0.0211, -0.0124, -0.035, -0.0414, -0.0141, -0.0058, 0.0454, -0.0249, 0.032, -0.0437, -0.026, 0.0027, 0.0081, -0.0341, 0.0177, 0.0058, -0.1911, 0.16, 0.03, 0.04, 0.03, 0.04, 0.02, 0.1, 0.08, 0.06, 0.1, -0.09, 0.07], n: 294 };      // fitted 2026-10-06 to 294 graded pictures; held-out correlation 0.59
-  F.newTaste = function () { return { b: F.TASTE0.b, w: F.TASTE0.w.slice(), n: 0, wb: 0, ww: F.TASTE0.w.map(function () { return 0; }) }; };
+  F.TASTE0 = { b: 0.2873, w: [0, 0.0049, -0.0083, 0.0033, -0.0273, -0.0226, -0.0825, -0.0151, -0.0389, 0.0131, -0.1379, -0.0141, 0.0624, -0.0415, 0.0307, 0.0259, -0.0108, 0.0604, 0.0325, 0.0211, 0.0569, -0.0014, 0.0695, -0.0342, 0.0021, 0.0547, 0.0282, 0, 0.0411, -0.0144, 0, 0.0459, -0.0337, -0.0617, -0.0081, 0.0229, 0.0106, 0.0234, -0.0046, 0.1216, -0.0289, -0.1043, -0.0193, 0.0673, 0.0252, 0.0303, 0.0212, 0.0287, -0.0097, 0.0386, 0.0068, 0.0427, 0.0899, -0.0541, 0.0169, -0.0288, -0.0187, 0.0047, 0.1863, -0.0773, 0.0375, 0.0359, 0.0165, 0.0006, 0.0031, 0.0184], n: 237, wb: -0.4464, ww: [0, 0.0204, 0.0073, -0.0277, -0.056, -0.0261, -0.0837, -0.0906, -0.0928, 0.0642, -0.0898, -0.0291, 0.0539, -0.0547, 0.0484, -0.017, 0.0095, 0.023, 0.0121, 0.0255, 0.0169, 0.0289, 0.0417, 0.0297, 0.0013, 0.0349, -0.0218, 0, 0.0306, -0.0208, 0, -0.0055, -0.0043, -0.0624, -0.0674, 0.0774, -0.0132, 0.0069, 0.0312, 0.1242, -0.02, -0.1493, -0.0363, 0.0128, 0.0691, -0.0068, -0.0309, -0.0183, -0.0226, -0.0287, -0.0124, -0.0221, 0.0998, -0.0709, -0.0195, -0.0115, -0.0126, -0.0062, 0.1629, -0.0111, 0.0452, -0.0617, 0.0212, 0.0447, 0.035, 0.0091] };      // fitted 2026-10-06 to the AI's marks on 237 random pond creatures (beauty r 0.55 held out; whole is a correction to F.whole, r 0.62)
+  F.newTaste = function () { return { b: F.TASTE0.b, w: F.TASTE0.w.slice(), n: 0, wb: F.TASTE0.wb || 0, ww: F.TASTE0.ww ? F.TASTE0.ww.slice() : F.TASTE0.w.map(function () { return 0; }) }; };
   F.fixTaste = function (t) {
     if (!t || !Array.isArray(t.w) || t.w.length !== NAMES.length || !isFinite(+t.b)) return null;
     const ok = Array.isArray(t.ww) && t.ww.length === NAMES.length;
@@ -1992,24 +2006,23 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
    *  (a tail, ears, a crest, horns), a skin of its own (a coat or markings), and nothing odd left hanging. Returns { v, has: [...], lacks: [...] } */
   F.whole = function (f) {
     if (!f.bd) return { v: 0.3, has: [], lacks: [] };
+    // Whole means complete, not any one kind of animal: a face, a way of getting about, the parts that finish a creature of its sort, a body that holds together.
+    // Nothing here names a kind: a fish, a worm, a bird or something nobody has named is as whole as a person if it has what it needs.
     const BD = G.body, bm = BD.measure(f), L = BD.lay(f, null), gnd = BD.ground(L), M = f.bd.m, has = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-    let legs = 0, arms = 0, sideDsg = 0; const legOn = {};
+    let legs = 0, arms = 0, sideDsg = 0, organs = 0; const legOn = {}, seen = {};
     for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on >= 0) continue; has[q.k] = 1; if (q.k === 8) { const d = F._dsg(q); if (d && d.place === 'sides') sideDsg = 1; } if (q.k === 0) for (let m = q.a; m <= q.b && m < f.n; m += q.e) { if (gnd[m] && !legOn[m]) { legOn[m] = 1; legs = 1; } else arms = 1; } }
-    // a head apart from a body: the face on a mass of its own, with a body mass at least as big to carry it
+    // the kinds of organ it has: each counts once, however it is used
+    const org = [['legs', legs], ['arms or hands', arms], ['fins or wings', has[1]], ['tentacles', has[3]], ['a tail', f.tk ? 1 : 0], ['a shell', f.shell > 0.25 ? 1 : 0], ['ears, horns or feelers', bm.pairs || has[7] || has[4] || f.crest > 0.25 ? 1 : 0], ['a coat, markings or clothes', f.coat || f.pat || f.cl ? 1 : 0], ['a kind of part this pond invented', has[8] ? 1 : 0]];
+    const got = [], lacks = []; for (let i = 0; i < org.length; i++) if (org[i][1]) { organs++; got.push(org[i][0]); }
+    const side = f.bd.v ? 1 : 0, face = f.en >= 2 ? 1 : f.en === 1 ? (side ? 1 : 0.6) : 0;
+    const mover = legs || has[1] || has[3] || f.tk || (side && M.length >= 3 && bm.cls === 'W') ? 1 : sideDsg ? 0.5 : 0;      // some way of getting about: legs, fins, tentacles, a tail, a long body
+    // a body of its own: a head set on a torso, or one body with a clear front and back that holds together
     let torso = 0; for (let i = 0; i < M.length; i++) if (i !== f.bd.e && !M[i].pr) torso = Math.max(torso, M[i].s);
-    const head = M.length >= 2 && torso >= M[f.bd.e].s * 0.8 ? 1 : M.length >= 2 && torso > 0 ? 0.5 : 0;
-    const P = [
-      ['a face (two eyes)', 0.12, f.en === 2 ? 1 : f.en ? 0.6 : 0],
-      ['a mouth of its own', 0.03, f.mk ? 1 : 0],
-      ['a head set apart from a body', 0.23, head],
-      ['legs to stand and walk on', 0.22, legs ? 1 : has[1] || has[3] || f.tk ? 0.25 : 0],
-      ['arms or hands', 0.17, arms ? 1 : has[1] || sideDsg ? 0.25 : 0],
-      ['an upright, standing build', 0.07, legs && bm.tall > 1.05 ? 1 : legs ? 0.4 : 0],
-      ['something that finishes it (a tail, ears, a crest or horns)', 0.03, f.tk || has[7] || has[4] || f.crest > 0.25 || bm.pairs ? 1 : 0],
-      ['a skin of its own (a coat or markings)', 0.03, f.coat || f.pat ? 1 : 0],
-    ];
-    let v = 0.1 - (bm.hollow ? 0.04 : 0) - (bm.stalks ? 0.03 : 0); const got = [], lacks = [];
-    for (let i = 0; i < P.length; i++) { v += P[i][1] * P[i][2]; if (P[i][2] >= 0.9) got.push(P[i][0]); else if (P[i][1] >= 0.1 || P[i][2] === 0) lacks.push(P[i][0]); }
+    const head = M.length >= 2 && torso >= M[f.bd.e].s * 0.8 ? 1 : M.length >= 2 && torso > 0 ? 0.6 : side && bm.asp > 1.15 ? 0.8 : 0.2;
+    const busy = BD.busy(f), tidy = busy <= 6.5 ? 1 : Math.max(0, 1 - (busy - 6.5) * 0.25);
+    const parts = [['a face (eyes)', 0.15, face], ['a mouth of its own', 0.04, f.mk || f.sm > 0.4 ? 1 : 0.3], ['a way of getting about', 0.24, mover], ['the parts that finish a creature of its sort', 0.3, Math.min(1, organs / 3.5)], ['a body of its own', 0.12, head], ['all of it holding together, nothing piled on', 0.05, tidy]];
+    let v = 0.1 - (bm.hollow ? 0.04 : 0) - (bm.stalks ? 0.03 : 0);
+    for (let i = 0; i < parts.length; i++) { v += parts[i][1] * parts[i][2]; if (parts[i][2] < 0.7) lacks.push(parts[i][0]); }
     return { v: clamp(v, 0, 1), has: got, lacks: lacks };
   };
   /** what counts for most in a grade, in words: the three things that lift this body most and the three that pull it down */
@@ -2046,7 +2059,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   /** how a body is built, read off its genes */
   F.build = function (f, cn) {
     // one bare mass with little on it is still a single cell: an amoeba, see-through, with a nucleus (an eyespot once it has an eye)
-    if (f.bd) { if (f.bd.m.length === 1 && !f.bd.m[0].lb && f.rules.length <= 2 && f.en <= 1 && !f.coat && !f.rules.some(function (q) { return q.k === 8 || q.k === 0; })) return 'microbe'; return 'free'; }
+    if (f.bd) { if (f.bd.m.length === 1 && !f.bd.m[0].lb && f.rules.length <= 2 && f.en <= 1 && !f.coat && !f.tk && !f.shell && !f.rules.some(function (q) { return q.k === 8 || q.k === 0 || q.k === 1 || q.k === 3 || q.k === 7; })) return 'microbe'; return 'free'; }
     cn = cn || F.counts(f);
     const k = cn.k, tent = k[3] > 0, fin = k[1] > 0, tail = f.tk && f.n > 1;
     if (f.sym) return k[2] + k[7] > k[0] + k[3] + k[1] && k[2] + k[7] > 0 ? 'orb' : 'star';
@@ -2068,14 +2081,17 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     o = o || {};
     // B(speed): how far along a movement of that speed is. In a loop (o.loop) every speed becomes a whole number of beats.
     const B = function (k) { return o.loop ? t * Math.max(1, Math.round(k / 2.6)) : t * k; };
-    const col = F._colours(f), INK = F._ink(), cn = F.counts(f), R = f.rules, build = F.build(f, cn);
+    let lcol; const col = F._colours(f), INK = F._ink(), cn = F.counts(f), R = f.rules, build = F.build(f, cn);
     const ink = function (fill, lw) { ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = lw || 2.6; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke(); };
     const body = function (k) { const out = []; for (let i = 0; i < R.length; i++) if (R[i].k === k && R[i].on < 0) out.push(R[i]); return out; };
     const kidOf = function (q) { const i = R.indexOf(q); for (let j = i + 1; j < R.length; j++) if (R[j].on === i) return R[j]; return null; };
     const legs = body(0), fins = body(1), spikes = body(2), tents = body(3), feels = body(4), plates = body(5), frills = body(6), horns = body(7);
+    let leanA = 0;      // a stance: the whole character leans a little from its feet
     const breathe = 1 + Math.sin(B(2.2)) * 0.015, rr = G.rng(f.seed);
     const plump = clamp((f.prof[1] + f.prof[2] + f.prof[3]) / 3, 0.55, 1.6);
     const hsl = function (h, s, l, a) { return 'hsla(' + Math.round(((h % 360) + 360) % 360) + ',' + Math.round(s) + '%,' + Math.round(l) + '%,' + a + ')'; };
+    const acc = hsl(f.hue + f.hue2 + 25, 80, 58, 1), acc2 = hsl(f.hue + f.hue2 + 25, 85, 80, 1);      // what it wears stands out from its skin
+    lcol = f.cl === 3 ? acc : col.limb;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     // every living thing in this water has a soft light of its own colour about it; a glowing one, much more
     const aura = function (x, y, r) { r = Math.max(20, Math.min(r, 158 - y, y + 188, 168 - Math.abs(x))); const g = ctx.createRadialGradient(x, y, r * 0.15, x, y, r); g.addColorStop(0, hsl(f.hue + (f.glow > 0.3 ? 30 : 0), 90, 72, f.glow > 0.3 ? 0.42 : 0.2)); g.addColorStop(1, hsl(f.hue, 90, 70, 0)); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); };
@@ -2089,7 +2105,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       const xs = Math.pow(plump, 0.4);
       const legOn = {}, armOn = {};
       for (let i = 0; i < legs.length; i++) for (let a = legs[i].a; a <= legs[i].b && a < f.n; a += legs[i].e) { if (gnd[a] && !legOn[a]) legOn[a] = legs[i]; else if (!armOn[a]) armOn[a] = legs[i]; }
-      let stands = false, legL = 0; for (const a in legOn) { stands = true; legL = Math.max(legL, 16 + 17 * Math.min(1.6, legOn[a].l)); }
+      let stands = false, legL = 0; for (const a in legOn) { stands = true; legL = Math.max(legL, (16 + 17 * Math.min(1.6, legOn[a].l)) * f.ll); }
       const hover = stands ? 0 : 30;
       const bw = Math.max(0.6, (LS.x1 - LS.x0) * xs), bh = Math.max(0.6, LS.y1 - LS.y0);
       const Sc = Math.min(50, 222 / bw, (208 - legL - hover) / bh);
@@ -2107,6 +2123,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       const near = []; for (let k = 0; k < I.length; k++) if (!I[k].far) near.push(I[k]);
       const fm = of(bd.e)[0] || I[0];
       aura(0, Y((LS.y0 + LS.y1) / 2), Math.max(bw, bh) * Sc * 0.7 + 34);
+      if (stands) { ctx.fillStyle = 'rgba(4,12,20,0.34)'; ctx.beginPath(); ctx.ellipse(0, GROUND - 2, Math.max(34, bw * Sc * xs * 0.46), 7, 0, 0, TAU); ctx.fill(); }      // it stands somewhere
+      leanA = (f.st || 0) * 0.09; if (leanA) { ctx.save(); ctx.translate(0, GROUND - 4); ctx.rotate(leanA); ctx.translate(0, -(GROUND - 4)); }
 
       // ── behind the body ──
       if (f.tk) { const o = I[0], th = seek(o, bd.v ? PI : PI - 0.95); if (th !== null) { const b = P(o, th, 0.86), sz = 30 * f.ts * kk(o), wag = Math.sin(B(3)) * 0.2;
@@ -2118,7 +2136,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         ctx.closePath(); ink(f.tk === 4 ? col.dark : col.fin, 2.4);
         if (f.tk <= 2) { ctx.strokeStyle = 'rgba(7,18,31,.25)'; ctx.lineWidth = 1.3; for (let j = -2; j <= 2; j++) { ctx.beginPath(); ctx.moveTo(4, j * 2); ctx.lineTo(sz * 1.25, j * sz * 0.36); ctx.stroke(); } }
         ctx.restore(); } }
-      if (f.crest > 0.25) { const o = fm, k = kk(o); for (let j = -2; j <= 2; j++) { const th = -PI / 2 + j * 0.25 - (bd.v ? 0.35 : 0); if (!open(o, th)) continue; const b = P(o, th, 0.94), up = (9 + 16 * f.crest) * k, c = Math.cos(th), sn = Math.sin(th); ctx.beginPath(); ctx.moveTo(b[0] + sn * 6 * k, b[1] - c * 6 * k); ctx.lineTo(b[0] + c * up, b[1] + sn * up); ctx.lineTo(b[0] - sn * 6 * k, b[1] + c * 6 * k); ctx.closePath(); ink(col.frill, 1.8); } }
+      if (f.crest > 0.25) { const o = fm, k = kk(o); for (let j = -2; j <= 2; j++) { const th = -PI / 2 + j * 0.25 - (bd.v ? 0.35 : 0); if (!open(o, th)) continue; const b = P(o, th, 0.94), up = (9 + 16 * f.crest) * k, c = Math.cos(th), sn = Math.sin(th); ctx.lineCap = 'round'; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.frill : INK; ctx.lineWidth = pass ? 8 * k : 11.6 * k; ctx.beginPath(); ctx.moveTo(b[0], b[1]); ctx.lineTo(b[0] + c * up * 0.75, b[1] + sn * up * 0.75); ctx.stroke(); } } }
       for (let ri = 0; ri < R.length; ri++) { const q = R[ri]; if (q.on >= 0) continue; const d = q.k === 8 ? F._dsg(q) : null;
         for (let a = q.a; a <= q.b && a < f.n; a += q.e) { const os = of(a); for (let n = 0; n < os.length; n++) { const o = os[n], k = kk(o), sds = sidesOf(o);
           if (q.k === 1) finOn(o, q, k, sds, ri); else if (q.k === 2) spikesOn(o, q, k); else if (q.k === 3) tentaclesOn(o, q, k, ri); else if (q.k === 6) frillOn(o, q, k, sds); else if (d && d.pts && d.place !== 'head') designOn(o, q, d, k, sds, ri);
@@ -2139,7 +2157,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         { const tor = rest.slice().sort(function (a, b) { return px(b) - px(a); })[0];
           if (tor && !tor.m.pr) { ctx.save(); ctx.beginPath(); trace(tor, 1); ctx.clip(); ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.ellipse(X(tor.x), Y(tor.y) + px(tor) * 0.2, px(tor) * xs * 0.55, px(tor) * 0.62, 0, 0, TAU); ctx.fill(); ctx.restore(); } }
         ctx.save(); ctx.beginPath(); for (let k = 0; k < rest.length; k++) trace(rest[k], 1); ctx.clip(); ctx.translate(0, px(fm) * 0.1); ctx.beginPath(); trace(fm, 1); ctx.fillStyle = 'rgba(7,18,31,0.3)'; ctx.fill(); ctx.restore();
+        { const tor = rest.slice().sort(function (a, b) { return px(b) - px(a); })[0];
+          if (tor && !tor.m.pr && f.cl === 2) { const bw0 = px(tor) * xs * 3.2, bx = X(tor.x) - bw0 / 2, bh = px(tor) * 0.25, by = Y(tor.y) + px(tor) * 0.12 - bh / 2; ctx.save(); ctx.beginPath(); trace(tor, 1); ctx.clip(); ctx.fillStyle = acc; ctx.fillRect(bx, by, bw0, bh); ctx.strokeStyle = INK; ctx.lineWidth = 1.8; ctx.strokeRect(bx, by, bw0, bh); ctx.fillStyle = acc2; ctx.fillRect(X(tor.x) - px(tor) * 0.14, by - bh * 0.12, px(tor) * 0.28, bh * 1.24); ctx.strokeRect(X(tor.x) - px(tor) * 0.12, by - bh * 0.12, px(tor) * 0.24, bh * 1.24); ctx.restore(); }
+          if (f.cl === 1) { const cx0 = X(fm.x), cy0 = Y(fm.y) + px(fm) * 0.8, rx = px(fm) * xs * 0.9; ctx.beginPath(); ctx.ellipse(cx0, cy0, rx, px(fm) * 0.27, 0, 0, TAU); ink(acc, 2.6); ctx.beginPath(); ctx.moveTo(cx0 + rx * 0.4, cy0 + px(fm) * 0.1); ctx.lineTo(cx0 + rx * 0.85, cy0 + px(fm) * 0.75); ctx.lineTo(cx0 + rx * 0.35, cy0 + px(fm) * 0.66); ctx.closePath(); ink(acc2, 2.4); } }
         { const b = bnd(fm); ctx.beginPath(); trace(fm, 1); skin(b[0], b[1], b[2], b[3], function () { ctx.beginPath(); }, 0); ctx.beginPath(); trace(fm, 1); ctx.strokeStyle = INK; ctx.globalAlpha = 0.8; ctx.lineWidth = 3.4; ctx.stroke(); ctx.globalAlpha = 1; }
+        if (f.cl === 4) { const tx = X(fm.x), ty = Y(fm.y) - px(fm) * 0.92; for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(tx + j * px(fm) * 0.2 - 6, ty + 8); ctx.quadraticCurveTo(tx + j * px(fm) * 0.34, ty - 34 - (j === 0 ? 12 : 0), tx + j * px(fm) * 0.2 + 9, ty + 8); ctx.closePath(); ink(acc, 2.2); } }
       } else { union(); skin(-bw * Sc / 2 - 4, baseY - bh * Sc - 4, bw * Sc + 8, bh * Sc + 8, function () { ctx.beginPath(); }, 0); }
       if (near.length > 1) { ctx.save(); union(); ctx.clip(); ctx.globalAlpha = 0.2; ctx.strokeStyle = INK; ctx.lineWidth = 2.4; for (let k = 1; k < near.length; k++) { ctx.beginPath(); trace(near[k], 1); ctx.stroke(); } ctx.restore(); ctx.globalAlpha = 1; }      // where one mass meets the next
       for (let k = 0; k < near.length; k++) { const o = near[k]; if (!o.m.h) continue; ctx.beginPath(); trace(o, 0.5); const g = ctx.createRadialGradient(X(o.x), Y(o.y), 1, X(o.x), Y(o.y), px(o) * 0.6); g.addColorStop(0, hsl(f.hue, f.sat * 0.6, 10, 0.95)); g.addColorStop(1, hsl(f.hue, f.sat, 24, 0.92)); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); }      // a ring: you look into the hollow of it
@@ -2158,6 +2180,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         } } }
       { const Rf = px(fm), hr = Math.min(clamp(Rf * 0.78 * Math.pow(f.hd, 0.5), 13, 54), Rf * 0.96) * Math.min(1, xs + 0.1);
         face(X(fm.x) + (bd.v ? Rf * xs * 0.18 : 0), Y(fm.y) + Rf * (f.shell > 0.25 && fm === I[0] ? 0.26 : 0.13), hr, bd.v, false); }
+      if (leanA) ctx.restore();
       return;
 
       function finOn(o, q, k, sds, ri) {
@@ -2165,7 +2188,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         if (!bd.v) { for (let n = 0; n < sds.length; n++) { const sd = sds[n], th = seek(o, sd > 0 ? -0.3 : PI + 0.3); if (th === null) continue; const b = P(o, th, 0.85); ctx.save(); ctx.translate(b[0], b[1]); ctx.scale(sd, 1); ctx.rotate(-0.35 + fl); ctx.beginPath(); ctx.moveTo(0, -10 * k); ctx.quadraticCurveTo(Lf * 0.9, -Lf * 0.75, Lf * 1.25, -Lf * 0.15); ctx.quadraticCurveTo(Lf * 0.75, Lf * 0.3, 0, 13 * k); ctx.closePath(); ink(col.fin, 2.2); ribs(Lf, -Lf * 0.3); ctx.restore(); } }
         else { const th = seek(o, -PI / 2 - 0.3); if (th !== null) { const b = P(o, th, 0.9); ctx.save(); ctx.translate(b[0], b[1]); ctx.rotate(th + PI / 2 + fl); ctx.beginPath(); ctx.moveTo(20 * k, 5); ctx.quadraticCurveTo(Lf * 0.1, -Lf * 1.3, -Lf * 0.8, -Lf * 0.8); ctx.quadraticCurveTo(-Lf * 0.3, -Lf * 0.2, -18 * k, 5); ctx.closePath(); ink(col.fin, 2.2); ribs(-Lf * 0.5, -Lf * 0.85); ctx.restore(); } }
       }
-      function spikesOn(o, q, k) { const Ls = (13 * q.l + 4) * k; for (let j = -2; j <= 2; j++) { const th = -PI / 2 + j * 0.44 - (bd.v ? 0.35 : 0); if (!open(o, th)) continue; const b = P(o, th, 0.95), c = Math.cos(th), sn = Math.sin(th); ctx.beginPath(); ctx.moveTo(b[0] + sn * 6 * k, b[1] - c * 6 * k); ctx.lineTo(b[0] + c * Ls * 1.5, b[1] + sn * Ls * 1.5); ctx.lineTo(b[0] - sn * 6 * k, b[1] + c * 6 * k); ctx.closePath(); ink('#f4f7fb', 2); } }
+      function spikesOn(o, q, k) { const Ls = (13 * q.l + 4) * k; for (let j = -2; j <= 2; j++) { const th = -PI / 2 + j * 0.44 - (bd.v ? 0.35 : 0); if (!open(o, th)) continue; const b = P(o, th, 0.95), c = Math.cos(th), sn = Math.sin(th); ctx.lineCap = 'round'; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? '#f4f7fb' : INK; ctx.lineWidth = pass ? 7 * k : 10.8 * k; ctx.beginPath(); ctx.moveTo(b[0], b[1]); ctx.lineTo(b[0] + c * Ls * 1.1, b[1] + sn * Ls * 1.1); ctx.stroke(); } } }
       function tentaclesOn(o, q, k, ri) { const n = bd.v ? 3 : 4, floor = (stands ? GROUND : 156) - 6; for (let j = 0; j < n; j++) { const th = PI / 2 + (j - (n - 1) / 2) * 0.42 + (bd.v ? 0.35 : 0); if (!open(o, th)) continue; const b = P(o, th, 0.88), Lt = Math.min((34 * q.l + 14) * k, floor - b[1]); if (Lt < 12) continue; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.limb : INK; ctx.lineWidth = pass ? 4.6 * k : 4.6 * k + 3.8; ctx.beginPath(); ctx.moveTo(b[0], b[1]); for (let i = 1; i <= 8; i++) { const u = i / 8; ctx.lineTo(b[0] + Math.cos(th) * Lt * u * 0.35 + Math.sin(u * 5 + B(2.4) + j * 1.3 + ri) * (3 + 8 * u) * k, b[1] + u * Lt); } ctx.stroke(); } } }
       function frillOn(o, q, k, sds) { const Lf = (22 * q.l + 8) * k, spn = 0.95 + 0.08 * Math.sin(B(3)); for (let n = 0; n < sds.length; n++) { const sd = sds[n], th0 = bd.v ? (sd > 0 ? PI - 0.7 : PI + 0.7) : (sd > 0 ? 0.55 : PI - 0.55); if (!open(o, th0)) continue; const b = P(o, th0, 0.82); ctx.beginPath(); ctx.moveTo(b[0], b[1]); for (let j = 0; j <= 6; j++) { const a = th0 + (j / 6 - 0.5) * 1.7 * spn, q2 = Lf * (j % 2 ? 0.85 : 1.15); ctx.lineTo(b[0] + Math.cos(a) * q2, b[1] + Math.sin(a) * q2); } ctx.closePath(); ink(col.frill, 2.2); } }
       function designOn(o, q, d, k, sds, ri) {
@@ -2193,20 +2216,22 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       function hand(ex, ey, a, tip, k) {
         if (tip === 2) for (let h = -1; h <= 1; h += 2) { ctx.beginPath(); ctx.moveTo(ex, ey); ctx.quadraticCurveTo(ex + Math.cos(a + h) * 14 * k, ey + Math.sin(a + h) * 14 * k, ex + Math.cos(a + h * 0.2) * 20 * k, ey + Math.sin(a + h * 0.2) * 20 * k); ctx.quadraticCurveTo(ex + Math.cos(a + h * 0.4) * 8 * k, ey + Math.sin(a + h * 0.4) * 8 * k, ex, ey); ink('#ff8a6b', 2.2); }
         else if (tip === 3) { ctx.beginPath(); ctx.ellipse(ex + Math.cos(a) * 7 * k, ey + Math.sin(a) * 7 * k, 13 * k, 8 * k, a, 0, TAU); ink(col.fin, 2.2); }
-        else if (tip === 1) { ctx.beginPath(); ctx.arc(ex, ey, 8 * k, 0, TAU); ink(col.limb, 2.2); for (let h = -1; h <= 1; h++) { ctx.beginPath(); ctx.arc(ex + Math.cos(a + h * 0.7) * 9 * k, ey + Math.sin(a + h * 0.7) * 9 * k, 3.6 * k, 0, TAU); ink(col.limb, 1.8); } }
-        else { ctx.beginPath(); ctx.arc(ex, ey, 7 * k, 0, TAU); ink(col.limb, 2.2); }
+        else if (tip === 1) { ctx.beginPath(); ctx.arc(ex, ey, 8 * k, 0, TAU); ink(lcol, 2.2); for (let h = -1; h <= 1; h++) { ctx.beginPath(); ctx.arc(ex + Math.cos(a + h * 0.7) * 9 * k, ey + Math.sin(a + h * 0.7) * 9 * k, 3.6 * k, 0, TAU); ink(lcol, 1.8); } }
+        else { ctx.beginPath(); ctx.arc(ex, ey, 7 * k, 0, TAU); ink(lcol, 2.2); }
       }
       function legOf(o, q, th, sd, far, idx) {
-        const hip = P(o, th, 0.8), w = (12 + 7 * q.w) * kk(o), st = Math.sin(B(5) + idx * 2.2 + (far || sd < 0 ? 3.14 : 0)) * 5, fx = hip[0] + (bd.v ? 0 : sd * 4) + st, fy = GROUND - 5;
+        const hip = P(o, th, 0.8), w = (12 + 7 * q.w) * kk(o) * f.lw, st = Math.sin(B(5) + idx * 2.2 + (far || sd < 0 ? 3.14 : 0)) * 5, fx = hip[0] + (bd.v ? 0 : sd * 4) + st, fy = GROUND - 5;
         if (far) ctx.globalAlpha = 0.75;
-        { const kx = (hip[0] + fx) / 2 + (bd.v ? 7 : sd * 8), ky = (hip[1] + fy) / 2 + 2; limb2(hip[0], hip[1], kx, ky, fx, fy, w, far ? col.dark : col.limb); ctx.beginPath(); ctx.arc(kx, ky, w * 0.6, 0, TAU); ink(far ? col.dark : col.limb, 1.8); } foot(fx, fy + 1, bd.v ? 1 : sd, q.t);
+        { ctx.beginPath(); ctx.arc(hip[0], hip[1], w * 0.78, 0, TAU); ink(far ? col.dark : col.limb, 2); }
+        { const kx = (hip[0] + fx) / 2 + (bd.v ? 7 : sd * 8), ky = (hip[1] + fy) / 2 + 2; limb2(hip[0], hip[1], kx, ky, fx, fy, w, far ? col.dark : col.limb); ctx.beginPath(); ctx.arc(kx, ky, w * 0.6, 0, TAU); ink(far ? col.dark : col.limb, 1.8); } foot(fx, fy + 1, bd.v ? 1 : sd, q.t, f.hs);
         ctx.globalAlpha = 1;
       }
       function armOf(o, q, th, a, sd, far, idx) {
-        const s0 = P(o, th, 0.85), k = kk(o), La = (30 * q.l + 16) * k, wv = Math.sin(B(2.6) + idx + (sd > 0 ? 0 : 1.4)) * 0.18, ang = a + sd * wv, ex = s0[0] + Math.cos(ang) * La, ey = s0[1] + Math.sin(ang) * La, kid = kidOf(q), tip = kid && kid.k === 0 && kid.t ? kid.t : q.t;
+        const s0 = P(o, th, 0.85), k = kk(o), La = (30 * q.l + 16) * k * f.ll, wv = Math.sin(B(2.6) + idx + (sd > 0 ? 0 : 1.4)) * 0.18, ang = a + sd * wv - (f.st && sd * f.st > 0 ? Math.min(0.5, Math.abs(f.st) * 1.2) * sd : 0), ex = s0[0] + Math.cos(ang) * La, ey = s0[1] + Math.sin(ang) * La, kid = kidOf(q), tip = kid && kid.k === 0 && kid.t ? kid.t : q.t;
         if (far) ctx.globalAlpha = 0.75;
-        { const wA = (13 + 5 * q.w) * k, elx = s0[0] + Math.cos(ang - sd * 0.5) * La * 0.55, ely = s0[1] + Math.sin(ang - sd * 0.5) * La * 0.55; limb2(s0[0], s0[1], elx, ely, ex, ey, wA, far ? col.dark : col.limb); ctx.beginPath(); ctx.arc(elx, ely, wA * 0.55, 0, TAU); ink(far ? col.dark : col.limb, 1.8); }
-        hand(ex, ey, ang, tip, k * 1.2);
+        { const wA0 = (13 + 5 * q.w) * k * f.lw; ctx.beginPath(); ctx.arc(s0[0], s0[1], wA0 * 0.8, 0, TAU); ink(far ? col.dark : col.limb, 2); }
+        { const wA = (13 + 5 * q.w) * k * f.lw, elx = s0[0] + Math.cos(ang - sd * 0.5) * La * 0.55, ely = s0[1] + Math.sin(ang - sd * 0.5) * La * 0.55; limb2(s0[0], s0[1], elx, ely, ex, ey, wA, far ? col.dark : col.limb); ctx.beginPath(); ctx.arc(elx, ely, wA * 0.55, 0, TAU); ink(far ? col.dark : col.limb, 1.8); }
+        hand(ex, ey, ang, tip, k * 1.2 * f.hs);
         ctx.globalAlpha = 1;
       }
       function limbs(far) {
@@ -2406,10 +2431,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     // ── helpers (shared by every build) ──
     function ribs(x, y) { ctx.strokeStyle = 'rgba(7,18,31,.28)'; ctx.lineWidth = 1.4; for (let r = 1; r <= 3; r++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(x * (0.5 + r * 0.17), y * (1.3 - r * 0.3)); ctx.stroke(); } }
     function strokeLimb(x0, y0, cx, cy2, x1, y1, w, fill) { for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? fill : INK; ctx.lineWidth = pass ? w : w + 4.4; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(cx, cy2, x1, y1); ctx.stroke(); } }
-    function limb2(x0, y0, kx, ky, x1, y1, w, fill) { for (let pass = 0; pass < 3; pass++) { ctx.strokeStyle = pass === 2 ? 'rgba(255,255,255,0.3)' : pass ? fill : INK; ctx.lineWidth = pass === 2 ? w * 0.26 : pass ? w : w + 4.4; const o = pass === 2 ? -w * 0.2 : 0; ctx.beginPath(); ctx.moveTo(x0 + o, y0); ctx.lineTo(kx + o, ky); ctx.lineTo(x1 + o, y1); ctx.stroke(); } }
-    function foot(x, y, sd, tip) {
+    function limb2(x0, y0, kx, ky, x1, y1, w, fill) { for (let pass = 0; pass < 3; pass++) { ctx.strokeStyle = pass === 2 ? 'rgba(255,255,255,0.3)' : pass ? fill : INK; const o = pass === 2 ? -w * 0.2 : 0; for (let seg = 0; seg < 2; seg++) { const sw = seg ? w * 0.8 : w; ctx.lineWidth = pass === 2 ? sw * 0.26 : pass ? sw : sw + 4.4; ctx.beginPath(); if (seg) { ctx.moveTo(kx + o, ky); ctx.lineTo(x1 + o, y1); } else { ctx.moveTo(x0 + o, y0); ctx.lineTo(kx + o, ky); } ctx.stroke(); } } }
+    function foot(x, y, sd, tip, s) {
+      s = s || 1;
       if (tip === 2) { for (let h = -1; h <= 1; h += 2) { ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + sd * 10, y + h * 10, x + sd * 18, y + h * 3); ctx.quadraticCurveTo(x + sd * 9, y + h * 4, x, y); ink('#ff8a6b', 2); } return; }
-      ctx.beginPath(); ctx.ellipse(x + sd * 6, y, tip === 3 ? 19 : 15, tip === 3 ? 7 : 9, 0, 0, TAU); ink(tip === 3 ? col.fin : col.limb, 2.2);
+      ctx.beginPath(); ctx.ellipse(x + sd * 6 * s, y, (tip === 3 ? 19 : 15) * s, (tip === 3 ? 7 : 9) * s, 0, 0, TAU); ink(tip === 3 ? col.fin : lcol, 2.2);
       if (tip !== 1) { ctx.strokeStyle = INK; ctx.globalAlpha = 0.45; ctx.lineWidth = 1.5; for (let j = -1; j <= 1; j += 2) { ctx.beginPath(); ctx.moveTo(x + sd * (tip === 3 ? 12 : 9), y + j * 1.5); ctx.lineTo(x + sd * (tip === 3 ? 17 : 14), y + j * 3.2); ctx.stroke(); } ctx.globalAlpha = 1; }
       if (tip === 1) { ctx.strokeStyle = INK; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.6; for (let j = -1; j <= 1; j++) { ctx.beginPath(); ctx.moveTo(x + sd * (6 + j * 5), y - 4); ctx.lineTo(x + sd * (8 + j * 5), y + 4); ctx.stroke(); } ctx.globalAlpha = 1; }
     }
@@ -2494,7 +2520,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     function eyeAt(ex, ey, r, ring) {
       const lid = o.sleep ? 1 : ((B(0.31) + (f.seed % 13)) % 3.7 < 0.1 ? 1 : 0);
       const lx = o.lx === undefined ? Math.sin(B(0.7)) * 0.5 : o.lx, ly = o.ly === undefined ? 0.15 + Math.cos(B(0.9)) * 0.25 : o.ly;
-      if (o.collect) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4); o.collect.push([ex, ey, r]); return; }
+      if (o.collect) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4); if (leanA) { const dx = ex, dy = ey - (GROUND - 4), cs = Math.cos(leanA), sn = Math.sin(leanA); o.collect.push([dx * cs - dy * sn, GROUND - 4 + dx * sn + dy * cs, r]); } else o.collect.push([ex, ey, r]); return; }
       if (lid) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(col.dark, 2.4); ctx.beginPath(); ctx.moveTo(ex - r * 0.7, ey); ctx.quadraticCurveTo(ex, ey + r * 0.6, ex + r * 0.7, ey); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); return; }
       ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4);
       F._pupil(ctx, ex, ey, r, lx, ly, hsl(f.hue + f.hue2, 68, 44, 1), INK, f.ep || 0.46);
@@ -2504,7 +2530,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       const ne = f.en, er = clamp(hr * (0.22 + f.es * 0.5), 7, hr * 0.66), gap = Math.max(hr * (f.eg || 0.5), er * 1.08);
       const st = f.ek > 0.25 && !isStar && !side ? hr * (0.5 + f.ek * 0.5) : 0, cx = x + (side ? hr * 0.22 : 0), ey0 = y - hr * (f.ey === undefined ? 0.14 : f.ey);
       const stalk = function (ex, ey) { if (!st) return ey; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.body : INK; ctx.lineWidth = pass ? 6 : 10; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex, ey - st); ctx.stroke(); } return ey - st; };
-      if (side) { if (ne >= 1) eyeAt(cx, ey0, er * 1.15, false); if (ne >= 3) eyeAt(cx - hr * 0.5, ey0 - hr * 0.35, er * 0.45, false); }
+      if (side) { if (ne >= 1) eyeAt(cx, ey0, Math.min(er * 1.5, hr * 0.7), false); if (ne >= 3) eyeAt(cx - hr * 0.5, ey0 - hr * 0.35, er * 0.45, false); }
       else if (ne === 1) eyeAt(cx, ey0, er * 1.3, false);
       else if (ne >= 2) { eyeAt(cx - gap, stalk(cx - gap, ey0), er, false); eyeAt(cx + gap, stalk(cx + gap, ey0), er, false); if (ne === 3) eyeAt(cx, y - hr * 0.64, er * 0.42, false);
         if (!st) for (let sd = -1; sd <= 1; sd += 2) { const bx = cx + sd * gap, by = ey0 - er * 1.2; ctx.strokeStyle = INK; ctx.globalAlpha = 0.7; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(bx - sd * er * 0.75, by - er * 0.02); ctx.quadraticCurveTo(bx, by - er * 0.3, bx + sd * er * 0.8, by + er * 0.14); ctx.stroke(); ctx.globalAlpha = 1; } }
@@ -3360,6 +3386,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         else { plan[i].p.snub = false; if (lk >= nice) { if (plan[i].n < 3 && plan[i].p.E > plan[i].p.ph.Emax * 0.3) plan[i].n++; } else if (plan[i].n > 1) plan[i].n = 1; }
       }
     }
+    // a creature with too much on it does not breed (nearly never): clutter is the commonest way to be unlovable, and it creeps in by chance and by the pond's pressures
+    for (let i = 0; i < plan.length; i++) if (plan[i].p.g.f.bd && G.body.busy(plan[i].p.g.f) > 7.2 && G.rand() < 0.85) plan[i].n = 0;
     // too many for the pond: only the fittest parents may breed
     let total = surv.length;
     for (let i = 0; i < plan.length; i++) total += plan[i].n;
@@ -3431,7 +3459,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const s = c.sp ? G.speciesById(c.sp) : null;
     // the grade the eye for beauty gave its kind is most of it; its own body's fit to the pond's taste is the rest. What the player kept is loved outright.
     // a grade counts for what it is next to the other grades in this pond: so a generous judge and a strict one select alike
-    let v = 0.5 * c.ph.charm + 0.5 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);
+    let v = 0.42 * c.ph.charm + 0.58 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);
     // a guess is not a look: where the watcher has really seen creatures, one nobody has looked at is held back towards what the watcher really said of this pond.
     // Selecting the highest guesses every generation would pile up error (the winner's curse); this keeps belief close to the truth.
     const W1 = G.W;
@@ -3485,7 +3513,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     for (let i = 0; i < cre.length; i++) {
       const c = cre[i];
       c.fed = clamp(c.E / c.ph.Emax, 0, 1);
-      c.fit = clamp(c.fed / 0.5, 0, 1) * (0.15 + 0.85 * G.charmOf(c));          // fed well enough (half a tank is plenty), times how nice to the eye and how whole it is
+      c.fit = clamp(c.fed / 0.5, 0, 1) * (0.15 + 0.85 * G.charmOf(c)) * (c.g.f.bd ? Math.max(0.35, 1 - 0.18 * Math.max(0, G.body.busy(c.g.f) - 6)) : 1);          // fed well enough (half a tank is plenty), times how nice to the eye and how whole it is
       sum += c.fit; genes += c.g.f.n + c.g.f.rules.length + c.g.p.length + c.g.w.length + c.g.h;
       intake += c.intake;
       if (c.fit > best) { best = c.fit; bestC = c; }
@@ -3523,6 +3551,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     for (let i = 0; i < cre.length; i++) { const c = cre[i], k = G.kindOf(c.g).kind; c.kd = k; share[k] = (share[k] || 0) + 1; c.shp = G.shapeOf(c.g); shapes[c.shp] = (shapes[c.shp] || 0) + 1; c.hb = G.hueOf(c.g); hues[c.hb]++; }
     // who lasts the winter: the well fed, the rare, and the good-looking (the pond is kind to what is admired)
     for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.8 * hues[cre[i].hb] / cre.length) ;
+    if (cre.length > 8) {
+      // fitness sharing: a creature in a crowd of look-alikes counts for less, however it is measured, so no single look can take the whole pond
+      for (let i = 0; i < cre.length; i++) if (!cre[i].fv) cre[i].fv = G.features(cre[i].g);
+      for (let i = 0; i < cre.length; i++) { let cr = 0; for (let j = 0; j < cre.length; j++) { if (i === j) continue; const d = G.fdist(cre[i].fv, cre[j].fv); cr += Math.exp(-d * d / 1.2); } cre[i].sel *= Math.max(0.2, 1.1 - 0.9 * cr / (cre.length - 1) * 3); }
+    }
     let topK = '', topN = 0; for (const k in share) if (share[k] > topN) { topN = share[k]; topK = k; }
     const crowd = topN / Math.max(1, cre.length);
     let sick = 0;
@@ -4967,9 +5000,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const n = function (v) { v = +v; return isFinite(v) ? clamp(v, 0, 0.3) : 0; };
     const rs = Array.isArray(raw.res) ? raw.res : raw.res && typeof raw.res === 'object' ? [raw.res.heat, raw.res.cold, raw.res.poison] : [];
     const name = String(raw.name || 'New shape').replace(/[<>"]/g, '').trim().slice(0, 22) || 'New shape';
-    let face = null; if (raw.face && typeof raw.face === 'object') { const q = function (v, a, b) { v = +v; return isFinite(v) ? clamp(v, a, b) : undefined; }; face = { es: q(raw.face.es, 0.34, 0.9), ep: q(raw.face.ep, 0.36, 0.78), ey: q(raw.face.ey, -0.2, 0.36), eg: q(raw.face.eg, 0.3, 0.8), bl: q(raw.face.bl, 0, 1), sm: q(raw.face.sm, -0.2, 1), hd: q(raw.face.hd, 0.7, 2.5) }; }
-    const kit = Array.isArray(raw.kit) ? raw.kit.filter(function (k) { return k === 'legs' || k === 'arms'; }).slice(0, 2) : null;
-    return { face: face, kit: kit && kit.length ? kit : null, name: name, noun: (String(raw.noun || '').replace(/[^A-Za-z\-]/g, '').slice(0, 14) || name.split(' ').pop()).replace(/^./, function (c) { return c.toUpperCase(); }),
+    let face = null; if (raw.face && typeof raw.face === 'object') { const q = function (v, a, b) { v = +v; return isFinite(v) ? clamp(v, a, b) : undefined; }; face = { es: q(raw.face.es, 0.34, 0.9), ep: q(raw.face.ep, 0.36, 0.78), ey: q(raw.face.ey, -0.2, 0.36), eg: q(raw.face.eg, 0.3, 0.8), bl: q(raw.face.bl, 0, 1), sm: q(raw.face.sm, -0.2, 1), hd: q(raw.face.hd, 0.7, 2.5), ll: q(raw.face.ll, 0.65, 1.7), lw: q(raw.face.lw, 0.65, 1.5), hs: q(raw.face.hs, 0.75, 1.7), st: q(raw.face.st, -0.6, 0.6) }; }
+    let tail = null; if (raw.tail && typeof raw.tail === 'object') { const tk = Math.round(+raw.tail.tk); if (isFinite(tk) && tk > 0 && tk <= 4) tail = { tk: tk, ts: clamp(+raw.tail.ts || 0.6, 0.3, 1.2) }; }
+    const kit = Array.isArray(raw.kit) ? raw.kit.filter(function (k) { return k === 'legs' || k === 'arms' || k === 'fins' || k === 'tail'; }).slice(0, 3) : null;
+    const outfit = Math.round(+raw.outfit); 
+    return { face: face, tail: tail, outfit: outfit >= 1 && outfit <= 4 ? outfit : 0, kit: kit && kit.length ? kit : null, name: name, noun: (String(raw.noun || '').replace(/[^A-Za-z\-]/g, '').slice(0, 14) || name.split(' ').pop()).replace(/^./, function (c) { return c.toUpperCase(); }),
       note: String(raw.note || '').replace(/[<>]/g, '').slice(0, 120), because: String(raw.because || '').replace(/[<>]/g, '').slice(0, 90),
       bd: bd, res: [n(rs[0]), n(rs[1]), n(rs[2])], by: String(raw.by || raw.model || '').slice(0, 60) };
   };
@@ -5014,11 +5049,10 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   // ── the pond's own stock, for when the AI is not asked (angles in degrees: 0 right, 90 up, 180 left, 270 down) ──
   // radii go clockwise from the right: right, lower right, bottom right, bottom left, lower left, left, upper left, top left, top right, upper right
   const ROUND = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
-  const PLUSH_FACE = { es: 0.72, ep: 0.62, ey: 0.0, eg: 0.56, bl: 0.7, sm: 0.85, hd: 1.7 };
   const OWN = [
-    { plush: true, name: 'Snowball', noun: 'Snowball', note: 'A round body with a smaller round head set on top.', body: { v: 0, e: 1, m: [{ r: ROUND }, { r: ROUND, s: 0.72, on: 0, at: 90, d: 0.85 }] } },
+    { name: 'Snowball', noun: 'Snowball', note: 'A round body with a smaller round head set on top.', body: { v: 0, e: 1, m: [{ r: ROUND }, { r: ROUND, s: 0.72, on: 0, at: 90, d: 0.85 }] } },
     { name: 'Toadstool', noun: 'Toadstool', note: 'A wide cap over a narrow stem, the face on the stem.', body: { v: 0, e: 0, m: [{ r: [0.8, 0.9, 1.2, 1.2, 0.9, 0.8, 0.85, 1.1, 1.1, 0.85] }, { r: [1.5, 1.1, 0.7, 0.7, 1.1, 1.5, 1.2, 0.9, 0.9, 1.2], s: 1.2, on: 0, at: 90, d: 0.62 }] } },
-    { plush: true, name: 'Eared One', noun: 'Earling', note: 'One round body with a pair of big round ears.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.5, on: 0, at: 52, d: 0.9, pr: 1 }] } },
+    { name: 'Eared One', noun: 'Earling', note: 'One round body with a pair of big round ears.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.5, on: 0, at: 52, d: 0.9, pr: 1 }] } },
     { name: 'Periscope', noun: 'Peeper', note: 'A low wide body, and the face held high on a stalk.', body: { v: 0, e: 1, m: [{ r: [1.4, 1.1, 0.8, 0.8, 1.1, 1.4, 1.1, 0.8, 0.8, 1.1] }, { r: ROUND, s: 0.6, on: 0, at: 90, d: 1.45 }] } },
     { name: 'Bead String', noun: 'Beadling', note: 'Three beads in a row, the biggest in front.', body: { v: 1, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.82, on: 0, at: 180, d: 0.9 }, { r: ROUND, s: 0.62, on: 1, at: 180, d: 0.9 }] } },
     { name: 'Twin Bells', noun: 'Twin', note: 'A small middle with a big round body out on each side.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.95, on: 0, at: -8, d: 1.0, pr: 1 }] } },
@@ -5027,24 +5061,21 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     { name: 'Pear', noun: 'Pearling', note: 'Narrow above and full below, like a ripe pear.', body: { v: 0, e: 0, m: [{ r: [1.1, 1.25, 1.2, 1.2, 1.25, 1.1, 0.85, 0.8, 0.8, 0.85] }] } },
     { name: 'Clover', noun: 'Clover', note: 'A body of three soft lobes.', body: { v: 0, e: 0, m: [{ r: ROUND, lb: 3, la: 0.2 }] } },
     // the proportions of a loved character: a big head with a big face, a small body beneath it
-    { plush: true, name: 'Bean Baby', noun: 'Beanling', note: 'A big round head on a small round body.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.66, on: 0, at: 270, d: 0.82 }] } },
-    { plush: true, name: 'Plush Cub', noun: 'Cub', note: 'A big head with two round ears and a small body.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.68, on: 0, at: 270, d: 0.8 }, { r: ROUND, s: 0.34, on: 0, at: 55, d: 0.95, pr: 1 }] } },
-    { plush: true, name: 'Little Hero', noun: 'Hero', note: 'A big head, a small pear body and two round mitts.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: [1, 1.1, 1.15, 1.15, 1.1, 1, 0.92, 0.9, 0.9, 0.92], s: 0.74, on: 0, at: 270, d: 0.8 }, { r: ROUND, s: 0.3, on: 1, at: 345, d: 0.95, pr: 1 }] } },
-    { plush: true, name: 'Pudgy', noun: 'Pudge', note: 'A fat round body with a face almost as big as itself.', body: { v: 0, e: 1, m: [{ r: [1, 1.1, 1.15, 1.15, 1.1, 1, 0.95, 0.92, 0.92, 0.95] }, { r: ROUND, s: 0.86, on: 0, at: 90, d: 0.7 }] } },
-    { plush: true, name: 'Sleepy Bun', noun: 'Bun', note: 'A wide soft bun of a head over a tiny body.', body: { v: 0, e: 0, m: [{ r: [1.2, 1.05, 0.95, 0.95, 1.05, 1.2, 1.05, 0.95, 0.95, 1.05] }, { r: ROUND, s: 0.55, on: 0, at: 270, d: 0.78 }] } },
+    { name: 'Bean Baby', noun: 'Beanling', note: 'A big round head on a small round body.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.66, on: 0, at: 270, d: 0.82 }] } },
+    { name: 'Plush Cub', noun: 'Cub', note: 'A big head with two round ears and a small body.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: ROUND, s: 0.68, on: 0, at: 270, d: 0.8 }, { r: ROUND, s: 0.34, on: 0, at: 55, d: 0.95, pr: 1 }] } },
+    { name: 'Little Hero', noun: 'Hero', note: 'A big head, a small pear body and two round mitts.', body: { v: 0, e: 0, m: [{ r: ROUND }, { r: [1, 1.1, 1.15, 1.15, 1.1, 1, 0.92, 0.9, 0.9, 0.92], s: 0.74, on: 0, at: 270, d: 0.8 }, { r: ROUND, s: 0.3, on: 1, at: 345, d: 0.95, pr: 1 }] } },
+    { name: 'Pudgy', noun: 'Pudge', note: 'A fat round body with a face almost as big as itself.', body: { v: 0, e: 1, m: [{ r: [1, 1.1, 1.15, 1.15, 1.1, 1, 0.95, 0.92, 0.92, 0.95] }, { r: ROUND, s: 0.86, on: 0, at: 90, d: 0.7 }] } },
+    { name: 'Sleepy Bun', noun: 'Bun', note: 'A wide soft bun of a head over a tiny body.', body: { v: 0, e: 0, m: [{ r: [1.2, 1.05, 0.95, 0.95, 1.05, 1.2, 1.05, 0.95, 0.95, 1.05] }, { r: ROUND, s: 0.55, on: 0, at: 270, d: 0.78 }] } },
   ];
   G.offlinePlan = function () {
     const r = G.rand, W = G.W, have = W ? W.plans.map(function (p) { return p.name; }) : [];
     let pick = null;
-    // the stock leans to the plush ones: a big face over a small soft body, with the face settings that go with it
-    const pool = r() < 0.65 ? OWN.filter(function (c) { return c.plush; }) : OWN;
-    for (let t = 0; t < 12 && !pick; t++) { const c = pool[Math.floor(r() * pool.length)]; if (have.indexOf(c.name) < 0) pick = c; }
     for (let t = 0; t < 10 && !pick; t++) { const c = OWN[Math.floor(r() * OWN.length)]; if (have.indexOf(c.name) < 0) pick = c; }
     if (!pick) return null;
     // the same idea never comes out the same twice
     const b = JSON.parse(JSON.stringify(pick.body));
     for (let i = 0; i < b.m.length; i++) { const q = b.m[i]; q.r = q.r.map(function (v) { return v * (0.93 + r() * 0.14); }); if (i) { q.s *= 0.88 + r() * 0.24; q.d = (q.d || 1) * (0.92 + r() * 0.16); } }
-    return { name: pick.name, noun: pick.noun, note: pick.note, because: '', body: b, by: '', face: pick.plush ? PLUSH_FACE : null, kit: pick.plush ? ['legs', 'arms'] : null };
+    return { name: pick.name, noun: pick.noun, note: pick.note, because: '', body: b, by: '' };
   };
   /** a plain animal of this shape, to show it */
   G.planDemo = function (p, hue) {
@@ -5410,18 +5441,10 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     }
     try { return cv.toDataURL('image/jpeg', 0.86).split(',')[1] || null; } catch (e) { return null; }
   };
-  /** the look the owner loves, as four hand-set characters: they stand in the first row of every sheet as what a 9 looks like */
+  /** the best this pond has made so far (the hall of fame: creatures the watcher really looked at), shown in the first row of a sheet for comparison. Nothing is put there by hand. */
   G.referenceForms = function () {
-    if (G._refForms) return G._refForms;
-    const R1 = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], leg = { k: 0, a: 0, b: 0, e: 1, l: 0.7, w: 0.6, j: 2, g: 0.2, c: 0, t: 3, p: 0.5, on: -1 }, ear = { k: 7, a: 1, b: 1, e: 1, l: 0.5, w: 0.5, j: 2, g: 0, c: 0, t: 0, p: 0.5, on: -1 };
-    const mk = function (hue, hd, es, eg, ey, ep, bl, sm, bs, rules) {
-      const f = G.form.cell(hue); f.hue2 = 60; f.en = 2; f.es = es; f.hd = hd; f.eg = eg; f.ey = ey; f.ep = ep; f.bl = bl; f.sm = sm; f.seed = 7 + Math.round(hue);
-      f.bd = { v: 0, e: 1, m: [{ r: R1.slice(), s: 1, on: -1, at: 0, d: 1, pr: 0, h: 0, lb: 0, la: 0 }, { r: R1.slice(), s: bs, on: 0, at: -Math.PI / 2, d: 0.85, pr: 0, h: 0, lb: 0, la: 0 }] };
-      f.rules = (rules || []).map(function (q) { return Object.assign({}, q); });
-      return G.form.fix(f);
-    };
-    const arm = { k: 0, a: 0, b: 0, e: 1, l: 0.55, w: 0.5, j: 2, g: 0.3, c: 0, t: 1, p: 0.5, on: -1 };
-    return (G._refForms = [mk(330, 1.8, 0.7, 0.56, 0.0, 0.64, 0.7, 0.8, 0.7, [leg, arm]), mk(120, 1.8, 0.7, 0.56, 0.0, 0.64, 0.7, 0.8, 0.68, [leg, arm]), mk(260, 1.8, 0.75, 0.56, 0.0, 0.66, 0.8, 0.8, 0.68, [leg, arm, ear]), mk(30, 2.0, 0.8, 0.6, -0.05, 0.7, 0.8, 0.9, 0.7, [leg, arm])]);
+    const W = G.W, H = W && W.hall ? W.hall.filter(function (h) { return h.s >= 0.55; }).sort(function (x, y) { return y.s - x.s; }).slice(0, 4) : [];
+    return H.map(function (h) { return G.form.clone(G.cloneGenome(h.g).f); });
   };
   const live = function () { return G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available(); };
   const ask = function (forms, names, extra) {
@@ -5475,7 +5498,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   // Every few seconds it is shown a sheet of living creatures nobody has looked at yet: first those whose marks are oldest guesses, and
   // those the pond believes are its best (a guess must be checked before it is bred from). Its marks become those creatures' own.
   let watching = false;
-  G.WATCH_BUDGET = 0.3;          // dollars a session may spend on looking at living creatures before the watcher goes quiet
+  G.WATCH_BUDGET = 0.4;          // dollars a session may spend on looking at living creatures before the watcher goes quiet
   const clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
   const c01 = function (v) { v = +v; return isFinite(v) ? G.clamp(v, 0, 1) : NaN; };
   G.eyeGrade = function (c, g) { c.real = { b: g.b, w: g.w, why: g.why || '', fix: g.fix || '', gen: G.W.gen }; c.eb = g.b; c.ew = g.w; c.st = 0; c.ph.charm = g.b; c.ph.whole = g.w; };
@@ -5484,8 +5507,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.real || !c.g.f.bd) continue; const hit = seen[G.form.key(c.g.f)]; if (hit) { G.eyeGrade(c, hit); continue; } L.push(c); }
     L.sort(function (a, b) { return ((b.st || 0) * 0.5 + 6 * G.charmOf(b)) - ((a.st || 0) * 0.5 + 6 * G.charmOf(a)); });
     // one creature to a species (the one the pond thinks best: it is the one that will breed), and a species is not looked at again for a few generations
-    const out = [], kinds = {}, sl = W.spLook = W.spLook || {};
-    for (let i = 0; i < L.length && out.length < max; i++) { const c = L[i], k = c.sp ? 's' + c.sp : G.shapeOf(c.g) + '|' + G.hueOf(c.g); if (kinds[k] || (c.sp && W.gen - (sl[c.sp] === undefined ? -99 : sl[c.sp]) < 6)) continue; kinds[k] = 1; out.push(c); }
+    // most of a sheet is the best of each species (the ones that will breed); a few are ordinary creatures picked at random, so what the pond believes is tested
+    // on the creatures it actually has and not only on its favourites (a taste taught only on its favourites thinks everyone is one)
+    const nRand = Math.min(4, Math.floor(max / 3)), out = [], kinds = {}, sl = W.spLook = W.spLook || {};
+    for (let i = 0; i < L.length && out.length < max - nRand; i++) { const c = L[i], k = c.sp ? 's' + c.sp : G.shapeOf(c.g) + '|' + G.hueOf(c.g); if (kinds[k] || (c.sp && W.gen - (sl[c.sp] === undefined ? -99 : sl[c.sp]) < 6)) continue; kinds[k] = 1; out.push(c); }
+    { const rest = L.filter(function (c) { return out.indexOf(c) < 0; }), lk = {}; for (let t = 0; t < nRand * 3 && rest.length && out.length < max; t++) { const c = rest.splice((G.rand() * rest.length) | 0, 1)[0], k = G.shapeOf(c.g) + '|' + G.hueOf(c.g); if (lk[k]) continue; lk[k] = 1; out.push(c); } }
     // a pond of two or three species still gets a look: the look-alike kinds within them stand in
     if (out.length < 4) { const lk = {}; for (let i = 0; i < L.length && out.length < 5; i++) { const c = L[i], k = G.shapeOf(c.g) + '|' + G.hueOf(c.g); if (lk[k] || out.indexOf(c) >= 0) continue; lk[k] = 1; out.push(c); } }
     return out;
@@ -5496,7 +5522,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const picks = G.watchPick(12);
     // the watcher's own spending slows it as it goes, whatever model it is: looking often at first, when the pond is learning what is nice,
     // then rarely. A session's looks cost about 20 to 30 cents in all (WATCH_BUDGET); once spent it looks only now and then.
-    { const sp = G.ai.count && G.ai.count.watch ? G.ai.count.watch.usd || 0 : 0, B = G.WATCH_BUDGET; G.ai.gaps.watch = sp < B * 0.35 ? 5000 : sp < B * 0.7 ? 9000 : sp < B ? 16000 : 60000; }
+    { const sp = G.ai.count && G.ai.count.watch ? G.ai.count.watch.usd || 0 : 0, B = G.WATCH_BUDGET; G.ai.gaps.watch = sp < B * 0.3 ? 2500 : sp < B * 0.6 ? 6000 : sp < B ? 12000 : 60000; }
     if (picks.length < 4 || !G.ai.allow('watch')) return;
     const refs = G.referenceForms(), img = G.sheet(refs.concat(picks.map(function (c) { return c.g.f; })), { cw: 176, ch: 182, sc: 0.48, cols: 4, refs: refs.length });
     if (!img) return;
@@ -6757,14 +6783,14 @@ G.addSystem({
       const u = Math.max(0, (ts - splash.t0) / 3400);
       if (u >= 1) splash = null;
       else {
-        const c = COL[splash.kind] || COL.wonder, a = u < 0.12 ? u / 0.12 : u > 0.7 ? (1 - u) / 0.3 : 1;
+        const c = COL[splash.kind] || COL.wonder, lit = splash.kind === 'dark' ? [190, 195, 255] : c.map(function (v) { return Math.round(v + (255 - v) * 0.45); }), a = u < 0.12 ? u / 0.12 : u > 0.7 ? (1 - u) / 0.3 : 1;
         ctx.fillStyle = rgba(c, 0.3 * Math.max(0, 1 - u * 3)); ctx.fillRect(0, 0, W_, H_);
-        ctx.strokeStyle = rgba(c, 0.8 * (1 - u)); ctx.lineWidth = 10 * (1 - u) + 2; ctx.beginPath(); ctx.arc(W_ / 2, H_ / 2, u * Math.max(W_, H_) * 0.75, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = rgba(lit, 0.8 * (1 - u)); ctx.lineWidth = 10 * (1 - u) + 2; ctx.beginPath(); ctx.arc(W_ / 2, H_ / 2, u * Math.max(W_, H_) * 0.75, 0, TAU); ctx.stroke();
         const fs = Math.max(26, Math.min(64, W_ / Math.max(10, splash.name.length * 0.62)));
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '800 ' + fs + 'px system-ui, sans-serif';
-        ctx.shadowColor = rgba(c, 0.95 * a); ctx.shadowBlur = 34; ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(7,18,31,' + 0.85 * a + ')'; ctx.strokeText(splash.name.toUpperCase(), W_ / 2, H_ * 0.42);
+        ctx.shadowColor = rgba(lit, 0.95 * a); ctx.shadowBlur = 34; ctx.lineWidth = 7; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(4,10,18,' + 0.95 * a + ')'; ctx.strokeText(splash.name.toUpperCase(), W_ / 2, H_ * 0.42);
         ctx.fillStyle = 'rgba(255,255,255,' + a + ')'; ctx.fillText(splash.name.toUpperCase(), W_ / 2, H_ * 0.42); ctx.shadowBlur = 0;
-        if (splash.does) { ctx.font = '700 ' + Math.round(fs * 0.34) + 'px system-ui, sans-serif'; ctx.fillStyle = rgba(c, a); ctx.strokeText(splash.does, W_ / 2, H_ * 0.42 + fs * 0.85); ctx.fillText(splash.does, W_ / 2, H_ * 0.42 + fs * 0.85); }
+        if (splash.does) { ctx.font = '700 ' + Math.round(fs * 0.34) + 'px system-ui, sans-serif'; ctx.lineWidth = 5; ctx.fillStyle = rgba(lit, a); ctx.strokeText(splash.does, W_ / 2, H_ * 0.42 + fs * 0.85); ctx.fillText(splash.does, W_ / 2, H_ * 0.42 + fs * 0.85); }
       }
     }
   }

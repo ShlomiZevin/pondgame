@@ -120,7 +120,7 @@
     let n = 0; const M = f.bd.m, cnt = [];
     for (let i = 0; i < M.length; i++) { cnt[i] = (i ? cnt[M[i].on] : 1) * (M[i].pr ? 2 : 1); n += i ? (M[i].pr ? 1.5 : 1) : 1; if (M[i].lb && M[i].la > 0.1) n += 0.5; if (M[i].h) n += 0.5; }
     for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; n += q.on >= 0 ? 0.6 : q.k === 8 ? 0.6 : 1 + 0.5 * Math.max(0, Math.floor((Math.min(q.b, f.n - 1) - q.a) / q.e)); }
-    n += (f.pat ? 0.7 : 0) + (f.coat ? 0.7 : 0) + (f.shell > 0.25 ? 1 : 0) + (f.crest > 0.25 ? 0.7 : 0) + (f.tk ? 0.7 : 0) + (f.en >= 3 ? 1 : 0) + (f.ek > 0.25 ? 0.5 : 0) + (f.venom > 0.3 ? 0.3 : 0);
+    n += (f.cl ? 0.6 : 0) + (f.pat ? 0.7 : 0) + (f.coat ? 0.7 : 0) + (f.shell > 0.25 ? 1 : 0) + (f.crest > 0.25 ? 0.7 : 0) + (f.tk ? 0.7 : 0) + (f.en >= 3 ? 1 : 0) + (f.ek > 0.25 ? 0.5 : 0) + (f.venom > 0.3 ? 0.3 : 0);
     return n;
   };
   /** the body in a few plain words */

@@ -17,18 +17,17 @@ const tag = process.argv[2] || 'a', model = process.argv[3] || 'claude-sonnet-5-
     const mk = (hue, masses, e, rules, g, v) => { const f = G.form.cell(hue); f.hue2 = 60; f.en = 2; f.es = 0.7; f.hd = 1.8; f.eg = 0.56; f.ey = 0.0; f.ep = 0.64; f.bl = 0.7; f.sm = 0.8; Object.assign(f, g || {}); f.bd = { v: v || 0, e: e, m: masses }; f.rules = rules || []; f.seed = 11 + hue; return G.form.fix(f); };
     const UP = -Math.PI / 2, DN = Math.PI / 2;
     const body = (s, o) => M([1, 1.1, 1.15, 1.15, 1.1, 1, 0.92, 0.9, 0.9, 0.92], Object.assign({ s: s, on: 0, at: DN, d: 0.8 }, o));
-    const CH = { ll: 1.35, lw: 1.2, hs: 1.3 };
-    const kitR = [rule(0, 1), rule(0, 1, { l: 0.5, t: 1 })];
+    const SIDE = (r) => M(r, {});
     G.critForms = () => [
-      { name: 'A chibi + scarf', f: mk(120, [M(), body(0.68)], 0, kitR.map((q) => Object.assign({}, q)), { cl: 1 }) },
-      { name: 'B chibi, longer sturdier limbs, bigger hands and feet', f: mk(30, [M(), body(0.68)], 0, kitR.map((q) => Object.assign({}, q)), Object.assign({ cl: 2 }, CH)) },
-      { name: 'C B + a lean', f: mk(330, [M(), body(0.68)], 0, kitR.map((q) => Object.assign({}, q)), Object.assign({ st: 0.4 }, CH)) },
-      { name: 'D C + ears + fan tail', f: mk(260, [M(), body(0.68), M(null, { s: 0.32, on: 0, at: -0.95, d: 0.95, pr: 1 })], 0, kitR.map((q) => Object.assign({}, q)), Object.assign({ st: 0.3, tk: 1, ts: 0.7 }, CH)) },
-      { name: 'E gloves and boots', f: mk(200, [M(), body(0.7)], 0, kitR.map((q) => Object.assign({}, q)), { ll: 1.1, lw: 1.1, hs: 1.5, cl: 3 }) },
-      { name: 'F heroic: bigger torso, long limbs, lean', f: mk(15, [M(null, { s: 0.8 }), body(1.0, { at: DN, d: 0.8 })], 0, kitR.map((q) => Object.assign({}, q)), { ll: 1.5, lw: 1.3, hs: 1.3, st: -0.3 }) },
-      { name: 'G bear: ears, whip tail, lean, sturdy', f: mk(40, [M(), body(0.7), M(null, { s: 0.34, on: 0, at: -0.95, d: 0.95, pr: 1 })], 0, kitR.map((q) => Object.assign({}, q)), { ll: 1.25, lw: 1.25, hs: 1.3, st: 0.25, tk: 3, ts: 0.7 }) },
-      { name: 'H hair tuft', f: mk(300, [M(), body(0.7)], 0, kitR.map((q) => Object.assign({}, q)), { cl: 4, st: 0.2 }) },
-    ];  });
+      { name: 'fish', f: mk(200, [M([1.5, 1.25, 0.85, 0.85, 1.25, 1.5, 1.25, 0.85, 0.85, 1.25])], 0, [rule(1, 0, { l: 0.9 })], { en: 1, es: 0.78, sm: 0.8, hd: 1.6, tk: 1, ts: 0.95 }, 1) },
+      { name: 'goldfish', f: mk(30, [M([1.2, 1.15, 1, 1, 1.15, 1.2, 1.1, 0.95, 0.95, 1.1])], 0, [rule(1, 0, { l: 1.1 })], { en: 1, es: 0.8, sm: 0.9, hd: 1.7, tk: 2, ts: 1.05, pat: 3 }, 1) },
+      { name: 'worm', f: mk(100, [M(), M(null, { s: 0.88, on: 0, at: Math.PI, d: 0.85 }), M(null, { s: 0.74, on: 1, at: Math.PI, d: 0.85 })], 0, [], { en: 1, es: 0.8, sm: 0.9, hd: 1.7, pat: 4 }, 1) },
+      { name: 'bird', f: mk(50, [M(), M(null, { s: 0.62, on: 0, at: -0.8, d: 0.8 })], 1, [rule(1, 0, { l: 0.8 }), rule(0, 0, { l: 0.6 })], { en: 1, es: 0.75, mk: 1, tk: 1, ts: 0.6, sm: 0.5 }, 1) },
+      { name: 'dog', f: mk(40, [M([1.3, 1.1, 0.9, 0.9, 1.1, 1.3, 1.1, 0.9, 0.9, 1.1]), M(null, { s: 0.7, on: 0, at: -0.5, d: 0.9 })], 1, [rule(0, 0, { l: 0.8 }), rule(7, 1, { l: 0.5 })], { en: 1, es: 0.75, tk: 3, ts: 0.8, sm: 0.9 }, 1) },
+      { name: 'snail', f: mk(140, [M([1.5, 1.1, 0.7, 0.7, 1.1, 1.5, 1.2, 0.9, 0.9, 1.2]), M(null, { s: 0.5, on: 0, at: -0.3, d: 0.95 })], 1, [], { en: 1, es: 0.8, shell: 1, sm: 0.9 }, 1) },
+      { name: 'jelly', f: mk(280, [M([1.1, 1.05, 0.9, 0.9, 1.05, 1.1, 1.1, 1.05, 1.05, 1.1])], 0, [rule(3, 0, { l: 1.0 })], { en: 2, es: 0.8, sm: 0.9 }, 0) },
+      { name: 'plush biped (reference)', f: mk(330, [M(), body(0.7)], 0, [rule(0, 1), rule(0, 1, { l: 0.5, t: 1 })], {}) },
+    ]; });
   const res = await fr.evaluate(async (model) => {
     G.setSpeed(0.0001);
     const spec = window.__SPEC;
@@ -40,6 +39,6 @@ const tag = process.argv[2] || 'a', model = process.argv[3] || 'claude-sonnet-5-
     return { img: img, names: forms.map((x) => x.name), scores: r.judge ? r.judge.scores : null, usd: r.usd };
   }, model).catch((e) => ({ err: String(e) }));
   console.log(res.err || (res.scores || []).map((q) => (res.names[q.id - 1] + ': beauty ' + Math.round(q.score * 10) + ' whole ' + Math.round(q.whole * 10) + ' - ' + q.why)).join(String.fromCharCode(10)) + String.fromCharCode(10) + '$' + res.usd);
-  if (res.img) fs.writeFileSync(path.join(__dirname, 'crit-' + tag + '.jpg'), Buffer.from(res.img, 'base64'));
+  if (res.img) fs.writeFileSync(path.join(__dirname, 'kinds-' + tag + '.jpg'), Buffer.from(res.img, 'base64'));
   await browser.close();
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -785,6 +785,8 @@
         else { plan[i].p.snub = false; if (lk >= nice) { if (plan[i].n < 3 && plan[i].p.E > plan[i].p.ph.Emax * 0.3) plan[i].n++; } else if (plan[i].n > 1) plan[i].n = 1; }
       }
     }
+    // a creature with too much on it does not breed (nearly never): clutter is the commonest way to be unlovable, and it creeps in by chance and by the pond's pressures
+    for (let i = 0; i < plan.length; i++) if (plan[i].p.g.f.bd && G.body.busy(plan[i].p.g.f) > 7.2 && G.rand() < 0.85) plan[i].n = 0;
     // too many for the pond: only the fittest parents may breed
     let total = surv.length;
     for (let i = 0; i < plan.length; i++) total += plan[i].n;
@@ -856,7 +858,7 @@
     const s = c.sp ? G.speciesById(c.sp) : null;
     // the grade the eye for beauty gave its kind is most of it; its own body's fit to the pond's taste is the rest. What the player kept is loved outright.
     // a grade counts for what it is next to the other grades in this pond: so a generous judge and a strict one select alike
-    let v = 0.5 * c.ph.charm + 0.5 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);
+    let v = 0.42 * c.ph.charm + 0.58 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);
     // a guess is not a look: where the watcher has really seen creatures, one nobody has looked at is held back towards what the watcher really said of this pond.
     // Selecting the highest guesses every generation would pile up error (the winner's curse); this keeps belief close to the truth.
     const W1 = G.W;
@@ -910,7 +912,7 @@
     for (let i = 0; i < cre.length; i++) {
       const c = cre[i];
       c.fed = clamp(c.E / c.ph.Emax, 0, 1);
-      c.fit = clamp(c.fed / 0.5, 0, 1) * (0.15 + 0.85 * G.charmOf(c));          // fed well enough (half a tank is plenty), times how nice to the eye and how whole it is
+      c.fit = clamp(c.fed / 0.5, 0, 1) * (0.15 + 0.85 * G.charmOf(c)) * (c.g.f.bd ? Math.max(0.35, 1 - 0.18 * Math.max(0, G.body.busy(c.g.f) - 6)) : 1);          // fed well enough (half a tank is plenty), times how nice to the eye and how whole it is
       sum += c.fit; genes += c.g.f.n + c.g.f.rules.length + c.g.p.length + c.g.w.length + c.g.h;
       intake += c.intake;
       if (c.fit > best) { best = c.fit; bestC = c; }
@@ -948,6 +950,11 @@
     for (let i = 0; i < cre.length; i++) { const c = cre[i], k = G.kindOf(c.g).kind; c.kd = k; share[k] = (share[k] || 0) + 1; c.shp = G.shapeOf(c.g); shapes[c.shp] = (shapes[c.shp] || 0) + 1; c.hb = G.hueOf(c.g); hues[c.hb]++; }
     // who lasts the winter: the well fed, the rare, and the good-looking (the pond is kind to what is admired)
     for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.8 * hues[cre[i].hb] / cre.length) ;
+    if (cre.length > 8) {
+      // fitness sharing: a creature in a crowd of look-alikes counts for less, however it is measured, so no single look can take the whole pond
+      for (let i = 0; i < cre.length; i++) if (!cre[i].fv) cre[i].fv = G.features(cre[i].g);
+      for (let i = 0; i < cre.length; i++) { let cr = 0; for (let j = 0; j < cre.length; j++) { if (i === j) continue; const d = G.fdist(cre[i].fv, cre[j].fv); cr += Math.exp(-d * d / 1.2); } cre[i].sel *= Math.max(0.2, 1.1 - 0.9 * cr / (cre.length - 1) * 3); }
+    }
     let topK = '', topN = 0; for (const k in share) if (share[k] > topN) { topN = share[k]; topK = k; }
     const crowd = topN / Math.max(1, cre.length);
     let sick = 0;
