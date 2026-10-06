@@ -374,6 +374,16 @@
     G.R.flash = 1; G.R.flashCol = G.PAL.gold; G.R.shake = 0.4;
     G.sfx('discovery');
   });
+  G.on('marvel', function (c, def) {
+    if (G.mode !== 'play') return;
+    let item = null; try { item = G.keep ? G.keep(c) : null; } catch (e) { console.error(e); }
+    if (item) item.age = ('Marvel · ' + def.name).slice(0, 70);
+    if (G.sfx) G.sfx('discovery');
+    if (G.select) G.select(c); if (G.focusOn) G.focusOn(c.x, c.y, 2.4);
+    if (G.banner) G.banner('★ A MARVEL', 'Creature #' + c.id + ' was born with ' + def.name + '. ' + def.wonder + (item ? ' It is kept in your collection (BOOK).' : ''), 12000);
+    if (G.log) G.log('disc', 'A marvel: ' + def.name, 'Creature #' + c.id + '. ' + def.wonder);
+    if (G.markDirty) G.markDirty();
+  });
   G.on('plan-new', function (p) { if (G.mode !== 'play') return; const t = 'A new shape of body was imagined for this pond: the ' + p.name + '. ' + p.note + (p.because ? ' Why: ' + p.because + '.' : '') + (p.seen ? ' Drawn and looked at first: ' + Math.round(p.seen.score * 10) + '/10.' : ''); G.log('disc', 'A new shape of body', t); if (G.speed <= 16) G.banner('A body nobody has seen', t, 7500); });
   G.on('idea-dropped', function (name, v) { if (G.mode !== 'play') return; G.log('disc', 'An idea was turned away', 'The "' + name + '" was imagined for this pond, drawn, and looked at. The eye for beauty gave it ' + Math.round(v.score * 10) + '/10 (' + v.why + '), so it was not let in.'); });
   G.on('design-new', function (d) { if (G.mode !== 'play') return; const t = 'A new kind of body part is now possible in this pond: the ' + d.name + '. ' + d.note + (d.because ? ' Why: ' + d.because + '.' : ''); G.log('disc', 'A new kind of part', t); if (G.speed <= 16) G.banner('Something never seen before', t, 7000); });
@@ -716,7 +726,7 @@
         UI.followed = null;
       }
       $('iPar').textContent = par;
-      $('isub').textContent = sp ? G.describeSpecies(sp) : 'A newborn: its species is sorted out in autumn.';
+      $('isub').textContent = (sp ? G.describeSpecies(sp) : 'A newborn: its species is sorted out in autumn.') + (c.ph.mv ? '  ★ MARVEL, ' + c.ph.mv.name + ': ' + c.ph.mv.wonder : '');
       G.R.selPrev = G.preview(c.g, c.id);
     }
     const now = performance.now();

@@ -42,6 +42,7 @@
     G.form.fix(g.f);
     if (sp) sp.loved = true;
     const item = { name: (sp ? sp.name : 'Creature') + ' #' + c.id, kind: G.form.kind(g.f).full, age: G.ageNow ? G.ageNow().name : '', gen: G.W.gen, g: G.packGenome(g) };
+    if (g.mv && g.mv >= 100) { const md = G.marvelOf(g.mv); if (md) item.mv = JSON.parse(JSON.stringify(md)); }      // an invented marvel travels with it
     G.collection.push(item); if (G.collection.length > MAXKEEP) G.collection.shift();
     G.emit('kept', item);
     return item;
@@ -64,7 +65,9 @@
   };
   /** set a kept creature free in this pond: a small family of it, each a little different, to breed with what lives here */
   G.release = function (item) {
-    const W = G.W, g0 = G.unpackGenome(item.g);
+    const W = G.W;
+    if (item.mv && G.addMarvelDef && W) { const nid = G.addMarvelDef(item.mv); if (nid && item.g && Array.isArray(item.g)) { item.g = item.g.slice(); item.g[8] = nid; } }      // its marvel becomes part of this pond
+    const g0 = G.unpackGenome(item.g);
     if (!g0 || !W) return 0;
     // the kinds of part it carries become part of this pond, so they can spread by mutation too
     for (let i = 0; i < g0.f.rules.length; i++) { const q = g0.f.rules[i]; if (q.k === 8 && q.t >= 100000 && !W.designs.some(function (x) { return x.id === q.t; })) { const d = G.designOf(q.t); if (d && W.designs.length < 12) W.designs.push(JSON.parse(JSON.stringify(d))); } }

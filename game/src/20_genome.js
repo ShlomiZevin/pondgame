@@ -71,6 +71,7 @@
       p: g.p.map(function (p) { return { k: p.k, a: p.a, s: p.s }; }),
       h: g.h,
       w: g.w.map(function (w) { return { f: w.f, t: w.t, v: w.v }; }),
+      mv: g.mv | 0,
     };
   };
 
@@ -94,6 +95,7 @@
     g.c.length = 15;
     for (let i = 6; i < 15; i++) g.c[i] = clamp(+g.c[i] || 0, 0, 1);
     g.h = clamp(g.h | 0, 0, MAXH);
+    g.mv = g.mv && G.marvelOf && G.marvelOf(g.mv) ? g.mv | 0 : 0;      // a marvel the pond does not know is lost
     // organs: one of each
     const seen = {};
     g.p = (g.p || []).filter(function (p) { if (!(p.k >= 100 && p.k < 1e6) || seen[p.k]) return false; seen[p.k] = 1; return true; }).slice(0, MAXP);
@@ -108,7 +110,8 @@
   G.derive = function (g) {
     const t = g.t, c = g.c, f = g.f, FM = G.form, U = FM.U;
     const cn = FM.counts(f), A = FM.abilities(f, cn), ext = FM.extent(f), k = cn.k;
-    const r = Math.min(t[0], 22 + 8 * (f.n - 1));          // a body of more parts can be a bigger one; the ceiling is high, so size is limited by food and by the pond, not by a rule
+    const mvd = g.mv && G.marvelOf ? G.marvelOf(g.mv) : null;
+    const r = Math.min(t[0], 22 + 8 * (f.n - 1)) * (mvd && mvd.sp === 'titan' ? 1.35 : 1);          // a body of more parts can be a bigger one; the ceiling is high, so size is limited by food and by the pond, not by a rule
     const FX = { speed: 0, sense: 0, eat: 0, armor: 0, spike: 0, toxin: 0, photo: 0, glow: 0, heat: 0, cold: 0, poison: 0 };
     const dig = [c[0], c[1], c[2], c[3], c[4], c[5]];
     let orgCost = 0;
@@ -121,6 +124,7 @@
       if (o.digest >= 0) dig[o.digest] = Math.min(1, dig[o.digest] + 0.4 * q.s);
       orgCost += (0.03 + 0.065 * tot) * q.s;
     }
+    if (mvd) { for (const x in FX) FX[x] += mvd.fx[x] || 0; orgCost += 0.05; }      // a marvel's effects, like an organ's
     const tail = !f.sym && f.tk && f.n > 1;
     const plump = clamp(((f.prof[1] + f.prof[2] + f.prof[3]) / 3 - 0.7) / 0.5, 0, 1);      // 0 slim .. 1 round
     const bite = Math.min(2, (f.mk === 2 ? 0.8 + 1.6 * f.ms : f.mk === 1 ? 0.6 : 0) + 0.25 * cn.pincer);
@@ -202,6 +206,7 @@
     }
     ph.bf = Int16Array.from(bf); ph.bv = Float32Array.from(bv); ph.bs = Int32Array.from(bs);
     ph.nh = g.h;
+    if (mvd) { ph.mv = mvd; ph.mvsp = mvd.sp; if (mvd.sp === 'mind') { ph.turn *= 1.25; ph.speed *= 1.08; } }
     return ph;
   };
 
@@ -293,6 +298,8 @@
     }
     // an idea from the mutation pool (offline or from the server)
     if (idea && r() < 0.18 * wild) applyIdea(g, idea, note);
+    // a marvel can fade; the commoner it is, the likelier (one that has taken over the pond thins out, so it stays rare)
+    if (g.mv) { const sh = G.W && G.W.mvShare ? G.W.mvShare[g.mv] || 0 : 0; if (r() < (0.012 + 0.7 * Math.max(0, sh - 0.15)) * wild) { g.mv = 0; note('f', 0, 'lost its marvel', true); } }
     G.validateGenome(g);
     return { g: g, muts: muts };
   };
@@ -327,6 +334,7 @@
     c.p = a.p.slice(0, pa).map(function (p) { return { k: p.k, a: p.a, s: p.s }; })
       .concat(b.p.slice(pb).map(function (p) { return { k: p.k, a: p.a, s: p.s }; }));
     c.h = r() < 0.5 ? a.h : b.h;
+    c.mv = a.mv && b.mv ? (r() < 0.5 ? a.mv : b.mv) : (a.mv || b.mv) ? (r() < 0.92 ? (a.mv || b.mv) : 0) : 0;      // a marvel is usually handed down, but not always
     const wa = Math.floor(a.w.length * r()), wb = Math.floor(b.w.length * r());
     c.w = a.w.slice(0, wa).map(function (w) { return { f: w.f, t: w.t, v: w.v }; })
       .concat(b.w.slice(wb).map(function (w) { return { f: w.f, t: w.t, v: w.v }; }));
@@ -361,7 +369,7 @@
   G.packGenome = function (g) {
     const r2 = function (x) { return Math.round(x * 100) / 100; };
     const flat = []; for (let i = 0; i < g.w.length; i++) flat.push(g.w[i].f, g.w[i].t, Math.round(g.w[i].v * 100));
-    return [g.t.map(r2), g.c.map(function (v) { return Math.round(v * 100); }), g.p.map(function (p) { return [p.k, r2(p.a), r2(p.s)]; }), g.h, flat, 2, 0, G.form.pack(g.f)];
+    return [g.t.map(r2), g.c.map(function (v) { return Math.round(v * 100); }), g.p.map(function (p) { return [p.k, r2(p.a), r2(p.s)]; }), g.h, flat, 2, 0, G.form.pack(g.f), g.mv | 0];
   };
   G.unpackGenome = function (a) {
     if (!Array.isArray(a) || a.length < 5) return null;
@@ -373,6 +381,7 @@
         p: (a[2] || []).map(function (p) { return { k: p[0] | 0, a: +p[1] || 0, s: +p[2] || 1 }; }),
         h: a[3] | 0,
         w: compact ? wires : (a[4] || []).map(function (w) { return { f: w[0] | 0, t: w[1] | 0, v: +w[2] || 0 }; }),
+        mv: a[8] | 0,
         f: a[7] ? G.form.unpack(a[7]) : null,      // a pond saved before bodies were grown from genes starts again from cells
       };
       if (g.t.length < 3 || g.c.length < 9) return null;

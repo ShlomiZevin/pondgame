@@ -3,6 +3,7 @@
 //   POST /api/ai/thing   { word }            → { thing }       what a typed word is made of
 //   POST /api/ai/ideas   { gen, species }    → { ideas }       mutation ideas for the living species
 //   POST /api/ai/organ   { the pond now }    → { organ }       a new body part invented for this pond
+//   POST /api/ai/marvel  { pond, creature }  → { marvel }      a super-rare gift for one lucky creature (name, wonder, a special, effects)
 //   POST /api/wish       { op: 'get' | 'check' | 'done', ... } → the pond's wish (kept per player), marks for a sheet of creatures, the next wish
 //   POST /api/ai/figure  { word, note, hue } → { figure: { svg, pivots, floats } }   a typed being, DRAWN by the model as a puppet of parts (kept per word)
 //   POST /api/ai/plan    { the pond, have } → { plan }         a new SHAPE OF BODY (a few masses and how they join), answering what is happening in the pond
@@ -173,6 +174,11 @@ function createApp(opts = {}) {
     if (route === 'POST /api/ai/ideas') {
       const body = await readJson(req, 4000);
       return send(res, 200, await ai.ideas(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr }));
+    }
+    if (route === 'POST /api/ai/marvel') {
+      const body = await readJson(req, 8000);
+      const r = await ai.marvel(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr });
+      return send(res, 200, r);
     }
     if (route === 'POST /api/ai/organ') {
       const body = await readJson(req, 6000);

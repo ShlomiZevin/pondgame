@@ -609,6 +609,7 @@
         }
       }
       // ── biting other creatures ──
+      if (ph.mv && G.marvelStep) G.marvelStep(c, dt, cg);
       c.cool -= dt;
       if (c.cool <= 0 && ph.cnt[0] > 0) {
         const br = ph.eatR + 2;
@@ -688,8 +689,11 @@
     }
   }
 
+  G.killCreature = function (c, cause, by) { kill(c, cause, by); };
   function kill(c, cause, by) {
     if (c.dead) return;
+    if (c.g.mv && G.marvelBlessed && G.marvelBlessed(c) && !c.graceUsed && cause !== 'starved') { c.graceUsed = true; c.E = Math.max(c.E, c.ph.Emax * 0.5); c.doomed = false; c.flash = 1; return; }      /* the one who was born with a marvel is spared once, so it can be a parent */
+    if (c.ph && c.ph.mvsp === 'luck' && G.marvelSave && G.marvelSave(c, cause)) return;      // the Lucky Star: it was missed
     c.dead = true; c.cause = cause;
     const W = G.W;
     if (cause === 'starved') W.stats.starved++;
@@ -756,9 +760,11 @@
       const p = surv[i], Em = p.ph.Emax;
       const cost = K.repro * Em;
       let n = clamp(Math.floor((p.E - K.keep * Em) / cost), 0, 3);
+      if (p.ph.mvsp === 'fertile' && n < 3 && p.E - K.keep * Em > cost * (n + 1)) n++;      // the Heart of Spring: one child more
       // a child is built from protein as well as energy; a parent short of it has fewer, or scrapes one together now and then
       const byP = Math.floor(p.P / (cost * p.ph.pneed));
       if (byP < n) { W.stats.protShort += n - byP; n = byP > 0 ? byP : (G.rand() < 0.25 ? 1 : 0); }
+      if (G.marvelBlessed && G.marvelBlessed(p) && n < 1 && p.E > cost * 0.6) n = 1;      // a new marvel is treasured: its carriers have a child if they at all can
       if (n > 0) plan.push({ p: p, n: n });
     }
     {
@@ -781,12 +787,12 @@
       const ugly = looks[Math.floor(looks.length * 0.33)], mid = looks[looks.length >> 1], nice = looks[Math.floor(looks.length * 0.67)];
       for (let i = 0; i < plan.length; i++) {
         const bq = beauty(plan[i].p), lk = G.charmOf(plan[i].p);
-        if (lk <= ugly && lk < mid * 0.97) { W.stats.snubbed++; plan[i].n = G.rand() < 0.08 ? 1 : 0; plan[i].p.snub = true; }
+        if (!(G.marvelBlessed && G.marvelBlessed(plan[i].p)) && lk <= ugly && lk < mid * 0.97) { W.stats.snubbed++; plan[i].n = G.rand() < 0.08 ? 1 : 0; plan[i].p.snub = true; }
         else { plan[i].p.snub = false; if (lk >= nice) { if (plan[i].n < 3 && plan[i].p.E > plan[i].p.ph.Emax * 0.3) plan[i].n++; } else if (plan[i].n > 1) plan[i].n = 1; }
       }
     }
     // a creature with too much on it does not breed (nearly never): clutter is the commonest way to be unlovable, and it creeps in by chance and by the pond's pressures
-    for (let i = 0; i < plan.length; i++) if (plan[i].p.g.f.bd && G.body.busy(plan[i].p.g.f) > 7.2 && G.rand() < 0.85) plan[i].n = 0;
+    for (let i = 0; i < plan.length; i++) if (plan[i].p.g.f.bd && !(G.marvelBlessed && G.marvelBlessed(plan[i].p)) && G.body.busy(plan[i].p.g.f) > 7.2 && G.rand() < 0.85) plan[i].n = 0;
     // too many for the pond: only the fittest parents may breed
     let total = surv.length;
     for (let i = 0; i < plan.length; i++) total += plan[i].n;
@@ -881,7 +887,7 @@
         if (!p.fv) p.fv = G.features(p.g);
         if (!o.fv) o.fv = G.features(o.g);
         // of the compatible ones nearby, the most charming and healthy is chosen
-        if (G.fdist(p.fv, o.fv) < 1.7) { const b = 2.2 * G.charmOf(o) + 0.3 * clamp(o.E / o.ph.Emax, 0, 1) + (G.kindOf(o.g).kind === G.kindOf(p.g).kind ? 1 : 0) + (Math.abs(((o.g.f.hue - p.g.f.hue + 540) % 360) - 180) < 35 ? 0.6 : 0); if (!best || b > bd2) { best = o; bd2 = b; } }
+        if (G.fdist(p.fv, o.fv) < 1.7) { const b = 2.2 * G.charmOf(o) + 0.3 * clamp(o.E / o.ph.Emax, 0, 1) + (o.g.mv ? 0.8 : 0) + (G.kindOf(o.g).kind === G.kindOf(p.g).kind ? 1 : 0) + (Math.abs(((o.g.f.hue - p.g.f.hue + 540) % 360) - 180) < 35 ? 0.6 : 0); if (!best || b > bd2) { best = o; bd2 = b; } }
       }
     }
     return best;
@@ -936,6 +942,7 @@
     if (G.fashionTick) G.fashionTick(W.gen);
     if (G.natureTick) G.natureTick(W.gen);
     if (G.judgeTick) G.judgeTick(W.gen);
+    if (G.marvelTick) G.marvelTick(W.gen);
     if (G.paintTick) G.paintTick(W.gen);
     W.hist[W.hist.length - 1].species = W.species.filter(function (s) { return !s.extinct; }).length;
     G.emit('scored', W.hist[W.hist.length - 1]);
@@ -958,7 +965,7 @@
     let topK = '', topN = 0; for (const k in share) if (share[k] > topN) { topN = share[k]; topK = k; }
     const crowd = topN / Math.max(1, cre.length);
     let sick = 0;
-    { const ap = cre.map(G.charmOf).sort(function (a, b) { return b - a; }), cut = ap[Math.floor(ap.length * 0.15)] || 1; for (let i = 0; i < cre.length; i++) { cre[i].elite = cre.length >= 12 && G.charmOf(cre[i]) >= cut && cre[i].fed > 0.2; if (cre[i].elite) cre[i].sel += 1; } }
+    { const ap = cre.map(G.charmOf).sort(function (a, b) { return b - a; }), cut = ap[Math.floor(ap.length * 0.15)] || 1; for (let i = 0; i < cre.length; i++) { cre[i].elite = cre.length >= 12 && G.charmOf(cre[i]) >= cut && cre[i].fed > 0.2; if (cre[i].elite) cre[i].sel += 1; if (G.marvelBlessed && G.marvelBlessed(cre[i])) { cre[i].elite = true; cre[i].sel += 2; } }      /* a marvel is looked after */ }
     if (crowd > 0.5 && cre.length > 30) { const pr = (crowd - 0.5) * 0.9; for (let i = 0; i < cre.length; i++) if (cre[i].kd === topK && !cre[i].elite && G.rand() < pr) { cre[i].sel = -1; cre[i].sick = true; sick++; } }
     if (sick > 4 && (W.gen - (W.sickGen || 0)) > 6) { W.sickGen = W.gen; W.discLog.push({ key: 'sick' + W.gen, text: 'A sickness is going round the ' + topK.toLowerCase() + 's: there are so many of them (' + Math.round(crowd * 100) + '% of the pond) that it spreads easily. ' + sick + ' will not see spring. The rarer kinds are hardly touched.', gen: W.gen }); G.emit('sickness', topK, sick, crowd); }
     const sorted = cre.slice().sort(function (a, b) { return a.sel - b.sel; });

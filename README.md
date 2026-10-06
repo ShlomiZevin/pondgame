@@ -89,6 +89,7 @@ use it directly, and `npm run pull-game` copies it into `game/` before a commit.
 | `43_why.js` | The reason shown when a feature takes hold. |
 | `44_pressure.js` | What the pond is up against right now (it tilts which mutations appear). |
 | `45_organs.js`, `45_parts.js` | Organs and new kinds of body part invented for a pond; the collection. |
+| `46b_marvels.js`, `50b_marveldraw.js` | **Rare marvels.** Now and then one lucky creature is born with something super rare (a mind that thinks, a voice that talks, breath of fire, a diamond heart, a rainbow coat, a healing light, a lucky star, a heart of spring, a titan's heart, or one the AI invents for this pond). See the section below. |
 | `45_plans.js` | **Shapes of body imagined for a pond**, by the AI looking at the pond (`G.worldBrief`: things dropped in, events, dangers, who lives there and their beauty grades, what the player kept, what became of earlier ideas), or from a stock of fourteen. At most three at a time; a mutation may bear a child towards one. |
 | `48_paint.js` | AI paintings of creatures. Switched off (`G.ai.drawn = true`): paintings cannot move. |
 | `46_events.js` | Free-text world events. |
@@ -137,6 +138,7 @@ that hosts it, and that page calls the server. `public/dev-host.html` is a compl
 | `ai.judge` | `POST /api/ai/judge` | The picture of the creatures (base64 JPEG, about 50 kB) → a grade, a reason and a fix for each. |
 | `ai.event` | `POST /api/ai/event` | A typed sentence → a world event. |
 | `ai.organ`, `ai.design` | `POST /api/ai/organ`, `/design` | A new organ, a new kind of body part. |
+| `ai.marvel` | `POST /api/ai/marvel` | A marvel for one lucky creature: a name, a story, one special gift and a few effects, kept fair by the server. |
 | `ai.judge` | `POST /api/ai/judge` | How striking each kind of creature looks. |
 | `ai.story`, `ai.ideas` | `POST /api/ai/story`, `/ideas` | The narrator; mutation ideas. |
 | `ai.sound` | `POST /api/ai/sound` | A sound for a typed thing. |
@@ -145,6 +147,15 @@ that hosts it, and that page calls the server. `public/dev-host.html` is a compl
 | `fuel`, `fuel.spent` | none | The host sets how many paid answers are left; the game reports each one spent. |
 
 Every `/api/*` call carries `x-user: <a stable id>`.
+
+## Rare marvels
+
+A pond now and then gives one creature a **marvel**: something super rare that players gasp at and tell a friend about. It is rare by chance but never left to chance alone: the chance for each generation is `1 − exp(−(0.0004 + 0.00003 × generations since the last + (0.004 + 0.006 × minutes since the last) × minutes since the last check))`, so it comes about every 3 minutes at 64× and every 15 minutes at 1× (`node tools/marvel-test.js` prints the waits), and a player is never without one for long.
+
+- **What:** nine are built in (`G.MARVELS`): Bright Mind (senses, speed, a sharper brain), The Gift of Words (it talks in speech bubbles; its kin hear it and mates prefer it), Dragon Breath (burns what hunts it), Diamond Heart (armour and light), Rainbow Coat (resists heat, cold and poison), Healing Light (mends creatures near it), Lucky Star (danger sometimes misses it), Heart of Spring (an extra child each spring), Titan's Heart (35% bigger). About half the time, when the AI is on, it invents the pond's marvel instead (name, one-sentence wonder, a sign, effects from the organ vocabulary capped in total, at most one special gift, the words a voice says): about a tenth of a cent each, at most eight a session.
+- **A moment:** a banner, a sound, the camera goes to the creature, it is kept in the player's collection as "Marvel · name" (an invented one travels with it), and in the pond it has an aura, circling sparks and a small sign floating beside its head.
+- **In the genes (`g.mv`):** children can inherit it (usually), it can fade (rarely at first, and much more as it becomes common, so it stays something special), the carrier is spared once and looked after for twenty generations while the marvel is still rare. `node tools/marvel-spread.js` shows what becomes of one: it usually reaches a tenth to a quarter of the pond for 15 to 60 generations and then fades, unless it helps.
+- **Saved and kept:** the marvel is in the genome (packed at index 8), the pond saves its invented marvels and the clock, and a kept creature carries its marvel into any pond.
 
 ## Putting it on Plaxzy
 

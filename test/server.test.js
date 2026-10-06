@@ -166,3 +166,37 @@ test('library: once enough is kept, most requests are answered without the model
   assert.ok(n - b2 < 25, 'idea sets are reused');
   assert.ok(ai.library().ideas >= 6);
 });
+
+test('marvels: the model invents one, and the server keeps it fair', async () => {
+  const store = createStore(tmpDir());
+  const wild = JSON.stringify({ name: 'Thunder Throat <b>', wonder: 'Its voice shakes the water and fills it with fire.', special: 'voice', fx: { glow: 0.9, spike: 5, speed: 9 }, glyph: 'nonsense', hue: 400, words: ['BOOM', 'rrraa!', 'x<y>z', 'a very long word indeed that goes on'] });
+  const ai = createAi({ store, callModel: async () => wild, offline });
+  const r = await ai.marvel({ have: [] });
+  assert.equal(r.source, 'ai');
+  const m = r.marvel;
+  assert.ok(m.name.indexOf('<') < 0 && m.sp === 'voice' && m.glyph === 'star');
+  const sum = Object.values(m.fx).reduce((s, v) => s + Math.abs(v), 0);
+  assert.ok(sum <= 1.41 && m.fx.speed <= 0.6, 'effects are capped: ' + sum);
+  assert.ok(m.words.every((w) => w.length <= 14 && w.indexOf('<') < 0) && m.words.length <= 8);
+  assert.ok(m.hue >= 0 && m.hue < 360);
+  const none = await createAi({ store: createStore(tmpDir()), callModel: null, offline }).marvel({ have: [] });
+  assert.equal(none.marvel, null);
+});
+
+test('marvels: a pond with an invented marvel saves, and comes back with the marvel still on its creature', () => {
+  const vm = require('vm'), fs = require('fs'), path = require('path');
+  const mk = () => { const ctx = vm.createContext({ console, performance, Date, Math, JSON, Float32Array, Int16Array, Int32Array, Promise, setTimeout, clearTimeout }); ctx.window = ctx; ctx.addEventListener = () => {}; let cap = null; ctx.Plaxzy = { save: { set(d) { cap = JSON.parse(JSON.stringify(d)); }, load() {} } };
+    for (const f of ['10_core.js', '20_genome.js', '21_form.js', '21b_body.js', '21c_taste.js', '30_world.js', '40_words.js', '41_look.js', '43_why.js', '44_pressure.js', '45_organs.js', '45_parts.js', '45_plans.js', '46_events.js', '46b_marvels.js', '47_story.js', '48_judge.js', '49_eras.js', '80_save.js']) { const p = path.join(__dirname, '..', 'sim', f); if (fs.existsSync(p)) vm.runInContext(fs.readFileSync(p, 'utf8'), ctx, { filename: f }); }
+    vm.runInContext('G.hints = {}; G.R = {}; G.mode = "play";', ctx); return { G: ctx.G, cap: () => cap }; };
+  const a = mk(); a.G.newWorld({ seed: 7 }); a.G.founderPond(); while (a.G.W.gen < 4) a.G.step(0.1);
+  const id = a.G.addMarvelDef({ name: 'Moonlit Memory', wonder: 'It remembers every place it has been.', special: 'mind', fx: { sense: 0.6 }, glyph: 'moon', hue: 230 });
+  assert.ok(id >= 100);
+  const c = a.G.W.cre.filter((x) => !x.dead && x.g.f.bd)[0]; c.g.mv = id; c.ph = a.G.derive(c.g);
+  a.G.saveNow(); const save = a.cap();
+  assert.ok(save.marvelX && save.marvelX.length === 1);
+  const b = mk(); assert.ok(b.G.validSave(save)); b.G.applySave(save);
+  const back = b.G.W.cre.filter((x) => x.g.mv === id);
+  assert.ok(back.length >= 1, 'the creature kept its marvel');
+  assert.equal(b.G.marvelOf(id).name, 'Moonlit Memory');
+  assert.equal(back[0].ph.mvsp, 'mind');
+});
