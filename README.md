@@ -256,3 +256,7 @@ The pond grows when bodies cover more than about a twelfth of the water (`src/57
 ## Beyond the pond, the box in two tabs, and the budget
 
 `src/58_beyond.js`: the pond has no wall; at its sides and floor the water goes on into a mist with far lights and, now and then, something large passing. When the pond grows (`57_grow.js`, now eased over seconds) the mist draws back. The rare box has two tabs, Plans and Marvels; a click on a row goes there and opens its details (a built thing: its picture, how and why it was built, what it does, how long it lasts). `src/69_budget.js` holds the limits for the AI calls that happen by themselves (plans, marvels, the pond's own events, wish checks): about a dollar and a quarter at most in a sitting.
+
+## A budget for every kind of AI work
+
+`src/69_budget.js` holds one table, `G.ai.budget`: dollars per pond for each kind (things typed, world events, the pond's own events, plans, marvels, pictures, the watcher, wish checks, ...). What a pond has spent is kept in its save (`G.ai.life`). When a kind has used its budget it is OFF in that pond: automatic kinds are no longer asked (`G.ai.allow`), what the player types is refused with the reason, ADD / WORLD are dimmed with an OFF badge, the rare box and the wish card say so, and the costs sheet shows each budget with a bar. A new pond starts with full budgets. Test (no AI asked): `node scripts/budget.js`.

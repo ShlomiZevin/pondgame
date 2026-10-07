@@ -55,7 +55,7 @@
       '<div class="wt">' + esc(S.cur.title) + '</div>' +
       '<div class="wrow"><span>Closest creature: <b>' + (b ? b.close : 0) + ' of 10</b></span><span>comes true at ' + NEED + '</span></div>' +
       '<div class="wbar"><i style="width:' + pct + '%"></i><b></b></div>' +
-      '<div class="wsub">' + (b ? '<u>Still missing</u> ' + esc(String(b.why).replace(/\.+$/, '')) + '.' : 'Nobody has been looked at yet. The pond looks once a minute.') + '</div>' +
+      '<div class="wsub">' + (b ? '<u>Still missing</u> ' + esc(String(b.why).replace(/\.+$/, '')) + '.' : 'Nobody has been looked at yet. The pond looks once a minute.') + (G.ai.over && G.ai.over('wishcheck') ? ' <b style="color:#ff9db0">Looking is OFF: its budget for this pond is used up.</b>' : '') + '</div>' +
       '<div class="wmore"><p class="wsay">“' + esc(S.cur.text) + '”</p>' +
       '<div class="wlab">It must have</div><div class="wneeds">' + S.cur.needs.map(function (n) { return '<span class="wchip">' + esc(n) + '</span>'; }).join('') + '</div>' +
       (S.cur.hint ? '<div class="wlab">A thought</div><p>' + esc(S.cur.hint) + '</p>' : '') +

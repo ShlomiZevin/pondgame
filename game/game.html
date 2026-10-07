@@ -8011,7 +8011,8 @@ G.addSystem({
     const d = W.deed, dn = d ? W.cre.filter(function (c) { return c.deedId === d.id && !c.dead; }).length : 0;
     const Wk = W.works || [], Pa = W.deedPast || [];
     const s2 = order.map(function (id) { return id + ':' + by[id].n; }).join(',') + '|' + (d ? d.id + ':' + d.i + ':' + dn + ':' + Math.round(d.progress * 20) + ':' + Math.round((d.steps[d.i].secs - d.t) / 2) : '') + '|' + Wk.map(function (w) { return w.name + (w.fig ? 1 : 0); }).join(',') + '|' + Pa.length + ':' + (Pa.length ? Pa[Pa.length - 1].gen : 0);
-    if (s2 + shut + tab + open === sig) return; sig = s2 + shut + tab + open; box.classList.toggle('shut', shut);
+    const bo = G.ai.over ? '' + G.ai.over('deed') + G.ai.over('marvel') : '';
+    if (s2 + shut + tab + open + bo === sig) return; sig = s2 + shut + tab + open + bo; box.classList.toggle('shut', shut);
     const chips = [order.length ? order.length + (order.length === 1 ? ' marvel' : ' marvels') : '', d ? 'a plan' : '', Wk.length ? Wk.length + ' built' : ''].filter(Boolean);
     let fresh = false, h = '<div class="rk" title="' + (shut ? 'Open' : 'Fold away') + '"><span>★ Rare' + (shut ? '' : ' in this pond') + '</span><span class="rc">' + chips.map(function (c) { return '<em>' + c + '</em>'; }).join('') + '<u>' + (shut ? '▸' : '▾') + '</u></span></div>';
     if (shut) { for (let i = 0; i < order.length; i++) if (!seen['m' + order[i]]) { seen['m' + order[i]] = 1; fresh = true; } if (d && !seen['d' + d.id]) { seen['d' + d.id] = 1; fresh = true; } box.innerHTML = h; if (fresh) { box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash'); } return; }
@@ -8033,6 +8034,7 @@ G.addSystem({
     if (Pa.length && P) h += '<div class="rh">Earlier plans</div>';
     for (let i = Pa.length - 1; i >= 0 && i >= Pa.length - 3 && P; i--) { const p = Pa[i];
       h += '<div class="rrow old" data-go="p' + i + '"><span class="ric">' + (p.how === 'done' ? '✓' : '✕') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(p.title) + '</b><span class="rtag' + (p.how === 'done' ? '' : ' no') + '">' + (p.how === 'done' ? 'done' : 'gave up') + ' · gen ' + p.gen + '</span></span><div class="rsub">' + chip(p.kind, p.hue) + ' ' + (p.what ? names('set out to ' + p.what.replace(/\.$/, '') + '.') : names(p.say)) + '</div></span></div>'; }
+    if (G.ai.over && G.ai.provider === 'server') { if (P && G.ai.over('deed')) h += '<div class="rnone" style="color:#ff9db0">New plans are OFF: their budget for this pond is used up.</div>'; if (!P && G.ai.over('marvel')) h += '<div class="rnone" style="color:#ff9db0">New marvels are OFF: their budget for this pond is used up.</div>'; }
     if (P && !d) h += '<div class="rnone">' + (Wk.length || Pa.length ? 'No plan under way just now.' : 'No plan yet. Every few minutes a kind of creature decides to do something together: build, march, meet. It shows here.') + '</div>';
     if (!P && !order.length) h += '<div class="rnone">No marvel alive just now. Every few minutes a creature is born with a rare gift. It shows here, and a click takes you to it.</div>';
     box.innerHTML = h;
@@ -8333,7 +8335,7 @@ G.addSystem({
           const W0 = G.W; W0.evShelf = (W0.evShelf || []).filter(function (e) { return e.name.toLowerCase() !== ev.name.toLowerCase(); }); W0.evShelf.push(JSON.parse(JSON.stringify(ev))); if (W0.evShelf.length > 10) W0.evShelf.shift(); G.markDirty();
         }
         closePop();
-      }, function (err) { evMsg.textContent = err && err.refused ? 'The pond will not do that. Try another.' : 'Nothing happened. Try again.'; });
+      }, function (err) { evMsg.textContent = err && err.budget ? 'World events have used their budget for this pond, so they are off. A new pond starts with a full budget.' : err && err.refused ? 'The pond will not do that. Try another.' : 'Nothing happened. Try again.'; });
     };
     evIn.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); evGo(); } else if (e.key === 'Escape') { evIn.blur(); closePop(); } e.stopPropagation(); };
     el('h3', '', 'DISASTERS', pop).style.marginTop = '10px';
@@ -8389,7 +8391,7 @@ G.addSystem({
         (G.figureFor ? G.figureFor({ name: info.name, note: info.note, hue: info.hue, wall: wall }, w) : Promise.resolve(null)).then(fin, fin);
       }, function (err) {
         making('');
-        const msg = err && err.refused ? 'The pond cannot take that word. Try another.' : 'The pond could not make sense of that. Try again.';
+        const msg = err && err.budget ? 'Adding things has used its budget for this pond, so it is off. A new pond starts with a full budget.' : err && err.refused ? 'The pond cannot take that word. Try another.' : 'The pond could not make sense of that. Try again.';
         if (open()) $('thing').innerHTML = '<div class="thingcard">' + msg + '</div>'; else if (G.toast) G.toast(msg);
       });
     };
@@ -9210,7 +9212,7 @@ G.addSystem({
       '<div class="wt">' + esc(S.cur.title) + '</div>' +
       '<div class="wrow"><span>Closest creature: <b>' + (b ? b.close : 0) + ' of 10</b></span><span>comes true at ' + NEED + '</span></div>' +
       '<div class="wbar"><i style="width:' + pct + '%"></i><b></b></div>' +
-      '<div class="wsub">' + (b ? '<u>Still missing</u> ' + esc(String(b.why).replace(/\.+$/, '')) + '.' : 'Nobody has been looked at yet. The pond looks once a minute.') + '</div>' +
+      '<div class="wsub">' + (b ? '<u>Still missing</u> ' + esc(String(b.why).replace(/\.+$/, '')) + '.' : 'Nobody has been looked at yet. The pond looks once a minute.') + (G.ai.over && G.ai.over('wishcheck') ? ' <b style="color:#ff9db0">Looking is OFF: its budget for this pond is used up.</b>' : '') + '</div>' +
       '<div class="wmore"><p class="wsay">“' + esc(S.cur.text) + '”</p>' +
       '<div class="wlab">It must have</div><div class="wneeds">' + S.cur.needs.map(function (n) { return '<span class="wchip">' + esc(n) + '</span>'; }).join('') + '</div>' +
       (S.cur.hint ? '<div class="wlab">A thought</div><p>' + esc(S.cur.hint) + '</p>' : '') +
@@ -9598,12 +9600,14 @@ G.addSystem({
     for (let i = 0; i < kinds.length; i++) {
       const k = kinds[i], c = A.count[k] || { asked: 0, fresh: 0, usd: 0 }, L = A.life[k] || { asked: 0, fresh: 0, usd: 0 };
       sA += c.asked; sF += c.fresh; sU += c.usd || 0; lF += L.fresh; lU += L.usd;
-      rows += '<tr><td style="text-align:left">' + esc(A.LABEL[k] || k) + '</td><td>' + c.fresh + '</td><td>' + (c.asked - c.fresh) + '</td><td><b>' + m(c.usd) + '</b></td><td style="color:rgba(207,232,255,.7)">' + L.fresh + '</td><td style="color:rgba(207,232,255,.7)">' + m(L.usd) + '</td></tr>';
+      const bud = A.budgetOf ? A.budgetOf(k) : 0, out = A.over && A.over(k), part = bud ? Math.min(1, L.usd / bud) : 0;
+      rows += '<tr' + (out ? ' style="opacity:.55"' : '') + '><td style="text-align:left">' + esc(A.LABEL[k] || k) + (out ? ' <b style="color:var(--rose);font-size:10px;letter-spacing:.08em">OFF</b>' : '') + '</td><td>' + c.fresh + '</td><td>' + (c.asked - c.fresh) + '</td><td><b>' + m(c.usd) + '</b></td><td style="color:rgba(207,232,255,.7)">' + L.fresh + '</td><td style="color:rgba(207,232,255,.7)">' + m(L.usd) + '</td><td style="white-space:nowrap"><span style="display:inline-block;vertical-align:middle;width:46px;height:5px;border-radius:3px;background:rgba(207,232,255,.18);overflow:hidden;margin-right:6px"><i style="display:block;height:100%;width:' + Math.round(part * 100) + '%;background:' + (out ? 'var(--rose)' : part > 0.75 ? 'var(--gold)' : '#33d6a6') + '"></i></span>' + (bud ? '$' + bud.toFixed(2) : '') + '</td></tr>';
     }
-    rows += '<tr style="border-top:1px solid rgba(207,232,255,.25)"><td style="text-align:left;color:var(--gold)"><b>TOTAL</b></td><td>' + sF + '</td><td>' + (sA - sF) + '</td><td><b style="color:var(--gold)">' + m(sU) + '</b></td><td>' + lF + '</td><td><b style="color:var(--gold)">' + m(lU) + '</b></td></tr>';
+    rows += '<tr style="border-top:1px solid rgba(207,232,255,.25)"><td style="text-align:left;color:var(--gold)"><b>TOTAL</b></td><td>' + sF + '</td><td>' + (sA - sF) + '</td><td><b style="color:var(--gold)">' + m(sU) + '</b></td><td>' + lF + '</td><td><b style="color:var(--gold)">' + m(lU) + '</b></td><td></td></tr>';
     const last = A.ledger.filter(function (e) { return e.paid; }).slice(-10).reverse().map(function (e) { const d = new Date(e.at); return '<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:1px 0"><span>' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ' · gen ' + e.gen + ' · ' + esc(A.LABEL[e.kind] || e.kind) + '</span><b>' + (e.usd === null ? 'no price set' : m(e.usd)) + '</b></div>'; }).join('');
-    openOverlay('costs', '<div class="glass sheet" style="width:min(640px,100%);max-height:92vh;overflow:auto"><h3 style="margin-bottom:4px">WHAT THE AI COST</h3><small style="margin-bottom:10px;display:block">Every paid answer is counted here, in dollars for now. "Paid" means a model really ran; "free" came from the library of earlier answers, or from the pond itself.</small>' +
-      '<table style="width:100%;border-collapse:collapse;font-size:12.5px;text-align:right"><tr style="font-size:10px;letter-spacing:.08em;color:rgba(207,232,255,.6)"><th style="text-align:left;font-weight:600">WHAT FOR</th><th style="font-weight:600">PAID</th><th style="font-weight:600">FREE</th><th style="font-weight:600">THIS SESSION</th><th style="font-weight:600">PAID, THIS POND</th><th style="font-weight:600">THIS POND</th></tr>' + rows + '</table>' +
+    openOverlay('costs', '<div class="glass sheet" style="width:min(760px,100%);max-height:92vh;overflow:auto"><h3 style="margin-bottom:4px">WHAT THE AI COST</h3><small style="margin-bottom:10px;display:block">Every paid answer is counted here, in dollars for now. "Paid" means a model really ran; "free" came from the library of earlier answers, or from the pond itself.</small>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px;text-align:right"><tr style="font-size:10px;letter-spacing:.08em;color:rgba(207,232,255,.6)"><th style="text-align:left;font-weight:600">WHAT FOR</th><th style="font-weight:600">PAID</th><th style="font-weight:600">FREE</th><th style="font-weight:600">THIS SESSION</th><th style="font-weight:600">PAID, THIS POND</th><th style="font-weight:600">THIS POND</th><th style="font-weight:600">BUDGET, THIS POND</th></tr>' + rows + '</table>' +
+      '<small style="display:block;margin-top:6px">Each kind of AI work has its own budget for one pond. When it is used up that kind is OFF in this pond; a new pond starts with full budgets.</small>' +
       (A.unpriced ? '<small style="display:block;margin-top:6px;color:var(--rose)">' + A.unpriced + ' paid answer' + (A.unpriced === 1 ? '' : 's') + ' came from a model with no price set, so the total is too low by that much.</small>' : '') +
       (A.fuel !== null ? '<small style="display:block;margin-top:6px">Fuel left: <b>' + A.fuel + '</b> paid answers.</small>' : '') +
       '<h3 style="font-size:11px;letter-spacing:.16em;margin:12px 0 4px;color:var(--gold)">LATEST PAID ANSWERS</h3>' + (last || '<small>None yet this session.</small>') +
@@ -10094,19 +10098,73 @@ G.addSystem({
 
 </script>
 <script data-part="budget">
-// ── The pace of the things that happen by themselves ──
-// One place for how far apart (milliseconds of real time) the AI calls nobody typed for may be. It sets the PACE only: a
-// sitting is not cut off after so many (the old, generous limits of each kind stay as they were, as a safety net).
-//   a plan: about 1.2 cents, and about 5 cents more if they build something (its picture)     at least 90 s apart
-//   a marvel: about 1.2 cents                                                                 at least 2 min apart
-//   the pond's own event: about 1.7 cents                                                     at least 5 min apart
-//   the wish, looked at: about 0.35 cents                                                     once a minute
-// Plans and marvels are spaced by GENERATIONS (what happens in a pond is measured in generations), so these gaps only stop two being asked for at once;
-// the rest keep real time.
+// ── A budget for every thing the AI does ──
+// Each kind of AI work has its own budget in dollars FOR THIS POND (what a pond has spent is kept in its save, G.ai.life).
+// When a kind has used its budget it stops, in this pond, for good: nothing more is asked of the AI for it, the place where
+// it shows says so, and it is marked OFF in the costs sheet (the $ chip, top right). A new pond starts with full budgets.
+// The numbers are in one table, here. The server's prices decide what a call costs; this only decides when to stop.
 (function () {
   'use strict';
   if (!G.ai) return;
-  const g = G.ai.gaps, c = G.ai.caps;
+  const A = G.ai;
+  //                 dollars for one pond            what one call costs, roughly
+  A.budget = {
+    thing: 0.40,     // things you type in ADD                     1-2 cents
+    figure: 0.80,    // the picture of a typed thing or a monument  4-6 cents
+    event: 0.40,     // world events you type in WORLD              2 cents
+    nature: 0.25,    // events the pond causes by itself            1.7 cents
+    deed: 0.40,      // plans the creatures make                    1.2 cents
+    marvel: 0.40,    // rare marvels                                1.2 cents
+    icon: 0.50,      // a marvel's picture
+    voice: 0.30,     // a line spoken aloud                         13 cents
+    sound: 0.15,
+    wish: 0.10,      // dreaming a wish                             0.4 cents
+    wishcheck: 0.30, // looking whether the wish came true          0.35 cents
+    watch: 0.50,     // the watcher grading living creatures        0.4 cents
+    judge: 0.30, check: 0.10,
+    organ: 0.20, design: 0.20, plan: 0.20, paint: 0.15, story: 0.25, ideas: 0.10,
+  };
+  A.budgetDefault = 0.20;
+  const ALIAS = { 'mutation-ideas': 'ideas' };
+  const key = function (k) { return ALIAS[k] || k; };
+  A.budgetOf = function (kind) { const b = A.budget[key(kind)]; return typeof b === 'number' ? b : A.budgetDefault; };
+  A.spentOn = function (kind) { const L = A.life[key(kind)]; return L ? L.usd || 0 : 0; };
+  /** has this kind used up its budget in this pond? */
+  A.over = function (kind) { return A.spentOn(kind) >= A.budgetOf(kind) - 1e-9; };
+
+  // 1. nothing automatic is asked for once its budget is used
+  const allow0 = A.allow;
+  A.allow = function (kind) { if (A.over(kind)) return false; return allow0(kind); };
+  // 2. what the player types (a thing, a world event) is refused with a clear reason, not quietly made up without the AI
+  const ask0 = A.ask;
+  A.ask = function (task, input, schema) {
+    const kind = task === 'event' && input && typeof input === 'object' && input.auto ? 'nature' : task;
+    if ((kind === 'thing' || kind === 'event') && A.provider === 'server' && A.over(kind)) { const e = new Error('budget'); e.budget = true; e.kind = kind; return Promise.reject(e); }
+    return ask0(task, input, schema);
+  };
+  // 3. the moment a budget runs out, say so once
+  let told = {};
+  const tally0 = A.tally;
+  A.tally = function (kind, source, usd) {
+    tally0(kind, source, usd);
+    const k = key(kind);
+    if (!told[k] && A.over(k)) { told[k] = 1; const name = A.LABEL[k] || k; if (G.note) G.note('A budget is used up', name + ' has used its ' + A.money(A.budgetOf(k)) + ' for this pond, so it is off now. See the $ chip for all of them.'); if (G.log) G.log('sel', 'Budget used up', name + ': ' + A.money(A.budgetOf(k)) + ' for this pond. It is off now.'); G.emit('budget-out', k); mark(); }
+  };
+  G.on('new-pond', function () { told = {}; setTimeout(mark, 50); });
+
+  // 4. it shows: ADD and WORLD are dimmed and badged when they can no longer ask
+  function mark() {
+    if (typeof document === 'undefined') return;
+    const B = document.querySelectorAll('#toolbar button'); if (!B.length) return;
+    for (let i = 0; i < B.length; i++) { const b = B[i], t = (b.textContent || '').trim().toUpperCase(), kind = t.indexOf('ADD') === 0 ? 'thing' : t.indexOf('WORLD') === 0 ? 'event' : '';
+      if (!kind) continue; const off = A.provider === 'server' && A.over(kind);
+      b.style.opacity = off ? '0.45' : ''; b.title = off ? 'Off: its budget for this pond is used up' : '';
+      let tag = b.querySelector('.boff'); if (off && !tag) { tag = document.createElement('i'); tag.className = 'boff'; tag.textContent = 'OFF'; tag.style.cssText = 'font:800 8.5px system-ui,sans-serif;font-style:normal;letter-spacing:.08em;color:#ff9db0;margin-left:5px'; b.appendChild(tag); } else if (!off && tag) tag.remove(); }
+  }
+  if (typeof setInterval !== 'undefined' && typeof document !== 'undefined') setInterval(mark, 3000);
+
+  // the pace of the automatic ones (milliseconds of real time between two of a kind)
+  const g = A.gaps, c = A.caps;
   g.deed = 8000; c.deed = 40;      // plans and marvels are spaced by GENERATIONS (see 54_deeds.js and 46b_marvels.js); this only stops two being asked for at once
   g.marvel = 8000;
   g.nature = 300000;

@@ -201,7 +201,7 @@
           const W0 = G.W; W0.evShelf = (W0.evShelf || []).filter(function (e) { return e.name.toLowerCase() !== ev.name.toLowerCase(); }); W0.evShelf.push(JSON.parse(JSON.stringify(ev))); if (W0.evShelf.length > 10) W0.evShelf.shift(); G.markDirty();
         }
         closePop();
-      }, function (err) { evMsg.textContent = err && err.refused ? 'The pond will not do that. Try another.' : 'Nothing happened. Try again.'; });
+      }, function (err) { evMsg.textContent = err && err.budget ? 'World events have used their budget for this pond, so they are off. A new pond starts with a full budget.' : err && err.refused ? 'The pond will not do that. Try another.' : 'Nothing happened. Try again.'; });
     };
     evIn.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); evGo(); } else if (e.key === 'Escape') { evIn.blur(); closePop(); } e.stopPropagation(); };
     el('h3', '', 'DISASTERS', pop).style.marginTop = '10px';
@@ -257,7 +257,7 @@
         (G.figureFor ? G.figureFor({ name: info.name, note: info.note, hue: info.hue, wall: wall }, w) : Promise.resolve(null)).then(fin, fin);
       }, function (err) {
         making('');
-        const msg = err && err.refused ? 'The pond cannot take that word. Try another.' : 'The pond could not make sense of that. Try again.';
+        const msg = err && err.budget ? 'Adding things has used its budget for this pond, so it is off. A new pond starts with a full budget.' : err && err.refused ? 'The pond cannot take that word. Try another.' : 'The pond could not make sense of that. Try again.';
         if (open()) $('thing').innerHTML = '<div class="thingcard">' + msg + '</div>'; else if (G.toast) G.toast(msg);
       });
     };

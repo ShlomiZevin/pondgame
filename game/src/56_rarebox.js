@@ -93,7 +93,8 @@
     const d = W.deed, dn = d ? W.cre.filter(function (c) { return c.deedId === d.id && !c.dead; }).length : 0;
     const Wk = W.works || [], Pa = W.deedPast || [];
     const s2 = order.map(function (id) { return id + ':' + by[id].n; }).join(',') + '|' + (d ? d.id + ':' + d.i + ':' + dn + ':' + Math.round(d.progress * 20) + ':' + Math.round((d.steps[d.i].secs - d.t) / 2) : '') + '|' + Wk.map(function (w) { return w.name + (w.fig ? 1 : 0); }).join(',') + '|' + Pa.length + ':' + (Pa.length ? Pa[Pa.length - 1].gen : 0);
-    if (s2 + shut + tab + open === sig) return; sig = s2 + shut + tab + open; box.classList.toggle('shut', shut);
+    const bo = G.ai.over ? '' + G.ai.over('deed') + G.ai.over('marvel') : '';
+    if (s2 + shut + tab + open + bo === sig) return; sig = s2 + shut + tab + open + bo; box.classList.toggle('shut', shut);
     const chips = [order.length ? order.length + (order.length === 1 ? ' marvel' : ' marvels') : '', d ? 'a plan' : '', Wk.length ? Wk.length + ' built' : ''].filter(Boolean);
     let fresh = false, h = '<div class="rk" title="' + (shut ? 'Open' : 'Fold away') + '"><span>★ Rare' + (shut ? '' : ' in this pond') + '</span><span class="rc">' + chips.map(function (c) { return '<em>' + c + '</em>'; }).join('') + '<u>' + (shut ? '▸' : '▾') + '</u></span></div>';
     if (shut) { for (let i = 0; i < order.length; i++) if (!seen['m' + order[i]]) { seen['m' + order[i]] = 1; fresh = true; } if (d && !seen['d' + d.id]) { seen['d' + d.id] = 1; fresh = true; } box.innerHTML = h; if (fresh) { box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash'); } return; }
@@ -115,6 +116,7 @@
     if (Pa.length && P) h += '<div class="rh">Earlier plans</div>';
     for (let i = Pa.length - 1; i >= 0 && i >= Pa.length - 3 && P; i--) { const p = Pa[i];
       h += '<div class="rrow old" data-go="p' + i + '"><span class="ric">' + (p.how === 'done' ? '✓' : '✕') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(p.title) + '</b><span class="rtag' + (p.how === 'done' ? '' : ' no') + '">' + (p.how === 'done' ? 'done' : 'gave up') + ' · gen ' + p.gen + '</span></span><div class="rsub">' + chip(p.kind, p.hue) + ' ' + (p.what ? names('set out to ' + p.what.replace(/\.$/, '') + '.') : names(p.say)) + '</div></span></div>'; }
+    if (G.ai.over && G.ai.provider === 'server') { if (P && G.ai.over('deed')) h += '<div class="rnone" style="color:#ff9db0">New plans are OFF: their budget for this pond is used up.</div>'; if (!P && G.ai.over('marvel')) h += '<div class="rnone" style="color:#ff9db0">New marvels are OFF: their budget for this pond is used up.</div>'; }
     if (P && !d) h += '<div class="rnone">' + (Wk.length || Pa.length ? 'No plan under way just now.' : 'No plan yet. Every few minutes a kind of creature decides to do something together: build, march, meet. It shows here.') + '</div>';
     if (!P && !order.length) h += '<div class="rnone">No marvel alive just now. Every few minutes a creature is born with a rare gift. It shows here, and a click takes you to it.</div>';
     box.innerHTML = h;
