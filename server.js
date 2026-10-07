@@ -198,6 +198,7 @@ function createApp(opts = {}) {
     }
     if (route === 'POST /api/ai/marvel') {
       const body = await readJson(req, 8000);
+      body.recorded = sounds.lines(10);      // lines that already have a real recorded voice: a talking marvel may reuse some (see MARVEL_SYSTEM)
       const r = await ai.marvel(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr });
       return send(res, 200, r);
     }

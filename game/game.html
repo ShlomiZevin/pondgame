@@ -5733,7 +5733,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     }
     lastPlay = t0;
     try { PXS.play(key, { volume: 0.5, pan: pan }); } catch (e) { console.error(e); }
-    if (G.VOICE_REAL && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.sound !== false && String(word).length <= 12 && Math.random() < G.VOICE_ODDS) realLine(c, word, mv, key);
+    if (G.VOICE_REAL && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.sound !== false && String(word).length <= 40 && Math.random() < G.VOICE_ODDS) realLine(c, word, mv, key);
   });
   // the real thing: rare and short (see above); G.ai.gaps.voice keeps it to one new line every five minutes at most
   function realLine(c, word, mv, babbleKey) {
@@ -5747,7 +5747,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     };
     // a new line, made and paid for: only some of the time, and within the gap and the budget
     const fresh = function () {
-      if (Math.random() >= G.VOICE_NEW_ODDS || !G.ai.allow('voice')) { made[key] = 'missing'; return; }
+      if (String(word).length > 12 || Math.random() >= G.VOICE_NEW_ODDS || !G.ai.allow('voice'))      /* a NEW line is only ever a short one */ { made[key] = 'missing'; return; }
       made[key] = 'asked';
       G.host.call('ai.voice', { text: word, tone: tone }, 60000).then(function (r) { G.ai.tally('voice', r && (r.source === 'leonardo' ? 'leonardo' : r.source), r && r.usd); if (!take(r)) made[key] = 'none'; }, function () { made[key] = 'none'; });
     };
