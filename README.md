@@ -260,3 +260,7 @@ The pond grows when bodies cover more than about a twelfth of the water (`src/57
 ## A budget for every kind of AI work
 
 `src/69_budget.js` holds one table, `G.ai.budget`: dollars per pond for each kind (things typed, world events, the pond's own events, plans, marvels, pictures, the watcher, wish checks, ...). What a pond has spent is kept in its save (`G.ai.life`). When a kind has used its budget it is OFF in that pond: automatic kinds are no longer asked (`G.ai.allow`), what the player types is refused with the reason, ADD / WORLD are dimmed with an OFF badge, the rare box and the wish card say so, and the costs sheet shows each budget with a bar. A new pond starts with full budgets. Test (no AI asked): `node scripts/budget.js`.
+
+## Away: the pond stops
+
+The pond's clock runs only while the player watches. Closing the game or leaving the tab no longer makes it catch up, and the server no longer lives the time for it: `GET /api/pond` returns the save as it was left and `POST /api/tick` advances nothing. The old behaviour is kept behind a switch: `PRIMORDIA_AWAY=1` on the server (or `away: true` to `createApp`), and `G.awayLives = true` in the game. Test: `node scripts/away.js`.

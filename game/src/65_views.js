@@ -310,7 +310,7 @@
       (A.fuel !== null ? '<small style="display:block;margin-top:6px">Fuel left: <b>' + A.fuel + '</b> paid answers.</small>' : '') +
       '<h3 style="font-size:11px;letter-spacing:.16em;margin:12px 0 4px;color:var(--gold)">LATEST PAID ANSWERS</h3>' + (last || '<small>None yet this session.</small>') +
       '<h3 style="font-size:11px;letter-spacing:.16em;margin:12px 0 4px;color:var(--gold)">THE SERVER’S OWN BOOKS</h3><div id="costBooks"><small>Asking the server…</small></div>' +
-      '<small style="display:block;margin-top:10px">Running the pond faster does not cost more: it asks by the clock, not by the generation.</small>' +
+      '<small style="display:block;margin-top:10px">Plans and marvels come by the generation, so a faster pond asks for them sooner; each kind stops at its budget.</small>' +
       '<div class="actions" style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" id="costClose">CLOSE</button></div></div>');
     $('costClose').onclick = function () { closeModal(); };
     // the server keeps its own account of every call it made, for every player, with the prices it used: shown as it is

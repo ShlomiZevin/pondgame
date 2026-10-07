@@ -88,7 +88,7 @@ function createApp(opts = {}) {
   const icons = opts.icons || createIcons({ store, apiKey: opts.leonardoKey });
   const iconLimiter = createLimiter(Number(process.env.PRIMORDIA_ICONS_PER_HOUR) || 12);
   const soundLimiter = createLimiter(opts.soundsPerHour || Number(process.env.PRIMORDIA_SOUNDS_PER_HOUR) || 20);
-  const ponds = createPonds({ store, now: opts.now });
+  const ponds = createPonds({ store, now: opts.now, away: opts.away });
   const whoIs = opts.whoIs || defaultWhoIs;
   const limiter = createLimiter(opts.perHour || Number(process.env.PRIMORDIA_AI_PER_HOUR) || 240);
   const adminKey = opts.adminKey !== undefined ? opts.adminKey : process.env.PRIMORDIA_ADMIN;

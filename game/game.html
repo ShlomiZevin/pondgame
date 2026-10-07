@@ -9612,7 +9612,7 @@ G.addSystem({
       (A.fuel !== null ? '<small style="display:block;margin-top:6px">Fuel left: <b>' + A.fuel + '</b> paid answers.</small>' : '') +
       '<h3 style="font-size:11px;letter-spacing:.16em;margin:12px 0 4px;color:var(--gold)">LATEST PAID ANSWERS</h3>' + (last || '<small>None yet this session.</small>') +
       '<h3 style="font-size:11px;letter-spacing:.16em;margin:12px 0 4px;color:var(--gold)">THE SERVER’S OWN BOOKS</h3><div id="costBooks"><small>Asking the server…</small></div>' +
-      '<small style="display:block;margin-top:10px">Running the pond faster does not cost more: it asks by the clock, not by the generation.</small>' +
+      '<small style="display:block;margin-top:10px">Plans and marvels come by the generation, so a faster pond asks for them sooner; each kind stops at its budget.</small>' +
       '<div class="actions" style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" id="costClose">CLOSE</button></div></div>');
     $('costClose').onclick = function () { closeModal(); };
     // the server keeps its own account of every call it made, for every player, with the prices it used: shown as it is
@@ -9815,9 +9815,10 @@ G.addSystem({
 
 </script>
 <script data-part="away">
-// ── The pond keeps living while you are away. You come back as nature. ──
-// A page cannot run when it is closed, so on return the pond catches up: the time you were gone is
-// simulated (up to a cap) with the same rules, and a short report says what happened.
+// ── While you are away the pond stops. ──
+// Its clock runs only while you watch: close the game or leave the tab and it comes back exactly as you left it. (It used
+// to catch up, living the time you were gone by itself, but most of what happens in a pond is imagined by the AI while you
+// watch, so time lived without it was not the same pond.) The catching-up below is kept, switched off: G.awayLives = true brings it back.
 (function () {
   'use strict';
   const el = G.el, $ = G.$, esc = G.escapeHtml;
@@ -9825,10 +9826,11 @@ G.addSystem({
   const MIN_AWAY = 25;                // seconds; shorter than this is just looking away
   let job = null, hiddenAt = 0;
   G.catching = false;
+  G.awayLives = false;
 
   G.startCatchUp = function (seconds, label) {
     const W = G.W;
-    if (!W || W.title || W.extinct || !(seconds >= MIN_AWAY)) return false;
+    if (!G.awayLives || !W || W.title || W.extinct || !(seconds >= MIN_AWAY)) return false;
     const target = Math.min(seconds, MAX_AWAY);
     job = {
       target: target, done: 0, real: seconds, label: label || 'away',

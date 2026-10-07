@@ -114,11 +114,25 @@ test('http: the model is only called as often as the limit allows', async () => 
   });
 });
 
-test('http: a pond is stored, and lives while the player is away', async () => {
+test('http: while the player is away the pond stops: it comes back as it was left', async () => {
+  const save = makeSave(3);
+  let clock = save.at;
+  await withApp({ callModel: null, now: () => clock, adminKey: 'sekret' }, async ({ call }) => {
+    assert.equal((await call('PUT', '/api/pond', { save })).status, 200);
+    clock = save.at + 3600 * 1000;      // an hour later
+    const got = await (await call('GET', '/api/pond')).json();
+    assert.equal(got.report, null);
+    assert.equal(got.save.gen, save.gen);
+    assert.equal(got.save.at, save.at);
+    assert.equal((await (await call('POST', '/api/tick', {}, { 'x-admin': 'sekret' })).json()).advanced, 0);
+  });
+});
+
+test('http: with away switched on, a pond is stored and lives while the player is away', async () => {
   const save = makeSave(3);
   assert.equal(save.v, 1);
   let clock = save.at;
-  await withApp({ callModel: null, now: () => clock }, async ({ call }) => {
+  await withApp({ callModel: null, now: () => clock, away: true }, async ({ call }) => {
     assert.deepEqual(await (await call('GET', '/api/pond')).json(), { save: null, report: null });
     assert.equal((await call('PUT', '/api/pond', { save: { v: 2 } })).status, 400);
     assert.equal((await call('PUT', '/api/pond', { save })).status, 200);
@@ -137,10 +151,10 @@ test('http: a pond is stored, and lives while the player is away', async () => {
   });
 });
 
-test('http: tick advances idle ponds, and only for the admin', async () => {
+test('http: with away switched on, tick advances idle ponds, and only for the admin', async () => {
   const save = makeSave(2, 11);
   let clock = save.at;
-  await withApp({ callModel: null, now: () => clock, adminKey: 'sekret' }, async ({ call, app }) => {
+  await withApp({ callModel: null, now: () => clock, adminKey: 'sekret', away: true }, async ({ call, app }) => {
     await call('PUT', '/api/pond', { save });
     clock = save.at + 30 * 60 * 1000;
     assert.equal((await call('POST', '/api/tick', {})).status, 403);

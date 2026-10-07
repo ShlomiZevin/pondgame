@@ -1,6 +1,7 @@
-// ── The pond keeps living while you are away. You come back as nature. ──
-// A page cannot run when it is closed, so on return the pond catches up: the time you were gone is
-// simulated (up to a cap) with the same rules, and a short report says what happened.
+// ── While you are away the pond stops. ──
+// Its clock runs only while you watch: close the game or leave the tab and it comes back exactly as you left it. (It used
+// to catch up, living the time you were gone by itself, but most of what happens in a pond is imagined by the AI while you
+// watch, so time lived without it was not the same pond.) The catching-up below is kept, switched off: G.awayLives = true brings it back.
 (function () {
   'use strict';
   const el = G.el, $ = G.$, esc = G.escapeHtml;
@@ -8,10 +9,11 @@
   const MIN_AWAY = 25;                // seconds; shorter than this is just looking away
   let job = null, hiddenAt = 0;
   G.catching = false;
+  G.awayLives = false;
 
   G.startCatchUp = function (seconds, label) {
     const W = G.W;
-    if (!W || W.title || W.extinct || !(seconds >= MIN_AWAY)) return false;
+    if (!G.awayLives || !W || W.title || W.extinct || !(seconds >= MIN_AWAY)) return false;
     const target = Math.min(seconds, MAX_AWAY);
     job = {
       target: target, done: 0, real: seconds, label: label || 'away',
