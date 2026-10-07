@@ -98,8 +98,8 @@
     try { const raw = localStorage.getItem(MIRROR); if (!raw) return d; const m = JSON.parse(raw); if (G.validSave(m) && m.seed === d.seed && Number(m.at) > Number(d.at || 0)) return m; } catch (e) { /* unreadable: use the host's */ }
     return d;
   };
-  setInterval(function () { try { if (G.mode === 'play' && G.W && !G.W.title && !document.hidden && G.speed > 0 && !G.isBlocked()) { const d = collect(); if (d) mirror(d); } } catch (e) { console.error(e); } }, 6000);
-  document.addEventListener('visibilitychange', function () { if (document.hidden && G.mode === 'play') { try { const d = collect(); if (d) mirror(d); } catch (e) { console.error(e); } } });
+  if (typeof document !== 'undefined') setInterval(function () { try { if (G.mode === 'play' && G.W && !G.W.title && !document.hidden && G.speed > 0 && !G.isBlocked()) { const d = collect(); if (d) mirror(d); } } catch (e) { console.error(e); } }, 6000);
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', function () { if (document.hidden && G.mode === 'play') { try { const d = collect(); if (d) mirror(d); } catch (e) { console.error(e); } } });
 
   // ── every creature fits ──
   // A save has to stay under 100 kB, and written out plainly a creature takes about 700 characters: only some 50 of a pond's 130 fitted, so a pond
