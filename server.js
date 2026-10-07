@@ -178,8 +178,8 @@ function createApp(opts = {}) {
       const text = String(body.text || '').trim().slice(0, 40);
       if (!text) return send(res, 400, { error: 'empty' });
       if (ai.refused(text)) return send(res, 422, { error: 'refused' });
-      const r = await sounds.speak(text, String(body.tone || ''), { canGenerate: () => soundLimiter.take(who), onError: (e) => console.error('speech failed:', e.message) });
-      return send(res, r.error ? (r.error === 'no_sound' ? 404 : 503) : 200, r);
+      const r = await sounds.speak(text, String(body.tone || ''), { libraryOnly: !!body.libraryOnly, canGenerate: () => soundLimiter.take(who), onError: (e) => console.error('speech failed:', e.message) });
+      return send(res, r.error ? (r.error === 'no_sound' || r.error === 'no_line_yet' ? 404 : 503) : 200, r);
     }
     if (route === 'POST /api/ai/thing') {
       const body = await readJson(req, 2000);

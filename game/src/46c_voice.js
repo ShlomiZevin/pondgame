@@ -2,12 +2,17 @@
 // When a marvel speaks, its line appears over its head, and here it is also HEARD, for nothing: the words are turned into a short
 // babble made on the spot (a tiny voice synth: syllables follow the word, a vowel colours each one, the pitch follows the creature's size,
 // the tone follows the voice the marvel was given), kept as a sound and played through Plaxzy Sound, so mute and volume work as for
-// everything else. A real spoken line from a speech model is the dear part (about thirteen cents a line), so it is RARE and SHORT: only a very short
-// line, at most once every five minutes of play, and then only some of the time; a line once made is kept and costs nothing again.
+// everything else. A real spoken line from a speech model is the dear part (about thirteen cents a line), so there are two chances, one after the other:
+//   1. the chance that a short line is spoken for real at all (G.VOICE_ODDS). The server's repository of lines already spoken is asked first, and that
+//      is free: the same words said before, by anyone, in any voice, are simply reused. The repository grows with every line ever made.
+//   2. only when the repository has no such line: the chance that a NEW one is made and paid for (G.VOICE_NEW_ODDS), at most one every five minutes
+//      of play and within the pond's voice budget. It then joins the repository for good.
 (function () {
   'use strict';
   if (typeof window === 'undefined') return;
   G.VOICE_REAL = true;
+  G.VOICE_ODDS = 0.5;          // a short line is spoken for real this often, when the repository has it (free)
+  G.VOICE_NEW_ODDS = 0.15;     // and this often a line the repository lacks is made new (paid)
   if (G.ai) { G.ai.gaps.voice = 300000; G.ai.caps.voice = 12; G.ai.LABEL.voice = 'Creatures speaking aloud (Leonardo: rare and short)'; G.ai.lastAt.voice = Date.now(); }      // the first real line waits its five minutes too
   const made = {};           // key → 'ready' | 'none' | 'asked'
   let lastPlay = 0;
@@ -47,19 +52,26 @@
     }
     lastPlay = t0;
     try { PXS.play(key, { volume: 0.5, pan: pan }); } catch (e) { console.error(e); }
-    if (G.VOICE_REAL && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.sound !== false && String(word).length <= 12 && Math.random() < 0.35) realLine(c, word, mv, key);
+    if (G.VOICE_REAL && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.sound !== false && String(word).length <= 12 && Math.random() < G.VOICE_ODDS) realLine(c, word, mv, key);
   });
   // the real thing: rare and short (see above); G.ai.gaps.voice keeps it to one new line every five minutes at most
   function realLine(c, word, mv, babbleKey) {
     const tone = (mv.voice && mv.voice.tone) || 'bright', speed = (mv.voice && mv.voice.speed) || 1.25, key = 'say:' + tone + ':' + String(word).toLowerCase();
     if (made[key] === 'ready') { try { PXS.play(key, { speed: speed, rate: speed, volume: 0.9 }); } catch (e) { console.error(e); } return; }
-    if (made[key] || !G.ai.allow('voice')) return;
-    made[key] = 'asked';
-    G.host.call('ai.voice', { text: word, tone: tone }, 60000).then(function (r) {
-      G.ai.tally('voice', r && (r.source === 'leonardo' ? 'leonardo' : r.source), r && r.usd);
-      if (!r || !r.sound || !/^audio\/(mpeg|wav|ogg|mp4)$/.test(r.sound.mime) || typeof r.sound.b64 !== 'string' || r.sound.b64.length > 600000) { made[key] = 'none'; return; }
+    if (made[key] === 'asked' || made[key] === 'none') return;
+    const take = function (r) {
+      if (!r || !r.sound || !/^audio\/(mpeg|wav|ogg|mp4)$/.test(r.sound.mime) || typeof r.sound.b64 !== 'string' || r.sound.b64.length > 600000) return false;
       const def = {}; def[key] = 'data:' + r.sound.mime + ';base64,' + r.sound.b64;
-      try { PXS.define(def); made[key] = 'ready'; if (c.say && !c.dead && c.say.w === word) PXS.play(key, { speed: speed, rate: speed, volume: 0.9 }); } catch (e) { made[key] = 'none'; console.error(e); }
-    }, function () { made[key] = 'none'; });
+      try { PXS.define(def); made[key] = 'ready'; if (c.say && !c.dead && c.say.w === word) PXS.play(key, { speed: speed, rate: speed, volume: 0.9 }); return true; } catch (e) { console.error(e); return false; }
+    };
+    // a new line, made and paid for: only some of the time, and within the gap and the budget
+    const fresh = function () {
+      if (Math.random() >= G.VOICE_NEW_ODDS || !G.ai.allow('voice')) { made[key] = 'missing'; return; }
+      made[key] = 'asked';
+      G.host.call('ai.voice', { text: word, tone: tone }, 60000).then(function (r) { G.ai.tally('voice', r && (r.source === 'leonardo' ? 'leonardo' : r.source), r && r.usd); if (!take(r)) made[key] = 'none'; }, function () { made[key] = 'none'; });
+    };
+    if (made[key] === 'missing') { fresh(); return; }      // the repository was asked before and had nothing
+    made[key] = 'asked';
+    G.host.call('ai.voice', { text: word, tone: tone, libraryOnly: true }, 30000).then(function (r) { if (take(r)) { G.voiceReused = (G.voiceReused || 0) + 1; return; } fresh(); }, function () { fresh(); });
   }
 })();
