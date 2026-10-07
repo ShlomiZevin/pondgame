@@ -232,10 +232,10 @@
       });
     }
     // a safe garden for the marvels, offered while there is a marvel to save and no garden yet
-    if (G.marvelsAlive && G.marvelsAlive() > 0 && G.HAVEN && !G.havenOf()) {
+    if (G.marvelsAlive && G.marvelsAlive() > 0 && G.HAVEN) {
       const hb = el('button', 'chip', '★ Marvel Garden', chips); hb.title = G.HAVEN.note; hb.style.cssText = 'border-color:rgba(246,211,101,.8);color:#ffe9a8;background:rgba(246,211,101,.12)';
       hb.onclick = function () { G.sfx('click'); G.beginPlacing(JSON.parse(JSON.stringify(G.HAVEN))); closePop(); };
-      el('div', '', 'You have a marvel. Add a <b style="color:#f6d365">Marvel Garden</b> to keep it alive longer: it is free, marvels go to it, and their children there are often marvels too.', chips).style.cssText = 'flex-basis:100%;font-size:11.5px;line-height:1.4;color:#dcecff;margin:2px 2px 4px';
+      el('div', '', 'You have a marvel. Add a <b style="color:#f6d365">Marvel Garden</b> to keep it alive longer: it is free, it shelters up to 3 marvels at a time, and their children there are often marvels too. Typing garden, sanctuary or nest makes one as well.', chips).style.cssText = 'flex-basis:100%;font-size:11.5px;line-height:1.4;color:#dcecff;margin:2px 2px 4px';
     }
     const pool = SUGGEST.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 7);
     pool.forEach(function (w) { const c = el('button', 'chip', w, chips); c.onclick = function () { inp.value = w; submit(); }; });
@@ -243,6 +243,7 @@
       const w = inp.value.trim();
       if (!w) return;
       G.sfx('click');
+      { const hv = G.havenWord ? G.havenWord(w) : null; if (hv) { G.beginPlacing(hv); closePop(); return; } }      // a garden, a sanctuary, a nest: a safe place for the marvels
       const open = function () { return UI.popName === 'add' && $('thing'); };
       const dots = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-right:8px;animation:wishp 1s ease-in-out infinite"></span>';
       const making = function (text) { let m = $('making'); if (!text) { if (m) m.classList.add('hide'); return; } if (!m) { m = el('div', 'glass', '', $('ui')); m.id = 'making'; m.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:124px;z-index:7;padding:8px 14px;border-radius:999px;font-size:12px;pointer-events:none;white-space:nowrap;max-width:calc(100vw - 28px);overflow:hidden;text-overflow:ellipsis'; } m.classList.remove('hide'); m.innerHTML = dots + text; };

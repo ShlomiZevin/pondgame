@@ -107,6 +107,7 @@
       const does = p.deadly > 0.05 ? 'kills at a touch' : p.eats > 0.05 ? 'eats creatures' : p.poison > 0.05 ? 'poisons' : 'burns', taken = (z.deaths || 0) + (p.eats > 0.05 ? (z.ate || 0) : 0);
       return { t: does + (taken ? ' · ' + taken + ' taken' : '') + (z.hurtN ? ' · hurting ' + z.hurtN : '') + (z.atk ? ' · ' + z.atk + ' fighting back' : ' · weak to ' + w), tone: z.atk ? 'fight' : 'bad', bar: z.alive > 0.25 ? G.clamp(z.health, 0, 1) : G.clamp(z.life / (z.life0 || 120), 0, 1) };
     }
+    if (z.haven) { const n = Math.min(G.HAVEN_ROOM || 3, Math.max(z.hvPrev || 0, z.hvNow || 0)); return { t: 'shelters marvels · ' + n + ' of ' + (G.HAVEN_ROOM || 3) + ' places taken', tone: 'good', bar: null }; }
     if (p.nut > 0.2) { const u = G.usedBy ? G.usedBy(z) : null; return { t: 'feeds the pond' + (u ? ' · ' + pct(u.can) + ' can eat it' : '') + (z.near ? ' · ' + z.near + ' here' : ''), tone: 'good', bar: null }; }
     const what = Math.abs(p.heat) > 0.3 ? (p.heat > 0 ? 'warms the water' : 'chills the water') : Math.abs(p.light) > 0.3 ? (p.light > 0 ? 'lights the water' : 'darkens the water') : p.sticky > 0.3 ? 'slows what touches it' : p.pull ? (p.pull > 0 ? 'draws creatures in' : 'drives creatures away') : p.hard > 0.3 ? 'blocks the way' : 'drifts';
     return { t: what + (z.near ? ' · ' + z.near + ' here' : ''), tone: 'calm', bar: null };

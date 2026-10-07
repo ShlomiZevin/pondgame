@@ -118,9 +118,9 @@
       if (ask) { big = 'A kind is making up its mind'; small = 'A new plan is being thought up right now. It starts here in a moment.'; cls = 'ask'; }
       else if (off) { big = 'No new plans'; small = 'The budget for plans in this pond is used up. Raise it in the costs window to get plans again.'; cls = 'off'; }
       else if (W.gen < from) { big = 'No plan yet'; small = 'Plans start at generation ' + from + ' (now ' + W.gen + '). Then a kind of creature may decide to do something together: build, march, meet.'; }
-      else if (G.speed > 16) { big = 'No plan right now'; small = 'No plan starts while time runs this fast, because it could not be watched. Slow down to get plans.'; }
-      else { const od = G.deedOdds ? G.deedOdds() : 0.125; big = 'No plan right now'; small = 'One can start when any generation ends: about 1 chance in ' + Math.max(2, Math.round(1 / od)) + ' now. Bigger brains and bodies plan together more often.' + (last !== undefined && Pa.length ? ' The last one began in generation ' + last + ', ' + (W.gen - last) + (W.gen - last === 1 ? ' generation' : ' generations') + ' ago.' : ''); }
-      h += '<div class="rh">Happening now</div><div class="rrow idle ' + cls + '"><span class="ric">' + (cls === 'ask' ? '…' : '⚑') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + big + '</b><span class="rtag ' + (cls === 'off' ? 'no' : 'wait') + '">' + (cls === 'ask' ? 'starting' : cls === 'off' ? 'off' : 'waiting') + '</span></span><div class="rsub">' + small + '</div></span></div>';
+      else if (G.speed > 16) { big = 'No plan under way just now'; small = 'No plan starts while time runs this fast, because it could not be watched. Slow down to get plans.'; }
+      else { const od = G.deedOdds ? G.deedOdds() : 0.125; big = 'No plan under way just now'; small = 'One can start when any generation ends: about 1 chance in ' + Math.max(2, Math.round(1 / od)) + ' now. Bigger brains and bodies plan together more often.' + (last !== undefined && Pa.length ? ' The last one began in generation ' + last + ', ' + (W.gen - last) + (W.gen - last === 1 ? ' generation' : ' generations') + ' ago.' : ''); }
+      h += '<div class="rnone"' + (cls === 'off' ? ' style="color:#ff9db0"' : '') + '>' + big + '. ' + small + '</div>';
     }
     if (Wk.length && P) h += '<div class="rh">They built · ' + Wk.length + '</div>';
     for (let i = Wk.length - 1; i >= 0 && P; i--) { const w = Wk[i], pic = w.fig && G.figurePic && G.figurePic(w.name), fl = (W.fields || []).filter(function (f) { return f.id === w.field; })[0];
@@ -129,7 +129,7 @@
     for (let i = Pa.length - 1; i >= 0 && i >= Pa.length - 3 && P; i--) { const p = Pa[i];
       h += '<div class="rrow old" data-go="p' + i + '"><span class="ric">' + (p.how === 'done' ? '✓' : '✕') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(p.title) + '</b><span class="rtag' + (p.how === 'done' ? '' : ' no') + '">' + (p.how === 'done' ? 'done' : 'gave up') + ' · gen ' + p.gen + '</span></span><div class="rsub">' + chip(p.kind, p.hue) + ' ' + (p.what ? names('set out to ' + p.what.replace(/\.$/, '') + '.') : names(p.say)) + '</div></span></div>'; }
     if (G.ai.over && G.ai.provider === 'server') { if (P && G.ai.over('deed') && d) h += '<div class="rnone" style="color:#ff9db0">New plans are OFF: their budget for this pond is used up.</div>'; if (!P && G.ai.over('marvel')) h += '<div class="rnone" style="color:#ff9db0">New marvels are OFF: their budget for this pond is used up.</div>'; }
-    if (!P && !order.length) h += '<div class="rnone">No marvel alive just now. Every few minutes a creature is born with a rare gift. It shows here, and a click takes you to it.</div>';
+    if (!P && !order.length) h += '<div class="rnone">No marvel alive just now. Once in many generations a creature is born with a rare gift. It shows here, and a click takes you to it.</div>';
     box.innerHTML = h;
     if (fresh) { box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash'); }
   }
