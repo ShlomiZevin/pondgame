@@ -98,7 +98,7 @@
     // a body of its own: a head set on a torso, or one body with a clear front and back that holds together
     let torso = 0; for (let i = 0; i < M.length; i++) if (i !== f.bd.e && !M[i].pr) torso = Math.max(torso, M[i].s);
     const head = M.length >= 2 && torso >= M[f.bd.e].s * 0.8 ? 1 : M.length >= 2 && torso > 0 ? 0.6 : side && bm.asp > 1.15 ? 0.8 : 0.2;
-    const busy = BD.busy(f), tidy = busy <= 6.5 ? 1 : Math.max(0, 1 - (busy - 6.5) * 0.25);
+    const busy = BD.busy(f), tidy = busy <= 6.5 + F.room() ? 1 : Math.max(0, 1 - (busy - 6.5 - F.room()) * 0.25);
     const parts = [['a face (eyes)', 0.15, face], ['a mouth of its own', 0.04, f.mk || f.sm > 0.4 ? 1 : 0.3], ['a way of getting about', 0.24, mover], ['the parts that finish a creature of its sort', 0.3, Math.min(1, organs / 3.5)], ['a body of its own', 0.12, head], ['all of it holding together, nothing piled on', 0.05, tidy]];
     let v = 0.1 - (bm.hollow ? 0.04 : 0) - (bm.stalks ? 0.03 : 0);
     for (let i = 0; i < parts.length; i++) { v += parts[i][1] * parts[i][2]; if (parts[i][2] < 0.7) lacks.push(parts[i][0]); }

@@ -101,9 +101,14 @@
   const has = function (f, k) { for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k === k) return true; return false; };
 
   /** mutate a form in place. m: chance of a nudge per gene; wild: the world's mutation slider; press: what the pond is up against; note(text, big) */
+  // ── room to grow ──
+  // A young pond keeps its bodies simple: more than about six things on one body counts as clutter, and clutter is shed, snubbed and scored down.
+  // As the pond grows old that limit loosens (W.room, 0 to 6, set once a generation in 30_world.js): bodies may carry more parts, more sets of growths,
+  // and new parts bud more often. So complexity is something a pond grows INTO over hundreds of generations, not something it starts with.
+  F.room = function () { const W = G.W; return G.ROOM_OFF ? 0 : G.ROOM_FORCE !== undefined ? G.ROOM_FORCE : (W && W.room) || 0; };
   F.mutate = function (f, m, wild, press, note) {
     const r = G.rand, n = G.randn;
-    if (f.bd) { const busy = G.body.busy(f); if (busy > 6 && r() < Math.min(0.7, 0.2 * (busy - 6)) * wild) {
+    if (f.bd) { const busy = G.body.busy(f), lim = 6 + F.room(); if (busy > lim && r() < Math.min(0.7, 0.2 * (busy - lim)) * wild) {
       const roll = r();
       if (roll < 0.5 && f.rules.length) { const i = Math.floor(r() * f.rules.length); note('shed its ' + KMANY[f.rules[i].k] + ': a simpler body', true); dropRule(f, i); }
       else if (roll < 0.7 && G.body.drop(f, null)) note('lost a part of its body: a simpler shape', true);
@@ -113,12 +118,12 @@
       else if (f.rules.length) { const q = f.rules[Math.floor(r() * f.rules.length)]; if (q.b > q.a) { q.b = q.a; note(KMANY[q.k] + ' now grow from one place only', true); } }
     } }
     // a change of structure: at most one a birth
-    if (r() < (f.bd ? 0.07 : 0.16) * wild) {
+    if (r() < (f.bd ? 0.07 + 0.012 * F.room() : 0.16) * wild) {      /* an old pond grows new parts about twice as often as a young one */
       const roll = r();
       if (roll < 0.13) { if (f.bd) G.body.bud(f, note); else if (f.n < MAXN) { f.n++; note('body grew to ' + f.n + ' segments', true); } }
       else if (roll < 0.17) { if (f.bd) G.body.drop(f, note); else if (f.n > 1) { f.n--; note('body shrank to ' + f.n + (f.n === 1 ? ' segment' : ' segments'), true); } }
       else if (roll < 0.33) {
-        if (f.rules.length < (f.bd ? 4 : MAXR)) {
+        if (f.rules.length < (f.bd ? Math.min(MAXR, 4 + Math.round(F.room() * 0.67)) : MAXR)) {
           // what sprouts next leans towards what the pond is up against
           const w = [1, 1, 1, 1, 1, 1, 1, 1], pp = press ? press.part : null;
           if (press && press.o2) { w[1] += press.o2; w[6] += press.o2 * 1.5; w[3] += press.o2 * 0.5; }
@@ -133,7 +138,7 @@
       }
       else if (roll < 0.38) { if (f.rules.length) { const i = Math.floor(r() * f.rules.length); note('lost its ' + KMANY[f.rules[i].k], true); dropRule(f, i); } }
       else if (roll < 0.46) {
-        if (f.rules.length && f.rules.length < (f.bd ? 4 : MAXR)) {
+        if (f.rules.length && f.rules.length < (f.bd ? Math.min(MAXR, 4 + Math.round(F.room() * 0.67)) : MAXR)) {
           const src = f.rules[Math.floor(r() * f.rules.length)], c = cpRule(src);
           c.a = src.a + (r() < 0.5 ? 1 : -1);
           c.b = c.a; if (r() < 0.5) c.k = Math.floor(r() * 8);
@@ -154,7 +159,7 @@
       else { f.hue += 60 + r() * 240; note('a new colour', true); }
     }
     // a limb grows a joint: a copy of itself sprouts from its own tip (an arm gets a forearm, a forearm a hand)
-    if (f.rules.length < (f.bd ? 4 : MAXR) && r() < 0.03 * wild) {
+    if (f.rules.length < (f.bd ? Math.min(MAXR, 4 + Math.round(F.room() * 0.67)) : MAXR) && r() < 0.03 * wild) {
       const ok = []; for (let i = 0; i < f.rules.length; i++) { const p = f.rules[i]; if (CHAIN[p.k] && !(p.on >= 0 && f.rules[p.on].on >= 0) && !f.rules.some(function (x) { return x.on === i; })) ok.push(i); }
       if (ok.length) { const pi = ok[Math.floor(r() * ok.length)], c = cpRule(f.rules[pi]); c.on = pi; c.l *= 0.7; c.w *= 0.85; c.g = (r() - 0.5) * 1.2; if (c.k === 0) c.t = 1 + Math.floor(r() * 3); f.rules.push(c); note('its ' + KMANY[c.k] + ' grew a joint: a part on a part', true); }
     }
@@ -179,7 +184,7 @@
       const d = dsl[Math.floor(r() * dsl.length)];
       if (!f.rules.some(function (q) { return q.k === 8 && q.t === d.id; })) {
         const q = newRule(f.n, 8); q.t = d.id; if (d.place === 'head') { q.a = 0; q.b = 0; q.e = 1; }
-        if (f.rules.length < (f.bd ? 4 : MAXR)) f.rules.push(q); else { let at = Math.floor(r() * f.rules.length); for (let t = 0; t < 4 && f.rules[at].k === 8; t++) at = Math.floor(r() * f.rules.length); dropRule(f, at); f.rules.push(q); }
+        if (f.rules.length < (f.bd ? Math.min(MAXR, 4 + Math.round(F.room() * 0.67)) : MAXR)) f.rules.push(q); else { let at = Math.floor(r() * f.rules.length); for (let t = 0; t < 4 && f.rules[at].k === 8; t++) at = Math.floor(r() * f.rules.length); dropRule(f, at); f.rules.push(q); }
         note('grew a ' + d.name.toLowerCase(), true);
       }
     }
@@ -212,15 +217,15 @@
     const pp = press ? press.part : null;
     if (pp) {
       const hit = function (i) { return pp[i] > 0 && r() < 0.055 * wild * Math.min(2.5, pp[i]); };
-      if (hit(2) && !has(f, 2) && !has(f, 7) && f.rules.length < (f.bd ? 4 : MAXR)) { const k = r() < 0.6 ? 2 : 7; f.rules.push(newRule(f.n, k)); note('grew ' + KMANY[k], true); }
+      if (hit(2) && !has(f, 2) && !has(f, 7) && f.rules.length < (f.bd ? Math.min(MAXR, 4 + Math.round(F.room() * 0.67)) : MAXR)) { const k = r() < 0.6 ? 2 : 7; f.rules.push(newRule(f.n, k)); note('grew ' + KMANY[k], true); }
       if (hit(3) && f.shell < 1) { f.shell = clamp(f.shell + 0.4, 0, 1); note('grew a shell', true); }
       if (hit(6) && f.venom < 1) { f.venom = clamp(f.venom + 0.5, 0, 1); note('grew poison glands', true); }
       if (hit(5) && f.glow < 1) { f.glow = clamp(f.glow + 0.5, 0, 1); note('began to glow', true); }
       if (hit(4) && f.en < 2) { f.en++; note('grew an eye (' + f.en + ' now)', true); }
       if (hit(0) && f.mk !== 2) { f.mk = 2; note('grew jaws', true); }
-      if (hit(1) && !has(f, 1) && f.rules.length < (f.bd ? 4 : MAXR)) { f.rules.push(newRule(f.n, 1)); note('grew fins', true); }
+      if (hit(1) && !has(f, 1) && f.rules.length < (f.bd ? Math.min(MAXR, 4 + Math.round(F.room() * 0.67)) : MAXR)) { f.rules.push(newRule(f.n, 1)); note('grew fins', true); }
       if (hit(7) && !f.tk && f.n > 1) { f.tk = 1 + Math.floor(r() * 2); note('grew a tail', true); }
-      if (hit(8) && !has(f, 3) && f.rules.length < (f.bd ? 4 : MAXR)) { f.rules.push(newRule(f.n, 3)); note('grew tentacles', true); }
+      if (hit(8) && !has(f, 3) && f.rules.length < (f.bd ? Math.min(MAXR, 4 + Math.round(F.room() * 0.67)) : MAXR)) { f.rules.push(newRule(f.n, 3)); note('grew tentacles', true); }
     }
     // and a little drift in the numbers
     let drift = false;
@@ -391,7 +396,7 @@
     let longest = 0; for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k !== 5) longest = Math.max(longest, f.rules[i].l);
     const harmony = (c.kinds <= 3 ? 1 : c.kinds === 4 ? 0.5 : 0.15) * (longest * 1.25 > L * 0.9 + 0.8 ? 0.5 : 1);
     let base = 0.24 * face + 0.1 * big + 0.18 * shape + 0.14 * prop + 0.14 * tidy + 0.14 * harmony + 0.06 * clamp(Math.abs(f.hue2) / 90, 0.4, 1);
-    if (f.bd) { const busy = G.body.busy(f), clean = busy < 2.5 ? 0.45 : busy <= 6 ? 1 : Math.max(0, 1 - (busy - 6) * 0.22), eyes = f.en === 0 ? 0 : f.en === 2 ? 1 : f.en === 1 ? 0.85 : 0.45; let sig = 0; for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k === 8) sig++; base = 0.2 * eyes + 0.14 * big + 0.42 * clean + 0.08 * (longest > 1.7 ? 0.4 : 1) + 0.08 * clamp(Math.abs(f.hue2) / 90, 0.4, 1) + (sig === 1 || sig === 2 ? 0.08 : 0); }
+    if (f.bd) { const busy = G.body.busy(f), clean = busy < 2.5 ? 0.45 : busy <= 6 + F.room() ? 1 : Math.max(0, 1 - (busy - 6 - F.room()) * 0.22), eyes = f.en === 0 ? 0 : f.en === 2 ? 1 : f.en === 1 ? 0.85 : 0.45; let sig = 0; for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k === 8) sig++; base = 0.2 * eyes + 0.14 * big + 0.42 * clean + 0.08 * (longest > 1.7 ? 0.4 : 1) + 0.08 * clamp(Math.abs(f.hue2) / 90, 0.4, 1) + (sig === 1 || sig === 2 ? 0.08 : 0); }
     if (!X) return base;
     let grow = 0;
     for (let i = 0; i < f.rules.length; i++) grow += f.rules[i].k === 8 ? 0.6 : X.like[f.rules[i].k];      // something never seen before turns heads

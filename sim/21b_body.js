@@ -8,7 +8,7 @@
 // measured from the shape that results.
 (function () {
   'use strict';
-  const clamp = G.clamp, PI = Math.PI, TAU = PI * 2, K = 10, MAXM = 3;      // three masses at most: a body is one clear idea, not a heap
+  const clamp = G.clamp, PI = Math.PI, TAU = PI * 2, K = 10, MAXM = 6;      // a young pond buds three masses at most (a body is one clear idea, not a heap); an old one up to six (see B.bud)
   const B = G.body = { K: K, MAXM: MAXM };
   const num = function (v, lo, hi, d) { v = +v; return isFinite(v) ? clamp(v, lo, hi) : d; };
   const mass = function (o) { const q = { r: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], s: 1, on: -1, at: -PI / 2, d: 1, pr: 0, h: 0, lb: 0, la: 0 }; if (o) for (const k in o) q[k] = o[k]; return q; };
@@ -139,7 +139,7 @@
   // ── chance ──
   B.bud = function (f, note) {
     const r = G.rand, bd = f.bd, M = bd.m;
-    if (M.length >= MAXM) return false;
+    if (M.length >= Math.min(MAXM, 3 + Math.round(G.form.room() / 2))) return false;      /* three parts in a young pond, up to six in an old one */
     const par = Math.floor(r() * M.length), src = M[par], pr = r() < 0.32 ? 1 : 0;
     const rr = src.r.map(function (v) { return 1 + (v - 1) * (r() < 0.5 ? 1 : 0.3) + (r() - 0.5) * 0.12; });
     M.push(mass({ r: rr, s: 0.42 + r() * 0.55, on: par, at: bd.v ? r() * TAU - PI : pr ? (r() - 0.5) * 2 : (r() < 0.35 ? -PI / 2 : PI / 2), d: 0.6 + r() * 0.75, pr: pr, lb: r() < 0.15 ? 3 + Math.floor(r() * 5) : 0, la: 0.12 }));

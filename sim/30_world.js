@@ -846,7 +846,7 @@
       }
     }
     // a creature with too much on it does not breed (nearly never): clutter is the commonest way to be unlovable, and it creeps in by chance and by the pond's pressures
-    for (let i = 0; i < plan.length; i++) if (plan[i].p.g.f.bd && !(G.marvelBlessed && G.marvelBlessed(plan[i].p)) && G.body.busy(plan[i].p.g.f) > 7.2 && G.rand() < 0.85) plan[i].n = 0;
+    for (let i = 0; i < plan.length; i++) if (plan[i].p.g.f.bd && !(G.marvelBlessed && G.marvelBlessed(plan[i].p)) && G.body.busy(plan[i].p.g.f) > 7.2 + G.form.room() && G.rand() < 0.85) plan[i].n = 0;
     // too many for the pond: only the fittest parents may breed
     let total = surv.length;
     for (let i = 0; i < plan.length; i++) total += plan[i].n;
@@ -984,7 +984,7 @@
     for (let i = 0; i < cre.length; i++) {
       const c = cre[i];
       c.fed = clamp(c.E / c.ph.Emax, 0, 1);
-      c.fit = clamp(c.fed / 0.5, 0, 1) * (0.15 + 0.85 * G.charmOf(c)) * (c.g.f.bd ? Math.max(0.35, 1 - 0.18 * Math.max(0, G.body.busy(c.g.f) - 6)) : 1);          // fed well enough (half a tank is plenty), times how nice to the eye and how whole it is
+      c.fit = clamp(c.fed / 0.5, 0, 1) * (0.15 + 0.85 * G.charmOf(c)) * (c.g.f.bd ? Math.max(0.35, 1 - 0.18 * Math.max(0, G.body.busy(c.g.f) - 6 - G.form.room())) : 1);          // fed well enough (half a tank is plenty), times how nice to the eye and how whole it is
       sum += c.fit; genes += c.g.f.n + c.g.f.rules.length + c.g.p.length + c.g.w.length + c.g.h;
       intake += c.intake;
       if (c.fit > best) { best = c.fit; bestC = c; }
@@ -1001,7 +1001,8 @@
       if (H.length >= 20) { let a = 0, b = 0; for (let i = 0; i < 10; i++) { a += H[H.length - 1 - i]; b += H[H.length - 11 - i]; } const was = W.stall || 0; W.stall = a / 10 < b / 10 + 0.01 ? Math.min(1, was + 0.2) : Math.max(0, was - 0.35);
         if (W.stall >= 0.6 && was < 0.6 && W.gen - (W.stallNote || -99) > 40) { W.stallNote = W.gen; W.discLog.push({ key: 'stall' + W.gen, text: 'The pond has stopped getting nicer, so its creatures turn to growing bigger: size is what there is left to improve.', gen: W.gen }); G.emit('stall'); } } }
     // the drive to grow is only as strong as the pond can bear: it eases off when the pond is below its capacity (the big need feeding) and as the average size gets large
-    { const popR = W.popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12; W.grow = (W.stall || 0) * clamp((popR - 0.6) / 0.3, 0, 1) * (1 - clamp((mr - 26) / 14, 0, 1)); }
+    { const popR = W.popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12; W.room = 6 * clamp((W.gen - 60) / 360, 0, 1);      /* how much more a body may carry: none before generation 60, all of it from about generation 420 (see F.room) */
+      W.grow = Math.max(W.stall || 0, G.ROOM_OFF ? 0 : 0.5 * W.room / 6) * clamp((popR - 0.6) / 0.3, 0, 1) * (1 - clamp((mr - 26) / 14, 0, 1)); }
     W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop });
     if (W.hist.length > 600) W.hist.shift();
     G.updateSpecies();
