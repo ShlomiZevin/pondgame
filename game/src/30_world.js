@@ -511,7 +511,7 @@
           if (z.hvStep !== W.step) { z.hvPrev = z.hvStep === W.step - 1 ? z.hvNow : 0; z.hvNow = 0; z.hvStep = W.step; }
           const room = G.HAVEN_ROOM || 3, guest = c.guestOf === z.id && c.guestStep >= W.step - 2, free = Math.max(z.hvPrev, z.hvNow) < room;
           if (hd < z.r * 0.9) { if (guest || free) { z.hvNow++; c.guestOf = z.id; c.guestStep = W.step; c.havenGen = W.gen; if (!(c.graceLeft >= 3)) c.graceLeft = 3; c.E = Math.min(ph.Emax, c.E + 1.6 * dt); c.vx *= 1 - 0.6 * dt; c.vy *= 1 - 0.6 * dt; } }
-          else if (free) { c.vx += hx / hd * 70 * dt; c.vy += hy / hd * 70 * dt; }
+          else if (free) { c.vx += hx / hd * 70 * dt; c.vy += hy / hd * 70 * dt; c.havenGen = W.gen; if (!(c.graceLeft >= 2)) c.graceLeft = 2; if (c.E < ph.Emax * 0.3) c.E = ph.Emax * 0.3; }      /* on its way to a garden with room: the journey itself is safe, it does not starve or fall on the road */
         }
         if (z.p.sticky) {
           const dx = c.x - z.x, dy = c.y - z.y;

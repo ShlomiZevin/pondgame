@@ -40,6 +40,21 @@
     let bin = ''; for (let i = 0; i < bytes.length; i += 4096) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 4096));
     return btoa(bin);
   }
+  // What a kind cries out while it carries out a plan is heard too, as babble; and when the plan is to SING, the cries are sung: each one on the next
+  // note of a little tune, with a second voice a third above, so a gathering that sings sounds like a small choir. Free: made on the spot.
+  const TUNE = [1, 1.125, 1.25, 1.5, 1.25, 1.125, 1.6667, 1.5];
+  let lastCry = 0;
+  G.on('cry', function (c, word, sings, note) {
+    if (G.mode !== 'play' || G.speed > 4 || !window.PXS || !word) return;
+    const t0 = now(); if (t0 - lastCry < (sings ? 650 : 1100)) return; lastCry = t0;
+    const sizeF = Math.max(0.5, Math.min(2, Math.pow(12 / Math.max(6, c.ph.r || 12), 0.55))), pan = G.W ? Math.max(-1, Math.min(1, (c.x / G.W.ww - 0.5) * 1.6)) : 0;
+    const one = function (ratio, vol) {
+      const key = 'cry:' + Math.round(sizeF * 6) + ':' + Math.round(ratio * 100) + ':' + String(word).toLowerCase().slice(0, 24);
+      if (made[key] !== 'ready') { try { const d = {}; d[key] = 'data:audio/wav;base64,' + babble(word, 1.2 * ratio, sizeF); PXS.define(d); made[key] = 'ready'; } catch (e) { made[key] = 'none'; console.error(e); return; } }
+      try { PXS.play(key, { volume: vol, pan: pan }); } catch (e) { console.error(e); }
+    };
+    if (sings) { const r = TUNE[(note || 0) % TUNE.length]; one(r, 0.42); one(r * 1.25, 0.26); } else one(1, 0.36);
+  });
   G.on('say', function (c, word) {
     if (G.mode !== 'play' || G.speed > 4 || !window.PXS) return;
     const mv = c.ph && c.ph.mv; if (!mv) return;

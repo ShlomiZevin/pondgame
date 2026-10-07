@@ -3166,7 +3166,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
           if (z.hvStep !== W.step) { z.hvPrev = z.hvStep === W.step - 1 ? z.hvNow : 0; z.hvNow = 0; z.hvStep = W.step; }
           const room = G.HAVEN_ROOM || 3, guest = c.guestOf === z.id && c.guestStep >= W.step - 2, free = Math.max(z.hvPrev, z.hvNow) < room;
           if (hd < z.r * 0.9) { if (guest || free) { z.hvNow++; c.guestOf = z.id; c.guestStep = W.step; c.havenGen = W.gen; if (!(c.graceLeft >= 3)) c.graceLeft = 3; c.E = Math.min(ph.Emax, c.E + 1.6 * dt); c.vx *= 1 - 0.6 * dt; c.vy *= 1 - 0.6 * dt; } }
-          else if (free) { c.vx += hx / hd * 70 * dt; c.vy += hy / hd * 70 * dt; }
+          else if (free) { c.vx += hx / hd * 70 * dt; c.vy += hy / hd * 70 * dt; c.havenGen = W.gen; if (!(c.graceLeft >= 2)) c.graceLeft = 2; if (c.E < ph.Emax * 0.3) c.E = ph.Emax * 0.3; }      /* on its way to a garden with room: the journey itself is safe, it does not starve or fall on the road */
         }
         if (z.p.sticky) {
           const dx = c.x - z.x, dy = c.y - z.y;
@@ -5653,7 +5653,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   };
   /** luck: danger sometimes misses (called as a creature is about to die) */
   /** is this the creature that was born with the marvel, in the first generations of its life (looked after so that it can be a parent, and it does not die of old age for a while)? Its children are not looked after: a marvel is rare, and stays rare. */
-  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && W && ((c.marvelBorn !== undefined && W.gen <= c.marvelBorn + 30) || (c.havenGen !== undefined && W.gen - c.havenGen <= 1))); };      // new, or living in a safe garden
+  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && W && ((c.marvelBorn !== undefined && W.gen <= c.marvelBorn + 30) || (c.havenGen !== undefined && W.gen - c.havenGen <= 1) || (c.rescuedGen !== undefined && W.gen - c.rescuedGen <= (G.MARVEL_KEEP || 4)))); };      // new, or living in a safe garden, or lately saved by the player
   /** the safe garden a player can add for the pond's marvels (nothing is asked of the AI: it costs nothing) */
   G.HAVEN = { name: 'Marvel Garden', haven: true, props: {}, tag: 2, hue: 48, radius: 95, life: 600, source: 'local', note: 'A small fenced garden that only marvels can enter. It has room for 3 at a time. Marvels are drawn to it. Inside they are fed and kept from harm, they do not die of old age, and a child born there is a little likelier to be a marvel too (never more than 3 alive with the same marvel).' };
   G.MARVEL_MAX = 3;      // the most marvel carriers a pond holds at once, of all marvels together (a child is born plain when the pond is full)
@@ -5721,6 +5721,21 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     let bin = ''; for (let i = 0; i < bytes.length; i += 4096) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 4096));
     return btoa(bin);
   }
+  // What a kind cries out while it carries out a plan is heard too, as babble; and when the plan is to SING, the cries are sung: each one on the next
+  // note of a little tune, with a second voice a third above, so a gathering that sings sounds like a small choir. Free: made on the spot.
+  const TUNE = [1, 1.125, 1.25, 1.5, 1.25, 1.125, 1.6667, 1.5];
+  let lastCry = 0;
+  G.on('cry', function (c, word, sings, note) {
+    if (G.mode !== 'play' || G.speed > 4 || !window.PXS || !word) return;
+    const t0 = now(); if (t0 - lastCry < (sings ? 650 : 1100)) return; lastCry = t0;
+    const sizeF = Math.max(0.5, Math.min(2, Math.pow(12 / Math.max(6, c.ph.r || 12), 0.55))), pan = G.W ? Math.max(-1, Math.min(1, (c.x / G.W.ww - 0.5) * 1.6)) : 0;
+    const one = function (ratio, vol) {
+      const key = 'cry:' + Math.round(sizeF * 6) + ':' + Math.round(ratio * 100) + ':' + String(word).toLowerCase().slice(0, 24);
+      if (made[key] !== 'ready') { try { const d = {}; d[key] = 'data:audio/wav;base64,' + babble(word, 1.2 * ratio, sizeF); PXS.define(d); made[key] = 'ready'; } catch (e) { made[key] = 'none'; console.error(e); return; } }
+      try { PXS.play(key, { volume: vol, pan: pan }); } catch (e) { console.error(e); }
+    };
+    if (sings) { const r = TUNE[(note || 0) % TUNE.length]; one(r, 0.42); one(r * 1.25, 0.26); } else one(1, 0.36);
+  });
   G.on('say', function (c, word) {
     if (G.mode !== 'play' || G.speed > 4 || !window.PXS) return;
     const mv = c.ph && c.ph.mv; if (!mv) return;
@@ -5827,6 +5842,86 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     '#imarvel ul{margin:6px 0 0;padding:0;list-style:none}#imarvel li{font:600 12px/1.4 system-ui,sans-serif;color:#ffe9a8;padding:2px 0 2px 15px;position:relative}#imarvel li:before{content:"\\25C6";position:absolute;left:0;font-size:8px;top:5px}' +
     '#imarvel .my{font:italic 500 11.5px/1.4 system-ui,sans-serif;color:#c9d9ee;margin:6px 0 0}';
   document.head.appendChild(st);
+})();
+
+</script>
+<script data-part="46e_marvelguard">
+// ── A marvel in danger: the player is told, and can save it ──
+// A marvel is rare and a player grows fond of it, so its death must not come as a surprise. When one is about to die (it is starving, or winter's
+// choice has gone against it, or it is old) an alarm shows with what is wrong and two buttons: SAVE IT and SHOW ME. Saving feeds it, lifts winter's
+// sentence and keeps it from harm for a few generations (it counts as blessed, see G.marvelBlessed). Each marvel creature can be saved twice:
+// enough to matter, not enough to make it immortal. After that only a Marvel Garden shelters it.
+(function () {
+  'use strict';
+  const SAVES = 2, KEEP = 4;      // saves per marvel creature; generations of protection each one gives
+  /** why this marvel is about to die, in a few words, or '' when it is in no danger */
+  G.marvelDanger = function (c) {
+    const W = G.W; if (!W || !c || c.dead || !c.g.mv) return '';
+    const safe = G.marvelBlessed && G.marvelBlessed(c) && (c.graceLeft === undefined || c.graceLeft > 0);
+    if (safe) return '';
+    if (c.doomed) return c.age >= G.K.maxAge ? 'it is old, and will not see the spring' : c.sick ? 'it is sick, and will not see the spring' : 'winter will take it: it did not do well enough this year';
+    // hunger: the alarm starts when it is nearly empty and stays until it has eaten properly, so it does not flicker with every bite
+    if (c.E < c.ph.Emax * 0.2) c.hungerAlarm = true; else if (c.E > c.ph.Emax * 0.45) c.hungerAlarm = false;
+    if (c.hungerAlarm) return c.asleep ? 'it is starving in its sleep' : 'it is starving';
+    return '';
+  };
+  G.marvelSavesLeft = function (c) { return Math.max(0, SAVES - (c.rescues || 0)); };
+  /** the player saves it: fed, spared by winter, and kept from harm for a few generations */
+  G.marvelRescue = function (c) {
+    const W = G.W; if (!W || !c || c.dead || !c.g.mv || G.marvelSavesLeft(c) <= 0) return false;
+    c.rescues = (c.rescues || 0) + 1; c.rescuedGen = W.gen;
+    c.E = c.ph.Emax; c.P = Math.max(c.P || 0, c.ph.Emax * 0.5); c.doomed = false; c.sick = false; c.sel = 0; c.graceLeft = 3; c.tired = 0; c.asleep = false; c.flash = 1; c.aura = 1;
+    if (G.log) G.log('disc', 'You saved a marvel', 'It is fed and safe for the next ' + KEEP + ' generations.');
+    G.emit('marvel-saved', c);
+    if (G.markDirty) G.markDirty();
+    return true;
+  };
+  G.MARVEL_KEEP = KEEP;
+
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  const esc = function (s) { return G.escapeHtml ? G.escapeHtml(String(s)) : String(s); };
+  let box = null, shown = 0, snoozed = {}, rang = {};
+  function ui() {
+    if (box) return box;
+    const st = document.createElement('style');
+    st.textContent = '#mvalert{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:8;width:min(520px,calc(100vw - 28px));padding:11px 14px 12px;border-radius:18px;font:500 12.5px/1.4 system-ui,sans-serif;color:#cfe8ff;border-color:rgba(255,126,182,.75) !important;box-shadow:0 0 0 1px rgba(255,126,182,.25),0 10px 34px rgba(0,0,0,.45);animation:mvring 1.6s ease-in-out infinite}' +
+      '@keyframes mvring{50%{box-shadow:0 0 0 4px rgba(255,126,182,.28),0 10px 34px rgba(0,0,0,.45)}}' +
+      '#mvalert .ak{font:700 9.5px system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#ff9ec6;display:flex;justify-content:space-between;align-items:center}#mvalert .ak u{text-decoration:none;cursor:pointer;font-size:14px;color:#cfe8ff;opacity:.7;padding:0 2px}' +
+      '#mvalert .ab{display:flex;align-items:center;gap:11px;margin-top:5px}#mvalert .ab .mic{flex:none;width:40px;height:40px;object-fit:contain}#mvalert .at{flex:1;min-width:0}#mvalert .at b{display:block;font:700 15px/1.25 system-ui,sans-serif;color:#fff}#mvalert .at span{display:block;color:#dcecff}' +
+      '#mvalert .af{display:flex;gap:8px;margin-top:9px}#mvalert .af .btn{flex:1;min-height:34px}#mvalert .af .go{background:#f6d365;color:#1a2433;border-color:#f6d365;font-weight:800}#mvalert .af .go[disabled]{opacity:.45}' +
+      '#mvalert .an{font-size:11.5px;color:#b9cde2;margin-top:6px}';
+    document.head.appendChild(st);
+    box = document.createElement('div'); box.id = 'mvalert'; box.className = 'glass hide';
+    (document.getElementById('ui') || document.body).appendChild(box);
+    box.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    box.addEventListener('click', function (e) {
+      const W = G.W, c = W && W.cre.filter(function (x) { return x.id === shown && !x.dead; })[0], id = e.target && e.target.id;
+      if (id === 'mvaX') { snoozed[shown] = W ? W.gen : 0; draw(); return; }
+      if (!c) { draw(); return; }
+      if (id === 'mvaSave') { if (G.marvelRescue(c)) { if (G.sfx) G.sfx('discovery'); G.select(c); G.R.ping = { c: c, t: 0 }; } draw(); return; }
+      if (id === 'mvaShow') { if (G.sfx) G.sfx('click'); G.select(c); G.R.ping = { c: c, t: 0 }; G.focusOn(c.x, c.y, 2.2); }
+    });
+    return box;
+  }
+  let sig = '';
+  function draw() {
+    const W = G.W, on = G.mode === 'play' && W && !W.title && !(G.ui && G.ui.modal);
+    ui();
+    let c = null, why = '';
+    if (on) for (let i = 0; i < W.cre.length && !c; i++) { const x = W.cre[i]; if (!x.g.mv || x.dead || snoozed[x.id] === W.gen) continue; const d = G.marvelDanger(x); if (d) { c = x; why = d; } }
+    box.classList.toggle('hide', !c);
+    if (!c) { shown = 0; sig = ''; return; }
+    const mv = c.ph.mv || {}, left = G.marvelSavesLeft(c), s2 = c.id + why + left;
+    if (!rang[c.id + ':' + W.gen]) { rang[c.id + ':' + W.gen] = 1; if (G.sfx && G.speed <= 16) G.sfx('squeak'); }
+    if (s2 === sig) return; sig = s2; shown = c.id;
+    const sp = G.speciesById(c.sp);
+    box.innerHTML = '<div class="ak"><span>★ A marvel is in danger</span><u id="mvaX" title="Not now">✕</u></div>' +
+      '<div class="ab">' + ((G.marvelPic && G.marvelPic(mv, 40)) || '') + '<div class="at"><b>' + esc(mv.name || 'A marvel') + '</b><span>' + esc((sp ? sp.name : 'Creature') + ' #' + c.id) + ': ' + esc(why) + '.</span></div></div>' +
+      '<div class="af"><button class="btn sm go" id="mvaSave"' + (left ? '' : ' disabled') + '>SAVE IT' + (left ? ' · ' + left + ' left' : '') + '</button><button class="btn sm" id="mvaShow">SHOW ME</button></div>' +
+      '<div class="an">' + (left ? 'Saving feeds it and keeps it from harm for ' + KEEP + ' generations. Each marvel can be saved ' + SAVES + ' times.' : 'This one has no saves left. A Marvel Garden (ADD) can still shelter it.') + '</div>';
+  }
+  setInterval(function () { try { draw(); } catch (e) { console.error(e); } }, 600);
+  G.on('new-pond', function () { snoozed = {}; rang = {}; sig = ''; });
 })();
 
 </script>
@@ -7799,7 +7894,7 @@ G.addSystem({
   // where a name in the plan is, in the pond: a thing, a wall or region, a kind
   function whereIs(name) {
     const W = G.W, low = String(name || '').toLowerCase(); if (!low) return null;
-    for (let i = 0; i < W.zones.length; i++) if (String(W.zones[i].word).toLowerCase() === low) return { x: W.zones[i].x, y: W.zones[i].y, zone: W.zones[i] };
+    for (let i = 0; i < W.zones.length; i++) if (!W.zones[i].haven && String(W.zones[i].word).toLowerCase() === low) return { x: W.zones[i].x, y: W.zones[i].y, zone: W.zones[i] };
     const F = W.fields || []; for (let i = 0; i < F.length; i++) if (String(F[i].name).toLowerCase() === low) { const f = F[i]; return { x: (f.shape === 'circle' || f.shape === 'ring' ? f.x : f.across === 'horizontal' ? 0.5 : f.at) * W.ww, y: (f.shape === 'circle' || f.shape === 'ring' ? f.y : f.across === 'horizontal' ? f.at : 0.5) * W.wh, field: f }; }
     const s = spByName(name); if (s) { let x = 0, y = 0, n = 0; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].sp === s.id) { x += W.cre[i].x; y += W.cre[i].y; n++; } if (n) return { x: x / n, y: y / n, kind: s }; }
     return null;
@@ -7809,6 +7904,7 @@ G.addSystem({
   function brief() {
     const W = G.W, o = G.worldBrief ? G.worldBrief() : {};
     o.kinds = W.species.filter(function (s) { return !s.extinct && s.n >= 5 && s.rep; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 5).map(function (s) { const one = W.cre.filter(function (c) { return c.sp === s.id; })[0]; return { name: s.name, count: s.n, looks: G.form.kind(s.rep.f).full + ': ' + G.form.facts(s.rep.f).slice(0, 5).join('; '), ways: one ? (one.ph.aggro > 0.38 ? 'fierce, attacks other kinds' : 'peaceful') + (one.ph.lungs ? ', can walk the shore' : '') + (one.ph.mv ? ', one of them carries the marvel ' + one.ph.mv.name : '') : '' }; });
+    if (o.things) { const hv = {}; W.zones.forEach(function (z) { if (z.haven) hv[String(z.word).toLowerCase()] = 1; }); o.things = o.things.filter(function (t) { return !hv[String(t.name).toLowerCase()]; }); }      /* the marvels' garden is no place for a plan: only marvels can enter it */
     o.walls = (W.fields || []).map(function (f) { return f.name; });
     o.built = (W.works || []).map(function (w) { return w.name; });
     o.doneBefore = (W.deedLog || []).slice(-6);
@@ -7893,7 +7989,7 @@ G.addSystem({
     if (n < Math.min(d.n0, 6)) { d.thin = (d.thin || 0) + rt; if (n < 2) { if (d.thin > 30) finish(d, 'lost'); return; } } else d.thin = 0;      // too few just now: the plan waits for hands (after a while anyone near will do) before it is dropped
     const st = d.steps[d.i], tg = d.target ? whereIs(d.target) : null;
     d.t += rt; d.cryT -= rt;
-    if (d.cryT <= 0 && st.cry) { d.cryT = 1.6 + G.rand() * 1.6; const c = M[(G.rand() * n) | 0]; c.cryT = 1.9; c.cryW = st.cry; }
+    if (d.cryT <= 0 && st.cry) { d.cryT = 1.6 + G.rand() * 1.6; const c = M[(G.rand() * n) | 0]; c.cryT = 1.9; c.cryW = st.cry; d.note = (d.note || 0) + 1; G.emit('cry', c, st.cry, d.sings === undefined ? (d.sings = /\b(sing|sings|singing|song|chant|choir|chorus|hum|hymn|carol|music|serenade|lullaby)\b/i.test(d.title + ' ' + d.what + ' ' + d.say)) : d.sings, d.note); }
     let near = 0;
     for (let k = 0; k < n; k++) {
       const c = M[k], j = c.deedJ || k, a = j / Math.max(1, d.n0) * TAU;

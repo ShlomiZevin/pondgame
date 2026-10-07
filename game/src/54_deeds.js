@@ -17,7 +17,7 @@
   // where a name in the plan is, in the pond: a thing, a wall or region, a kind
   function whereIs(name) {
     const W = G.W, low = String(name || '').toLowerCase(); if (!low) return null;
-    for (let i = 0; i < W.zones.length; i++) if (String(W.zones[i].word).toLowerCase() === low) return { x: W.zones[i].x, y: W.zones[i].y, zone: W.zones[i] };
+    for (let i = 0; i < W.zones.length; i++) if (!W.zones[i].haven && String(W.zones[i].word).toLowerCase() === low) return { x: W.zones[i].x, y: W.zones[i].y, zone: W.zones[i] };
     const F = W.fields || []; for (let i = 0; i < F.length; i++) if (String(F[i].name).toLowerCase() === low) { const f = F[i]; return { x: (f.shape === 'circle' || f.shape === 'ring' ? f.x : f.across === 'horizontal' ? 0.5 : f.at) * W.ww, y: (f.shape === 'circle' || f.shape === 'ring' ? f.y : f.across === 'horizontal' ? f.at : 0.5) * W.wh, field: f }; }
     const s = spByName(name); if (s) { let x = 0, y = 0, n = 0; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].sp === s.id) { x += W.cre[i].x; y += W.cre[i].y; n++; } if (n) return { x: x / n, y: y / n, kind: s }; }
     return null;
@@ -27,6 +27,7 @@
   function brief() {
     const W = G.W, o = G.worldBrief ? G.worldBrief() : {};
     o.kinds = W.species.filter(function (s) { return !s.extinct && s.n >= 5 && s.rep; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 5).map(function (s) { const one = W.cre.filter(function (c) { return c.sp === s.id; })[0]; return { name: s.name, count: s.n, looks: G.form.kind(s.rep.f).full + ': ' + G.form.facts(s.rep.f).slice(0, 5).join('; '), ways: one ? (one.ph.aggro > 0.38 ? 'fierce, attacks other kinds' : 'peaceful') + (one.ph.lungs ? ', can walk the shore' : '') + (one.ph.mv ? ', one of them carries the marvel ' + one.ph.mv.name : '') : '' }; });
+    if (o.things) { const hv = {}; W.zones.forEach(function (z) { if (z.haven) hv[String(z.word).toLowerCase()] = 1; }); o.things = o.things.filter(function (t) { return !hv[String(t.name).toLowerCase()]; }); }      /* the marvels' garden is no place for a plan: only marvels can enter it */
     o.walls = (W.fields || []).map(function (f) { return f.name; });
     o.built = (W.works || []).map(function (w) { return w.name; });
     o.doneBefore = (W.deedLog || []).slice(-6);
@@ -111,7 +112,7 @@
     if (n < Math.min(d.n0, 6)) { d.thin = (d.thin || 0) + rt; if (n < 2) { if (d.thin > 30) finish(d, 'lost'); return; } } else d.thin = 0;      // too few just now: the plan waits for hands (after a while anyone near will do) before it is dropped
     const st = d.steps[d.i], tg = d.target ? whereIs(d.target) : null;
     d.t += rt; d.cryT -= rt;
-    if (d.cryT <= 0 && st.cry) { d.cryT = 1.6 + G.rand() * 1.6; const c = M[(G.rand() * n) | 0]; c.cryT = 1.9; c.cryW = st.cry; }
+    if (d.cryT <= 0 && st.cry) { d.cryT = 1.6 + G.rand() * 1.6; const c = M[(G.rand() * n) | 0]; c.cryT = 1.9; c.cryW = st.cry; d.note = (d.note || 0) + 1; G.emit('cry', c, st.cry, d.sings === undefined ? (d.sings = /\b(sing|sings|singing|song|chant|choir|chorus|hum|hymn|carol|music|serenade|lullaby)\b/i.test(d.title + ' ' + d.what + ' ' + d.say)) : d.sings, d.note); }
     let near = 0;
     for (let k = 0; k < n; k++) {
       const c = M[k], j = c.deedJ || k, a = j / Math.max(1, d.n0) * TAU;

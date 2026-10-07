@@ -199,7 +199,7 @@
   };
   /** luck: danger sometimes misses (called as a creature is about to die) */
   /** is this the creature that was born with the marvel, in the first generations of its life (looked after so that it can be a parent, and it does not die of old age for a while)? Its children are not looked after: a marvel is rare, and stays rare. */
-  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && W && ((c.marvelBorn !== undefined && W.gen <= c.marvelBorn + 30) || (c.havenGen !== undefined && W.gen - c.havenGen <= 1))); };      // new, or living in a safe garden
+  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && W && ((c.marvelBorn !== undefined && W.gen <= c.marvelBorn + 30) || (c.havenGen !== undefined && W.gen - c.havenGen <= 1) || (c.rescuedGen !== undefined && W.gen - c.rescuedGen <= (G.MARVEL_KEEP || 4)))); };      // new, or living in a safe garden, or lately saved by the player
   /** the safe garden a player can add for the pond's marvels (nothing is asked of the AI: it costs nothing) */
   G.HAVEN = { name: 'Marvel Garden', haven: true, props: {}, tag: 2, hue: 48, radius: 95, life: 600, source: 'local', note: 'A small fenced garden that only marvels can enter. It has room for 3 at a time. Marvels are drawn to it. Inside they are fed and kept from harm, they do not die of old age, and a child born there is a little likelier to be a marvel too (never more than 3 alive with the same marvel).' };
   G.MARVEL_MAX = 3;      // the most marvel carriers a pond holds at once, of all marvels together (a child is born plain when the pond is full)
