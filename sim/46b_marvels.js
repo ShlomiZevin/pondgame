@@ -200,7 +200,7 @@
   /** is this the creature that was born with the marvel, in the first generations of its life (looked after so that it can be a parent, and it does not die of old age for a while)? Its children are not looked after: a marvel is rare, and stays rare. */
   G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && W && ((c.marvelBorn !== undefined && W.gen <= c.marvelBorn + 30) || (c.havenGen !== undefined && W.gen - c.havenGen <= 1))); };      // new, or living in a safe garden
   /** the safe garden a player can add for the pond's marvels (nothing is asked of the AI: it costs nothing) */
-  G.HAVEN = { name: 'Marvel Garden', haven: true, props: { nutrition: 0.55, light: 0.35 }, tag: 2, hue: 48, radius: 150, life: 600, source: 'local', note: 'A safe garden. It has room for 3 marvels at a time. Marvels are drawn to it. Inside they are fed and kept from harm, they do not die of old age, and their children are far likelier to be marvels too.' };
+  G.HAVEN = { name: 'Marvel Garden', haven: true, props: { nutrition: 0.55, light: 0.35 }, tag: 2, hue: 48, radius: 150, life: 600, source: 'local', note: 'A safe garden. It has room for 3 marvels at a time. Marvels are drawn to it. Inside they are fed and kept from harm, they do not die of old age, and a child born there is a little likelier to be a marvel too (never more than 3 alive with the same marvel).' };
   G.HAVEN_ROOM = 3;      // how many marvels one garden shelters at a time
   /** a typed word that means a safe place for the marvels: it becomes a garden under that name, with no AI call */
   G.havenWord = function (w) { const low = String(w || '').toLowerCase(); if (!/\b(garden|sanctuary|haven|refuge|shelter|nursery|nest|safe (place|home|house|zone|spot|garden)|marvel (home|house|place))\b/.test(low)) return null; const t = JSON.parse(JSON.stringify(G.HAVEN)); t.name = String(w).trim().slice(0, 28).replace(/\b[a-z]/g, function (m) { return m.toUpperCase(); }); return t; };
@@ -209,8 +209,8 @@
   /** does a child of a carrier get the marvel? Seldom: it comes with the creature that was given it, not with its line. About one child in eight, and never past a few carriers in a pond. */
   G.marvelInherits = function (id) {
     const W = G.W; if (!W) return false;
-    const cnt = (W.mvCount && W.mvCount[id]) || 0, pend = W.mvPend = W.mvPend || {}, hv = !!G._mvHaven, cap = Math.max(2, Math.ceil(0.035 * Math.max(1, W.cre.length))) + (hv ? 3 : 0);
-    if (cnt + (pend[id] || 0) >= cap || G.rand() >= (hv ? 0.45 : 0.125)) return false;      // one in eight; nearly one in two when born in a safe garden
+    const cnt = (W.mvCount && W.mvCount[id]) || 0, pend = W.mvPend = W.mvPend || {}, hv = !!G._mvHaven, cap = hv ? 3 : 2;      /* a marvel stays rare: at most two alive carry the same one, three when a garden shelters them */
+    if (cnt + (pend[id] || 0) >= cap || G.rand() >= (hv ? 0.25 : 0.125)) return false;      // one in eight; one in four when born in a safe garden
     pend[id] = (pend[id] || 0) + 1; return true;
   };
   G.marvelSave = function (c, cause) {
