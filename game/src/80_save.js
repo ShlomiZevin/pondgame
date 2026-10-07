@@ -32,11 +32,16 @@
     };
     // the most successful creatures, up to a budget
     const sorted = W.cre.slice().sort(function (a, b) { return (b.E / b.ph.Emax) - (a.E / a.ph.Emax); });
-    const maxC = Math.min(sorted.length, 110);
+    const maxC = Math.min(sorted.length, 220);
     for (let i = 0; i < maxC; i++) {
       const c = sorted[i];
       out.cre.push([G.packGenome(c.g), Math.round(c.x), Math.round(c.y), Math.round(c.E), c.age, c.sp, c.born, c.eb === undefined ? -1 : +c.eb.toFixed(2), c.ew === undefined ? -1 : +c.ew.toFixed(2), c.real ? 1 : 0, c.real ? c.real.why : '']);
     }
+    // children already on their way (spring's births come a few at a time) are saved as born, so a save in spring does not lose them
+    (W.births || []).slice(0, 60).forEach(function (b) { const c = b && b.c; if (!c || !c.g || out.cre.length >= 240) return; out.cre.push([G.packGenome(c.g), Math.round(b.x), Math.round(b.y), Math.round(c.E), c.age || 0, c.sp || 0, c.born === undefined ? W.gen : c.born, -1, -1, 0, '']); });
+    const all = out.cre;
+    const packCre = function () { const raw = JSON.stringify(all); let z = null; try { z = G.lzPack(raw); if (z && G.lzUnpack(z) !== raw) z = null; } catch (e) { console.error(e); z = null; } if (z) { out.creZ = z; out.cre = []; } else { delete out.creZ; out.cre = all; } };
+    packCre();
     const sp = W.species.filter(function (s) { return s.rep; }).sort(function (a, b) { return (b.extinct ? 0 : 1) - (a.extinct ? 0 : 1) || b.peak - a.peak; }).slice(0, 26);
     sp.forEach(function (s) { out.species.push([s.id, s.name, s.born, s.parent, s.extinct ? s.diedGen || 1 : 0, s.peak, s.kills || 0, Math.round(s.hue), G.packGenome(s.rep), s.hist.slice(-40), s.judge && !s.extinct ? { score: +s.judge.score.toFixed(2), why: s.judge.why, gen: s.judge.gen, fix: s.judge.fix || '', loved: s.loved ? 1 : 0 } : s.loved ? { loved: 1 } : null]); });
     W.fossils.slice(-12).forEach(function (f) { if (f.g) out.fossils.push([f.id, f.name, f.born, f.died, f.peak, G.packGenome(f.g)]); });
@@ -45,11 +50,12 @@
     if (s.length > 92000) { out.zones.forEach(function (z) { z.svg = ''; }); s = JSON.stringify(out); }
     if (s.length > 92000) { out.history = out.history.slice(-30); s = JSON.stringify(out); }
     for (let i = out.species.length - 1; i >= 0 && s.length > 92000; i--) { if (out.species[i][10]) { out.species[i][10] = null; s = JSON.stringify(out); } }
-    while (s.length > 92000 && (out.cre.length > 10 || out.species.length > 8 || out.fossils.length > 4)) {
+    if (s.length > 92000 && out.discLog && out.discLog.length > 20) { out.discLog = out.discLog.slice(-20); s = JSON.stringify(out); }
+    while (s.length > 92000 && (all.length > 10 || out.species.length > 8 || out.fossils.length > 4)) {
       if (out.fossils.length > 4) out.fossils.length = Math.max(4, out.fossils.length - 4);
       else if (out.species.length > 16) out.species.length = 16;
       else if (out.species.length > 12) out.species.length = Math.max(12, out.species.length - 4);
-      else if (out.cre.length > 10) out.cre.length = Math.max(10, out.cre.length - 6);
+      else if (all.length > 10) { all.length = Math.max(10, all.length - 6); packCre(); }
       else out.species.length = Math.max(8, out.species.length - 2);
       s = JSON.stringify(out);
     }
@@ -80,12 +86,57 @@
   G.on('new-pond', function () { if (G.mode === 'play') later(); });
   window.addEventListener('pagehide', function () { if (G.mode === 'play') G.saveNow(); });
 
+  // ── every creature fits ──
+  // A save has to stay under 100 kB, and written out plainly a creature takes about 700 characters: only some 50 of a pond's 130 fitted, so a pond
+  // came back from a reload with most of its creatures gone. The list of creatures is therefore packed (LZW over its JSON, written in base64 letters,
+  // about a quarter of the size) and kept in `creZ`; `cre` stays in the save as an empty list for readers that only check that it is there.
+  // The packing is checked by unpacking it again before it is trusted; if that ever fails the plain list is saved as before.
+  const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', MAXCODE = 65535;
+  const widthAt = function (i) { let v = Math.min(256 + i, MAXCODE), w = 0; while (v > 0) { w++; v >>= 1; } return w; };      // the i-th code is this many bits wide: both sides count alike
+  G.lzPack = function (str) {
+    const dict = new Map(); let next = 256, w = '', acc = 0, nb = 0, out = '', i = 0;
+    const emit = function (code) { const wd = widthAt(i++); for (let b = wd - 1; b >= 0; b--) { acc = (acc << 1) | ((code >> b) & 1); if (++nb === 6) { out += B64.charAt(acc); acc = 0; nb = 0; } } };
+    const codeOf = function (x) { return x.length === 1 ? x.charCodeAt(0) : dict.get(x); };
+    for (let k = 0; k < str.length; k++) {
+      const ch = str.charAt(k); if (ch.charCodeAt(0) > 255) return null;      /* plain text only */
+      const wc = w + ch;
+      if (wc.length === 1 || dict.has(wc)) w = wc;
+      else { emit(codeOf(w)); if (next <= MAXCODE) dict.set(wc, next++); w = ch; }
+    }
+    if (w) emit(codeOf(w));
+    if (nb) out += B64.charAt(acc << (6 - nb));
+    return out;
+  };
+  G.lzUnpack = function (z) {
+    const dict = []; let next = 256, pos = 0, i = 0, prev = null, out = [];
+    const total = z.length * 6;
+    const read = function (wd) { let v = 0; for (let b = 0; b < wd; b++) { const ci = B64.indexOf(z.charAt(Math.floor(pos / 6))); if (ci < 0) throw new Error('bad letter'); v = (v << 1) | ((ci >> (5 - pos % 6)) & 1); pos++; } return v; };
+    while (true) {
+      const wd = widthAt(i); if (pos + wd > total) break; i++;
+      const code = read(wd); let cur;
+      if (code < 256) cur = String.fromCharCode(code);
+      else if (code < next) cur = dict[code - 256];
+      else if (code === next && prev !== null) cur = prev + prev.charAt(0);
+      else throw new Error('bad code');
+      out.push(cur);
+      if (prev !== null && next <= MAXCODE) { dict.push(prev + cur.charAt(0)); next++; }
+      prev = cur;
+    }
+    return out.join('');
+  };
+  /** the creatures of a save, whichever way they were written */
+  G.saveCre = function (d) {
+    if (d && typeof d.creZ === 'string' && d.creZ.length < 400000 && !(Array.isArray(d.cre) && d.cre.length)) { try { const a = JSON.parse(G.lzUnpack(d.creZ)); if (Array.isArray(a)) return a.slice(0, 260); } catch (e) { console.error(e); } }
+    return Array.isArray(d && d.cre) ? d.cre : [];
+  };
+
   // a save is never trusted: every field is checked and clamped
   function num(v, a, b, d) { v = +v; return isFinite(v) ? clamp(v, a, b) : d; }
   G.validSave = function (d) {
     if (!d || typeof d !== 'object' || d.v !== 1 || !Array.isArray(d.cre)) return false;
     let ok = 0;
-    for (let i = 0; i < d.cre.length; i++) { if (Array.isArray(d.cre[i]) && G.unpackGenome(d.cre[i][0])) ok++; }
+    const cre = G.saveCre(d);
+    for (let i = 0; i < cre.length; i++) { if (Array.isArray(cre[i]) && G.unpackGenome(cre[i][0])) ok++; }
     return ok > 0 || (Array.isArray(d.fossils) && d.fossils.length > 0) || num(d.gen, 1, 1e6, 1) > 1;
   };
 
@@ -179,7 +230,7 @@
       z.made = num(q.made, 0, 1e7, 0); z.fed = num(q.fed, 0, 1e7, 0); z.hurt = num(q.hurt, 0, 1e9, 0); z.deaths = num(q.deaths, 0, 1e6, 0); z.vis = num(q.vis, 0, 1e9, 0); z.ate = num(q.ate, 0, 1e6, 0); z.hit = num(q.hit, 0, 100, 0); z.born = num(q.born, 0, 1e6, W.gen);
       if (Array.isArray(q.ev)) z.ev = q.ev.filter(function (e) { return e && typeof e.t === 'string'; }).slice(-8).map(function (e) { return { g: num(e.g, 0, 1e6, 0), t: e.t.slice(0, 60) }; });
     });
-    d.cre.forEach(function (r) {
+    G.saveCre(d).forEach(function (r) {
       if (!Array.isArray(r) || r.length < 7) return;
       const g = G.unpackGenome(r[0]); if (!g) return;
       const c = G.makeCreature(g, null, null, []);

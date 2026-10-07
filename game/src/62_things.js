@@ -63,11 +63,12 @@
       facts.push('<span style="color:var(--gold)">Its weakness: ' + w.text + '.</span> <b>' + (cre.length ? Math.round(100 * n / cre.length) : 0) + '%</b> of creatures carry them' + (z.hit > 0.02 ? ', and they have worn it down by <b>' + Math.round(Math.min(1, z.hit / 1.2) * 100) + '%</b>.' : '.'));
     }
     if (z.p.poison + z.p.acid + z.p.eats + (z.p.deadly || 0) > 0.25) { const a = G.adaptedTo(z); facts.push('The pond has adapted to it: <b>' + Math.round(a * 100) + '%</b>' + (a > 0.45 ? ' (they have learned to live with it).' : a > 0.2 ? ' (they are learning).' : ' (so far it still hurts).')); }
+    if (z.haven) { const n = Math.min(G.HAVEN_ROOM || 3, Math.max(z.hvPrev || 0, z.hvNow || 0)); facts.length = 0; facts.push('<b>' + n + ' of ' + (G.HAVEN_ROOM || 3) + '</b> places are taken. Only marvels can enter, and only through the gate at the bottom.', 'Inside, a marvel is fed, kept from harm and does not die of old age. A child born here is a marvel one time in four.', 'It stands for about <b>' + Math.round(z.life) + '</b> more seconds of pond time; then you can add another.'); }
     if (!facts.length) facts.push('Nothing has happened to it yet.');
     const ev = (z.ev || []).map(function (e) { return '<div><small>g' + e.g + '</small> ' + esc(e.t) + '</div>'; }).join('');
     const lifeTxt = living ? 'Health' : 'Time left';
     card.innerHTML = '<div class="ihead">' + picture(z) + '<div><b>' + esc(z.word) + (living && z.genN > 1 ? ' <small>· generation ' + z.genN + '</small>' : '') + '</b><small>' + esc(z.note || '') + '</small>' + (by ? '<small style="color:var(--gold)">imagined by ' + esc(by) + '</small>' : '') + '</div><button class="x" id="zclose" aria-label="Close">' + G.ICON.close + '</button></div>' +
-      '<div class="ilabel">What it does</div>' + (bars || '<small>Very little.</small>') +
+      '<div class="ilabel">What it does</div>' + (bars || (z.haven ? '<small>Shelters the marvels of the pond.</small>' : '<small>Very little.</small>')) +
       '<div class="ilabel">' + lifeTxt + '</div><div class="meter"><i id="zlife"></i></div>' +
       '<div class="ilabel">Its story</div><div class="log" style="height:auto;max-height:96px" id="zev">' + ev + '</div>' +
       '<div id="zfacts" style="font-size:11.5px;line-height:1.45;margin-top:6px">' + facts.join(' ') + '</div>';

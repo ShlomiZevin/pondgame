@@ -332,8 +332,11 @@
       const dx = x - c.x, dy = y - c.y, d = Math.sqrt(dx * dx + dy * dy) - o.ph.r;
       if (d < bd) { bd = d; best = o; }
     }
-    if (best && bd < (c.touch ? 55 : 42)) { G.selectZone(null); G.select(best); }
-    else { G.select(null); G.selectZone(G.zoneAt(c.x, c.y)); }
+    // a creature that was clicked ON wins; then whatever else is drawn under the click (a thing, something built, a wall, a plan); then the nearest creature
+    const hit = G.thingAt ? G.thingAt(c.x, c.y) : null, onIt = best && bd < (c.touch ? 26 : 10);
+    if (best && (onIt || (!hit && bd < (c.touch ? 55 : 42)))) { G.selectZone(null); if (G.selectThing) G.selectThing(null); G.select(best); }
+    else if (hit && G.selectThing) { G.select(null); G.selectThing(hit); }
+    else { G.select(null); if (G.selectThing) G.selectThing(null); G.selectZone(G.zoneAt(c.x, c.y)); }
   });
 
   G.select = function (c) {

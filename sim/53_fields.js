@@ -184,6 +184,7 @@
     return t.join(' · ');
   };
   G.fieldWords = words;
+  G.fieldLocate = locate;
   // The outline of a region, as something that GREW or was thrown up, not ruled with a ruler: every edge wanders and breathes a
   // little (each region in its own way, from its id). The effect on creatures keeps the plain shape underneath; the wander is small.
   function path(ctx, f, W) {

@@ -1,0 +1,81 @@
+// ── Everything in the pond can be clicked ──
+// Things the player added (and the marvels' garden) already had a card. Here the rest gets one too: what the creatures BUILT, the walls and regions
+// that events and plans put in the pond, and a plan while it is being carried out. The card is the same one a thing uses (#zcard), so it looks the same.
+// G.thingAt(x, y) finds whatever is drawn under a point: the click handler asks it before it falls back to "the nearest creature".
+(function () {
+  'use strict';
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  const esc = function (s) { return G.escapeHtml(String(s === undefined || s === null ? '' : s)); };
+  const cap = function (s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); };
+  const dot = function (s) { s = String(s || '').trim(); return s ? (/[.!?]$/.test(s) ? s : s + '.') : ''; };
+  const STEP = { gather: 'gathering', circle: 'in council', line: 'forming up', carry: 'fetching and carrying', build: 'building', charge: 'charging', guard: 'standing guard', scatter: 'setting off' };
+  let cur = null, lastSig = '';
+
+  /** what is drawn under this point, other than a creature: { k: 'zone' | 'work' | 'deed' | 'field', o } or null */
+  G.thingAt = function (x, y) {
+    const W = G.W; if (!W) return null;
+    const Wk = W.works || [];
+    for (let i = Wk.length - 1; i >= 0; i--) { const w = Wk[i]; if (Math.hypot(w.x - x, w.y - y) < Math.max(46, Math.min(w.r * 1.5, 190) * 0.5)) return { k: 'work', o: w }; }
+    const z = G.zoneAt(x, y); if (z) return { k: 'zone', o: z };
+    const d = W.deed; if (d) { const R = d.result ? d.result.size * Math.min(W.ww, W.wh) : 60; if (Math.hypot(d.x - x, d.y - y) < R + 12) return { k: 'deed', o: d }; }
+    const F = W.fields || [];
+    if (G.fieldLocate) for (let i = F.length - 1; i >= 0; i--) { const f = F[i]; if (f.shape === 'all' || W.t < f.start) continue; if (f.shape === 'ring') { const m = Math.min(W.ww, W.wh), dd = Math.hypot(f.x * W.ww - x, f.y * W.wh - y); if (Math.abs(dd - f.r * m) < Math.max(16, f.width * m * 0.3)) return { k: 'field', o: f }; continue; } if (G.fieldLocate(f, W, x, y, 10)) return { k: 'field', o: f }; }
+    return null;
+  };
+
+  function card() { return document.getElementById('zcard'); }
+  G.selectThing = function (hit) {
+    if (!hit) { if (cur) { cur = null; lastSig = ''; const c = card(); if (c && !G.R.selZone) c.classList.add('hide'); } return; }
+    if (hit.k === 'zone') { cur = null; G.selectZone(hit.o); return; }
+    G.selectZone(null);
+    cur = hit; lastSig = '';
+    if (G.sfx) G.sfx('click');
+    draw();
+  };
+  const head = function (pic, title, note, by) {
+    return '<div class="ihead">' + pic + '<div><b>' + esc(title) + '</b><small>' + esc(note) + '</small>' + (by ? '<small style="color:var(--gold)">' + esc(by) + '</small>' : '') + '</div><button class="x" id="zclose" aria-label="Close">' + G.ICON.close + '</button></div>';
+  };
+  const blob = function (hue) { return '<div style="flex:none;width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 40% 35%, ' + G.hsl(hue, 90, 80, 1) + ', ' + G.hsl(hue, 85, 50, 0.5) + ' 60%, transparent 72%)"></div>'; };
+  const meter = function (label, f) { f = Math.max(0, Math.min(1, f)); return '<div class="ilabel">' + label + '</div><div class="meter"><i style="width:' + Math.round(f * 100) + '%;background:' + (f > 0.5 ? G.PAL.algae : f > 0.2 ? G.PAL.gold : G.PAL.rose) + '"></i></div>'; };
+  const facts = function (L) { return '<div style="font-size:11.5px;line-height:1.5;margin-top:6px">' + L.filter(Boolean).join('<br>') + '</div>'; };
+  const fieldOf = function (id) { const F = (G.W && G.W.fields) || []; for (let i = 0; i < F.length; i++) if (F[i].id === id) return F[i]; return null; };
+
+  function draw() {
+    const W = G.W, c = card(); if (!c) return;
+    if (!cur || !W || G.mode !== 'play') { if (cur) { cur = null; c.classList.add('hide'); } return; }
+    const o = cur.o; let h = '', sig = '';
+    if (cur.k === 'work') {
+      if ((W.works || []).indexOf(o) < 0) { G.selectThing(null); return; }
+      const left = Math.max(0, o.until - W.t), f = fieldOf(o.field), does = f && G.fieldWords ? G.fieldWords(f) : '', fp = G.figurePic ? G.figurePic(o.name) : '';
+      sig = 'w' + o.name + Math.round(left / 2) + (fp ? 1 : 0);
+      if (sig === lastSig) return;
+      h = head(fp ? '<img alt="" width="64" height="64" style="flex:none;border-radius:14px;background:rgba(7,18,31,.55);padding:4px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(fp) + '">' : blob(o.hue || 50), o.name, cap(dot(o.looks)), 'Built by the ' + o.by + ' in generation ' + o.gen) +
+        '<div class="ilabel">What it does</div><small>' + (does ? esc(cap(does)) + '. It does not harm those who built it.' : 'It stands as their mark.') + '</small>' +
+        meter('Time left', left / Math.max(1, (f && f.life0) || 120)) +
+        facts([o.plan ? '<b>The plan:</b> ' + esc(o.plan) + '.' : '', o.what ? esc(cap(dot(o.what))) : '', o.why ? '<span style="color:var(--gold)">Why:</span> ' + esc(dot(o.why)) : '', 'It stands for about <b>' + Math.round(left) + '</b> more seconds of pond time.']);
+    } else if (cur.k === 'deed') {
+      if (W.deed !== o) { G.selectThing(null); return; }
+      const st = o.steps[o.i] || {}, n = W.cre.filter(function (x) { return x.deedId === o.id && !x.dead; }).length, togo = Math.max(1, Math.ceil(o.steps.slice(o.i).reduce(function (a, q) { return a + q.secs; }, 0) - o.t));
+      sig = 'd' + o.id + o.i + n + Math.round(togo / 2) + Math.round((o.progress || 0) * 20);
+      if (sig === lastSig) return;
+      h = head(blob(o.hue || 50), o.title, o.say ? '“' + o.say + '”' : '', 'A plan of the ' + o.kind + ', begun in generation ' + o.gen) +
+        '<div class="ilabel">Now</div><small><b style="color:var(--gold)">' + esc(cap(STEP[st.do] || st.do || '')) + (st.do === 'build' ? ' ' + Math.round((o.progress || 0) * 100) + '%' : '') + '</b> · step ' + (o.i + 1) + ' of ' + o.steps.length + ' · ' + n + ' of them · about ' + togo + ' s to go</small>' +
+        meter('How far along', (o.i + Math.min(1, o.t / Math.max(1, st.secs || 1))) / Math.max(1, o.steps.length)) +
+        facts([o.what ? esc(cap(dot(o.what))) : '', o.why ? '<span style="color:var(--gold)">Why:</span> ' + esc(dot(o.why)) : '', o.result && o.result.name ? 'If they finish, they will have built <b>' + esc(o.result.name) + '</b>.' : '']);
+    } else {
+      if ((W.fields || []).indexOf(o) < 0) { G.selectThing(null); return; }
+      const does = G.fieldWords ? G.fieldWords(o) : '', mine = (W.works || []).filter(function (w) { return w.field === o.id; })[0];
+      sig = 'f' + o.id + Math.round(o.life / 2) + (o.atk || 0);
+      if (sig === lastSig) return;
+      h = head(blob(o.hue === undefined ? 200 : o.hue), o.name, o.solid ? 'A wall across the pond.' : 'A part of the pond that is different from the rest.', mine ? 'Built by the ' + mine.by : 'It came with an event') +
+        '<div class="ilabel">What it does</div><small>' + (does ? esc(cap(does)) + '.' : 'Very little.') + '</small>' +
+        meter('Time left', o.life / Math.max(1, o.life0 || o.life || 1)) +
+        facts([o.solid && G.WEAK && G.WEAK[o.weak] ? '<span style="color:var(--gold)">Its weakness: ' + esc(G.WEAK[o.weak].text) + '.</span>' : '', o.atk ? '<b>' + o.atk + '</b> creatures are breaking through it now.' : '', 'It lasts about <b>' + Math.round(o.life) + '</b> more seconds of pond time.']);
+    }
+    lastSig = sig; c.innerHTML = h; c.classList.remove('hide');
+    const x = document.getElementById('zclose'); if (x) x.onclick = function () { G.selectThing(null); };
+  }
+  setInterval(function () { try { if (cur) draw(); } catch (e) { console.error(e); cur = null; } }, 500);
+  G.on('select', function (c) { if (c) G.selectThing(null); });
+  G.on('new-pond', function () { cur = null; lastSig = ''; });
+})();
