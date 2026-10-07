@@ -50,11 +50,18 @@
   };
   // once a generation: perhaps somebody takes something into their head. By generations, not by the clock: one chance in eight each generation
   // (a plan about every 8 generations on average); and only while it can be watched (not when time runs at full speed).
-  const ODDS = 0.125;      // each generation: one chance in eight that some kind takes something into its head
+  // each generation some kind may take something into its head. The chance grows with the creatures: one in ten for small simple ones, more as
+  // their brains gain thinking cells (most of all) and as their bodies grow, up to two in five.
+  G.deedOdds = function () {
+    const W = G.W; if (!W || !W.cre.length) return 0.1;
+    let h = 0, sz = 0; for (let i = 0; i < W.cre.length; i++) { h += W.cre[i].g.h; sz += W.cre[i].g.t[0]; }
+    h /= W.cre.length; sz /= W.cre.length;
+    return Math.max(0.1, Math.min(0.4, 0.1 + 0.035 * h + 0.003 * Math.max(0, sz - 10)));
+  };
   G.on('scored', function () {
     const W = G.W; if (!W || W.title || G.mode !== 'play' || W.deed || asking || G.speed > 16 || W.gen < 5 || W.cre.length < 14) return;
     const since = W.gen - (W.lastDeedGen === undefined ? 0 : W.lastDeedGen);
-    if (since < 2 || G.rand() >= ODDS) return;
+    if (since < 2 || G.rand() >= G.deedOdds()) return;
     if (G.deedAsk()) W.lastDeedGen = W.gen;
   });
 

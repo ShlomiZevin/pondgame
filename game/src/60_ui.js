@@ -231,6 +231,12 @@
         c.onclick = function () { G.sfx('click'); G.beginPlacing(JSON.parse(JSON.stringify(t))); closePop(); };
       });
     }
+    // a safe garden for the marvels, offered while there is a marvel to save and no garden yet
+    if (G.marvelsAlive && G.marvelsAlive() > 0 && G.HAVEN && !G.havenOf()) {
+      const hb = el('button', 'chip', '★ Marvel Garden', chips); hb.title = G.HAVEN.note; hb.style.cssText = 'border-color:rgba(246,211,101,.8);color:#ffe9a8;background:rgba(246,211,101,.12)';
+      hb.onclick = function () { G.sfx('click'); G.beginPlacing(JSON.parse(JSON.stringify(G.HAVEN))); closePop(); };
+      el('div', '', 'You have a marvel. Add a <b style="color:#f6d365">Marvel Garden</b> to keep it alive longer: it is free, marvels go to it, and their children there are often marvels too.', chips).style.cssText = 'flex-basis:100%;font-size:11.5px;line-height:1.4;color:#dcecff;margin:2px 2px 4px';
+    }
     const pool = SUGGEST.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 7);
     pool.forEach(function (w) { const c = el('button', 'chip', w, chips); c.onclick = function () { inp.value = w; submit(); }; });
     const submit = function () {

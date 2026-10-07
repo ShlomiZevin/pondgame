@@ -409,6 +409,7 @@ function drawAddedThings() {
     const z = W.zones[i];
     const fig = G.figureOf ? G.figureOf(z) : null, form = fig ? null : G.zoneForm ? G.zoneForm(z) : null, im = form || fig ? null : thingImage(z);
     const label = z.alive > 0.25 && z.genN > 1 ? z.word + ' · gen ' + z.genN : z.word;
+    if (z.haven) { ctx.save(); ctx.fillStyle = 'rgba(246,211,101,0.07)'; ctx.beginPath(); ctx.arc(z.x, z.y, z.r * 0.9, 0, 6.2832); ctx.fill(); ctx.strokeStyle = 'rgba(246,211,101,0.6)'; ctx.lineWidth = 3; ctx.setLineDash([10, 9]); ctx.lineDashOffset = -W.t * 8; ctx.stroke(); ctx.restore(); }      // the safe garden's golden bound
     drawOrb(ctx, z, z.x, z.y, z.r * 0.8, z.k, '', false, !!im || !!form || !!fig);
     if (form) {
       const sc = Math.max(84, z.r * 1.15) / 150 * (1 + 0.12 * Math.max(0, z.bite || 0));

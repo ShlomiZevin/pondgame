@@ -42,6 +42,8 @@
   G.lifeText = function (c) {
     const L = G.lifeOf(c), out = [];
     if (L.diet >= 0) out.push('Lives mostly on ' + FOODS[L.diet] + ' food.');
+    { const ph = c.ph; if (ph && ph.love > 0.3) out.push('Made for ' + FOODS[ph.fav] + ' food' + (ph.bane >= 0 ? '; ' + FOODS[ph.bane] + ' food makes it ill' + (c.ill ? ' (it has found that out ' + (c.ill === 1 ? 'once' : c.ill + ' times') + ')' : '') : '') + '.'); }
+    if (c.lessons > 3 && c.learned > 0.05) out.push('It has learned from ' + c.lessons + ' meals and mishaps.');
     if (L.land > 0.3) out.push('Spends its days on the shore.'); else if (L.shore > 0.3) out.push('Keeps to the water by the shore.'); else if (L.deep > 0.5) out.push('Lives in the dark deep.'); else if ((c.liveT || 0) > 3) out.push('Lives in open water.');
     return out.join(' ');
   };
@@ -431,7 +433,9 @@
           for (let yy = cy0; yy <= cy1; yy++) for (let xx = cx0; xx <= cx1; xx++) {
             for (let j = fg.head[yy * fg.cw + xx]; j >= 0; j = fg.next[j]) {
               const o = food[j];
-              if (o.dead || dig[o.tag] < dmin || (o.big && !ph.jaws) || (o.land && !ph.lungs)) continue;
+              if (o.dead) continue;
+              if (o.tag === ph.bane) { const dx = o.x - c.x, dy = o.y - c.y, d2 = dx * dx + dy * dy; if (d2 < bt && d2 < range * range * 0.36) { bt = d2; btx = dx; bty = dy; } continue; }
+              if (dig[o.tag] < dmin || (o.big && !ph.jaws) || (o.land && !ph.lungs)) continue;
               const dx = o.x - c.x, dy = o.y - c.y, d2 = dx * dx + dy * dy;
               if (d2 < bf && d2 < range * range) { bf = d2; bfx = dx; bfy = dy; }
             }
@@ -497,6 +501,11 @@
       let sticky = 1;
       for (let i = 0; i < W.zones.length; i++) {
         const z = W.zones[i];
+        if (z.haven && c.g.mv) {      /* a marvel is drawn to the safe garden, and inside it is fed, kept from harm and may have marvel children */
+          const hx = z.x - c.x, hy = z.y - c.y, hd = Math.sqrt(hx * hx + hy * hy) + 0.01;
+          if (hd < z.r * 0.9) { c.havenGen = W.gen; if (!(c.graceLeft >= 3)) c.graceLeft = 3; c.E = Math.min(ph.Emax, c.E + 1.6 * dt); c.vx *= 1 - 0.6 * dt; c.vy *= 1 - 0.6 * dt; }
+          else { c.vx += hx / hd * 70 * dt; c.vy += hy / hd * 70 * dt; }
+        }
         if (z.p.sticky) {
           const dx = c.x - z.x, dy = c.y - z.y;
           if (dx * dx + dy * dy < z.r * z.r) sticky += z.p.sticky * 2.2 * z.k * (1 - ph.cnt[8] * 0.08);
@@ -606,11 +615,18 @@
         for (let yy = cy0; yy <= cy1; yy++) for (let xx = cx0; xx <= cx1; xx++) {
           for (let j = fg.head[yy * fg.cw + xx]; j >= 0; j = fg.next[j]) {
             const o = food[j];
-            if (o.dead || dig[o.tag] < dmin || (o.big && !ph.jaws) || (o.land && !ph.lungs)) continue;
+            if (o.dead) continue;
+            if (o.tag === ph.bane && !o.big) {      /* it swallowed the food that does not agree with it: it is ill for a moment, and learns */
+              const bx = o.x - c.x, by = o.y - c.y;
+              if (bx * bx + by * by < ph.r * ph.r * 1.2) { c.E -= o.v * 0.45 * ph.baneS; c.illT = 2.2; c.ill = (c.ill || 0) + 1; o.dead = true; W.stats.ill = (W.stats.ill || 0) + 1; G.learn(c, -0.8); G.emit('ill', c, o); if (c.E <= 0) { kill(c, 'starved'); break; } }
+              continue;
+            }
+            if (dig[o.tag] < dmin || (o.big && !ph.jaws) || (o.land && !ph.lungs)) continue;
             const dx = o.x - c.x, dy = o.y - c.y;
             if (dx * dx + dy * dy < er * er && c.E < ph.Emax) {
-              const gain = o.v * ph.forage[o.tag] * (o.land ? Math.max(0.7, dig[o.tag]) : dig[o.tag]) * (ph.nh >= 4 ? 1 + 0.08 * Math.min(c.kin || 0, 5) : 1) * (o.land ? (ph.warm ? 1.25 : 1) * (ph.hands ? 1.3 : 1) : 1);
+              const gain = o.v * ph.forage[o.tag] * (o.land ? Math.max(0.7, dig[o.tag]) : dig[o.tag]) * (ph.nh >= 4 ? 1 + 0.08 * Math.min(c.kin || 0, 5) : 1) * (o.land ? (ph.warm ? 1.25 : 1) * (ph.hands ? 1.3 : 1) : 1) * (o.tag === ph.fav ? 1 + 0.3 * ph.love : 1);
               c.E = Math.min(ph.Emax, c.E + gain);
+              G.learn(c, 0.25 + 3 * gain / ph.Emax);
               c.intake += gain; (c.ate || (c.ate = [0, 0, 0, 0, 0, 0]))[o.tag] += gain;      // what it lived on (see G.lifeOf)
               c.P = Math.min(ph.Emax, c.P + gain * PROT[o.tag] * (o.big ? 1.5 : 1));
               o.dead = true;
@@ -654,12 +670,12 @@
             if (dx * dx + dy * dy < rr * rr) {
               c.cool = 1.2; did = true;
               // spikes hurt the biter, armour helps the bitten
-              c.E -= 4 * o.ph.spike;
+              c.E -= 4 * o.ph.spike; if (o.ph.spike > 0.2) G.learn(c, -0.5);
               const def = o.ph.defense + (o.colony ? 0.15 : 0);
               if (G.rand() < 0.85 - def * 0.85) {
                 const gain = (o.E * 0.55 + o.ph.r * 1.5) * ph.dig[o.ph.tag];
                 c.E = Math.min(ph.Emax, c.E + gain - 9 * o.ph.gland);
-                c.intake += gain;
+                c.intake += gain; G.learn(c, 0.8);
                 c.P = Math.min(ph.Emax, c.P + gain * 1.6);      // meat is the richest food there is
                 c.eatFlash = 1;
                 W.stats.killed++;
@@ -833,9 +849,10 @@
         { const sp0 = p.sp ? G.speciesById(p.sp) : null; G.form._fix = p.real && p.real.fix ? p.real.fix : sp0 && sp0.judge && sp0.judge.fix ? sp0.judge.fix : null;
           // what the watcher has lately said of the pond's creatures is advice for the whole pond, not only for the ones it happened to see
           if (!G.form._fix && W.advice && W.advice.length && G.rand() < 0.6) { const fvp = p.fv || (p.fv = G.features(p.g)); let best = null, bd = 2.2; for (let q = 0; q < W.advice.length; q++) { const a = W.advice[q]; if (W.gen - a.gen > 40 || !a.fv) continue; const dd = G.fdist(fvp, a.fv); if (dd < bd) { bd = dd; best = a; } } if (best) G.form._fix = best.fix; } }      // what the judge wished for its kind
+        G._mvHaven = p.havenGen === W.gen;      /* born in the safe garden: far likelier to carry its parent's marvel */
         G.form._life = G.lifeOf(p);      // what its parent ate and where it lived tilt what the child may grow
         const res = G.mutate(genome, wild, idea);
-        G.form._fix = null; G.form._life = null;
+        G.form._fix = null; G.form._life = null; G._mvHaven = false;
         const child = G.makeCreature(res.g, p, mate, res.muts);
         child.sp = p.sp;
         child.E = child.ph.Emax * K.repro * 0.95;
@@ -1161,6 +1178,8 @@
       model: info.model || '', alive: clamp(+info.alive || 0, 0, 1), health: 1, genN: info.genN || 1, kids: 0,
       made: 0, fed: 0, hurt: 0, deaths: 0, vis: 0, ate: 0, ev: [], born: W.gen, ma: G.rand() * PI2, bite: 0,
     };
+    // a safe garden for marvels: harmless, long-lived, and it shelters the marvels that live in it (see G.marvelBlessed)
+    if (info.haven) { z.haven = true; z.p.poison = z.p.acid = z.p.eats = z.p.deadly = z.p.vault = z.p.hard = z.p.moves = z.p.sticky = 0; z.alive = 0; z.r0 = Math.max(z.r0, 150); z.life = Math.max(z.life, 600); }
     if (z.p.vault > 0.2) { z.p.hard = 1; z.p.moves = 0; z.alive = 0; z.r0 = Math.max(z.r0, 165); z.life = 420; }    // a wall is big, solid, and only falls when it is broken
     z.look = info.look || (G.beingLook && !(z.p.vault > 0.2) && info.source !== 'ai' ? G.beingLook({ name: z.word, props: { eats: z.p.eats, moves: z.p.moves, deadly: z.p.deadly, poison: z.p.poison, light: z.p.light }, alive: z.alive }) : null);
     z.life0 = z.life;

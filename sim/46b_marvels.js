@@ -198,12 +198,16 @@
   };
   /** luck: danger sometimes misses (called as a creature is about to die) */
   /** is this the creature that was born with the marvel, in the first generations of its life (looked after so that it can be a parent, and it does not die of old age for a while)? Its children are not looked after: a marvel is rare, and stays rare. */
-  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && c.marvelBorn !== undefined && W && W.gen <= c.marvelBorn + 30); };
+  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && W && ((c.marvelBorn !== undefined && W.gen <= c.marvelBorn + 30) || (c.havenGen !== undefined && W.gen - c.havenGen <= 1))); };      // new, or living in a safe garden
+  /** the safe garden a player can add for the pond's marvels (nothing is asked of the AI: it costs nothing) */
+  G.HAVEN = { name: 'Marvel Garden', haven: true, props: { nutrition: 0.55, light: 0.35 }, tag: 2, hue: 48, radius: 150, life: 600, source: 'local', note: 'A safe garden. Marvels are drawn to it. Inside they are fed and kept from harm, they do not die of old age, and their children are far likelier to be marvels too.' };
+  G.havenOf = function () { const W = G.W; if (!W) return null; for (let i = 0; i < W.zones.length; i++) if (W.zones[i].haven) return W.zones[i]; return null; };
+  G.marvelsAlive = function () { const W = G.W; let n = 0; if (W) for (let i = 0; i < W.cre.length; i++) if (W.cre[i].g.mv && !W.cre[i].dead) n++; return n; };
   /** does a child of a carrier get the marvel? Seldom: it comes with the creature that was given it, not with its line. About one child in eight, and never past a few carriers in a pond. */
   G.marvelInherits = function (id) {
     const W = G.W; if (!W) return false;
-    const cnt = (W.mvCount && W.mvCount[id]) || 0, pend = W.mvPend = W.mvPend || {}, cap = Math.max(2, Math.ceil(0.035 * Math.max(1, W.cre.length)));
-    if (cnt + (pend[id] || 0) >= cap || G.rand() >= 0.125) return false;
+    const cnt = (W.mvCount && W.mvCount[id]) || 0, pend = W.mvPend = W.mvPend || {}, hv = !!G._mvHaven, cap = Math.max(2, Math.ceil(0.035 * Math.max(1, W.cre.length))) + (hv ? 3 : 0);
+    if (cnt + (pend[id] || 0) >= cap || G.rand() >= (hv ? 0.45 : 0.125)) return false;      // one in eight; nearly one in two when born in a safe garden
     pend[id] = (pend[id] || 0) + 1; return true;
   };
   G.marvelSave = function (c, cause) {

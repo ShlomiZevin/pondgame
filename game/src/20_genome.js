@@ -207,6 +207,12 @@
     }
     ph.bf = Int16Array.from(bf); ph.bv = Float32Array.from(bv); ph.bs = Int32Array.from(bs);
     ph.nh = g.h;
+    // Its favourite food is the one its gut is best at. The more its gut is made for that one food (and not spread over all of them), the more it
+    // gets from it, and the worse the opposite colour sits with it: a food it cannot digest at all then makes it ill. A creature that evolves a
+    // little digestion for that food loses the illness; one that digests everything a little has neither the bonus nor the illness.
+    { const dg = ph.dig; let fav = 0, sum = 0; for (let i = 0; i < 6; i++) { sum += Math.max(0, dg[i]); if (dg[i] > dg[fav]) fav = i; }
+      const love = clamp((dg[fav] / Math.max(0.01, sum) - 0.22) / 0.3, 0, 1), opp = (fav + 3) % 6, ill = love * clamp(1 - dg[opp] / G.K.foodDigestMin, 0, 1);
+      ph.fav = fav; ph.love = love; ph.bane = ill > 0.15 ? opp : -1; ph.baneS = ill; }
     if (mvd) { ph.mv = mvd; ph.mvsp = mvd.sp; if (mvd.sp === 'mind') { ph.turn *= 1.25; ph.speed *= 1.08; } }
     return ph;
   };
@@ -215,23 +221,40 @@
   // run the brain: reads c.inp (12), fills c.out (5)
   G.think = function (c) {
     const ph = c.ph, inp = c.inp, hv = c.hv, out = c.out, bf = ph.bf, bv = ph.bv, bs = ph.bs, nh = ph.nh;
+    if (!c.lw || c.lw.length !== bv.length) { c.lw = new Float32Array(bv.length); c.el = new Float32Array(bv.length); c.learned = 0; }
+    const lw = c.lw, el = c.el;
     for (let n = 0; n < nh; n++) {
       let s = 0;
       for (let j = bs[n]; j < bs[n + 1]; j++) {
         const f = bf[j];
-        s += (f < NIN ? inp[f] : hv[f - NIN]) * bv[j];
+        s += (f < NIN ? inp[f] : hv[f - NIN]) * (bv[j] + lw[j]);
       }
       hv[n] = tanh(s);
+      for (let j = bs[n]; j < bs[n + 1]; j++) { const f = bf[j]; el[j] = el[j] * 0.92 + (f < NIN ? inp[f] : hv[f - NIN]) * hv[n] * 0.08; }
     }
     for (let o = 0; o < NOUT; o++) {
       let s = 0;
       const idx = nh + o;
       for (let j = bs[idx]; j < bs[idx + 1]; j++) {
         const f = bf[j];
-        s += (f < NIN ? inp[f] : hv[f - NIN]) * bv[j];
+        s += (f < NIN ? inp[f] : hv[f - NIN]) * (bv[j] + lw[j]);
       }
       out[o] = o === 1 ? tanh(s) : (tanh(s) + 1) * 0.5;
+      { const post = o === 1 ? out[1] : out[o] * 2 - 1; for (let j = bs[idx]; j < bs[idx + 1]; j++) { const f = bf[j]; el[j] = el[j] * 0.92 + (f < NIN ? inp[f] : hv[f - NIN]) * post * 0.08; } }
     }
+  };
+
+  // ── learning in one life ──
+  // Every wire remembers how much it has just been in use (which sense was firing while which action was being taken). When something good happens
+  // (a meal) the wires that were in use grow a little stronger; when something bad happens (it is hurt, it eats what makes it ill) they grow
+  // weaker. So a creature gets better at what fed it and shyer of what hurt it, within its own life. What it learned is its own: its children
+  // are born with the genes, not the lessons. But a brain that learns well finds more food, so brains that are good at learning are the ones passed on.
+  G.LEARN = 0.15;
+  G.learn = function (c, reward) {
+    const lw = c.lw, el = c.el; if (!lw || !G.LEARN) return;
+    const k = G.LEARN * clamp(reward, -1, 1); let sum = 0;
+    for (let j = 0; j < lw.length; j++) { const v = lw[j] + k * el[j]; lw[j] = v > 0.9 ? 0.9 : v < -0.9 ? -0.9 : v; sum += Math.abs(lw[j]); }
+    c.learned = sum; c.lessons = (c.lessons || 0) + 1;
   };
 
   // ── mutation ──

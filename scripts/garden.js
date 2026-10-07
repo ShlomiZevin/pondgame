@@ -1,0 +1,30 @@
+// A Marvel Garden added from ADD, and the rare box with no plan running.  node scripts/garden.js   (no AI: free)
+const { chromium } = require('../../plaxzy-creator/node_modules/playwright-core');
+const path = require('path');
+(async () => {
+  const browser = await chromium.launch({ channel: 'chrome', headless: true });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
+  const errs = []; page.on('pageerror', (e) => errs.push('PAGEERROR ' + e.message));
+  await page.goto((process.env.BASE || 'http://localhost:8787') + '/dev?user=garden' + Date.now() + '&ai=0', { waitUntil: 'load' });
+  await page.waitForTimeout(2500);
+  const fr = page.frames().find((f) => f !== page.mainFrame());
+  await fr.locator('#tBegin').click(); await page.waitForTimeout(1200);
+  await fr.evaluate(() => G.setSpeed(64)); await page.waitForTimeout(14000); await fr.evaluate(() => G.setSpeed(1));
+  const got = await fr.evaluate(() => { if (!G.marvelsAlive()) G.grantMarvel(); return G.marvelsAlive(); });
+  console.log('marvels alive: ' + got);
+  await page.waitForTimeout(800);
+  await fr.locator('#bAdd, [data-pop="add"], button:has-text("ADD")').first().click(); await page.waitForTimeout(600);
+  await page.screenshot({ path: path.join(__dirname, 'garden-1-add.png') });
+  await fr.locator('button.chip:has-text("Marvel Garden")').click(); await page.waitForTimeout(300);
+  await page.mouse.click(720, 520); await page.waitForTimeout(600);
+  await fr.evaluate(() => G.setSpeed(8)); await page.waitForTimeout(9000); await fr.evaluate(() => G.setSpeed(1));
+  const st = await fr.evaluate(() => { const z = G.havenOf(), m = G.W.cre.filter((c) => c.g.mv && !c.dead); if (m[0]) { G.select(m[0]); G.focusOn(z.x, z.y, 1.6); } return { garden: !!z, marvels: m.length, inGarden: m.filter((c) => c.havenGen === G.W.gen).length }; });
+  console.log(JSON.stringify(st));
+  if (await fr.locator('#rarebox.shut').count()) await fr.locator('#rarebox .rk').click();
+  await page.waitForTimeout(1000);
+  if (await fr.locator('#rarebox [data-tab=plans]').count()) await fr.locator('#rarebox [data-tab=plans]').click();
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: path.join(__dirname, 'garden-2-pond.png') });
+  console.log(errs.slice(0, 6).join('\n') || 'no errors');
+  await browser.close();
+})().catch((e) => { console.error(e); process.exit(1); });

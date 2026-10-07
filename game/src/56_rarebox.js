@@ -23,6 +23,7 @@
     const does = G.marvelDoes(m);
     const pic = G.marvelPic ? G.marvelPic(m, 46) : '';
     return '<div class="mh">' + pic + '<div class="mt"><div class="mk">★ MARVEL · RARE</div><span class="mn">' + esc(m.name) + '</span></div></div><div class="mw">' + esc(m.wonder) + '</div>' +
+      '<div class="my" style="font-style:normal">' + (G.havenOf && G.havenOf() ? 'There is a Marvel Garden: it is safe while it lives there.' : 'To keep it alive longer: ADD → ★ Marvel Garden.') + '</div>' +
       ((does.length || m.why) ? '<details><summary>What it does</summary>' + (does.length ? '<ul>' + does.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>' : '') + (m.why ? '<div class="my">' + esc(m.why) + '</div>' : '') + '</details>' : '');
   };
   function ui() {
@@ -45,7 +46,7 @@
       '#rarebox .rn{display:inline-block;padding:0 8px;border-radius:999px;font-weight:700;font-size:11.5px;line-height:1.6;color:#fff;border:1px solid rgba(255,255,255,.35);white-space:nowrap}' +
       '#rarebox .rs{display:flex;gap:4px;margin-top:9px}#rarebox .rs span{flex:1;min-width:0;text-align:center;font:700 8.5px system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#8fb2d6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#rarebox .rs span:before{content:"";display:block;height:5px;border-radius:3px;background:rgba(207,232,255,.18);margin-bottom:3px}#rarebox .rs .dn{color:#bfe9d9}#rarebox .rs .dn:before{background:#33d6a6}#rarebox .rs .on{color:#f6d365}#rarebox .rs .on:before{background:linear-gradient(90deg,#f6d365 var(--p),rgba(207,232,255,.18) var(--p))}' +
       '#rarebox .rnow{margin-top:5px;font-size:12px;color:#dcecff}#rarebox .rnow b{font-size:12.5px;color:#f6d365}' +
-      '#rarebox .rstat{display:flex;gap:9px;align-items:flex-start;padding:9px 10px;border-radius:11px;background:rgba(7,18,31,.55);border:1px dashed rgba(143,178,214,.45)}#rarebox .rstat b{display:block;font:800 12.5px system-ui,sans-serif;color:#eaf4ff}#rarebox .rstat i{display:block;font:500 11.5px/1.4 system-ui,sans-serif;font-style:normal;color:#b9cde2;margin-top:2px}#rarebox .rdot{flex:none;width:9px;height:9px;border-radius:50%;margin-top:4px;background:#6f86a0}#rarebox .rstat.ask{border-style:solid;border-color:rgba(246,211,101,.7)}#rarebox .rstat.ask .rdot{background:#f6d365;animation:rpulse 1s ease-in-out infinite}#rarebox .rstat.off .rdot{background:#ff9db0}#rarebox .rstat.off b{color:#ffb9c6}@keyframes rpulse{50%{opacity:.25;transform:scale(1.5)}}' +
+      '#rarebox .rrow.idle{cursor:default}#rarebox .rrow.idle:hover{background:rgba(7,18,31,.38);border-color:rgba(207,232,255,.12)}#rarebox .rrow.idle .ric{opacity:.75}#rarebox .rrow.ask .ric{border-color:rgba(246,211,101,.7);color:#f6d365;animation:rpulse 1.2s ease-in-out infinite}#rarebox .rtag.wait{background:rgba(207,232,255,.1);border-color:rgba(207,232,255,.35);color:#dcecff}@keyframes rpulse{50%{opacity:.45}}' +
       '#rarebox .rnone{font-size:12px;color:#b9cde2;margin:8px 2px 0;line-height:1.45}' +
       '#rarebox{scrollbar-color:rgba(207,232,255,.35) transparent}#rarebox::-webkit-scrollbar{width:6px}#rarebox::-webkit-scrollbar-track{background:transparent}#rarebox::-webkit-scrollbar-thumb{background:rgba(207,232,255,.3);border-radius:3px}' +
       '#rarebox .tabs2{display:flex;gap:6px;margin:8px 0 2px}#rarebox .tabs2 span{flex:1;text-align:center;padding:6px 4px;border-radius:10px;cursor:pointer;font:700 11.5px system-ui,sans-serif;color:#b9cde2;background:rgba(7,18,31,.4);border:1px solid rgba(207,232,255,.14)}#rarebox .tabs2 span.on{color:#14202e;background:#f6d365;border-color:#f6d365}#rarebox .tabs2 span i{font-style:normal;opacity:.75;margin-left:4px}#rarebox .tabs2 span.new:not(.on){border-color:#f6d365;color:#ffe9a8}' +
@@ -114,12 +115,12 @@
     if (P && !d) {
       const from = G.DEED_FROM || 5, last = W.lastDeedGen, off = G.ai.over && G.ai.provider === 'server' && G.ai.over('deed'), ask = G.deedAsking && G.deedAsking();
       let big, small, cls = 'idle';
-      if (ask) { big = 'A kind is making up its mind…'; small = 'A new plan is being thought up right now. It starts here in a moment.'; cls = 'ask'; }
-      else if (off) { big = 'Nothing, and no new plans'; small = 'The budget for plans in this pond is used up. Raise it in the costs window to get plans again.'; cls = 'off'; }
-      else if (W.gen < from) { big = 'Nothing yet'; small = 'Plans start at generation ' + from + ' (now ' + W.gen + '). Then a kind of creature may decide to do something together: build, march, meet.'; }
-      else if (G.speed > 16) { big = 'Nothing running'; small = 'No plan starts while time runs this fast, because it could not be watched. Slow down to get plans.'; }
-      else { big = 'Nothing running'; small = 'A new plan can start at the end of any generation: about one chance in eight each time.' + (last !== undefined && Pa.length ? ' The last one began in generation ' + last + ', ' + (W.gen - last) + (W.gen - last === 1 ? ' generation' : ' generations') + ' ago.' : ''); }
-      h += '<div class="rh">Happening now</div><div class="rstat ' + cls + '"><span class="rdot"></span><span><b>' + big + '</b><i>' + small + '</i></span></div>';
+      if (ask) { big = 'A kind is making up its mind'; small = 'A new plan is being thought up right now. It starts here in a moment.'; cls = 'ask'; }
+      else if (off) { big = 'No new plans'; small = 'The budget for plans in this pond is used up. Raise it in the costs window to get plans again.'; cls = 'off'; }
+      else if (W.gen < from) { big = 'No plan yet'; small = 'Plans start at generation ' + from + ' (now ' + W.gen + '). Then a kind of creature may decide to do something together: build, march, meet.'; }
+      else if (G.speed > 16) { big = 'No plan right now'; small = 'No plan starts while time runs this fast, because it could not be watched. Slow down to get plans.'; }
+      else { const od = G.deedOdds ? G.deedOdds() : 0.125; big = 'No plan right now'; small = 'One can start when any generation ends: about 1 chance in ' + Math.max(2, Math.round(1 / od)) + ' now. Bigger brains and bodies plan together more often.' + (last !== undefined && Pa.length ? ' The last one began in generation ' + last + ', ' + (W.gen - last) + (W.gen - last === 1 ? ' generation' : ' generations') + ' ago.' : ''); }
+      h += '<div class="rh">Happening now</div><div class="rrow idle ' + cls + '"><span class="ric">' + (cls === 'ask' ? '…' : '⚑') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + big + '</b><span class="rtag ' + (cls === 'off' ? 'no' : 'wait') + '">' + (cls === 'ask' ? 'starting' : cls === 'off' ? 'off' : 'waiting') + '</span></span><div class="rsub">' + small + '</div></span></div>';
     }
     if (Wk.length && P) h += '<div class="rh">They built · ' + Wk.length + '</div>';
     for (let i = Wk.length - 1; i >= 0 && P; i--) { const w = Wk[i], pic = w.fig && G.figurePic && G.figurePic(w.name), fl = (W.fields || []).filter(function (f) { return f.id === w.field; })[0];

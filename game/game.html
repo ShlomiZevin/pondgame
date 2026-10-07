@@ -647,6 +647,12 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     }
     ph.bf = Int16Array.from(bf); ph.bv = Float32Array.from(bv); ph.bs = Int32Array.from(bs);
     ph.nh = g.h;
+    // Its favourite food is the one its gut is best at. The more its gut is made for that one food (and not spread over all of them), the more it
+    // gets from it, and the worse the opposite colour sits with it: a food it cannot digest at all then makes it ill. A creature that evolves a
+    // little digestion for that food loses the illness; one that digests everything a little has neither the bonus nor the illness.
+    { const dg = ph.dig; let fav = 0, sum = 0; for (let i = 0; i < 6; i++) { sum += Math.max(0, dg[i]); if (dg[i] > dg[fav]) fav = i; }
+      const love = clamp((dg[fav] / Math.max(0.01, sum) - 0.22) / 0.3, 0, 1), opp = (fav + 3) % 6, ill = love * clamp(1 - dg[opp] / G.K.foodDigestMin, 0, 1);
+      ph.fav = fav; ph.love = love; ph.bane = ill > 0.15 ? opp : -1; ph.baneS = ill; }
     if (mvd) { ph.mv = mvd; ph.mvsp = mvd.sp; if (mvd.sp === 'mind') { ph.turn *= 1.25; ph.speed *= 1.08; } }
     return ph;
   };
@@ -655,23 +661,40 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   // run the brain: reads c.inp (12), fills c.out (5)
   G.think = function (c) {
     const ph = c.ph, inp = c.inp, hv = c.hv, out = c.out, bf = ph.bf, bv = ph.bv, bs = ph.bs, nh = ph.nh;
+    if (!c.lw || c.lw.length !== bv.length) { c.lw = new Float32Array(bv.length); c.el = new Float32Array(bv.length); c.learned = 0; }
+    const lw = c.lw, el = c.el;
     for (let n = 0; n < nh; n++) {
       let s = 0;
       for (let j = bs[n]; j < bs[n + 1]; j++) {
         const f = bf[j];
-        s += (f < NIN ? inp[f] : hv[f - NIN]) * bv[j];
+        s += (f < NIN ? inp[f] : hv[f - NIN]) * (bv[j] + lw[j]);
       }
       hv[n] = tanh(s);
+      for (let j = bs[n]; j < bs[n + 1]; j++) { const f = bf[j]; el[j] = el[j] * 0.92 + (f < NIN ? inp[f] : hv[f - NIN]) * hv[n] * 0.08; }
     }
     for (let o = 0; o < NOUT; o++) {
       let s = 0;
       const idx = nh + o;
       for (let j = bs[idx]; j < bs[idx + 1]; j++) {
         const f = bf[j];
-        s += (f < NIN ? inp[f] : hv[f - NIN]) * bv[j];
+        s += (f < NIN ? inp[f] : hv[f - NIN]) * (bv[j] + lw[j]);
       }
       out[o] = o === 1 ? tanh(s) : (tanh(s) + 1) * 0.5;
+      { const post = o === 1 ? out[1] : out[o] * 2 - 1; for (let j = bs[idx]; j < bs[idx + 1]; j++) { const f = bf[j]; el[j] = el[j] * 0.92 + (f < NIN ? inp[f] : hv[f - NIN]) * post * 0.08; } }
     }
+  };
+
+  // ── learning in one life ──
+  // Every wire remembers how much it has just been in use (which sense was firing while which action was being taken). When something good happens
+  // (a meal) the wires that were in use grow a little stronger; when something bad happens (it is hurt, it eats what makes it ill) they grow
+  // weaker. So a creature gets better at what fed it and shyer of what hurt it, within its own life. What it learned is its own: its children
+  // are born with the genes, not the lessons. But a brain that learns well finds more food, so brains that are good at learning are the ones passed on.
+  G.LEARN = 0.15;
+  G.learn = function (c, reward) {
+    const lw = c.lw, el = c.el; if (!lw || !G.LEARN) return;
+    const k = G.LEARN * clamp(reward, -1, 1); let sum = 0;
+    for (let j = 0; j < lw.length; j++) { const v = lw[j] + k * el[j]; lw[j] = v > 0.9 ? 0.9 : v < -0.9 ? -0.9 : v; sum += Math.abs(lw[j]); }
+    c.learned = sum; c.lessons = (c.lessons || 0) + 1;
   };
 
   // ── mutation ──
@@ -2674,6 +2697,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   G.lifeText = function (c) {
     const L = G.lifeOf(c), out = [];
     if (L.diet >= 0) out.push('Lives mostly on ' + FOODS[L.diet] + ' food.');
+    { const ph = c.ph; if (ph && ph.love > 0.3) out.push('Made for ' + FOODS[ph.fav] + ' food' + (ph.bane >= 0 ? '; ' + FOODS[ph.bane] + ' food makes it ill' + (c.ill ? ' (it has found that out ' + (c.ill === 1 ? 'once' : c.ill + ' times') + ')' : '') : '') + '.'); }
+    if (c.lessons > 3 && c.learned > 0.05) out.push('It has learned from ' + c.lessons + ' meals and mishaps.');
     if (L.land > 0.3) out.push('Spends its days on the shore.'); else if (L.shore > 0.3) out.push('Keeps to the water by the shore.'); else if (L.deep > 0.5) out.push('Lives in the dark deep.'); else if ((c.liveT || 0) > 3) out.push('Lives in open water.');
     return out.join(' ');
   };
@@ -3063,7 +3088,9 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
           for (let yy = cy0; yy <= cy1; yy++) for (let xx = cx0; xx <= cx1; xx++) {
             for (let j = fg.head[yy * fg.cw + xx]; j >= 0; j = fg.next[j]) {
               const o = food[j];
-              if (o.dead || dig[o.tag] < dmin || (o.big && !ph.jaws) || (o.land && !ph.lungs)) continue;
+              if (o.dead) continue;
+              if (o.tag === ph.bane) { const dx = o.x - c.x, dy = o.y - c.y, d2 = dx * dx + dy * dy; if (d2 < bt && d2 < range * range * 0.36) { bt = d2; btx = dx; bty = dy; } continue; }
+              if (dig[o.tag] < dmin || (o.big && !ph.jaws) || (o.land && !ph.lungs)) continue;
               const dx = o.x - c.x, dy = o.y - c.y, d2 = dx * dx + dy * dy;
               if (d2 < bf && d2 < range * range) { bf = d2; bfx = dx; bfy = dy; }
             }
@@ -3129,6 +3156,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       let sticky = 1;
       for (let i = 0; i < W.zones.length; i++) {
         const z = W.zones[i];
+        if (z.haven && c.g.mv) {      /* a marvel is drawn to the safe garden, and inside it is fed, kept from harm and may have marvel children */
+          const hx = z.x - c.x, hy = z.y - c.y, hd = Math.sqrt(hx * hx + hy * hy) + 0.01;
+          if (hd < z.r * 0.9) { c.havenGen = W.gen; if (!(c.graceLeft >= 3)) c.graceLeft = 3; c.E = Math.min(ph.Emax, c.E + 1.6 * dt); c.vx *= 1 - 0.6 * dt; c.vy *= 1 - 0.6 * dt; }
+          else { c.vx += hx / hd * 70 * dt; c.vy += hy / hd * 70 * dt; }
+        }
         if (z.p.sticky) {
           const dx = c.x - z.x, dy = c.y - z.y;
           if (dx * dx + dy * dy < z.r * z.r) sticky += z.p.sticky * 2.2 * z.k * (1 - ph.cnt[8] * 0.08);
@@ -3238,11 +3270,18 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         for (let yy = cy0; yy <= cy1; yy++) for (let xx = cx0; xx <= cx1; xx++) {
           for (let j = fg.head[yy * fg.cw + xx]; j >= 0; j = fg.next[j]) {
             const o = food[j];
-            if (o.dead || dig[o.tag] < dmin || (o.big && !ph.jaws) || (o.land && !ph.lungs)) continue;
+            if (o.dead) continue;
+            if (o.tag === ph.bane && !o.big) {      /* it swallowed the food that does not agree with it: it is ill for a moment, and learns */
+              const bx = o.x - c.x, by = o.y - c.y;
+              if (bx * bx + by * by < ph.r * ph.r * 1.2) { c.E -= o.v * 0.45 * ph.baneS; c.illT = 2.2; c.ill = (c.ill || 0) + 1; o.dead = true; W.stats.ill = (W.stats.ill || 0) + 1; G.learn(c, -0.8); G.emit('ill', c, o); if (c.E <= 0) { kill(c, 'starved'); break; } }
+              continue;
+            }
+            if (dig[o.tag] < dmin || (o.big && !ph.jaws) || (o.land && !ph.lungs)) continue;
             const dx = o.x - c.x, dy = o.y - c.y;
             if (dx * dx + dy * dy < er * er && c.E < ph.Emax) {
-              const gain = o.v * ph.forage[o.tag] * (o.land ? Math.max(0.7, dig[o.tag]) : dig[o.tag]) * (ph.nh >= 4 ? 1 + 0.08 * Math.min(c.kin || 0, 5) : 1) * (o.land ? (ph.warm ? 1.25 : 1) * (ph.hands ? 1.3 : 1) : 1);
+              const gain = o.v * ph.forage[o.tag] * (o.land ? Math.max(0.7, dig[o.tag]) : dig[o.tag]) * (ph.nh >= 4 ? 1 + 0.08 * Math.min(c.kin || 0, 5) : 1) * (o.land ? (ph.warm ? 1.25 : 1) * (ph.hands ? 1.3 : 1) : 1) * (o.tag === ph.fav ? 1 + 0.3 * ph.love : 1);
               c.E = Math.min(ph.Emax, c.E + gain);
+              G.learn(c, 0.25 + 3 * gain / ph.Emax);
               c.intake += gain; (c.ate || (c.ate = [0, 0, 0, 0, 0, 0]))[o.tag] += gain;      // what it lived on (see G.lifeOf)
               c.P = Math.min(ph.Emax, c.P + gain * PROT[o.tag] * (o.big ? 1.5 : 1));
               o.dead = true;
@@ -3286,12 +3325,12 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
             if (dx * dx + dy * dy < rr * rr) {
               c.cool = 1.2; did = true;
               // spikes hurt the biter, armour helps the bitten
-              c.E -= 4 * o.ph.spike;
+              c.E -= 4 * o.ph.spike; if (o.ph.spike > 0.2) G.learn(c, -0.5);
               const def = o.ph.defense + (o.colony ? 0.15 : 0);
               if (G.rand() < 0.85 - def * 0.85) {
                 const gain = (o.E * 0.55 + o.ph.r * 1.5) * ph.dig[o.ph.tag];
                 c.E = Math.min(ph.Emax, c.E + gain - 9 * o.ph.gland);
-                c.intake += gain;
+                c.intake += gain; G.learn(c, 0.8);
                 c.P = Math.min(ph.Emax, c.P + gain * 1.6);      // meat is the richest food there is
                 c.eatFlash = 1;
                 W.stats.killed++;
@@ -3465,9 +3504,10 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         { const sp0 = p.sp ? G.speciesById(p.sp) : null; G.form._fix = p.real && p.real.fix ? p.real.fix : sp0 && sp0.judge && sp0.judge.fix ? sp0.judge.fix : null;
           // what the watcher has lately said of the pond's creatures is advice for the whole pond, not only for the ones it happened to see
           if (!G.form._fix && W.advice && W.advice.length && G.rand() < 0.6) { const fvp = p.fv || (p.fv = G.features(p.g)); let best = null, bd = 2.2; for (let q = 0; q < W.advice.length; q++) { const a = W.advice[q]; if (W.gen - a.gen > 40 || !a.fv) continue; const dd = G.fdist(fvp, a.fv); if (dd < bd) { bd = dd; best = a; } } if (best) G.form._fix = best.fix; } }      // what the judge wished for its kind
+        G._mvHaven = p.havenGen === W.gen;      /* born in the safe garden: far likelier to carry its parent's marvel */
         G.form._life = G.lifeOf(p);      // what its parent ate and where it lived tilt what the child may grow
         const res = G.mutate(genome, wild, idea);
-        G.form._fix = null; G.form._life = null;
+        G.form._fix = null; G.form._life = null; G._mvHaven = false;
         const child = G.makeCreature(res.g, p, mate, res.muts);
         child.sp = p.sp;
         child.E = child.ph.Emax * K.repro * 0.95;
@@ -3793,6 +3833,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       model: info.model || '', alive: clamp(+info.alive || 0, 0, 1), health: 1, genN: info.genN || 1, kids: 0,
       made: 0, fed: 0, hurt: 0, deaths: 0, vis: 0, ate: 0, ev: [], born: W.gen, ma: G.rand() * PI2, bite: 0,
     };
+    // a safe garden for marvels: harmless, long-lived, and it shelters the marvels that live in it (see G.marvelBlessed)
+    if (info.haven) { z.haven = true; z.p.poison = z.p.acid = z.p.eats = z.p.deadly = z.p.vault = z.p.hard = z.p.moves = z.p.sticky = 0; z.alive = 0; z.r0 = Math.max(z.r0, 150); z.life = Math.max(z.life, 600); }
     if (z.p.vault > 0.2) { z.p.hard = 1; z.p.moves = 0; z.alive = 0; z.r0 = Math.max(z.r0, 165); z.life = 420; }    // a wall is big, solid, and only falls when it is broken
     z.look = info.look || (G.beingLook && !(z.p.vault > 0.2) && info.source !== 'ai' ? G.beingLook({ name: z.word, props: { eats: z.p.eats, moves: z.p.moves, deadly: z.p.deadly, poison: z.p.poison, light: z.p.light }, alive: z.alive }) : null);
     z.life0 = z.life;
@@ -5602,12 +5644,16 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   };
   /** luck: danger sometimes misses (called as a creature is about to die) */
   /** is this the creature that was born with the marvel, in the first generations of its life (looked after so that it can be a parent, and it does not die of old age for a while)? Its children are not looked after: a marvel is rare, and stays rare. */
-  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && c.marvelBorn !== undefined && W && W.gen <= c.marvelBorn + 30); };
+  G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && W && ((c.marvelBorn !== undefined && W.gen <= c.marvelBorn + 30) || (c.havenGen !== undefined && W.gen - c.havenGen <= 1))); };      // new, or living in a safe garden
+  /** the safe garden a player can add for the pond's marvels (nothing is asked of the AI: it costs nothing) */
+  G.HAVEN = { name: 'Marvel Garden', haven: true, props: { nutrition: 0.55, light: 0.35 }, tag: 2, hue: 48, radius: 150, life: 600, source: 'local', note: 'A safe garden. Marvels are drawn to it. Inside they are fed and kept from harm, they do not die of old age, and their children are far likelier to be marvels too.' };
+  G.havenOf = function () { const W = G.W; if (!W) return null; for (let i = 0; i < W.zones.length; i++) if (W.zones[i].haven) return W.zones[i]; return null; };
+  G.marvelsAlive = function () { const W = G.W; let n = 0; if (W) for (let i = 0; i < W.cre.length; i++) if (W.cre[i].g.mv && !W.cre[i].dead) n++; return n; };
   /** does a child of a carrier get the marvel? Seldom: it comes with the creature that was given it, not with its line. About one child in eight, and never past a few carriers in a pond. */
   G.marvelInherits = function (id) {
     const W = G.W; if (!W) return false;
-    const cnt = (W.mvCount && W.mvCount[id]) || 0, pend = W.mvPend = W.mvPend || {}, cap = Math.max(2, Math.ceil(0.035 * Math.max(1, W.cre.length)));
-    if (cnt + (pend[id] || 0) >= cap || G.rand() >= 0.125) return false;
+    const cnt = (W.mvCount && W.mvCount[id]) || 0, pend = W.mvPend = W.mvPend || {}, hv = !!G._mvHaven, cap = Math.max(2, Math.ceil(0.035 * Math.max(1, W.cre.length))) + (hv ? 3 : 0);
+    if (cnt + (pend[id] || 0) >= cap || G.rand() >= (hv ? 0.45 : 0.125)) return false;      // one in eight; nearly one in two when born in a safe garden
     pend[id] = (pend[id] || 0) + 1; return true;
   };
   G.marvelSave = function (c, cause) {
@@ -6609,6 +6655,7 @@ function drawAddedThings() {
     const z = W.zones[i];
     const fig = G.figureOf ? G.figureOf(z) : null, form = fig ? null : G.zoneForm ? G.zoneForm(z) : null, im = form || fig ? null : thingImage(z);
     const label = z.alive > 0.25 && z.genN > 1 ? z.word + ' · gen ' + z.genN : z.word;
+    if (z.haven) { ctx.save(); ctx.fillStyle = 'rgba(246,211,101,0.07)'; ctx.beginPath(); ctx.arc(z.x, z.y, z.r * 0.9, 0, 6.2832); ctx.fill(); ctx.strokeStyle = 'rgba(246,211,101,0.6)'; ctx.lineWidth = 3; ctx.setLineDash([10, 9]); ctx.lineDashOffset = -W.t * 8; ctx.stroke(); ctx.restore(); }      // the safe garden's golden bound
     drawOrb(ctx, z, z.x, z.y, z.r * 0.8, z.k, '', false, !!im || !!form || !!fig);
     if (form) {
       const sc = Math.max(84, z.r * 1.15) / 150 * (1 + 0.12 * Math.max(0, z.bite || 0));
@@ -7729,11 +7776,18 @@ G.addSystem({
   };
   // once a generation: perhaps somebody takes something into their head. By generations, not by the clock: one chance in eight each generation
   // (a plan about every 8 generations on average); and only while it can be watched (not when time runs at full speed).
-  const ODDS = 0.125;      // each generation: one chance in eight that some kind takes something into its head
+  // each generation some kind may take something into its head. The chance grows with the creatures: one in ten for small simple ones, more as
+  // their brains gain thinking cells (most of all) and as their bodies grow, up to two in five.
+  G.deedOdds = function () {
+    const W = G.W; if (!W || !W.cre.length) return 0.1;
+    let h = 0, sz = 0; for (let i = 0; i < W.cre.length; i++) { h += W.cre[i].g.h; sz += W.cre[i].g.t[0]; }
+    h /= W.cre.length; sz /= W.cre.length;
+    return Math.max(0.1, Math.min(0.4, 0.1 + 0.035 * h + 0.003 * Math.max(0, sz - 10)));
+  };
   G.on('scored', function () {
     const W = G.W; if (!W || W.title || G.mode !== 'play' || W.deed || asking || G.speed > 16 || W.gen < 5 || W.cre.length < 14) return;
     const since = W.gen - (W.lastDeedGen === undefined ? 0 : W.lastDeedGen);
-    if (since < 2 || G.rand() >= ODDS) return;
+    if (since < 2 || G.rand() >= G.deedOdds()) return;
     if (G.deedAsk()) W.lastDeedGen = W.gen;
   });
 
@@ -7977,6 +8031,7 @@ G.addSystem({
     const does = G.marvelDoes(m);
     const pic = G.marvelPic ? G.marvelPic(m, 46) : '';
     return '<div class="mh">' + pic + '<div class="mt"><div class="mk">★ MARVEL · RARE</div><span class="mn">' + esc(m.name) + '</span></div></div><div class="mw">' + esc(m.wonder) + '</div>' +
+      '<div class="my" style="font-style:normal">' + (G.havenOf && G.havenOf() ? 'There is a Marvel Garden: it is safe while it lives there.' : 'To keep it alive longer: ADD → ★ Marvel Garden.') + '</div>' +
       ((does.length || m.why) ? '<details><summary>What it does</summary>' + (does.length ? '<ul>' + does.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>' : '') + (m.why ? '<div class="my">' + esc(m.why) + '</div>' : '') + '</details>' : '');
   };
   function ui() {
@@ -7999,7 +8054,7 @@ G.addSystem({
       '#rarebox .rn{display:inline-block;padding:0 8px;border-radius:999px;font-weight:700;font-size:11.5px;line-height:1.6;color:#fff;border:1px solid rgba(255,255,255,.35);white-space:nowrap}' +
       '#rarebox .rs{display:flex;gap:4px;margin-top:9px}#rarebox .rs span{flex:1;min-width:0;text-align:center;font:700 8.5px system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#8fb2d6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#rarebox .rs span:before{content:"";display:block;height:5px;border-radius:3px;background:rgba(207,232,255,.18);margin-bottom:3px}#rarebox .rs .dn{color:#bfe9d9}#rarebox .rs .dn:before{background:#33d6a6}#rarebox .rs .on{color:#f6d365}#rarebox .rs .on:before{background:linear-gradient(90deg,#f6d365 var(--p),rgba(207,232,255,.18) var(--p))}' +
       '#rarebox .rnow{margin-top:5px;font-size:12px;color:#dcecff}#rarebox .rnow b{font-size:12.5px;color:#f6d365}' +
-      '#rarebox .rstat{display:flex;gap:9px;align-items:flex-start;padding:9px 10px;border-radius:11px;background:rgba(7,18,31,.55);border:1px dashed rgba(143,178,214,.45)}#rarebox .rstat b{display:block;font:800 12.5px system-ui,sans-serif;color:#eaf4ff}#rarebox .rstat i{display:block;font:500 11.5px/1.4 system-ui,sans-serif;font-style:normal;color:#b9cde2;margin-top:2px}#rarebox .rdot{flex:none;width:9px;height:9px;border-radius:50%;margin-top:4px;background:#6f86a0}#rarebox .rstat.ask{border-style:solid;border-color:rgba(246,211,101,.7)}#rarebox .rstat.ask .rdot{background:#f6d365;animation:rpulse 1s ease-in-out infinite}#rarebox .rstat.off .rdot{background:#ff9db0}#rarebox .rstat.off b{color:#ffb9c6}@keyframes rpulse{50%{opacity:.25;transform:scale(1.5)}}' +
+      '#rarebox .rrow.idle{cursor:default}#rarebox .rrow.idle:hover{background:rgba(7,18,31,.38);border-color:rgba(207,232,255,.12)}#rarebox .rrow.idle .ric{opacity:.75}#rarebox .rrow.ask .ric{border-color:rgba(246,211,101,.7);color:#f6d365;animation:rpulse 1.2s ease-in-out infinite}#rarebox .rtag.wait{background:rgba(207,232,255,.1);border-color:rgba(207,232,255,.35);color:#dcecff}@keyframes rpulse{50%{opacity:.45}}' +
       '#rarebox .rnone{font-size:12px;color:#b9cde2;margin:8px 2px 0;line-height:1.45}' +
       '#rarebox{scrollbar-color:rgba(207,232,255,.35) transparent}#rarebox::-webkit-scrollbar{width:6px}#rarebox::-webkit-scrollbar-track{background:transparent}#rarebox::-webkit-scrollbar-thumb{background:rgba(207,232,255,.3);border-radius:3px}' +
       '#rarebox .tabs2{display:flex;gap:6px;margin:8px 0 2px}#rarebox .tabs2 span{flex:1;text-align:center;padding:6px 4px;border-radius:10px;cursor:pointer;font:700 11.5px system-ui,sans-serif;color:#b9cde2;background:rgba(7,18,31,.4);border:1px solid rgba(207,232,255,.14)}#rarebox .tabs2 span.on{color:#14202e;background:#f6d365;border-color:#f6d365}#rarebox .tabs2 span i{font-style:normal;opacity:.75;margin-left:4px}#rarebox .tabs2 span.new:not(.on){border-color:#f6d365;color:#ffe9a8}' +
@@ -8068,12 +8123,12 @@ G.addSystem({
     if (P && !d) {
       const from = G.DEED_FROM || 5, last = W.lastDeedGen, off = G.ai.over && G.ai.provider === 'server' && G.ai.over('deed'), ask = G.deedAsking && G.deedAsking();
       let big, small, cls = 'idle';
-      if (ask) { big = 'A kind is making up its mind…'; small = 'A new plan is being thought up right now. It starts here in a moment.'; cls = 'ask'; }
-      else if (off) { big = 'Nothing, and no new plans'; small = 'The budget for plans in this pond is used up. Raise it in the costs window to get plans again.'; cls = 'off'; }
-      else if (W.gen < from) { big = 'Nothing yet'; small = 'Plans start at generation ' + from + ' (now ' + W.gen + '). Then a kind of creature may decide to do something together: build, march, meet.'; }
-      else if (G.speed > 16) { big = 'Nothing running'; small = 'No plan starts while time runs this fast, because it could not be watched. Slow down to get plans.'; }
-      else { big = 'Nothing running'; small = 'A new plan can start at the end of any generation: about one chance in eight each time.' + (last !== undefined && Pa.length ? ' The last one began in generation ' + last + ', ' + (W.gen - last) + (W.gen - last === 1 ? ' generation' : ' generations') + ' ago.' : ''); }
-      h += '<div class="rh">Happening now</div><div class="rstat ' + cls + '"><span class="rdot"></span><span><b>' + big + '</b><i>' + small + '</i></span></div>';
+      if (ask) { big = 'A kind is making up its mind'; small = 'A new plan is being thought up right now. It starts here in a moment.'; cls = 'ask'; }
+      else if (off) { big = 'No new plans'; small = 'The budget for plans in this pond is used up. Raise it in the costs window to get plans again.'; cls = 'off'; }
+      else if (W.gen < from) { big = 'No plan yet'; small = 'Plans start at generation ' + from + ' (now ' + W.gen + '). Then a kind of creature may decide to do something together: build, march, meet.'; }
+      else if (G.speed > 16) { big = 'No plan right now'; small = 'No plan starts while time runs this fast, because it could not be watched. Slow down to get plans.'; }
+      else { const od = G.deedOdds ? G.deedOdds() : 0.125; big = 'No plan right now'; small = 'One can start when any generation ends: about 1 chance in ' + Math.max(2, Math.round(1 / od)) + ' now. Bigger brains and bodies plan together more often.' + (last !== undefined && Pa.length ? ' The last one began in generation ' + last + ', ' + (W.gen - last) + (W.gen - last === 1 ? ' generation' : ' generations') + ' ago.' : ''); }
+      h += '<div class="rh">Happening now</div><div class="rrow idle ' + cls + '"><span class="ric">' + (cls === 'ask' ? '…' : '⚑') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + big + '</b><span class="rtag ' + (cls === 'off' ? 'no' : 'wait') + '">' + (cls === 'ask' ? 'starting' : cls === 'off' ? 'off' : 'waiting') + '</span></span><div class="rsub">' + small + '</div></span></div>';
     }
     if (Wk.length && P) h += '<div class="rh">They built · ' + Wk.length + '</div>';
     for (let i = Wk.length - 1; i >= 0 && P; i--) { const w = Wk[i], pic = w.fig && G.figurePic && G.figurePic(w.name), fl = (W.fields || []).filter(function (f) { return f.id === w.field; })[0];
@@ -8410,6 +8465,12 @@ G.addSystem({
         const c = el('button', 'chip', (pic ? '<img alt="" width="' + (fp ? 30 : 20) + '" height="' + (fp ? 36 : 20) + '" style="vertical-align:middle;margin:' + (fp ? '-6px 6px -6px -4px' : '0 5px 0 0') + '" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pic) + '">' : '') + escapeHtml(t.name), row);
         c.onclick = function () { G.sfx('click'); G.beginPlacing(JSON.parse(JSON.stringify(t))); closePop(); };
       });
+    }
+    // a safe garden for the marvels, offered while there is a marvel to save and no garden yet
+    if (G.marvelsAlive && G.marvelsAlive() > 0 && G.HAVEN && !G.havenOf()) {
+      const hb = el('button', 'chip', '★ Marvel Garden', chips); hb.title = G.HAVEN.note; hb.style.cssText = 'border-color:rgba(246,211,101,.8);color:#ffe9a8;background:rgba(246,211,101,.12)';
+      hb.onclick = function () { G.sfx('click'); G.beginPlacing(JSON.parse(JSON.stringify(G.HAVEN))); closePop(); };
+      el('div', '', 'You have a marvel. Add a <b style="color:#f6d365">Marvel Garden</b> to keep it alive longer: it is free, marvels go to it, and their children there are often marvels too.', chips).style.cssText = 'flex-basis:100%;font-size:11.5px;line-height:1.4;color:#dcecff;margin:2px 2px 4px';
     }
     const pool = SUGGEST.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 7);
     pool.forEach(function (w) { const c = el('button', 'chip', w, chips); c.onclick = function () { inp.value = w; submit(); }; });
@@ -8895,7 +8956,7 @@ G.addSystem({
     '#gbwin .gtop{display:flex;align-items:center;gap:14px;margin-bottom:6px}#gbwin .gtop canvas{flex:none;width:92px;height:92px}#gbwin .gtop>div{flex:1;min-width:0}#gbwin .gtop b{display:block;font:800 17px/1.25 system-ui,sans-serif;color:#fff}#gbwin .gtop small{display:block;font:500 13px/1.45 system-ui,sans-serif;color:#c4d8ee;margin-top:3px}' +
     '#gbwin .gcols{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px}@media (max-width:820px){#gbwin .gcols{grid-template-columns:minmax(0,1fr)}}' +
     '#gbwin h3{font:800 12px system-ui,sans-serif;letter-spacing:.22em;color:#f6d365;margin:12px 0 8px}#gbwin h4{font:800 10.5px system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#8fb2d6;margin:13px 0 6px}' +
-    '#gbwin .grow{display:grid;grid-template-columns:104px minmax(0,1fr) 58px;align-items:center;gap:9px;font:600 13px system-ui,sans-serif;padding:3px 0}#gbwin .grow .gl{display:flex;align-items:center;gap:7px;color:#e8f3ff}#gbwin .grow .gl i{flex:none;width:11px;height:11px;border-radius:50%}' +
+    '#gbwin .grow{display:grid;grid-template-columns:104px minmax(0,1fr) 84px;align-items:center;gap:9px;font:600 13px system-ui,sans-serif;padding:3px 0}#gbwin .grow .gl{display:flex;align-items:center;gap:7px;color:#e8f3ff}#gbwin .grow .gl i{flex:none;width:11px;height:11px;border-radius:50%}' +
     '#gbwin .gbar{height:9px;border-radius:5px;background:rgba(207,232,255,.13);overflow:hidden}#gbwin .gbar u{display:block;height:100%;border-radius:5px}#gbwin .grow .gv{text-align:right;font:700 12px system-ui,sans-serif;color:#c4d8ee;white-space:nowrap}' +
     '#gbwin .grow.new .gl{color:#ff9ec6}#gbwin .grow.new .gv:after{content:" new";color:#ff7eb6}' +
     '#gbwin .gchips{display:flex;flex-wrap:wrap;gap:6px}#gbwin .gchips span{font:700 12px system-ui,sans-serif;padding:5px 10px;border-radius:999px;background:rgba(207,232,255,.1);border:1px solid rgba(207,232,255,.2);color:#eaf4ff}#gbwin .gchips span.org{border-color:rgba(246,211,101,.7);color:#ffe9a8}' +
@@ -8915,8 +8976,8 @@ G.addSystem({
     win.innerHTML = '<div class="gtop"><canvas id="gbprev" width="184" height="184"></canvas><div><b id="gbname"></b><small id="gbsub"></small></div><button class="btn sm" id="gbclose">' + (G.ICON.close || '') + 'CLOSE</button></div>' +
       '<div class="gcols"><div><h3>GENES · WHAT IT IS MADE OF</h3><div id="gbgenes"></div></div>' +
       '<div><h3>BRAIN · WATCH IT THINK</h3><canvas id="gbbrain" width="1160" height="760"></canvas><div class="gsay" id="gbsay"></div>' +
-      '<div class="gleg"><span><i style="background:' + PAL.algae + '"></i>a wire that says "do it"</span><span><i style="background:' + PAL.rose + '"></i>a wire that says "do not"</span><span><i style="background:#fff;height:7px"></i>thicker = stronger</span><span><i class="d" style="background:#fff"></i>moving dots = a signal passing right now</span></div>' +
-      '<p class="gnote">The wires are genes too: a creature is born with them and they do not change during its life. Children get them from both parents, with small changes, and the brains that find food and stay alive are the ones passed on.</p></div></div>';
+      '<div class="gleg"><span><i style="background:' + PAL.algae + '"></i>a wire that says "do it"</span><span><i style="background:' + PAL.rose + '"></i>a wire that says "do not"</span><span><i style="background:#fff;height:7px"></i>thicker = stronger</span><span><i class="d" style="background:#fff"></i>moving dots = a signal passing right now</span><span><i style="background:' + PAL.gold + ';height:7px"></i>gold edge = changed by what it learned in its life</span></div>' +
+      '<p class="gnote">The wires are genes: a creature is born with them, from both parents, with small changes. During its life it also learns: wires that were in use just before a meal grow stronger, wires in use just before it was hurt or ate what makes it ill grow weaker. What it learned stays its own; its children get the genes, not the lessons.</p></div></div>';
     $('gbclose').onclick = function () { G.sfx('click'); close(); };
     win.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
     win.addEventListener('wheel', function (e) { e.stopPropagation(); }, { passive: true });
@@ -8939,7 +9000,8 @@ G.addSystem({
     h += row('Temper', g.t[4], PAL.rose, word(g.t[4], 'gentle', 'fierce', 'bold'), mut.t4);
     h += '<div class="grow' + (mut.t2 ? ' new' : '') + '"><span class="gl">Colour</span><span class="gbar" style="height:14px"><u style="width:100%;background:' + G.hsl(g.t[2], 80, 60, 1) + '"></u></span><span class="gv"></span></div>';
     h += '<h4>What it can eat (how well it digests each food)</h4>';
-    for (let i = 0; i < 6; i++) h += row(FOOD[i] + ' food', g.c[i], FOODCOL[i], pct(g.c[i]), mut['c' + i], FOODCOL[i]);
+    for (let i = 0; i < 6; i++) h += row(FOOD[i] + ' food', g.c[i], FOODCOL[i], c.ph.bane === i ? 'makes it ill' : (c.ph.fav === i && c.ph.love > 0.3 ? '\u2665 ' : '') + pct(g.c[i]), mut['c' + i], FOODCOL[i]);
+    if (c.ph.love > 0.3) h += '<div class="gnone" style="margin-top:4px">\u2665 its favourite: it gets ' + Math.round(30 * c.ph.love) + '% more from it.' + (c.ph.bane >= 0 ? ' The opposite colour, ' + FOOD[c.ph.bane] + ', makes it ill until its kind evolves a stomach for it.' : '') + '</div>';
     h += '<h4>What it can stand</h4>';
     h += row('Heat', g.c[6], '#ffb37a', pct(g.c[6]), mut.c6) + row('Cold', g.c[7], '#9fd6ff', pct(g.c[7]), mut.c7) + row('Poison', g.c[8], PAL.violet, pct(g.c[8]), mut.c8);
     // how the body is built: counted in plain words
@@ -8975,10 +9037,13 @@ G.addSystem({
     ctx.fillText('WHAT IT SENSES', X[0] - 70, 34); ctx.fillText('THINKING CELLS', X[1], 34); ctx.fillText('WHAT IT DOES', X[2] + 70, 34);
     const used = {};
     for (let i = 0; i < g.w.length; i++) { used[g.w[i].f] = 1; used[g.w[i].t] = 1; }
+    // what this one has learned in its life: its own change to each wire (the brain keeps wires grouped by where they end, so they are matched up here)
+    const LW = []; if (c.lw) { const nt = g.h + G.NOUT, at = []; for (let i = 0; i < nt; i++) at.push(c.ph.bs[i]); for (let i = 0; i < g.w.length; i++) { const w = g.w[i], ti = w.t >= 200 ? g.h + (w.t - 200) : w.t - 100; if (ti >= 0 && ti < nt) LW[i] = c.lw[at[ti]++] || 0; } }
     // wires, and the signals moving along them
     for (let i = 0; i < g.w.length; i++) {
-      const w = g.w[i], a = pos(w.f), b = pos(w.t), mx = (a[0] + b[0]) / 2, sig = Math.min(1, Math.abs((val(w.f) || 0) * w.v)), col = w.v >= 0 ? PAL.algae : PAL.rose;
-      ctx.strokeStyle = G.rgba(col, 0.22 + 0.7 * sig); ctx.lineWidth = 1.5 + Math.min(7, Math.abs(w.v) * 3.6);
+      const w = g.w[i], a = pos(w.f), b = pos(w.t), mx = (a[0] + b[0]) / 2, lv = LW[i] || 0, wv = w.v + lv, sig = Math.min(1, Math.abs((val(w.f) || 0) * wv)), col = wv >= 0 ? PAL.algae : PAL.rose;
+      if (Math.abs(lv) > 0.04) { ctx.strokeStyle = G.rgba(PAL.gold, Math.min(0.75, 0.2 + Math.abs(lv))); ctx.lineWidth = 5.5 + Math.min(7, Math.abs(wv) * 3.6); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.bezierCurveTo(mx, a[1], mx, b[1], b[0], b[1]); ctx.stroke(); }
+      ctx.strokeStyle = G.rgba(col, 0.22 + 0.7 * sig); ctx.lineWidth = 1.5 + Math.min(7, Math.abs(wv) * 3.6);
       ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.bezierCurveTo(mx, a[1], mx, b[1], b[0], b[1]); ctx.stroke();
       if (sig > 0.12) {
         const u = (t * (0.5 + sig * 0.7) + i * 0.37) % 1, v = 1 - u;
@@ -9317,6 +9382,8 @@ G.addSystem({
       '#wish .wk{display:flex;justify-content:space-between;gap:10px;white-space:nowrap}#wish .wk span:last-child{letter-spacing:.06em;text-transform:none;font-size:11px;color:#ffe9a8}#wish .wt{font-size:17px !important;line-height:1.25;margin:3px 0 6px}' +
       '#wish .wrow{display:flex;justify-content:space-between;font:600 12px system-ui,sans-serif;color:#dcecff}#wish .wrow b{color:#f6d365;font-size:13px}#wish .wrow span:last-child{color:#b9cde2;font-weight:500}' +
       '#wish .wsub{font:500 12.5px/1.4 system-ui,sans-serif;color:#eaf4ff;white-space:normal !important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:4px}#wish.open .wsub{display:block}#wish .wsub u{text-decoration:none;font:800 9px system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#8fb2d6;margin-right:5px}' +
+      '#wish .wfoot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(207,232,255,.16)}#wish .wfoot span{font:500 11.5px/1.4 system-ui,sans-serif;color:#b9cde2;white-space:normal}#wish .wfoot .wbtn{flex:none;margin:0;background:#f6d365;color:#1a2433;border-color:#f6d365;font-weight:800}' +
+      '#wish #wishMin{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-left:8px;border-radius:50%;text-decoration:none;font-size:11px;color:#cfe8ff;background:rgba(7,18,31,.55);border:1px solid rgba(207,232,255,.25);vertical-align:middle}#wish #wishMin:hover{border-color:#f6d365;color:#f6d365}#wish.min{width:auto;max-width:min(470px,calc(100vw - 28px));padding:7px 14px}#wish.min .wk{align-items:center}#wish.min .wmt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-transform:none;letter-spacing:0;font:700 12.5px system-ui,sans-serif;color:#fff}' +
       '#wish .wmore{display:none;margin-top:8px;padding-top:8px;border-top:1px solid rgba(207,232,255,.14)}#wish.open .wmore{display:block}' +
       '#wish .wmore p{margin:0;font-size:12px;line-height:1.45;color:#cfe8ff;opacity:.9}#wish .wsay{font-style:italic;font-size:13px !important;color:#fff !important;opacity:1 !important}' +
       '#wish .wlab{font:700 9px system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#f6d365;opacity:.85;margin:9px 0 3px}' +
@@ -9330,6 +9397,8 @@ G.addSystem({
     box = document.createElement('div'); box.id = 'wish'; box.className = 'glass hide';
     (document.getElementById('ui') || document.body).appendChild(box);
     box.addEventListener('click', function (e) {
+      if (e.target && e.target.id === 'wishMin') { e.stopPropagation(); S.min = !S.min; try { localStorage.setItem('primordia.wishMin', S.min ? '1' : ''); } catch (er) {} if (G.sfx) G.sfx('click'); draw(); return; }
+      if (S.min) { S.min = false; try { localStorage.setItem('primordia.wishMin', ''); } catch (er) {} if (G.sfx) G.sfx('click'); draw(); return; }
       if (e.target && e.target.id === 'wishAnother') { e.stopPropagation(); another(); return; }
       if (e.target && e.target.id === 'wishCheck') { e.stopPropagation(); check(true); draw(); return; }
       S.open = !S.open; box.classList.toggle('open', S.open); if (G.sfx) G.sfx('click');
@@ -9343,13 +9412,16 @@ G.addSystem({
     if (!on) return;
     if (S.busy || !S.cur) { box.classList.remove('open'); S.open = false; box.innerHTML = '<div class="wk"><span>✦ The wish of the pond</span></div><div class="wdream"><span class="wdot"></span>' + (S.asked === 'another' ? 'The pond is dreaming of something else…' : S.asked === 'next' ? 'The pond is dreaming its next wish…' : 'The pond is dreaming…') + '</div>'; return; }
     const b = S.best, pct = b ? Math.round(b.close * 10) : 0;
+    if (S.min === undefined) { try { S.min = !!localStorage.getItem('primordia.wishMin'); } catch (er) { S.min = false; } }
+    box.classList.toggle('min', !!S.min);
+    if (S.min) { box.classList.remove('open'); S.open = false; box.innerHTML = '<div class="wk" title="Open the wish"><span>✦ Wish</span><span class="wmt">' + esc(S.cur.title) + '</span><span>' + (b ? b.close : 0) + ' of 10 ▸</span></div>'; return; }
     const here = (G.W && G.W.wishN) || 0;
-    box.innerHTML = '<div class="wk"><span>✦ The pond wishes for</span><span>' + (here ? '★ ' + here + ' granted in this pond' : '') + '</span></div>' +
+    box.innerHTML = '<div class="wk"><span>✦ The pond wishes for</span><span>' + (here ? '★ ' + here + ' granted in this pond' : '') + '<u id="wishMin" title="Fold away">▾</u></span></div>' +
       '<div class="wt">' + esc(S.cur.title) + '</div>' +
       '<div class="wrow"><span>Closest creature: <b>' + (b ? b.close : 0) + ' of 10</b></span><span>comes true at ' + NEED + '</span></div>' +
-      '<div style="display:flex;align-items:center;gap:8px;margin:6px 0 2px"><button class="wbtn" id="wishCheck"' + (S.checking || (G.ai.over && G.ai.over('wishcheck')) ? ' disabled style="opacity:.5"' : '') + '>' + (S.checking ? 'LOOKING…' : 'CHECK NOW') + '</button><span style="font-size:11px;opacity:.75">' + (S.note || 'The pond looks only when you ask (about a third of a cent).') + '</span></div>' +
-      '<div class="wbar"><i style="width:' + pct + '%"></i><b></b></div>' +
-      '<div class="wsub">' + (b ? '<u>Still missing</u> ' + esc(String(b.why).replace(/\.+$/, '')) + '.' : 'Nobody has been looked at yet. Press CHECK NOW when you think one is close.') + (G.ai.over && G.ai.over('wishcheck') ? ' <b style="color:#ff9db0">Looking is OFF: its budget for this pond is used up.</b>' : '') + '</div>' +
+            '<div class="wbar"><i style="width:' + pct + '%"></i><b></b></div>' +
+      '<div class="wsub">' + (b ? '<u>Still missing</u> ' + esc(String(b.why).replace(/\.+$/, '')) + '.' : 'Nobody has been looked at yet.') + (G.ai.over && G.ai.over('wishcheck') ? ' <b style="color:#ff9db0">Looking is OFF: its budget for this pond is used up.</b>' : '') + '</div>' +
+      '<div class="wfoot"><span>' + (S.note || 'The pond looks at its creatures only when you ask. One look costs about a third of a cent.') + '</span><button class="wbtn" id="wishCheck"' + (S.checking || (G.ai.over && G.ai.over('wishcheck')) ? ' disabled style="opacity:.5"' : '') + '>' + (S.checking ? 'LOOKING…' : 'CHECK NOW') + '</button></div>' +
       '<div class="wmore"><p class="wsay">“' + esc(S.cur.text) + '”</p>' +
       '<div class="wlab">It must have</div><div class="wneeds">' + S.cur.needs.map(function (n) { return '<span class="wchip">' + esc(n) + '</span>'; }).join('') + '</div>' +
       (S.cur.hint ? '<div class="wlab">A thought</div><p>' + esc(S.cur.hint) + '</p>' : '') +
@@ -10459,7 +10531,7 @@ G.addSystem({
       history: (W.history || []).slice(-90), evShelf: (W.evShelf || []).slice(-10).map(function (e) { const c = JSON.parse(JSON.stringify(e)); if (c.thing) c.thing.svg = ''; return c; }),
       shelf: (W.shelf || []).slice(-12).map(function (t) { return Object.assign({}, t, { svg: t.svg && t.svg.length < 1500 ? t.svg : '' }); }),
       zones: W.zones.map(function (z) {
-        return { x: Math.round(z.x), y: Math.round(z.y), w: z.word, p: z.p, tag: z.tag, r0: Math.round(z.r0), life: Math.round(z.life), life0: Math.round(z.life0 || 120), age: Math.round(z.age), hue: Math.round(z.hue), shape: z.shape, note: z.note, svg: z.svg && z.svg.length < 1500 ? z.svg : '', look: z.look || null, model: z.model, alive: +(z.alive || 0).toFixed(2), health: +(z.health || 0).toFixed(2), genN: z.genN, kids: z.kids, made: z.made, fed: z.fed, hurt: Math.round(z.hurt), deaths: z.deaths, vis: Math.round(z.vis), sig: z.sig, weak: z.weak, hit: +(z.hit || 0).toFixed(2), ate: z.ate || 0, ev: (z.ev || []).slice(-8), born: z.born };
+        return { hv: z.haven ? 1 : 0, x: Math.round(z.x), y: Math.round(z.y), w: z.word, p: z.p, tag: z.tag, r0: Math.round(z.r0), life: Math.round(z.life), life0: Math.round(z.life0 || 120), age: Math.round(z.age), hue: Math.round(z.hue), shape: z.shape, note: z.note, svg: z.svg && z.svg.length < 1500 ? z.svg : '', look: z.look || null, model: z.model, alive: +(z.alive || 0).toFixed(2), health: +(z.health || 0).toFixed(2), genN: z.genN, kids: z.kids, made: z.made, fed: z.fed, hurt: Math.round(z.hurt), deaths: z.deaths, vis: Math.round(z.vis), sig: z.sig, weak: z.weak, hit: +(z.hit || 0).toFixed(2), ate: z.ate || 0, ev: (z.ev || []).slice(-8), born: z.born };
       }),
     };
     // the most successful creatures, up to a budget
@@ -10601,7 +10673,7 @@ G.addSystem({
       if (!q || typeof q !== 'object' || !q.p || typeof q.p !== 'object') return;
       const pr = q.p;
       const z = G.addZone(num(q.x, 0, W.ww, W.ww / 2), num(q.y, 0, W.wh, W.wh / 2), {
-        name: String(q.w || 'thing').slice(0, 28), look: G.cleanLook ? G.cleanLook(q.look) : null,
+        name: String(q.w || 'thing').slice(0, 28), haven: !!q.hv, look: G.cleanLook ? G.cleanLook(q.look) : null,
         props: { nutrition: num(pr.nut, 0, 1, 0), poison: num(pr.poison, 0, 1, 0), heat: num(pr.heat, -1, 1, 0), light: num(pr.light, -1, 1, 0), sticky: num(pr.sticky, 0, 1, 0), acid: num(pr.acid, 0, 1, 0), hard: num(pr.hard, 0, 1, 0), spread: num(pr.spread, 0, 1, 0), eats: num(pr.eats, 0, 1, 0), moves: num(pr.moves, 0, 1, 0), pull: num(pr.pull, -1, 1, 0), vault: num(pr.vault, 0, 0.7, 0), deadly: num(pr.deadly, 0, 1, 0) },
         tag: Math.floor(num(q.tag, 0, 5, 2)), radius: num(q.r0, 40, 150, 80), life: num(q.life, 1, 400, 60), hue: num(q.hue, 0, 360, 200), shape: Math.floor(num(q.shape, 0, 4, 0)),
         note: String(q.note || '').slice(0, 160), svg: typeof q.svg === 'string' ? G.safeSvg(q.svg) : '', model: String(q.model || '').slice(0, 60),

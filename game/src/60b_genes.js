@@ -17,7 +17,7 @@
     '#gbwin .gtop{display:flex;align-items:center;gap:14px;margin-bottom:6px}#gbwin .gtop canvas{flex:none;width:92px;height:92px}#gbwin .gtop>div{flex:1;min-width:0}#gbwin .gtop b{display:block;font:800 17px/1.25 system-ui,sans-serif;color:#fff}#gbwin .gtop small{display:block;font:500 13px/1.45 system-ui,sans-serif;color:#c4d8ee;margin-top:3px}' +
     '#gbwin .gcols{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px}@media (max-width:820px){#gbwin .gcols{grid-template-columns:minmax(0,1fr)}}' +
     '#gbwin h3{font:800 12px system-ui,sans-serif;letter-spacing:.22em;color:#f6d365;margin:12px 0 8px}#gbwin h4{font:800 10.5px system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#8fb2d6;margin:13px 0 6px}' +
-    '#gbwin .grow{display:grid;grid-template-columns:104px minmax(0,1fr) 58px;align-items:center;gap:9px;font:600 13px system-ui,sans-serif;padding:3px 0}#gbwin .grow .gl{display:flex;align-items:center;gap:7px;color:#e8f3ff}#gbwin .grow .gl i{flex:none;width:11px;height:11px;border-radius:50%}' +
+    '#gbwin .grow{display:grid;grid-template-columns:104px minmax(0,1fr) 84px;align-items:center;gap:9px;font:600 13px system-ui,sans-serif;padding:3px 0}#gbwin .grow .gl{display:flex;align-items:center;gap:7px;color:#e8f3ff}#gbwin .grow .gl i{flex:none;width:11px;height:11px;border-radius:50%}' +
     '#gbwin .gbar{height:9px;border-radius:5px;background:rgba(207,232,255,.13);overflow:hidden}#gbwin .gbar u{display:block;height:100%;border-radius:5px}#gbwin .grow .gv{text-align:right;font:700 12px system-ui,sans-serif;color:#c4d8ee;white-space:nowrap}' +
     '#gbwin .grow.new .gl{color:#ff9ec6}#gbwin .grow.new .gv:after{content:" new";color:#ff7eb6}' +
     '#gbwin .gchips{display:flex;flex-wrap:wrap;gap:6px}#gbwin .gchips span{font:700 12px system-ui,sans-serif;padding:5px 10px;border-radius:999px;background:rgba(207,232,255,.1);border:1px solid rgba(207,232,255,.2);color:#eaf4ff}#gbwin .gchips span.org{border-color:rgba(246,211,101,.7);color:#ffe9a8}' +
@@ -37,8 +37,8 @@
     win.innerHTML = '<div class="gtop"><canvas id="gbprev" width="184" height="184"></canvas><div><b id="gbname"></b><small id="gbsub"></small></div><button class="btn sm" id="gbclose">' + (G.ICON.close || '') + 'CLOSE</button></div>' +
       '<div class="gcols"><div><h3>GENES · WHAT IT IS MADE OF</h3><div id="gbgenes"></div></div>' +
       '<div><h3>BRAIN · WATCH IT THINK</h3><canvas id="gbbrain" width="1160" height="760"></canvas><div class="gsay" id="gbsay"></div>' +
-      '<div class="gleg"><span><i style="background:' + PAL.algae + '"></i>a wire that says "do it"</span><span><i style="background:' + PAL.rose + '"></i>a wire that says "do not"</span><span><i style="background:#fff;height:7px"></i>thicker = stronger</span><span><i class="d" style="background:#fff"></i>moving dots = a signal passing right now</span></div>' +
-      '<p class="gnote">The wires are genes too: a creature is born with them and they do not change during its life. Children get them from both parents, with small changes, and the brains that find food and stay alive are the ones passed on.</p></div></div>';
+      '<div class="gleg"><span><i style="background:' + PAL.algae + '"></i>a wire that says "do it"</span><span><i style="background:' + PAL.rose + '"></i>a wire that says "do not"</span><span><i style="background:#fff;height:7px"></i>thicker = stronger</span><span><i class="d" style="background:#fff"></i>moving dots = a signal passing right now</span><span><i style="background:' + PAL.gold + ';height:7px"></i>gold edge = changed by what it learned in its life</span></div>' +
+      '<p class="gnote">The wires are genes: a creature is born with them, from both parents, with small changes. During its life it also learns: wires that were in use just before a meal grow stronger, wires in use just before it was hurt or ate what makes it ill grow weaker. What it learned stays its own; its children get the genes, not the lessons.</p></div></div>';
     $('gbclose').onclick = function () { G.sfx('click'); close(); };
     win.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
     win.addEventListener('wheel', function (e) { e.stopPropagation(); }, { passive: true });
@@ -61,7 +61,8 @@
     h += row('Temper', g.t[4], PAL.rose, word(g.t[4], 'gentle', 'fierce', 'bold'), mut.t4);
     h += '<div class="grow' + (mut.t2 ? ' new' : '') + '"><span class="gl">Colour</span><span class="gbar" style="height:14px"><u style="width:100%;background:' + G.hsl(g.t[2], 80, 60, 1) + '"></u></span><span class="gv"></span></div>';
     h += '<h4>What it can eat (how well it digests each food)</h4>';
-    for (let i = 0; i < 6; i++) h += row(FOOD[i] + ' food', g.c[i], FOODCOL[i], pct(g.c[i]), mut['c' + i], FOODCOL[i]);
+    for (let i = 0; i < 6; i++) h += row(FOOD[i] + ' food', g.c[i], FOODCOL[i], c.ph.bane === i ? 'makes it ill' : (c.ph.fav === i && c.ph.love > 0.3 ? '\u2665 ' : '') + pct(g.c[i]), mut['c' + i], FOODCOL[i]);
+    if (c.ph.love > 0.3) h += '<div class="gnone" style="margin-top:4px">\u2665 its favourite: it gets ' + Math.round(30 * c.ph.love) + '% more from it.' + (c.ph.bane >= 0 ? ' The opposite colour, ' + FOOD[c.ph.bane] + ', makes it ill until its kind evolves a stomach for it.' : '') + '</div>';
     h += '<h4>What it can stand</h4>';
     h += row('Heat', g.c[6], '#ffb37a', pct(g.c[6]), mut.c6) + row('Cold', g.c[7], '#9fd6ff', pct(g.c[7]), mut.c7) + row('Poison', g.c[8], PAL.violet, pct(g.c[8]), mut.c8);
     // how the body is built: counted in plain words
@@ -97,10 +98,13 @@
     ctx.fillText('WHAT IT SENSES', X[0] - 70, 34); ctx.fillText('THINKING CELLS', X[1], 34); ctx.fillText('WHAT IT DOES', X[2] + 70, 34);
     const used = {};
     for (let i = 0; i < g.w.length; i++) { used[g.w[i].f] = 1; used[g.w[i].t] = 1; }
+    // what this one has learned in its life: its own change to each wire (the brain keeps wires grouped by where they end, so they are matched up here)
+    const LW = []; if (c.lw) { const nt = g.h + G.NOUT, at = []; for (let i = 0; i < nt; i++) at.push(c.ph.bs[i]); for (let i = 0; i < g.w.length; i++) { const w = g.w[i], ti = w.t >= 200 ? g.h + (w.t - 200) : w.t - 100; if (ti >= 0 && ti < nt) LW[i] = c.lw[at[ti]++] || 0; } }
     // wires, and the signals moving along them
     for (let i = 0; i < g.w.length; i++) {
-      const w = g.w[i], a = pos(w.f), b = pos(w.t), mx = (a[0] + b[0]) / 2, sig = Math.min(1, Math.abs((val(w.f) || 0) * w.v)), col = w.v >= 0 ? PAL.algae : PAL.rose;
-      ctx.strokeStyle = G.rgba(col, 0.22 + 0.7 * sig); ctx.lineWidth = 1.5 + Math.min(7, Math.abs(w.v) * 3.6);
+      const w = g.w[i], a = pos(w.f), b = pos(w.t), mx = (a[0] + b[0]) / 2, lv = LW[i] || 0, wv = w.v + lv, sig = Math.min(1, Math.abs((val(w.f) || 0) * wv)), col = wv >= 0 ? PAL.algae : PAL.rose;
+      if (Math.abs(lv) > 0.04) { ctx.strokeStyle = G.rgba(PAL.gold, Math.min(0.75, 0.2 + Math.abs(lv))); ctx.lineWidth = 5.5 + Math.min(7, Math.abs(wv) * 3.6); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.bezierCurveTo(mx, a[1], mx, b[1], b[0], b[1]); ctx.stroke(); }
+      ctx.strokeStyle = G.rgba(col, 0.22 + 0.7 * sig); ctx.lineWidth = 1.5 + Math.min(7, Math.abs(wv) * 3.6);
       ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.bezierCurveTo(mx, a[1], mx, b[1], b[0], b[1]); ctx.stroke();
       if (sig > 0.12) {
         const u = (t * (0.5 + sig * 0.7) + i * 0.37) % 1, v = 1 - u;
