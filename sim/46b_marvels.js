@@ -74,14 +74,14 @@
   // Two things make one likelier, and both grow the longer there has been none: the generations that have passed (a fast pond lives many in a minute) and the
   // real minutes of play (a slow pond lives few). Chance for this generation = 1 - exp(-(hazard per generation + hazard per minute x minutes since the last check)).
   // About one every 3 minutes at 64x, and every 15 minutes at 1x, and never none for long.
-  G.marvelChance = function (since) { return 1 - Math.exp(-(0.002 + 0.00012 * since)); };      // by generations: never within 40 of the last, about one in 90 on average, and never long without
+  G.marvelChance = function (since) { return 0.125; };      // each generation: one chance in eight (a marvel about every 8 generations)
   let busy = false;
   G.marvelTick = function (gen) {
     const W = G.W; if (!W || W.title) return;
     const M = W.mv = W.mv || { gen0: 0, n: 0 };      // minutes of play since the last check (a pause or a closed tab does not count)
     // how common each marvel is now: a marvel that has taken over the pond fades (see mutation), so it stays something special
     { const sh = W.mvShare = {}, cn = W.mvCount = {}, n = Math.max(1, W.cre.length); W.mvPend = {}; for (let i = 0; i < W.cre.length; i++) { const k = W.cre[i].g.mv; if (k) { sh[k] = (sh[k] || 0) + 1 / n; cn[k] = (cn[k] || 0) + 1; } } }
-    if (gen < 20 || W.cre.length < 16 || busy || gen - M.gen0 < 40) return;
+    if (gen < 6 || W.cre.length < 16 || busy || gen - M.gen0 < 2) return;
     const p = G.marvelChance(gen - M.gen0);
     if (G.rand() >= p && !(G.marvelForce)) return;
     G.grantMarvel();

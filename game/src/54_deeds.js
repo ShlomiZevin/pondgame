@@ -45,12 +45,13 @@
     }, function () { asking = false; });
     return true;
   };
-  // once a generation: perhaps somebody takes something into their head. By generations, not by the clock: never within 25 of the last plan, then a chance that grows
-  // each generation (a plan about every 30 on average); and only while it can be watched (not when time runs at full speed).
+  // once a generation: perhaps somebody takes something into their head. By generations, not by the clock: one chance in eight each generation
+  // (a plan about every 8 generations on average); and only while it can be watched (not when time runs at full speed).
+  const ODDS = 0.125;      // each generation: one chance in eight that some kind takes something into its head
   G.on('scored', function () {
     const W = G.W; if (!W || W.title || G.mode !== 'play' || W.deed || asking || G.speed > 16 || W.gen < 5 || W.cre.length < 14) return;
     const since = W.gen - (W.lastDeedGen === undefined ? 0 : W.lastDeedGen);
-    if (since < 25 || G.rand() >= Math.min(0.9, 0.1 + 0.015 * (since - 25))) return;
+    if (since < 2 || G.rand() >= ODDS) return;
     if (G.deedAsk()) W.lastDeedGen = W.gen;
   });
 
@@ -93,7 +94,7 @@
   function deedStep(dt) {
     const W = G.W, d = W.deed, m = Math.min(W.ww, W.wh);
     let M = members(d);
-    const rt = dt / Math.max(1, G.speed || 1);                               // the plan keeps the time of whoever is watching, not of the pond: sped up, it is still there to be seen
+    const rt = dt;                                                           // the pond's own clock, like everything else in it: sped up, the plan is carried out faster
     d.joinT = (d.joinT || 0) - dt;
     if (M.length < d.n0 && d.joinT <= 0) { d.joinT = 1.5; const used = {}; M.forEach(function (c) { used[c.deedJ] = 1; }); for (let i = 0; i < W.cre.length && M.length < d.n0; i++) { const c = W.cre[i]; if ((c.sp !== d.sp && c.deedKin !== d.id && !(d.thin > 6)) || c.dead || c.deedId) continue; let j = 0; while (used[j]) j++; used[j] = 1; c.deedId = d.id; c.deedJ = j; M.push(c); } }
     const n = M.length;

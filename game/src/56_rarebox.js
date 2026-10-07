@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   if (typeof document === 'undefined') return;
-  let box = null, sig = '', seen = {}, shut = false, tab = 'plans', open = '';
+  let box = null, sig = '', seen = {}, shut = true, tab = 'plans', open = '';
   const esc = function (s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   // what a marvel DOES, said plainly from its own numbers (the AI made the numbers up; this only reads them out)
   const WHO = { hunters: 'its hunters', others: 'other kinds', kin: 'its own kind', all: 'everyone near' };
@@ -28,7 +28,7 @@
   function ui() {
     if (box) return box;
     const st = document.createElement('style');
-    st.textContent = '#rarebox{position:fixed;left:14px;top:236px;width:min(340px,calc(100vw - 28px));padding:10px 12px 12px;border-radius:18px;z-index:2;font:500 12.5px/1.45 system-ui,sans-serif;color:#eaf4ff;max-height:54vh;overflow-y:auto;scrollbar-width:thin}' +
+    st.textContent = '#rarebox{position:fixed;right:14px;top:70px;width:min(340px,calc(100vw - 28px));padding:10px 12px 12px;border-radius:18px;z-index:2;font:500 12.5px/1.45 system-ui,sans-serif;color:#eaf4ff;max-height:54vh;overflow-y:auto;scrollbar-width:thin}' +
       '#rarebox.shut{width:auto;padding:7px 10px 7px 12px;border-radius:999px}' +
       '#rarebox .rk{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;min-height:28px}#rarebox .rk>span:first-child{font:800 10.5px system-ui,sans-serif;letter-spacing:.16em;color:#f6d365;text-transform:uppercase;white-space:nowrap}' +
       '#rarebox .rc{display:flex;align-items:center;gap:5px}#rarebox .rc em{font:700 10.5px system-ui,sans-serif;font-style:normal;padding:2px 8px;border-radius:999px;background:rgba(246,211,101,.16);border:1px solid rgba(246,211,101,.55);color:#ffe9a8;white-space:nowrap}' +
@@ -50,7 +50,7 @@
       '#rarebox .tabs2{display:flex;gap:6px;margin:8px 0 2px}#rarebox .tabs2 span{flex:1;text-align:center;padding:6px 4px;border-radius:10px;cursor:pointer;font:700 11.5px system-ui,sans-serif;color:#b9cde2;background:rgba(7,18,31,.4);border:1px solid rgba(207,232,255,.14)}#rarebox .tabs2 span.on{color:#14202e;background:#f6d365;border-color:#f6d365}#rarebox .tabs2 span i{font-style:normal;opacity:.75;margin-left:4px}#rarebox .tabs2 span.new:not(.on){border-color:#f6d365;color:#ffe9a8}' +
       '#rarebox .rmore{margin-top:8px;padding-top:8px;border-top:1px solid rgba(207,232,255,.16);font-size:12px;color:#dcecff}#rarebox .rmore img{display:block;width:120px;height:120px;margin:0 auto 6px}#rarebox .rmore ul{margin:4px 0 0;padding:0;list-style:none}#rarebox .rmore li{padding:2px 0 2px 14px;position:relative;color:#ffe9a8;font-weight:600}#rarebox .rmore li:before{content:"\\25C6";position:absolute;left:0;font-size:8px;top:6px}' +
       '#rarebox.flash{animation:rareflash 1.4s ease-out 2}@keyframes rareflash{0%{box-shadow:0 0 0 0 rgba(246,211,101,.9)}100%{box-shadow:0 0 0 22px rgba(246,211,101,0)}}' +
-      '@media (max-width:720px){#rarebox{top:auto;bottom:150px;left:7px;max-height:30vh}}@media (max-height:560px){#rarebox{display:none}}';
+      '@media (max-width:720px){#rarebox{top:auto;bottom:150px;left:7px;right:auto;max-height:30vh}}@media (max-height:560px){#rarebox{display:none}}';
     document.head.appendChild(st);
     box = document.createElement('div'); box.id = 'rarebox'; box.className = 'glass hide';
     (document.getElementById('ui') || document.body).appendChild(box);
@@ -84,9 +84,9 @@
     if (!on) { sig = ''; return; }
     // it sits under the "pond versus" card when that is showing
     const vs = document.getElementById('versus');
-    const se = document.getElementById('season'); let under = se && !se.classList.contains('hide') ? Math.round(se.getBoundingClientRect().bottom) : 224;      // under the season card, however tall its text has made it
-    if (vs && !vs.classList.contains('hide')) under = Math.max(under, Math.round(vs.getBoundingClientRect().bottom));
-    if (window.innerWidth > 720) box.style.top = (under + 12) + 'px'; else box.style.top = '';
+    const pn = document.getElementById('panel'), under = pn && !pn.classList.contains('hide') ? Math.round(pn.getBoundingClientRect().bottom) : 58;      // on the right, under the Evolution chip (out of the pond's way)
+    if (window.innerWidth > 720) box.style.top = (under + 10) + 'px'; else box.style.top = '';
+    box.style.zIndex = shut ? '2' : '9';
     const by = {}, order = [];
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i], mv = c.ph && c.ph.mv; if (!mv || c.dead) continue; if (!by[mv.id]) { by[mv.id] = { d: mv, n: 0 }; order.push(mv.id); } by[mv.id].n++; }
     const d = W.deed, dn = d ? W.cre.filter(function (c) { return c.deedId === d.id && !c.dead; }).length : 0;
