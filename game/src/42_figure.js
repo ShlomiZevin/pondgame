@@ -65,6 +65,7 @@
   /** the drawing of this thing in the pond, if it has one; asks for it if nobody has yet (a thing loaded from a save, or left by an event) */
   G.figureOf = function (z) {
     if (z._fig !== undefined) return z._fig;
+    if (z.haven) return (z._fig = null);      // the marvels' garden is drawn by the game itself (a fence): no picture is asked for
     const key = String(z.word || '').toLowerCase();
     if (ready[key]) { z._figSvg = ready[key].svg; return (z._fig = ready[key]); }
     if (none[key]) return (z._fig = null);

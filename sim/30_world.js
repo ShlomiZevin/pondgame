@@ -501,6 +501,10 @@
       let sticky = 1;
       for (let i = 0; i < W.zones.length; i++) {
         const z = W.zones[i];
+        if (z.haven && !c.g.mv) {      /* the fence lets only marvels in: anyone else is turned back at it */
+          const ox = c.x - z.x, oy = c.y - z.y, od = Math.sqrt(ox * ox + oy * oy) + 0.01, edge = z.r * 0.9 + ph.r * 0.6;
+          if (od < edge) { c.x = z.x + ox / od * edge; c.y = z.y + oy / od * edge; const vn = (c.vx * ox + c.vy * oy) / od; if (vn < 0) { c.vx -= vn * ox / od; c.vy -= vn * oy / od; } }
+        }
         if (z.haven && c.g.mv) {      /* a marvel is drawn to the safe garden, and inside it is fed, kept from harm and may have marvel children */
           const hx = z.x - c.x, hy = z.y - c.y, hd = Math.sqrt(hx * hx + hy * hy) + 0.01;
           /* a garden has room for only so many: those already living in it keep their place, a newcomer gets one only while there is room */
@@ -1182,7 +1186,7 @@
       made: 0, fed: 0, hurt: 0, deaths: 0, vis: 0, ate: 0, ev: [], born: W.gen, ma: G.rand() * PI2, bite: 0,
     };
     // a safe garden for marvels: harmless, long-lived, and it shelters the marvels that live in it (see G.marvelBlessed)
-    if (info.haven) { z.haven = true; z.p.poison = z.p.acid = z.p.eats = z.p.deadly = z.p.vault = z.p.hard = z.p.moves = z.p.sticky = 0; z.alive = 0; z.r0 = Math.max(z.r0, 150); z.life = Math.max(z.life, 600); }
+    if (info.haven) { z.haven = true; z.p.poison = z.p.acid = z.p.eats = z.p.deadly = z.p.vault = z.p.hard = z.p.moves = z.p.sticky = 0; z.p.nut = z.p.light = z.p.heat = z.p.spread = z.p.pull = 0; z.alive = 0; z.r0 = 95; z.life = Math.max(z.life, 600); }
     if (z.p.vault > 0.2) { z.p.hard = 1; z.p.moves = 0; z.alive = 0; z.r0 = Math.max(z.r0, 165); z.life = 420; }    // a wall is big, solid, and only falls when it is broken
     z.look = info.look || (G.beingLook && !(z.p.vault > 0.2) && info.source !== 'ai' ? G.beingLook({ name: z.word, props: { eats: z.p.eats, moves: z.p.moves, deadly: z.p.deadly, poison: z.p.poison, light: z.p.light }, alive: z.alive }) : null);
     z.life0 = z.life;

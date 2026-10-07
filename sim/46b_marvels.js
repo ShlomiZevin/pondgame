@@ -82,6 +82,7 @@
     // how common each marvel is now: a marvel that has taken over the pond fades (see mutation), so it stays something special
     { const sh = W.mvShare = {}, cn = W.mvCount = {}, n = Math.max(1, W.cre.length); W.mvPend = {}; for (let i = 0; i < W.cre.length; i++) { const k = W.cre[i].g.mv; if (k) { sh[k] = (sh[k] || 0) + 1 / n; cn[k] = (cn[k] || 0) + 1; } } }
     if (gen < 6 || W.cre.length < 16 || busy || gen - M.gen0 < 2) return;
+    if (G.marvelsAlive() >= 2 && !G.marvelForce) return;      /* the pond has its marvels: no new one is born while two or more are alive */
     const p = G.marvelChance(gen - M.gen0);
     if (G.rand() >= p && !(G.marvelForce)) return;
     G.grantMarvel();
@@ -200,7 +201,8 @@
   /** is this the creature that was born with the marvel, in the first generations of its life (looked after so that it can be a parent, and it does not die of old age for a while)? Its children are not looked after: a marvel is rare, and stays rare. */
   G.marvelBlessed = function (c) { const W = G.W; return !!(c.g.mv && W && ((c.marvelBorn !== undefined && W.gen <= c.marvelBorn + 30) || (c.havenGen !== undefined && W.gen - c.havenGen <= 1))); };      // new, or living in a safe garden
   /** the safe garden a player can add for the pond's marvels (nothing is asked of the AI: it costs nothing) */
-  G.HAVEN = { name: 'Marvel Garden', haven: true, props: { nutrition: 0.55, light: 0.35 }, tag: 2, hue: 48, radius: 150, life: 600, source: 'local', note: 'A safe garden. It has room for 3 marvels at a time. Marvels are drawn to it. Inside they are fed and kept from harm, they do not die of old age, and a child born there is a little likelier to be a marvel too (never more than 3 alive with the same marvel).' };
+  G.HAVEN = { name: 'Marvel Garden', haven: true, props: {}, tag: 2, hue: 48, radius: 95, life: 600, source: 'local', note: 'A small fenced garden that only marvels can enter. It has room for 3 at a time. Marvels are drawn to it. Inside they are fed and kept from harm, they do not die of old age, and a child born there is a little likelier to be a marvel too (never more than 3 alive with the same marvel).' };
+  G.MARVEL_MAX = 3;      // the most marvel carriers a pond holds at once, of all marvels together (a child is born plain when the pond is full)
   G.HAVEN_ROOM = 3;      // how many marvels one garden shelters at a time
   /** a typed word that means a safe place for the marvels: it becomes a garden under that name, with no AI call */
   G.havenWord = function (w) { const low = String(w || '').toLowerCase(); if (!/\b(garden|sanctuary|haven|refuge|shelter|nursery|nest|safe (place|home|house|zone|spot|garden)|marvel (home|house|place))\b/.test(low)) return null; const t = JSON.parse(JSON.stringify(G.HAVEN)); t.name = String(w).trim().slice(0, 28).replace(/\b[a-z]/g, function (m) { return m.toUpperCase(); }); return t; };
@@ -210,6 +212,7 @@
   G.marvelInherits = function (id) {
     const W = G.W; if (!W) return false;
     const cnt = (W.mvCount && W.mvCount[id]) || 0, pend = W.mvPend = W.mvPend || {}, hv = !!G._mvHaven, cap = hv ? 3 : 2;      /* a marvel stays rare: at most two alive carry the same one, three when a garden shelters them */
+    { let all = 0; for (const k in (W.mvCount || {})) all += W.mvCount[k]; for (const k in pend) all += pend[k]; if (all >= G.MARVEL_MAX) return false; }      /* and never more than a few marvels of any sort in one pond */
     if (cnt + (pend[id] || 0) >= cap || G.rand() >= (hv ? 0.25 : 0.125)) return false;      // one in eight; one in four when born in a safe garden
     pend[id] = (pend[id] || 0) + 1; return true;
   };
