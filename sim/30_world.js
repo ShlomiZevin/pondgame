@@ -32,6 +32,19 @@
   function foodCap(W) { return Math.round(K.foodMax * Math.max(1, W.ww * W.wh / 1.6e6 / Math.pow(G.view.grow || 1, 2))); }      // (a pond that GREW for room has the food it had: more water, not more mouths)
   /** the shore is the top strip of the pond: land. Only what can breathe air may go there. */
   G.shoreY = function (W) { return W.wh * 0.16; };
+  const FOODS = ['gold', 'lime', 'green', 'blue', 'violet', 'pink'];
+  /** how a creature has lived: the food it mostly ate (a kind, or -1 when it ate a bit of everything) and the share of its life on the shore, by the shore, in the deep */
+  G.lifeOf = function (c) {
+    const t = c.liveT || 0, a = c.ate; let diet = -1;
+    if (a) { let tot = 0, bi = 0; for (let i = 0; i < 6; i++) { tot += a[i]; if (a[i] > a[bi]) bi = i; } if (tot > 20 && a[bi] > tot * 0.5) diet = bi; }
+    return t < 3 ? { diet: diet, land: 0, shore: 0, deep: 0 } : { diet: diet, land: (c.landT || 0) / t, shore: (c.shoreT || 0) / t, deep: (c.deepT || 0) / t };
+  };
+  G.lifeText = function (c) {
+    const L = G.lifeOf(c), out = [];
+    if (L.diet >= 0) out.push('Lives mostly on ' + FOODS[L.diet] + ' food.');
+    if (L.land > 0.3) out.push('Spends its days on the shore.'); else if (L.shore > 0.3) out.push('Keeps to the water by the shore.'); else if (L.deep > 0.5) out.push('Lives in the dark deep.'); else if ((c.liveT || 0) > 3) out.push('Lives in open water.');
+    return out.join(' ');
+  };
   G.newWorld = function (opts) {
     opts = opts || {};
     const v = G.view;
@@ -523,6 +536,7 @@
       if (c.y < top) { c.y = top; c.vy = Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
       else if (c.y > wh - ph.r) { c.y = wh - ph.r; c.vy = -Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
       c.land = c.y < G.shoreY(W);
+      c.liveT = (c.liveT || 0) + dt; if (c.land) c.landT = (c.landT || 0) + dt; else if (c.y < G.shoreY(W) + W.wh * 0.14) c.shoreT = (c.shoreT || 0) + dt; else if (c.x > W.ww * 0.62) c.deepT = (c.deepT || 0) + dt;      // where it lived
       c.thrust = thrust * (sprint ? 1.7 : 1);
       c.squash = 0.82 * c.squash + 0.18 * clamp(Math.hypot(c.vx, c.vy) / (ph.speed + 1), 0, 1.4);
       c.glow = ph.lamp > 0 ? out[3] * Math.min(ph.lamp, 1.5) : 0;
@@ -597,7 +611,7 @@
             if (dx * dx + dy * dy < er * er && c.E < ph.Emax) {
               const gain = o.v * ph.forage[o.tag] * (o.land ? Math.max(0.7, dig[o.tag]) : dig[o.tag]) * (ph.nh >= 4 ? 1 + 0.08 * Math.min(c.kin || 0, 5) : 1) * (o.land ? (ph.warm ? 1.25 : 1) * (ph.hands ? 1.3 : 1) : 1);
               c.E = Math.min(ph.Emax, c.E + gain);
-              c.intake += gain;
+              c.intake += gain; (c.ate || (c.ate = [0, 0, 0, 0, 0, 0]))[o.tag] += gain;      // what it lived on (see G.lifeOf)
               c.P = Math.min(ph.Emax, c.P + gain * PROT[o.tag] * (o.big ? 1.5 : 1));
               o.dead = true;
               c.eatFlash = 1;
@@ -819,8 +833,9 @@
         { const sp0 = p.sp ? G.speciesById(p.sp) : null; G.form._fix = p.real && p.real.fix ? p.real.fix : sp0 && sp0.judge && sp0.judge.fix ? sp0.judge.fix : null;
           // what the watcher has lately said of the pond's creatures is advice for the whole pond, not only for the ones it happened to see
           if (!G.form._fix && W.advice && W.advice.length && G.rand() < 0.6) { const fvp = p.fv || (p.fv = G.features(p.g)); let best = null, bd = 2.2; for (let q = 0; q < W.advice.length; q++) { const a = W.advice[q]; if (W.gen - a.gen > 40 || !a.fv) continue; const dd = G.fdist(fvp, a.fv); if (dd < bd) { bd = dd; best = a; } } if (best) G.form._fix = best.fix; } }      // what the judge wished for its kind
+        G.form._life = G.lifeOf(p);      // what its parent ate and where it lived tilt what the child may grow
         const res = G.mutate(genome, wild, idea);
-        G.form._fix = null;
+        G.form._fix = null; G.form._life = null;
         const child = G.makeCreature(res.g, p, mate, res.muts);
         child.sp = p.sp;
         child.E = child.ph.Emax * K.repro * 0.95;

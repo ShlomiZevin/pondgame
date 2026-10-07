@@ -17,6 +17,7 @@
       cre: [], species: [], fossils: [],
       organs: (W.organs || []).map(function (o) { return { id: o.id, name: o.name, note: o.note, svg: o.svg && o.svg.length < 1500 ? o.svg : '', fx: o.fx, digest: o.digest, hue: Math.round(o.hue), by: o.by, gen: o.gen }; }),
       nextOrgan: W.nextOrgan || 1,
+      budgets: (G.ai && G.ai.budgetSet) || {},
       marvelX: (W.marvelX || []).map(function (m) { return { id: m.id, name: m.name, wonder: m.wonder, sp: m.sp, glyph: m.glyph, hue: Math.round(m.hue), fx: m.fx, words: m.words, powers: m.powers || [], voice: m.voice, emblem: m.emblem && m.emblem.length < 3500 ? m.emblem : '', why: m.why || '', by: m.by, gen: m.gen }; }),
       nextMarvel: W.nextMarvel || 100, marvelRecent: (W.marvelRecent || []).slice(-4), mvState: W.mv ? { gen0: W.mv.gen0 | 0, n: W.mv.n | 0 } : null,
       designs: (W.designs || []).map(function (d) { return { id: d.id, name: d.name, adj: d.adj, note: d.note, place: d.place, motion: d.motion, colour: d.colour, pts: d.pts, smooth: d.smooth, ribs: d.ribs, dots: d.dots, fx: d.fx, by: d.by, gen: d.gen }; }), nextDesign: W.nextDesign || 1,
@@ -157,6 +158,7 @@
     W.nextMarvel = Math.max(Math.floor(num(d.nextMarvel, 100, 1e6, 100)), (W.marvelX || []).reduce(function (m, o) { return Math.max(m, o.id + 1); }, 100));
     if (Array.isArray(d.marvelRecent)) W.marvelRecent = d.marvelRecent.slice(-4).map(Number).filter(isFinite);
     if (d.mvState && typeof d.mvState === 'object') W.mv = { gen0: Math.floor(num(d.mvState.gen0, 0, 1e7, 0)), rt0: G.rt || 0, n: Math.floor(num(d.mvState.n, 0, 1e5, 0)) };
+    if (G.ai && d.budgets && typeof d.budgets === 'object') { G.ai.budgetSet = {}; for (const k in d.budgets) { const v = +d.budgets[k]; if (isFinite(v) && /^[a-z-]{2,20}$/.test(k)) G.ai.budgetSet[k] = Math.max(0, Math.min(50, v)); } }
     W.nextOrgan = Math.max(Math.floor(num(d.nextOrgan, 1, 1e6, 1)), W.organs.reduce(function (m, o) { return Math.max(m, o.id + 1); }, 1));
     if (Array.isArray(d.story)) W.story = d.story.filter(function (s) { return s && typeof s.text === 'string'; }).slice(-12).map(function (s) { return { title: String(s.title || '').slice(0, 44), text: s.text.slice(0, 340), by: String(s.by || '').slice(0, 60), gen: num(s.gen, 0, 1e6, 0) }; });
     if (Array.isArray(d.events)) W.events = d.events.filter(function (e) { return e && typeof e.name === 'string'; }).slice(-12).map(function (e) { return { g: num(e.g, 0, 1e6, 0), name: e.name.slice(0, 30), note: String(e.note || '').slice(0, 140) }; });

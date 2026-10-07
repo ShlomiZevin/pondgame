@@ -34,6 +34,9 @@
   }
 
   let asking = false;
+  /** is a plan being thought up right now (the AI has been asked and has not answered yet) */
+  G.deedAsking = function () { return asking; };
+  G.DEED_ODDS = 0.125; G.DEED_FROM = 5;
   G.deedAsk = function () {
     const W = G.W; if (!W || W.deed || asking || !live()) return false;
     if (!G.ai.allow('deed')) return false;

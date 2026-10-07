@@ -8,7 +8,7 @@
   'use strict';
   const NEED = 8;                 // how close (of 10) a creature must be for the wish to come true
   const S = G.wish = { level: 1, cur: null, best: null, legends: [], busy: false, open: false, lastKeys: '' };
-  if (G.ai) { G.ai.gaps.wish = 4000; G.ai.caps.wish = 40; G.ai.gaps.wishcheck = 26000; G.ai.caps.wishcheck = 160; G.ai.LABEL.wish = 'The wishes of the pond'; G.ai.LABEL.wishcheck = 'Checking the creatures against the wish'; }
+  if (G.ai) { G.ai.gaps.wish = 4000; G.ai.caps.wish = 40; G.ai.gaps.wishcheck = 4000; G.ai.caps.wishcheck = 160; G.ai.LABEL.wish = 'The wishes of the pond'; G.ai.LABEL.wishcheck = 'Checking the creatures against the wish'; }
   const live = function () { return G.mode === 'play' && !G.catching && G.W && !G.W.title && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.provider === 'server' && G.ai.hasFuel(); };
   const esc = function (s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   const brief = function () { try { return G.worldBrief ? G.worldBrief() : {}; } catch (e) { return {}; } };
@@ -39,6 +39,7 @@
     (document.getElementById('ui') || document.body).appendChild(box);
     box.addEventListener('click', function (e) {
       if (e.target && e.target.id === 'wishAnother') { e.stopPropagation(); another(); return; }
+      if (e.target && e.target.id === 'wishCheck') { e.stopPropagation(); check(true); draw(); return; }
       S.open = !S.open; box.classList.toggle('open', S.open); if (G.sfx) G.sfx('click');
     });
     return box;
@@ -54,8 +55,9 @@
     box.innerHTML = '<div class="wk"><span>✦ The pond wishes for</span><span>' + (here ? '★ ' + here + ' granted in this pond' : '') + '</span></div>' +
       '<div class="wt">' + esc(S.cur.title) + '</div>' +
       '<div class="wrow"><span>Closest creature: <b>' + (b ? b.close : 0) + ' of 10</b></span><span>comes true at ' + NEED + '</span></div>' +
+      '<div style="display:flex;align-items:center;gap:8px;margin:6px 0 2px"><button class="wbtn" id="wishCheck"' + (S.checking || (G.ai.over && G.ai.over('wishcheck')) ? ' disabled style="opacity:.5"' : '') + '>' + (S.checking ? 'LOOKING…' : 'CHECK NOW') + '</button><span style="font-size:11px;opacity:.75">' + (S.note || 'The pond looks only when you ask (about a third of a cent).') + '</span></div>' +
       '<div class="wbar"><i style="width:' + pct + '%"></i><b></b></div>' +
-      '<div class="wsub">' + (b ? '<u>Still missing</u> ' + esc(String(b.why).replace(/\.+$/, '')) + '.' : 'Nobody has been looked at yet. The pond looks once a minute.') + (G.ai.over && G.ai.over('wishcheck') ? ' <b style="color:#ff9db0">Looking is OFF: its budget for this pond is used up.</b>' : '') + '</div>' +
+      '<div class="wsub">' + (b ? '<u>Still missing</u> ' + esc(String(b.why).replace(/\.+$/, '')) + '.' : 'Nobody has been looked at yet. Press CHECK NOW when you think one is close.') + (G.ai.over && G.ai.over('wishcheck') ? ' <b style="color:#ff9db0">Looking is OFF: its budget for this pond is used up.</b>' : '') + '</div>' +
       '<div class="wmore"><p class="wsay">“' + esc(S.cur.text) + '”</p>' +
       '<div class="wlab">It must have</div><div class="wneeds">' + S.cur.needs.map(function (n) { return '<span class="wchip">' + esc(n) + '</span>'; }).join('') + '</div>' +
       (S.cur.hint ? '<div class="wlab">A thought</div><p>' + esc(S.cur.hint) + '</p>' : '') +
@@ -87,13 +89,16 @@
     keys.sort(function (a, b) { return by[b].n - by[a].n; });
     return keys.slice(0, max).map(function (k) { return by[k].c; });
   }
-  function check() {
+  // The pond looks at its creatures against the wish only when the player asks (the CHECK NOW button): looking costs, and looking every minute cost more than it told.
+  function check(asked) {
     const W = G.W;
-    if (!S.cur || S.busy || S.checking || !live() || !G.sheet || W.cre.length < 4) return;
-    const picks = candidates(8); if (picks.length < 1) return;
+    if (!asked) return;
+    S.note = '';
+    if (!S.cur || S.busy || S.checking || !live() || !G.sheet || W.cre.length < 4) { S.note = !live() ? 'No AI is connected.' : 'Not just now.'; return; }
+    const picks = candidates(8); if (picks.length < 1) { S.note = 'Nobody to look at yet.'; return; }
     const sig = picks.map(function (c) { return G.form.key(c.g.f); }).join('~');
-    if (sig === S.lastKeys) return;                           // nothing new to look at
-    if (!G.ai.allow('wishcheck')) return;
+    if (sig === S.lastKeys) { S.note = 'Nothing has changed since the last look.'; return; }                           // nothing new to look at: no charge
+    if (!G.ai.allow('wishcheck')) { S.note = G.ai.over && G.ai.over('wishcheck') ? 'Its budget for this pond is used up.' : 'One moment: it has only just looked.'; return; }
     const img = G.sheet(picks.map(function (c) { return c.g.f; }), { cw: 200, ch: 206, sc: 0.55, cols: 4 });
     if (!img) return;
     S.checking = true; S.lastKeys = sig;
@@ -136,7 +141,7 @@
   }
 
   if (typeof document !== 'undefined' && typeof setInterval === 'function') setInterval(function () {
-    try { if (!live()) { draw(); return; } if (!S.cur) fetchWish(); else check(); draw(); } catch (e) { console.error(e); }
+    try { if (!live()) { draw(); return; } if (!S.cur) fetchWish(); draw(); } catch (e) { console.error(e); }
   }, 3000);
   G.on('new-pond', function () { S.best = null; S.lastKeys = ''; S.checking = false; });
 })();

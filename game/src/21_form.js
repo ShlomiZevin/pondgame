@@ -191,6 +191,23 @@
       if (B.eyes && r() < 0.14 * wild) { f.es += 0.06; if (f.en < 2 && r() < 0.5) f.en++; note('its eyes grew, for the dark', false); }
       if (B.hue >= 0 && r() < 0.22 * wild) { let d = ((B.hue - f.hue + 540) % 360) - 180; if (Math.abs(d) > 6) { f.hue += Math.sign(d) * Math.min(Math.abs(d), 10 + r() * 22); note('its colour drifted towards ' + (B.like || 'what hunts it'), false); } }
     }
+    // how its parent LIVED makes the fitting answer likelier too: what it ate, and where. Each kind of food is gathered by a different ability (see forage in G.derive:
+    // gold by reach, lime by agility, blue by senses, violet by attack, pink by speed), and shore, shallows and deep each ask something else of a body.
+    // It only tilts what chance offers: the part still has to earn its keep.
+    const life = F._life;
+    if (life && f.bd) {
+      const room = f.rules.length < 4, hitL = function (p) { return r() < p * wild; }, legR = function () { for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k === 0 && f.rules[i].on < 0) return f.rules[i]; return null; };
+      if (life.diet === 0 && hitL(0.05)) { if (!has(f, 0) && !has(f, 3) && room) { const q = newRule(f.n, r() < 0.5 ? 0 : 3); f.rules.push(q); note('grew ' + KMANY[q.k] + ', to reach the gold food', true); } else { f.ms += 0.05; note('its mouth grew, for the gold food', false); } }
+      else if (life.diet === 1 && hitL(0.05)) { if (!has(f, 1) && room) { f.rules.push(newRule(f.n, 1)); note('grew fins, to turn after the lime food', true); } }
+      else if (life.diet === 2 && hitL(0.03)) { if (f.mk !== 3) { f.mk = 3; note('its mouth became a sucker, for grazing the green food', true); } }
+      else if (life.diet === 3 && hitL(0.05)) { if (f.en < 2) { f.en++; note('grew an eye, to find the blue food of the deep', true); } else if (!has(f, 4) && room && r() < 0.4) { f.rules.push(newRule(f.n, 4)); note('grew feelers, to find the blue food of the deep', true); } else { f.es += 0.05; note('its eyes grew, for the blue food of the deep', false); } }
+      else if (life.diet === 4 && hitL(0.05)) { if (f.mk !== 2) { f.mk = 2; note('grew jaws, for the tough violet food', true); } else if (!has(f, 2) && room) { f.rules.push(newRule(f.n, 2)); note('grew spikes, for the tough violet food', true); } }
+      else if (life.diet === 5 && hitL(0.05)) { if (!f.tk) { f.tk = 1 + Math.floor(r() * 2); note('grew a tail, to chase the quick pink food', true); } else if (!has(f, 1) && room) { f.rules.push(newRule(f.n, 1)); note('grew fins, to chase the quick pink food', true); } }
+      if (life.land > 0.3 && hitL(0.06)) { const Lg = legR(); if (f.coat !== 2) { f.coat = 2; note('grew fur, living on the shore', true); } else if (Lg && Lg.t !== 1) { Lg.t = 1; note('its feet grew fingers, living on the shore', true); } }
+      else if (life.shore > 0.3 && life.land < 0.05 && hitL(0.06)) { const Lg = legR(); if (!Lg && room) { f.rules.push(newRule(f.n, 0)); note('grew legs, living by the shore', true); } else if (Lg && Lg.b < f.n - 1) { Lg.b++; note('grew more legs, living by the shore', true); } }
+      else if (life.deep > 0.5 && hitL(0.05)) { if (f.glow < 0.6) { f.glow = clamp(f.glow + 0.4, 0, 1); note('began to glow, living in the dark deep', true); } else { f.es += 0.05; note('its eyes grew, living in the dark deep', false); } }
+      else if (life.land < 0.02 && life.shore < 0.1 && life.deep < 0.3 && hitL(0.03)) { if (!has(f, 1) && room) { f.rules.push(newRule(f.n, 1)); note('grew fins, living in open water', true); } else if (!f.tk) { f.tk = 1 + Math.floor(r() * 2); note('grew a tail, living in open water', true); } }
+    }
     // what the pond is up against makes the fitting answer a likelier thing to stumble on
     const pp = press ? press.part : null;
     if (pp) {

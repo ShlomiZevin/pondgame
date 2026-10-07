@@ -27,7 +27,9 @@
   A.budgetDefault = 0.20;
   const ALIAS = { 'mutation-ideas': 'ideas' };
   const key = function (k) { return ALIAS[k] || k; };
-  A.budgetOf = function (kind) { const b = A.budget[key(kind)]; return typeof b === 'number' ? b : A.budgetDefault; };
+  A.budgetSet = A.budgetSet || {};      // what the PLAYER set, by kind (dollars for this pond; 0 turns that kind off). It is kept in the pond's save and carried into a new pond.
+  A.budgetDefaultOf = function (kind) { const b = A.budget[key(kind)]; return typeof b === 'number' ? b : A.budgetDefault; };
+  A.budgetOf = function (kind) { const s = A.budgetSet[key(kind)]; return typeof s === 'number' ? s : A.budgetDefaultOf(kind); };
   A.spentOn = function (kind) { const L = A.life[key(kind)]; return L ? L.usd || 0 : 0; };
   /** has this kind used up its budget in this pond? */
   A.over = function (kind) { return A.spentOn(kind) >= A.budgetOf(kind) - 1e-9; };
@@ -51,6 +53,13 @@
     if (!told[k] && A.over(k)) { told[k] = 1; const name = A.LABEL[k] || k; if (G.note) G.note('A budget is used up', name + ' has used its ' + A.money(A.budgetOf(k)) + ' for this pond, so it is off now. See the $ chip for all of them.'); if (G.log) G.log('sel', 'Budget used up', name + ': ' + A.money(A.budgetOf(k)) + ' for this pond. It is off now.'); G.emit('budget-out', k); mark(); }
   };
   G.on('new-pond', function () { told = {}; setTimeout(mark, 50); });
+  /** the player sets a budget (dollars for this pond; 0 = off; nothing = back to the usual one) */
+  A.setBudget = function (kind, v) {
+    const k = key(kind);
+    if (v === null || v === undefined || v === '' || !isFinite(+v)) delete A.budgetSet[k]; else A.budgetSet[k] = Math.max(0, Math.min(50, Math.round(+v * 100) / 100));
+    delete told[k]; if (G.markDirty) G.markDirty(); setTimeout(mark, 20);
+  };
+  A.resetBudgets = function () { A.budgetSet = {}; told = {}; if (G.markDirty) G.markDirty(); setTimeout(mark, 20); };
 
   // 4. it shows: ADD and WORLD are dimmed and badged when they can no longer ask
   function mark() {
@@ -68,5 +77,5 @@
   g.deed = 8000; c.deed = 40;      // plans and marvels are spaced by GENERATIONS (see 54_deeds.js and 46b_marvels.js); this only stops two being asked for at once
   g.marvel = 8000;
   g.nature = 300000;
-  g.wishcheck = 60000;
+  g.wishcheck = 4000;      // the wish is looked at only when the player presses CHECK NOW; this only stops a double press
 })();

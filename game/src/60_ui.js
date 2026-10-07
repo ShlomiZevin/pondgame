@@ -570,10 +570,11 @@
       '<div id="ifit" style="font-size:11.5px;line-height:1.4"></div>' +
       '<div class="irows"><div id="iE"></div><div id="iAge"></div><div id="iPar" style="grid-column:span 2"></div><div class="meter"><i id="iEb"></i></div></div>' +
       '<div class="imut" id="imut"></div>' +
-      '<details><summary>Genes and brain</summary><canvas id="istrip" width="560" height="80"></canvas><canvas id="ibrain" width="560" height="184" style="margin-top:6px"></canvas></details>' +
+      '<button class="btn sm" id="igenes" style="width:100%;margin-top:8px" title="See what this creature is made of and watch its brain work">GENES AND BRAIN</button>' +
       '<style>#inspector .ihead{flex-direction:column;align-items:center;text-align:center;position:relative;gap:0}#inspector .ihead canvas{width:150px;height:150px;margin:-14px 0 -10px}#inspector .ihead>div{width:100%}#inspector .ihead b{font-size:15px}#inspector .x{position:absolute;top:-6px;right:-6px;margin:0}#isub{text-align:left;margin-top:5px}#iacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}#iacts .btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:0 4px;font-size:10px;letter-spacing:.06em;white-space:nowrap}#iacts .btn svg{width:14px;height:14px;flex:none;margin:0}#iacts .btn i{font-style:normal;font-size:14px;line-height:1}#iacts #ikeep i{color:var(--gold)}#iacts #ibreed i{color:var(--rose)}#imarvel{margin:8px 0 6px;padding:9px 11px;border-radius:12px;background:rgba(246,211,101,.12);border:1.5px solid rgba(246,211,101,.7);text-align:left}#imarvel .mk{font:800 9.5px system-ui,sans-serif;letter-spacing:.2em;color:#f6d365}#imarvel .mn{display:flex;align-items:center;gap:8px;font:800 16px system-ui,sans-serif;color:#fff;margin:2px 0 3px}#imarvel .mn img{width:30px;height:30px;flex:none}#imarvel .mw{font:600 12.5px/1.4 system-ui,sans-serif;color:#fff}#imarvel ul{margin:6px 0 0;padding:0;list-style:none}#imarvel li{font:600 11.5px/1.35 system-ui,sans-serif;color:#ffe9a8;padding:3px 0 3px 16px;position:relative}#imarvel li:before{content:"\\25C6";position:absolute;left:0;font-size:9px;top:5px}#imarvel .my{font-size:10.5px;opacity:.75;margin-top:5px;font-style:italic}</style>' +
       '<div id="iacts"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond."><i>★</i>KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection."><i>♥</i>BREED</button><button class="btn sm" id="itree" title="Its family tree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide" title="Its kind, in the Book of Life">' + ICON.book + 'KIND</button></div>';
     $('iclose').onclick = function () { G.select(null); };
+    $('igenes').onclick = function () { G.sfx('click'); if (G.openGenes) G.openGenes(); };
     $('isub').onclick = function () { this.classList.toggle('open'); };
     $('itree').onclick = function () { G.sfx('click'); G.openTree(); };
     $('ibreed').onclick = function () { const c = G.R.sel; if (!c) return; G.sfx('click'); if (!G.collection.length) { G.banner('Nothing to breed it with yet', 'First ★ KEEP a creature you like (from this pond or another). Then choose it here to breed the two.', 5200); return; } UI.breedWith = c.id; UI.guideTab = 'coll'; G.openGuide(); };
@@ -593,101 +594,6 @@
       i.classList.toggle('hide', !c || G.mode !== 'play');
       UI.inspDirty = true;
     });
-  }
-
-  const BEADCOL = [PAL.gold, '#c9ee7a', PAL.algae, '#8fc7ff', PAL.violet, PAL.rose];
-  const PARTCOL = [PAL.rose, PAL.algae, PAL.frost, PAL.gold, '#ffffff', PAL.gold, PAL.algae, PAL.violet, PAL.frost];
-  const PARTLET = ['M', 'F', 'S', 'A', 'E', 'L', 'G', 'T', 'C'];
-  function drawStrip(c) {
-    const cv = $('istrip'), ctx = cv.getContext('2d');
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
-    const g = c.g, mutSet = {};
-    c.muts.forEach(function (m) { mutSet[m.kind + m.i] = 1; });
-    let x = 8; const y = 40, t = G.rt;
-    const mark = function (key, cx, rad) {
-      if (!mutSet[key]) return;
-      ctx.strokeStyle = G.rgba(PAL.rose, 0.7 + 0.3 * Math.sin(t * 6)); ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(cx, y, rad + 5, 0, 6.2832); ctx.stroke();
-    };
-    // traits: size, speed, colour
-    ctx.fillStyle = G.hsl(g.t[2], 80, 62, 1); ctx.beginPath(); ctx.arc(x + 14, y, 13, 0, 6.2832); ctx.fill(); mark('t2', x + 14, 13); x += 36;
-    const sz = 5 + (g.t[0] - 5) * 0.55;
-    ctx.strokeStyle = PAL.frost; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x + 12, y, sz, 0, 6.2832); ctx.stroke(); mark('t0', x + 12, sz); x += 32;
-    ctx.fillStyle = PAL.frost; ctx.fillRect(x, y - 3, 10 + g.t[1] * 22, 6); mark('t1', x + 14, 10); x += 38;
-    ctx.fillStyle = G.rgba(PAL.frost, 0.25); ctx.fillRect(x, y - 16, 2, 32); x += 10;
-    // diet beads: the opacity is how well it digests that colour of food
-    for (let i = 0; i < 6; i++) { ctx.fillStyle = BEADCOL[i]; ctx.globalAlpha = 0.2 + 0.8 * g.c[i]; ctx.beginPath(); ctx.arc(x + 8, y, 7.5, 0, 6.2832); ctx.fill(); ctx.globalAlpha = 1; mark('c' + i, x + 8, 7.5); x += 19; }
-    x += 4;
-    for (let i = 6; i < 9; i++) { ctx.strokeStyle = [PAL.rose, PAL.frost, PAL.violet][i - 6]; ctx.globalAlpha = 0.25 + 0.75 * g.c[i]; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x + 8, y, 6, 0, 6.2832); ctx.stroke(); ctx.globalAlpha = 1; mark('c' + i, x + 8, 6); x += 19; }
-    ctx.fillStyle = G.rgba(PAL.frost, 0.25); ctx.fillRect(x, y - 16, 2, 32); x += 10;
-    // the body's rules: segments, then one bead for each thing that grows from it
-    ctx.font = '700 13px ui-monospace, Consolas, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const f = g.f;
-    ctx.fillStyle = G.hsl(f.hue, f.sat, f.lit, 1); G.roundRect(ctx, x, y - 11, 30, 22, 7); ctx.fill();
-    ctx.fillStyle = PAL.deep; ctx.fillText((f.sym ? '✶' + f.sym : '') + (f.sym ? '' : f.n + 's'), x + 15, y + 1); mark('f0', x + 15, 14); x += 35;
-    for (let i = 0; i < f.rules.length && x < 500; i++) {
-      ctx.fillStyle = G.hsl(f.hue + f.hue2, f.sat, f.lit, 1); G.roundRect(ctx, x, y - 11, 22, 22, 7); ctx.fill();
-      ctx.fillStyle = PAL.deep; ctx.fillText('LFSTAPRH'.charAt(f.rules[i].k), x + 11, y + 1); x += 26;
-    }
-    for (let i = 0; i < g.p.length && x < 520; i++) {
-      const org = G.organOf(g.p[i].k);
-      ctx.fillStyle = G.hsl(org ? org.hue : 270, 80, 66, 1); ctx.beginPath(); ctx.arc(x + 11, y, 11, 0, 6.2832); ctx.fill();
-      ctx.strokeStyle = PAL.gold; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = PAL.deep; ctx.fillText(org ? org.name.charAt(0) : '?', x + 11, y + 1); mark('p' + i, x + 11, 11); x += 26;
-    }
-    // brain: one tick per wire
-    if (x < 520) {
-      ctx.fillStyle = G.rgba(PAL.frost, 0.25); ctx.fillRect(x, y - 16, 2, 32); x += 10;
-      for (let i = 0; i < g.w.length && x < 552; i++) {
-        const w = g.w[i], hgt = 6 + Math.min(1, Math.abs(w.v)) * 20;
-        ctx.fillStyle = w.v >= 0 ? PAL.algae : PAL.rose; ctx.globalAlpha = 0.85;
-        ctx.fillRect(x, y - hgt / 2, 4, hgt); ctx.globalAlpha = 1;
-        if (mutSet['w' + i]) { ctx.strokeStyle = PAL.rose; ctx.lineWidth = 2; ctx.strokeRect(x - 2, y - 17, 8, 34); }
-        x += 7;
-      }
-    }
-  }
-
-  function drawBrain(c) {
-    const cv = $('ibrain'), ctx = cv.getContext('2d');
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
-    const g = c.g, nh = g.h, W = cv.width, H = cv.height;
-    const colX = [34, W / 2, W - 34];
-    const pos = function (kind, i) {
-      if (kind === 0) return [colX[0], 14 + (H - 28) * i / (G.NIN - 1)];
-      if (kind === 1) return [colX[1], 18 + (H - 36) * (nh === 1 ? 0.5 : i / (nh - 1))];
-      return [colX[2], 22 + (H - 44) * i / (G.NOUT - 1)];
-    };
-    const node = function (id) {
-      if (id >= 200) return pos(2, id - 200);
-      if (id >= 100) return pos(1, id - 100);
-      return pos(0, id);
-    };
-    const used = {};
-    for (let i = 0; i < g.w.length; i++) { used[g.w[i].f] = 1; used[g.w[i].t] = 1; }
-    for (let i = 0; i < g.w.length; i++) {
-      const w = g.w[i], a = node(w.f), b = node(w.t);
-      const fv = w.f >= 100 ? c.hv[w.f - 100] : c.inp[w.f];
-      ctx.strokeStyle = w.v >= 0 ? G.rgba(PAL.algae, 0.3 + 0.5 * Math.min(1, Math.abs(fv || 0) + 0.2)) : G.rgba(PAL.rose, 0.3 + 0.5 * Math.min(1, Math.abs(fv || 0) + 0.2));
-      ctx.lineWidth = 1 + Math.min(4, Math.abs(w.v) * 2.2);
-      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.bezierCurveTo((a[0] + b[0]) / 2, a[1], (a[0] + b[0]) / 2, b[1], b[0], b[1]); ctx.stroke();
-    }
-    ctx.font = '15px system-ui, sans-serif'; ctx.textBaseline = 'middle';
-    for (let i = 0; i < G.NIN; i++) {
-      if (!used[i]) { const p = pos(0, i); ctx.fillStyle = G.rgba(PAL.frost, 0.14); ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, 6.2832); ctx.fill(); continue; }
-      const p = pos(0, i), v = Math.min(1, Math.abs(c.inp[i]));
-      ctx.fillStyle = G.rgba(PAL.frost, 0.35 + 0.65 * v); ctx.beginPath(); ctx.arc(p[0], p[1], 5 + v * 2, 0, 6.2832); ctx.fill();
-      ctx.fillStyle = G.rgba(PAL.frost, 0.75); ctx.textAlign = 'left'; ctx.fillText(G.INAMES[i], p[0] + 11, p[1]);
-    }
-    for (let i = 0; i < nh; i++) {
-      const p = pos(1, i), v = Math.min(1, Math.abs(c.hv[i]));
-      ctx.fillStyle = G.rgba(PAL.violet, 0.45 + 0.55 * v); ctx.beginPath(); ctx.arc(p[0], p[1], 8, 0, 6.2832); ctx.fill();
-    }
-    for (let i = 0; i < G.NOUT; i++) {
-      const p = pos(2, i), v = i === 1 ? Math.abs(c.out[1]) : c.out[i];
-      ctx.fillStyle = G.rgba(PAL.gold, 0.35 + 0.65 * v); ctx.beginPath(); ctx.arc(p[0], p[1], 6 + v * 3, 0, 6.2832); ctx.fill();
-      ctx.fillStyle = G.rgba(PAL.frost, 0.85); ctx.textAlign = 'right'; ctx.fillText(G.ONAMES[i], p[0] - 12, p[1]);
-    }
   }
 
   let prevT = 0;
@@ -727,7 +633,7 @@
         UI.followed = null;
       }
       $('iPar').textContent = par;
-      $('isub').textContent = (sp ? G.describeSpecies(sp) : 'A newborn: its species is sorted out in autumn.');
+      $('isub').textContent = (sp ? G.describeSpecies(sp) : 'A newborn: its species is sorted out in autumn.') + (G.lifeText && G.lifeText(c) ? ' ' + G.lifeText(c) : '');
       { const mb = $('imarvel'), mv = c.ph.mv, key = mv ? 'm' + mv.id : ''; if (mb && mb._k !== key) { mb._k = key; mb.classList.toggle('hide', !mv); mb.innerHTML = mv && G.marvelCard ? G.marvelCard(mv) : ''; } }
       G.R.selPrev = G.preview(c.g, c.id);
     }
@@ -760,9 +666,16 @@
       if (prev) {
         prev.ang = -0.5; prev.glow = c.glow || 0.5; prev.look = 0;
         prev.asleep = c.asleep; G.drawFit(ctx, prev, 104, 104, 96, G.rt);
+        const mv = c.ph && c.ph.mv, em = mv && G.marvelEmblem ? G.marvelEmblem(mv) : null;
+        if (mv) {
+          const gx = 168, gy = 44 + Math.sin(G.rt * 2.2) * 4, gs = 23;
+          ctx.save(); ctx.globalCompositeOperation = 'lighter';
+          const hg = ctx.createRadialGradient(gx, gy, 3, gx, gy, gs * 1.7); hg.addColorStop(0, G.hsl(mv.hue, 95, 70, 0.5)); hg.addColorStop(1, G.hsl(mv.hue, 95, 70, 0)); ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(gx, gy, gs * 1.7, 0, 6.2832); ctx.fill();
+          ctx.globalCompositeOperation = 'source-over';
+          if (em) ctx.drawImage(em, gx - gs, gy - gs, gs * 2, gs * 2); else if (G.glyph) G.glyph(ctx, mv.glyph, gx, gy, gs * 0.6, mv.hue, G.rt);
+          ctx.restore();
+        }
       }
-      drawStrip(c);
-      drawBrain(c);
     }
   }
 

@@ -38,6 +38,25 @@
     return cv;
   }
 
+  /** a small picture of one living creature, as it is (a card in the Book that stands for something alive in the pond) */
+  function livePic(parent, c, px) {
+    const cv = el('canvas', '', '', parent); cv.width = cv.height = 192; cv.style.cssText = 'flex:none;width:' + px + 'px;height:' + px + 'px;background:rgba(7,18,31,.5);border-radius:12px';
+    const pv = G.preview(c.g, c.id); pv.ang = -0.4; pv.glow = 0.7;
+    G.drawFit(cv.getContext('2d'), pv, 96, 96, 88, 1.2);
+    return cv;
+  }
+  /** a button that closes the Book and goes to that creature (or, if it has died meanwhile, to another that fits) */
+  function findBtn(parent, c, again, label) {
+    const b = el('button', 'btn sm', label || 'SHOW ME THIS ONE', parent);
+    b.onclick = function () {
+      let t = c && !c.dead && G.W.cre.indexOf(c) >= 0 ? c : null;
+      if (!t && again) t = again();
+      closeModal();
+      if (t) { G.select(t); G.R.ping = { c: t, t: 0 }; G.focusOn(t.x, t.y, 2.2); }
+    };
+    return b;
+  }
+
   // ── field guide ──
   G.openGuide = function () {
     const W = G.W; if (!W) return;
@@ -61,9 +80,19 @@
       }
       if (tab === 'live') {
         const list = W.species.filter(function (s) { return !s.extinct && s.n > 0; }).sort(function (a, b) { return b.n - a.n; });
-        if (!list.length) { body.innerHTML = '<div class="empty">No species yet. They are sorted out at the end of each autumn, once creatures start to differ.</div>'; return; }
+        const known = {}; list.forEach(function (s) { known[s.id] = 1; });
+        const loose = W.cre.filter(function (c) { return !c.dead && !known[c.sp]; });
+        const alive = W.cre.filter(function (c) { return !c.dead; }).length;
+        if (!alive) { body.innerHTML = '<div class="empty">Nothing is alive in the pond right now.</div>'; return; }
+        el('div', '', '<b>' + alive + '</b> creatures are alive now' + (list.length ? ', in <b>' + list.length + '</b> ' + (list.length === 1 ? 'kind' : 'kinds') : '') + '. Each card is one kind, not one creature: creatures that are alike count as the same kind. The picture is a living member of it, and the button takes you to that very one. Kinds are sorted out at the end of each autumn.', body).style.cssText = 'font-size:12.5px;line-height:1.45;margin:0 0 10px;color:rgba(207,232,255,.86)';
         const cards = el('div', 'cards', '', body);
         list.forEach(function (s) { speciesCard(cards, s, false); });
+        if (loose.length) {
+          const c0 = loose[0], card = el('div', 'card', '', cards);
+          cardCanvas(card, c0.g, c0.id);
+          const tx = el('div', '', '<b>Not sorted into a kind yet</b><p>' + (list.length ? 'Born since the last sorting.' : 'The first life of this pond.') + ' They get their kind, and a name, at the end of this autumn.</p><small>' + loose.length + ' alive now</small>', card);
+          findBtn(tx, c0, function () { return G.W.cre.find(function (x) { return !x.dead && !G.speciesById(x.sp); }); });
+        }
       } else if (tab === 'story') {
         const L = (W.story || []).slice().reverse();
         if (!L.length) { body.innerHTML = '<div class="empty">The story is written every few generations: what changed, and why it helped.</div>'; return; }
@@ -79,18 +108,25 @@
           let n = 0; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].g.p.some(function (p) { return p.k === 100 + o.id; })) n++;
           const fx = Object.keys(o.fx).filter(function (k) { return Math.abs(o.fx[k]) > 0.15; }).map(function (k) { return ({ photo: 'feeds on light', sense: 'senses further', eat: 'longer reach', armor: 'armour', spike: 'spikes', toxin: 'tastes bad', glow: 'glows', heat: 'heat-proof', cold: 'cold-proof', poison: 'poison-proof', speed: o.fx.speed > 0 ? 'faster' : 'slower' })[k]; });
           if (o.digest >= 0) fx.push('a new diet');
-          el('div', 'card' + (n ? '' : ' dead'), (o.svg ? '<img alt="" width="64" height="64" style="flex:none;background:rgba(7,18,31,.5);border-radius:12px;padding:6px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(o.svg) + '">' : '') + '<div><b>' + esc(o.name) + '</b><p>' + esc(o.note) + '</p><small>' + esc(fx.join(' · ')) + '</small><small>Invented in gen ' + o.gen + (G.ai.labelOf(o.by) ? ' by ' + esc(G.ai.labelOf(o.by)) : '') + ' · carried by <b>' + n + '</b> creatures</small></div>', cards);
+          const has = function (c) { return !c.dead && c.g.p.some(function (p) { return p.k === 100 + o.id; }); };
+          const who = n ? W.cre.find(has) : null;
+          const card = el('div', 'card' + (n ? '' : ' dead'), '', cards);
+          if (who) livePic(card, who, 96);
+          else if (o.svg) el('div', '', '<img alt="" width="52" height="52" style="display:block;opacity:.75" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(o.svg) + '">', card).style.cssText = 'flex:none;width:96px;height:96px;display:flex;align-items:center;justify-content:center;background:rgba(7,18,31,.5);border-radius:12px';
+          const tx = el('div', '', '<b>' + esc(o.name) + '</b><p>' + esc(o.note) + '</p><small>' + esc(fx.join(' · ')) + '</small><small>Invented in gen ' + o.gen + (G.ai.labelOf(o.by) ? ' by ' + esc(G.ai.labelOf(o.by)) : '') + ' · ' + (n ? 'carried by ' + n + (n === 1 ? ' creature: this one' : ' creatures; this is one of them') : 'nobody alive carries it now') + '</small>', card);
+          if (who) findBtn(tx, who, function () { return G.W.cre.find(has); });
         });
         // the builds this pond was given: whole ways of carrying a body
         if (PS.length) {
           el('h3', '', 'SHAPES OF BODY', body).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:16px 0 8px;color:var(--gold)';
           const pc = el('div', 'cards', '', body);
           PS.forEach(function (p, i) {
-            let n = 0, live = null; for (let k = 0; k < W.cre.length; k++) { const ff = W.cre[k].g.f; if (ff.pl === p.id) { n++; live = live || ff; } }
+            let n = 0, live = null, who = null; for (let k = 0; k < W.cre.length; k++) { const ff = W.cre[k].g.f; if (ff.pl === p.id) { n++; live = live || ff; who = who || W.cre[k]; } }
             const fx = [G.body.words({ bd: p.bd, rules: [] })[0]];
             const card = el('div', 'card' + (n ? '' : ' dead'), '<canvas width="192" height="192" style="flex:none;width:96px;height:96px;background:rgba(7,18,31,.5);border-radius:12px"></canvas><div><b>' + esc(p.name) + '</b><p>' + esc(p.note) + '</p><small>' + esc(fx.join(' · ')) + ' · ' + (p.because ? 'why: ' + esc(p.because) + ' · ' : '') + (n ? n + ' alive have it' : 'nobody has it yet') + (G.ai.labelOf(p.by) ? ' · imagined by ' + esc(G.ai.labelOf(p.by)) : '') + '</small></div>', pc);
             const cx = card.querySelector('canvas').getContext('2d'), f = live || G.planDemo(p, (W.hue0 + i * 70) % 360);
             cx.translate(96, 106); cx.scale(0.5, 0.5); G.form.portrait(cx, f, 1.2, {});
+            if (who) findBtn(card.lastElementChild, who, function () { return G.W.cre.find(function (x) { return !x.dead && x.g.f.pl === p.id; }); });
           });
         }
         // the kinds of body part this pond was given, each shown on a plain animal
@@ -98,10 +134,12 @@
           el('h3', '', 'KINDS OF BODY PART', body).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:16px 0 8px;color:var(--gold)';
           const dc = el('div', 'cards', '', body);
           DS.forEach(function (d, i) {
-            let n = 0; for (let k = 0; k < W.cre.length; k++) if (W.cre[k].g.f.rules.some(function (q) { return q.k === 8 && q.t === d.id; })) n++;
+            const grows = function (c) { return !c.dead && c.g.f.rules.some(function (q) { return q.k === 8 && q.t === d.id; }); };
+            let n = 0, who = null; for (let k = 0; k < W.cre.length; k++) if (grows(W.cre[k])) { n++; who = who || W.cre[k]; }
             const fx = Object.keys(d.fx).filter(function (k) { return Math.abs(d.fx[k]) > 0.04; }).map(function (k) { return k + ' ' + (d.fx[k] > 0 ? '+' : '−') + Math.abs(d.fx[k]).toFixed(2); });
             const card = el('div', 'card' + (n ? '' : ' dead'), '<canvas width="192" height="152" style="flex:none;width:96px;height:76px;background:rgba(7,18,31,.5);border-radius:12px"></canvas><div><b>' + esc(d.name) + '</b><p>' + esc(d.note) + '</p><small>' + esc(fx.join(' · ')) + ' · sits on the ' + esc(d.place) + '</small><small>Invented in gen ' + d.gen + (G.ai.labelOf(d.by) ? ' by ' + esc(G.ai.labelOf(d.by)) : ' by the pond') + ' · ' + (n ? n + ' creatures grow it now' : 'nobody grows it now') + '</small></div>', dc);
-            const cx = card.querySelector('canvas').getContext('2d'), f = G.designDemo(d, (W.hue0 + i * 50) % 360);
+            const cx = card.querySelector('canvas').getContext('2d'), f = who ? who.g.f : G.designDemo(d, (W.hue0 + i * 50) % 360);
+            if (who) findBtn(card.lastElementChild, who, function () { return G.W.cre.find(grows); });
             cx.translate(96, 84); cx.scale(0.42, 0.42); G.form.portrait(cx, f, 1.2, {});
           });
         }
@@ -156,17 +194,13 @@
 
   function speciesCard(parent, s, dead) {
     const card = el('div', 'card' + (dead ? ' dead' : ''), '', parent);
-    if (s.rep) cardCanvas(card, s.rep, s.id);
+    const one = dead ? null : G.W.cre.find(function (x) { return x.sp === s.id && !x.dead; });
+    if (one) cardCanvas(card, one.g, one.id); else if (s.rep) cardCanvas(card, s.rep, s.id);
     const tx = el('div', '', '', card);
     tx.innerHTML = '<b>' + esc(s.name) + '</b><p>' + esc(G.describeSpecies(s)) + '</p><small>Appeared in gen ' + s.born + ' · most ever ' + s.peak + ' · now ' + s.n + '</small>';
     const sp = el('canvas', '', '', tx); sp.width = 220; sp.height = 36; sp.style.cssText = 'width:110px;height:18px;margin-top:4px';
     spark(sp, s.hist);
-    const b = el('button', 'btn sm', 'FIND ONE', tx);
-    b.onclick = function () {
-      const c = G.W.cre.find(function (x) { return x.sp === s.id; });
-      closeModal();
-      if (c) { G.select(c); G.R.ping = { c: c, t: 0 }; G.focusOn(c.x, c.y, 2.2); }
-    };
+    findBtn(tx, one, function () { return G.W.cre.find(function (x) { return x.sp === s.id && !x.dead; }); });
   }
   function fossilCard(parent, f) {
     const card = el('div', 'card dead', '', parent);
@@ -294,18 +328,19 @@
   G.showCosts = function () {
     const A = G.ai, kinds = Object.keys(A.LABEL).concat(Object.keys(A.life).filter(function (k) { return !A.LABEL[k]; }));
     const m = function (v) { return v ? '$' + v.toFixed(v < 1 ? 4 : 2) : '$0'; };
-    let rows = '', sA = 0, sF = 0, sU = 0, lF = 0, lU = 0;
+    let rows = '', sA = 0, sF = 0, sU = 0, lF = 0, lU = 0, sB = 0;
     for (let i = 0; i < kinds.length; i++) {
       const k = kinds[i], c = A.count[k] || { asked: 0, fresh: 0, usd: 0 }, L = A.life[k] || { asked: 0, fresh: 0, usd: 0 };
       sA += c.asked; sF += c.fresh; sU += c.usd || 0; lF += L.fresh; lU += L.usd;
-      const bud = A.budgetOf ? A.budgetOf(k) : 0, out = A.over && A.over(k), part = bud ? Math.min(1, L.usd / bud) : 0;
-      rows += '<tr' + (out ? ' style="opacity:.55"' : '') + '><td style="text-align:left">' + esc(A.LABEL[k] || k) + (out ? ' <b style="color:var(--rose);font-size:10px;letter-spacing:.08em">OFF</b>' : '') + '</td><td>' + c.fresh + '</td><td>' + (c.asked - c.fresh) + '</td><td><b>' + m(c.usd) + '</b></td><td style="color:rgba(207,232,255,.7)">' + L.fresh + '</td><td style="color:rgba(207,232,255,.7)">' + m(L.usd) + '</td><td style="white-space:nowrap"><span style="display:inline-block;vertical-align:middle;width:46px;height:5px;border-radius:3px;background:rgba(207,232,255,.18);overflow:hidden;margin-right:6px"><i style="display:block;height:100%;width:' + Math.round(part * 100) + '%;background:' + (out ? 'var(--rose)' : part > 0.75 ? 'var(--gold)' : '#33d6a6') + '"></i></span>' + (bud ? '$' + bud.toFixed(2) : '') + '</td></tr>';
+      const bud = A.budgetOf ? A.budgetOf(k) : 0, out = A.over && A.over(k), part = bud ? Math.min(1, L.usd / bud) : 0; sB += bud;
+      rows += '<tr' + (out ? ' style="opacity:.55"' : '') + '><td style="text-align:left">' + esc(A.LABEL[k] || k) + (out ? ' <b style="color:var(--rose);font-size:10px;letter-spacing:.08em">OFF</b>' : '') + '</td><td>' + c.fresh + '</td><td>' + (c.asked - c.fresh) + '</td><td><b>' + m(c.usd) + '</b></td><td style="color:rgba(207,232,255,.7)">' + L.fresh + '</td><td style="color:rgba(207,232,255,.7)">' + m(L.usd) + '</td><td style="white-space:nowrap"><span style="display:inline-block;vertical-align:middle;width:46px;height:5px;border-radius:3px;background:rgba(207,232,255,.18);overflow:hidden;margin-right:6px"><i style="display:block;height:100%;width:' + Math.round(part * 100) + '%;background:' + (out ? 'var(--rose)' : part > 0.75 ? 'var(--gold)' : '#33d6a6') + '"></i></span>$<input data-bud="' + esc(k) + '" type="number" min="0" max="50" step="0.05" value="' + bud.toFixed(2) + '" title="What this kind may spend in this pond, in dollars. 0 turns it off." style="width:62px;padding:3px 5px;border-radius:7px;border:1px solid ' + (A.budgetSet && typeof A.budgetSet[k] === 'number' ? 'var(--gold)' : 'rgba(207,232,255,.3)') + ';background:rgba(7,18,31,.7);color:#fff;font:600 12px system-ui,sans-serif;text-align:right"></td></tr>';
     }
-    rows += '<tr style="border-top:1px solid rgba(207,232,255,.25)"><td style="text-align:left;color:var(--gold)"><b>TOTAL</b></td><td>' + sF + '</td><td>' + (sA - sF) + '</td><td><b style="color:var(--gold)">' + m(sU) + '</b></td><td>' + lF + '</td><td><b style="color:var(--gold)">' + m(lU) + '</b></td><td></td></tr>';
+    rows += '<tr style="border-top:1px solid rgba(207,232,255,.25)"><td style="text-align:left;color:var(--gold)"><b>TOTAL</b></td><td>' + sF + '</td><td>' + (sA - sF) + '</td><td><b style="color:var(--gold)">' + m(sU) + '</b></td><td>' + lF + '</td><td><b style="color:var(--gold)">' + m(lU) + '</b></td><td style="white-space:nowrap"><b style="color:var(--gold)">$' + sB.toFixed(2) + '</b></td></tr>' +
+      '<tr><td colspan="7" style="text-align:right;font-size:12px;padding-top:4px">You have given this pond <b style="color:var(--gold)">$' + sB.toFixed(2) + '</b> in all. It has used <b>' + m(lU) + '</b>; <b>$' + Math.max(0, sB - lU).toFixed(2) + '</b> is left.</td></tr>';
     const last = A.ledger.filter(function (e) { return e.paid; }).slice(-10).reverse().map(function (e) { const d = new Date(e.at); return '<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:1px 0"><span>' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ' · gen ' + e.gen + ' · ' + esc(A.LABEL[e.kind] || e.kind) + '</span><b>' + (e.usd === null ? 'no price set' : m(e.usd)) + '</b></div>'; }).join('');
     openOverlay('costs', '<div class="glass sheet" style="width:min(760px,100%);max-height:92vh;overflow:auto"><h3 style="margin-bottom:4px">WHAT THE AI COST</h3><small style="margin-bottom:10px;display:block">Every paid answer is counted here, in dollars for now. "Paid" means a model really ran; "free" came from the library of earlier answers, or from the pond itself.</small>' +
       '<table style="width:100%;border-collapse:collapse;font-size:12.5px;text-align:right"><tr style="font-size:10px;letter-spacing:.08em;color:rgba(207,232,255,.6)"><th style="text-align:left;font-weight:600">WHAT FOR</th><th style="font-weight:600">PAID</th><th style="font-weight:600">FREE</th><th style="font-weight:600">THIS SESSION</th><th style="font-weight:600">PAID, THIS POND</th><th style="font-weight:600">THIS POND</th><th style="font-weight:600">BUDGET, THIS POND</th></tr>' + rows + '</table>' +
-      '<small style="display:block;margin-top:6px">Each kind of AI work has its own budget for one pond. When it is used up that kind is OFF in this pond; a new pond starts with full budgets.</small>' +
+      '<small style="display:block;margin-top:6px">Each kind of AI work has its own budget for one pond, and <b>you set it</b>: type the dollars in the last column (0 turns that kind off). When a budget is used up that kind is OFF in this pond. Your budgets are kept with the pond and carried into a new one. <a href="#" id="budReset" style="color:var(--gold)">Back to the usual budgets</a></small>' +
       (A.unpriced ? '<small style="display:block;margin-top:6px;color:var(--rose)">' + A.unpriced + ' paid answer' + (A.unpriced === 1 ? '' : 's') + ' came from a model with no price set, so the total is too low by that much.</small>' : '') +
       (A.fuel !== null ? '<small style="display:block;margin-top:6px">Fuel left: <b>' + A.fuel + '</b> paid answers.</small>' : '') +
       '<h3 style="font-size:11px;letter-spacing:.16em;margin:12px 0 4px;color:var(--gold)">LATEST PAID ANSWERS</h3>' + (last || '<small>None yet this session.</small>') +
@@ -313,6 +348,10 @@
       '<small style="display:block;margin-top:10px">Plans and marvels come by the generation, so a faster pond asks for them sooner; each kind stops at its budget.</small>' +
       '<div class="actions" style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" id="costClose">CLOSE</button></div></div>');
     $('costClose').onclick = function () { closeModal(); };
+    // the budgets are the player's to set
+    { const ins = document.querySelectorAll('input[data-bud]'), again = function () { const sh = document.querySelector('.sheet'), y = sh ? sh.scrollTop : 0; G.showCosts(); const s2 = document.querySelector('.sheet'); if (s2) s2.scrollTop = y; };
+      for (let i = 0; i < ins.length; i++) ins[i].onchange = function () { const el = this; if (A.setBudget) A.setBudget(el.getAttribute('data-bud'), el.value); setTimeout(function () { if (document.body.contains(el)) again(); }, 0); };
+      const rs = $('budReset'); if (rs) rs.onclick = function (e) { e.preventDefault(); if (A.resetBudgets) A.resetBudgets(); again(); }; }
     // the server keeps its own account of every call it made, for every player, with the prices it used: shown as it is
     const box = $('costBooks');
     if (!(G.host && G.host.ready && G.host.caps.ai)) { box.innerHTML = '<small>No server is connected: nothing has been paid for.</small>'; return; }
@@ -416,7 +455,7 @@
       el('div', '', one('thing', 'Words you added') + one('event', 'Events you typed') + one('organ', 'New organs (at most ' + caps.organ + ', one per 40 s)') + one('story', 'Story chapters (at most ' + caps.story + ', one per 45 s)') + one('ideas', 'Mutation ideas (at most ' + caps['mutation-ideas'] + ', one per 2 min)') + (G.ai.sound ? one('sound', 'Sounds (one per new word, at most ' + caps.sound + ')') : '') +
         one('judge', 'The eye for beauty: grading creatures (at most ' + caps.judge + ')') + one('check', 'The eye for beauty: looking over new ideas (at most ' + caps.check + ')') + one('plan', 'New shapes of body (at most ' + caps.plan + ')') + one('design', 'New kinds of body part (at most ' + caps.design + ')') +
         '<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0 0;margin-top:4px;border-top:1px solid rgba(207,232,255,.15)"><span>Total</span><span><b style="color:var(--gold)">' + G.ai.money(t.usd) + '</b> · <b>' + t.fresh + '</b> new answers · ' + (t.asked - t.fresh) + ' reused for free' + (t.unpriced ? ' · ' + t.unpriced + ' with no price set' : '') + '</span></div>', root);
-      el('div', 'desc', 'Fast-forward does not use more AI: the pond asks by the clock, not by the generation. Only what you type is on top of that.', root).style.marginTop = '6px';
+      el('div', 'desc', 'Breeding and selection never ask the AI: they run every generation on their own, using the learned guess the pond keeps of what the watcher likes. The watcher looks by the clock (so at fast-forward more generations pass between looks); plans and marvels come by the generation (so a faster pond asks for those sooner). Each kind has a budget you can set in the costs sheet.', root).style.marginTop = '6px';
       el('h3', '', 'WHO IMAGINES', root).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:14px 0 4px;color:var(--gold)';
       el('div', 'desc', 'The AI that decides what your words become, and suggests mutations. Each one imagines differently.', root);
       const row = el('div', 'chips', '', root);

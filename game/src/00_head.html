@@ -147,6 +147,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 #ifit small { display: block; opacity: .8; line-height: 1.35; margin-top: 2px; }
 #banner { position: fixed; left: 50%; top: 14px; transform: translate(-50%, -140%); padding: 12px 22px; text-align: center; font-weight: 700; letter-spacing: .04em; transition: transform .6s cubic-bezier(.2,.9,.3,1.2); max-width: min(600px, calc(100vw - 28px)); font-size: 14px; line-height: 1.35; z-index: 8; border-color: rgba(246,211,101,.7); box-shadow: 0 0 36px rgba(246,211,101,.35), inset 0 0 24px rgba(246,211,101,.15); }
 #banner.show { transform: translate(-50%, 78px); }
+#banner:not(.show) { opacity: 0; pointer-events: none; transform: translate(-50%, -220%); }      /* gone when it has nothing to say: its edge used to peek out at the top like a button nobody could read */
 #banner small { display: block; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); margin-bottom: 2px; font-size: 10px; }
 #hint { position: fixed; left: 50%; bottom: 84px; transform: translate(-50%, 12px); opacity: 0; padding: 9px 18px; font-size: 13px; text-align: center; max-width: min(520px, calc(100vw - 28px)); transition: opacity .5s, transform .5s; pointer-events: none !important; z-index: 4; }
 #hint.show { opacity: 1; transform: translate(-50%, 0); }
