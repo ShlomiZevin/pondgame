@@ -949,6 +949,7 @@ G.addSystem({
     drawAddedThings();
     if (G.drawFields) G.drawFields(G.ctx);
     if (G.drawDeeds) G.drawDeeds(G.ctx);
+    if (G.drawFx) G.drawFx(G.ctx);      // who is biting, eating or dying, made plain (50c_fx.js)
     if (G.drawBeyond) G.drawBeyond(G.ctx);
     drawCreatures();
     drawThingCaptions();
