@@ -67,11 +67,13 @@
     dirty = false;
     const d = collect();
     if (!d) return;
+    mirror(d);
     if (hasSave()) { try { Plaxzy.save.set(d); } catch (e) { console.error(e); } }
     G.emit('saved');
   };
   G.eraseSave = function () {
     G.pendingSave = null;
+    try { localStorage.removeItem(MIRROR); } catch (e) { /* no storage here */ }
     G.emit('save-erased');
     if (hasSave()) { try { Plaxzy.save.set(null); } catch (e) { try { Plaxzy.save.set({ v: 0 }); } catch (e2) { console.error(e2); } } }
   };
@@ -85,6 +87,19 @@
   G.on('discovery', function () { if (G.mode === 'play') later(); });
   G.on('new-pond', function () { if (G.mode === 'play') later(); });
   window.addEventListener('pagehide', function () { if (G.mode === 'play') G.saveNow(); });
+  // ── the pond you left is the pond you come back to ──
+  // The save that goes to the host travels as a message and then over the network, and a page that is closing or being refreshed often does not get
+  // it out in time: the pond then came back as it was at its last autumn, a generation and a few dozen creatures behind. So every save is also
+  // written, at once and on the spot, into this browser's own storage, and so is the pond every few seconds while it is being played. On coming back,
+  // the newer of the two is used: but only when it is the SAME pond (the same seed) as the one the host holds, so nobody is handed another's pond.
+  const MIRROR = 'primordia.pond.v1';
+  function mirror(d) { try { localStorage.setItem(MIRROR, JSON.stringify(d)); } catch (e) { /* no storage here (a sandboxed frame), or it is full: the host's save still stands */ } }
+  G.newerSave = function (d) {
+    try { const raw = localStorage.getItem(MIRROR); if (!raw) return d; const m = JSON.parse(raw); if (G.validSave(m) && m.seed === d.seed && Number(m.at) > Number(d.at || 0)) return m; } catch (e) { /* unreadable: use the host's */ }
+    return d;
+  };
+  setInterval(function () { try { if (G.mode === 'play' && G.W && !G.W.title && !document.hidden && G.speed > 0 && !G.isBlocked()) { const d = collect(); if (d) mirror(d); } } catch (e) { console.error(e); } }, 6000);
+  document.addEventListener('visibilitychange', function () { if (document.hidden && G.mode === 'play') { try { const d = collect(); if (d) mirror(d); } catch (e) { console.error(e); } } });
 
   // ── every creature fits ──
   // A save has to stay under 100 kB, and written out plainly a creature takes about 700 characters: only some 50 of a pond's 130 fitted, so a pond
@@ -253,7 +268,7 @@
       try {
         Plaxzy.save.load(function (d) {
           try {
-            if (G.validSave(d)) { G.pendingSave = d; if (G.showContinue) G.showContinue(true); }
+            if (G.validSave(d)) { G.pendingSave = G.newerSave(d); if (G.showContinue) G.showContinue(true); }
           } catch (e) { console.error(e); }
         });
       } catch (e) { console.error(e); }

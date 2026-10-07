@@ -8233,7 +8233,7 @@ G.addSystem({
     update: function (dt) {
       const W = G.W;
       if (!W) return;
-      if (G.speed === 0 || G.isBlocked() || G.mode === 'boot' || G.catching) { G.alpha = 1; return; }
+      if (G.speed === 0 || G.isBlocked() || G.mode === 'boot' || G.catching || (typeof document !== 'undefined' && document.hidden)) { G.alpha = 1; return; }      // a pond nobody is looking at stands still
       const slow = G.mode === 'title';               // the title screen pond just drifts
       const sp = slow ? 0.5 : G.speed;
       const step = sp >= 16 ? 0.1 : G.K.dt;
@@ -8385,7 +8385,7 @@ G.addSystem({
     const vs = document.getElementById('versus');
     // on the left, at mid height: between the season card above and the zoom buttons below (it never covers either)
     { const se = document.getElementById('season'), zm = document.getElementById('zoom'), top = Math.max(se && !se.classList.contains('hide') ? se.getBoundingClientRect().bottom + 10 : 240, vs && !vs.classList.contains('hide') && vs.offsetHeight ? vs.getBoundingClientRect().bottom + 10 : 0),      /* below the 'pond versus' card when that is showing */ bot = zm ? zm.getBoundingClientRect().top - 10 : window.innerHeight - 240;
-      if (window.innerWidth > 720) { const h = box.offsetHeight || 40, mid = Math.max(top + h / 2, Math.min(window.innerHeight / 2, bot - h / 2)); box.style.top = Math.round(mid) + 'px'; box.style.maxHeight = Math.max(120, Math.round(bot - top)) + 'px'; } else { box.style.top = ''; box.style.maxHeight = ''; } }
+      if (window.innerWidth > 720) { box.style.top = Math.round(top) + 'px'; box.style.transform = 'none'; box.style.maxHeight = Math.max(120, Math.round(bot - top)) + 'px';      /* it hangs from its top edge: opening and folding it does not move it */ } else { box.style.top = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
     box.style.zIndex = shut ? '2' : '9';
     const by = {}, order = [];
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i], mv = c.ph && c.ph.mv; if (!mv || c.dead) continue; if (!by[mv.id]) { by[mv.id] = { d: mv, n: 0 }; order.push(mv.id); } by[mv.id].n++; }
@@ -9674,6 +9674,8 @@ G.addSystem({
     return '<div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="flex:0 0 108px;font-size:10.5px;color:rgba(207,232,255,.8)">' + label + '</span><div class="meter" style="flex:1;margin:0;height:6px"><i style="width:' + Math.round(v * 100) + '%;background:' + col + '"></i></div><b style="flex:0 0 30px;text-align:right;font-size:10.5px">' + Math.round(v * 100) + '%</b></div>';
   }
 
+  let shut = null;
+  function toggle(e) { if (e) e.stopPropagation(); shut = !shut; try { localStorage.setItem('primordia.versusShut', shut ? '1' : ''); } catch (er) {} if (G.sfx) G.sfx('click'); render(); }
   function render() {
     const W = G.W;
     const bad = W.zones.filter(G.isBad).sort(function (a, b) { return a.born - b.born; });
@@ -9683,18 +9685,24 @@ G.addSystem({
     const s = order.join('|');
     if (!order.length) { if (!box.classList.contains('hide')) box.classList.add('hide'); sig = ''; return; }
     box.classList.remove('hide');
-    let html = '<div class="ilabel" style="margin:0 0 4px;color:var(--gold)">THE POND VERSUS</div>';
+    // the heading folds the card away; under it, one line says what the card is
+    if (shut === null) { try { shut = !!localStorage.getItem('primordia.versusShut'); } catch (e) { shut = false; } }
+    let html = '<div id="vsHead" title="' + (shut ? 'Open' : 'Fold away') + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer"><span class="ilabel" style="margin:0;color:var(--gold)">' + (shut ? 'DANGERS' : 'DANGERS IN THE POND') + '</span><span style="display:flex;align-items:center;gap:6px">' + (shut ? '<small style="padding:1px 8px;border-radius:999px;border:1px solid rgba(255,126,182,.6);color:#ffd3e2">' + order.length + '</small>' : '') + '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;background:rgba(7,18,31,.55);border:1px solid rgba(207,232,255,.25)">' + (shut ? '▸' : '▾') + '</span></span></div>';
+    if (shut) { box.innerHTML = html; box.style.width = 'auto'; document.getElementById('vsHead').onclick = toggle; sig = s; return; }
+    box.style.width = '';
+    html += '<div style="font-size:11px;line-height:1.4;margin:3px 0 5px;color:rgba(207,232,255,.8)">Harmful things you or events put in the pond, and how far the creatures have got in beating each one. Click one to go to it.</div>';
     order.slice(0, 2).forEach(function (k) {
       const q = kinds[k], z = q.z, v = G.versus(z);
       const lock = z.p.vault > 0.2 ? 'It locks the food away. ' : z.p.deadly > 0.3 ? 'It kills with one touch. ' : '';
       const mood = lock + (v.carry > 0.5 ? 'They have the answer: <b>' + v.weak + '</b>.' : v.carry > 0.15 ? 'They are learning: <b>' + v.weak + '</b> hurt it.' : 'It is weak to <b>' + v.weak + '</b>. Few have them yet.');
       html += '<div data-z="' + z.id + '" style="cursor:pointer;padding:6px 0 4px;border-top:1px solid rgba(207,232,255,.12)"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:12.5px">' + esc(z.word) + (q.n > 1 ? ' <small>×' + q.n + '</small>' : '') + '</b><small>' + (q.ate ? 'it has killed ' + q.ate : 'since gen ' + z.born) + '</small></div>' +
         '<div style="font-size:11px;margin:2px 0 3px;color:rgba(207,232,255,.85)">' + mood + '</div>' +
-        bar('carry ' + v.weak, v.carry, PAL.algae) + (z.p.vault > 0.2 ? '' : bar('learned to bear it', v.adapt, PAL.gold)) + bar('its strength', q.left, PAL.rose) + '</div>';
+        bar('have ' + v.weak, v.carry, PAL.algae) + (z.p.vault > 0.2 ? '' : bar('can bear it', v.adapt, PAL.gold)) + bar('its life left', q.left, PAL.rose) + '</div>';
     });
     box.innerHTML = html;
     const rows = box.querySelectorAll('[data-z]');
-    for (let i = 0; i < rows.length; i++) rows[i].onclick = function () { const id = +this.dataset.z; const z = G.W.zones.filter(function (q) { return q.id === id; })[0]; if (z) { G.select(null); G.selectZone(z); } };
+    for (let i = 0; i < rows.length; i++) rows[i].onclick = function () { const id = +this.dataset.z; const z = G.W.zones.filter(function (q) { return q.id === id; })[0]; if (z) { G.select(null); G.selectZone(z); G.focusOn(z.x, z.y, Math.max(1.5, G.cam.z)); } };
+    document.getElementById('vsHead').onclick = toggle;
     sig = s;
   }
 
@@ -9720,7 +9728,7 @@ G.addSystem({
         G.R.ring(z.x, z.y, PAL.gold, z.r0 * 2.2, 1.6); G.R.ring(z.x, z.y, PAL.algae, z.r0 * 1.5, 1.2); G.R.sparkle(z.x, z.y, PAL.gold, 40, 160);
         G.sfx('discovery');
       });
-      G.on('zone', function (z) { if (G.mode === 'play' && G.isBad(z) && !z.genNote && z.genN === 1) G.hint('vs' + z.id, z.word + ' is dangerous. Watch THE POND VERSUS (left): life will look for its weakness.', 9000); });
+      G.on('zone', function (z) { if (G.mode === 'play' && G.isBad(z) && !z.genNote && z.genN === 1) G.hint('vs' + z.id, z.word + ' is dangerous. Watch DANGERS IN THE POND (left): life will look for its weakness.', 9000); });
     },
     update: function () {
       if (G.mode !== 'play' || !G.W) return;
@@ -10950,11 +10958,13 @@ G.addSystem({
     dirty = false;
     const d = collect();
     if (!d) return;
+    mirror(d);
     if (hasSave()) { try { Plaxzy.save.set(d); } catch (e) { console.error(e); } }
     G.emit('saved');
   };
   G.eraseSave = function () {
     G.pendingSave = null;
+    try { localStorage.removeItem(MIRROR); } catch (e) { /* no storage here */ }
     G.emit('save-erased');
     if (hasSave()) { try { Plaxzy.save.set(null); } catch (e) { try { Plaxzy.save.set({ v: 0 }); } catch (e2) { console.error(e2); } } }
   };
@@ -10968,6 +10978,19 @@ G.addSystem({
   G.on('discovery', function () { if (G.mode === 'play') later(); });
   G.on('new-pond', function () { if (G.mode === 'play') later(); });
   window.addEventListener('pagehide', function () { if (G.mode === 'play') G.saveNow(); });
+  // ── the pond you left is the pond you come back to ──
+  // The save that goes to the host travels as a message and then over the network, and a page that is closing or being refreshed often does not get
+  // it out in time: the pond then came back as it was at its last autumn, a generation and a few dozen creatures behind. So every save is also
+  // written, at once and on the spot, into this browser's own storage, and so is the pond every few seconds while it is being played. On coming back,
+  // the newer of the two is used: but only when it is the SAME pond (the same seed) as the one the host holds, so nobody is handed another's pond.
+  const MIRROR = 'primordia.pond.v1';
+  function mirror(d) { try { localStorage.setItem(MIRROR, JSON.stringify(d)); } catch (e) { /* no storage here (a sandboxed frame), or it is full: the host's save still stands */ } }
+  G.newerSave = function (d) {
+    try { const raw = localStorage.getItem(MIRROR); if (!raw) return d; const m = JSON.parse(raw); if (G.validSave(m) && m.seed === d.seed && Number(m.at) > Number(d.at || 0)) return m; } catch (e) { /* unreadable: use the host's */ }
+    return d;
+  };
+  setInterval(function () { try { if (G.mode === 'play' && G.W && !G.W.title && !document.hidden && G.speed > 0 && !G.isBlocked()) { const d = collect(); if (d) mirror(d); } } catch (e) { console.error(e); } }, 6000);
+  document.addEventListener('visibilitychange', function () { if (document.hidden && G.mode === 'play') { try { const d = collect(); if (d) mirror(d); } catch (e) { console.error(e); } } });
 
   // ── every creature fits ──
   // A save has to stay under 100 kB, and written out plainly a creature takes about 700 characters: only some 50 of a pond's 130 fitted, so a pond
@@ -11136,7 +11159,7 @@ G.addSystem({
       try {
         Plaxzy.save.load(function (d) {
           try {
-            if (G.validSave(d)) { G.pendingSave = d; if (G.showContinue) G.showContinue(true); }
+            if (G.validSave(d)) { G.pendingSave = G.newerSave(d); if (G.showContinue) G.showContinue(true); }
           } catch (e) { console.error(e); }
         });
       } catch (e) { console.error(e); }

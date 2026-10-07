@@ -22,7 +22,7 @@
     update: function (dt) {
       const W = G.W;
       if (!W) return;
-      if (G.speed === 0 || G.isBlocked() || G.mode === 'boot' || G.catching) { G.alpha = 1; return; }
+      if (G.speed === 0 || G.isBlocked() || G.mode === 'boot' || G.catching || (typeof document !== 'undefined' && document.hidden)) { G.alpha = 1; return; }      // a pond nobody is looking at stands still
       const slow = G.mode === 'title';               // the title screen pond just drifts
       const sp = slow ? 0.5 : G.speed;
       const step = sp >= 16 ? 0.1 : G.K.dt;

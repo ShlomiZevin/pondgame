@@ -24,6 +24,8 @@
     return '<div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="flex:0 0 108px;font-size:10.5px;color:rgba(207,232,255,.8)">' + label + '</span><div class="meter" style="flex:1;margin:0;height:6px"><i style="width:' + Math.round(v * 100) + '%;background:' + col + '"></i></div><b style="flex:0 0 30px;text-align:right;font-size:10.5px">' + Math.round(v * 100) + '%</b></div>';
   }
 
+  let shut = null;
+  function toggle(e) { if (e) e.stopPropagation(); shut = !shut; try { localStorage.setItem('primordia.versusShut', shut ? '1' : ''); } catch (er) {} if (G.sfx) G.sfx('click'); render(); }
   function render() {
     const W = G.W;
     const bad = W.zones.filter(G.isBad).sort(function (a, b) { return a.born - b.born; });
@@ -33,18 +35,24 @@
     const s = order.join('|');
     if (!order.length) { if (!box.classList.contains('hide')) box.classList.add('hide'); sig = ''; return; }
     box.classList.remove('hide');
-    let html = '<div class="ilabel" style="margin:0 0 4px;color:var(--gold)">THE POND VERSUS</div>';
+    // the heading folds the card away; under it, one line says what the card is
+    if (shut === null) { try { shut = !!localStorage.getItem('primordia.versusShut'); } catch (e) { shut = false; } }
+    let html = '<div id="vsHead" title="' + (shut ? 'Open' : 'Fold away') + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer"><span class="ilabel" style="margin:0;color:var(--gold)">' + (shut ? 'DANGERS' : 'DANGERS IN THE POND') + '</span><span style="display:flex;align-items:center;gap:6px">' + (shut ? '<small style="padding:1px 8px;border-radius:999px;border:1px solid rgba(255,126,182,.6);color:#ffd3e2">' + order.length + '</small>' : '') + '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;background:rgba(7,18,31,.55);border:1px solid rgba(207,232,255,.25)">' + (shut ? '▸' : '▾') + '</span></span></div>';
+    if (shut) { box.innerHTML = html; box.style.width = 'auto'; document.getElementById('vsHead').onclick = toggle; sig = s; return; }
+    box.style.width = '';
+    html += '<div style="font-size:11px;line-height:1.4;margin:3px 0 5px;color:rgba(207,232,255,.8)">Harmful things you or events put in the pond, and how far the creatures have got in beating each one. Click one to go to it.</div>';
     order.slice(0, 2).forEach(function (k) {
       const q = kinds[k], z = q.z, v = G.versus(z);
       const lock = z.p.vault > 0.2 ? 'It locks the food away. ' : z.p.deadly > 0.3 ? 'It kills with one touch. ' : '';
       const mood = lock + (v.carry > 0.5 ? 'They have the answer: <b>' + v.weak + '</b>.' : v.carry > 0.15 ? 'They are learning: <b>' + v.weak + '</b> hurt it.' : 'It is weak to <b>' + v.weak + '</b>. Few have them yet.');
       html += '<div data-z="' + z.id + '" style="cursor:pointer;padding:6px 0 4px;border-top:1px solid rgba(207,232,255,.12)"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:12.5px">' + esc(z.word) + (q.n > 1 ? ' <small>×' + q.n + '</small>' : '') + '</b><small>' + (q.ate ? 'it has killed ' + q.ate : 'since gen ' + z.born) + '</small></div>' +
         '<div style="font-size:11px;margin:2px 0 3px;color:rgba(207,232,255,.85)">' + mood + '</div>' +
-        bar('carry ' + v.weak, v.carry, PAL.algae) + (z.p.vault > 0.2 ? '' : bar('learned to bear it', v.adapt, PAL.gold)) + bar('its strength', q.left, PAL.rose) + '</div>';
+        bar('have ' + v.weak, v.carry, PAL.algae) + (z.p.vault > 0.2 ? '' : bar('can bear it', v.adapt, PAL.gold)) + bar('its life left', q.left, PAL.rose) + '</div>';
     });
     box.innerHTML = html;
     const rows = box.querySelectorAll('[data-z]');
-    for (let i = 0; i < rows.length; i++) rows[i].onclick = function () { const id = +this.dataset.z; const z = G.W.zones.filter(function (q) { return q.id === id; })[0]; if (z) { G.select(null); G.selectZone(z); } };
+    for (let i = 0; i < rows.length; i++) rows[i].onclick = function () { const id = +this.dataset.z; const z = G.W.zones.filter(function (q) { return q.id === id; })[0]; if (z) { G.select(null); G.selectZone(z); G.focusOn(z.x, z.y, Math.max(1.5, G.cam.z)); } };
+    document.getElementById('vsHead').onclick = toggle;
     sig = s;
   }
 
@@ -70,7 +78,7 @@
         G.R.ring(z.x, z.y, PAL.gold, z.r0 * 2.2, 1.6); G.R.ring(z.x, z.y, PAL.algae, z.r0 * 1.5, 1.2); G.R.sparkle(z.x, z.y, PAL.gold, 40, 160);
         G.sfx('discovery');
       });
-      G.on('zone', function (z) { if (G.mode === 'play' && G.isBad(z) && !z.genNote && z.genN === 1) G.hint('vs' + z.id, z.word + ' is dangerous. Watch THE POND VERSUS (left): life will look for its weakness.', 9000); });
+      G.on('zone', function (z) { if (G.mode === 'play' && G.isBad(z) && !z.genNote && z.genN === 1) G.hint('vs' + z.id, z.word + ' is dangerous. Watch DANGERS IN THE POND (left): life will look for its weakness.', 9000); });
     },
     update: function () {
       if (G.mode !== 'play' || !G.W) return;
