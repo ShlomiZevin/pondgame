@@ -24,7 +24,7 @@ const path = require('path');
   // fly to a far pond by clicking it
   const tgt = await fr.evaluate(() => { const v = G.view; G.cam.z = 0.09; G.cam.x = v.ww / 2; G.cam.y = v.wh / 2; G.applyCam(); const cs = Math.max(v.ww, v.wh) / (v.grow || 1) * 8; for (let r = 1; r < 4; r++) for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) { const sx = v.w / 2 + i * cs * v.scale, sy = v.h / 2 + j * cs * v.scale; } return null; });
   await fr.evaluate(() => { let n = 0; G.on('pond-click', () => n++); const v = G.view, W = G.W; const step = 30; for (let sx = 0; sx < v.w && !document.getElementById('farcard').offsetHeight; sx += step) for (let sy = 0; sy < v.h; sy += step) { const wx = (sx - v.ox) / v.scale, wy = (sy - v.oy) / v.scale; if (wx > 0 && wx < W.ww && wy > 0 && wy < W.wh) continue; G.emit('pond-click', { x: wx, y: wy }); if (!document.getElementById('farcard').classList.contains('hide')) return; } });
-  await page.waitForTimeout(1700); await shot('3-farpond');
+  await page.waitForTimeout(4000); await shot("3-farpond");
   console.log('far pond card: ' + (await fr.locator('#farcard').innerText()).replace(/\n+/g, ' | ').slice(0, 200));
   console.log('home button at a far pond: ' + await btn() + ' · ' + (await fr.locator('#gohome').innerText()).replace(/\n+/g, ' '));
   await fr.locator('#gohome').click(); await page.waitForTimeout(1600);

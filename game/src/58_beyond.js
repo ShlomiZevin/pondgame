@@ -97,7 +97,10 @@
   let EDGE = null;
   function edgeMask(w, h, mg, R, fadeIn) {
     const key = Math.round(w / h * 200) + ':' + Math.round(mg / h * 200); if (EDGE && EDGE.key === key) return EDGE.cv;
-    const TW = 720, k = TW / (w + 2 * mg), TH = Math.max(8, Math.round((h + 2 * mg) * k)), cv = document.createElement('canvas'); cv.width = TW; cv.height = TH;
+    EDGE = { key: key, cv: buildMask(w, h, mg, R, fadeIn, 720) }; return EDGE.cv;
+  }
+  function buildMask(w, h, mg, R, fadeIn, TW) {
+    const k = TW / (w + 2 * mg), TH = Math.max(8, Math.round((h + 2 * mg) * k)), cv = document.createElement('canvas'); cv.width = TW; cv.height = TH;
     const x = cv.getContext('2d'), im = x.createImageData(TW, TH), D = im.data, hw = w / 2, hh = h / 2;
     for (let py = 0; py < TH; py++) for (let px = 0; px < TW; px++) {
       const wx = px / k - mg - hw, wy = py / k - mg - hh, qx = Math.abs(wx) - (hw - R), qy = Math.abs(wy) - (hh - R);
@@ -109,7 +112,7 @@
       D[o] = r; D[o + 1] = gg; D[o + 2] = b; D[o + 3] = Math.round(a * 255);
     }
     x.putImageData(im, 0, 0);
-    EDGE = { key: key, cv: cv }; return cv;
+    return cv;
   }
   /** the same ending for a round pond: a ring that eats the rim of whatever disc it is laid on */
   let RING = null;
@@ -121,42 +124,51 @@
   }
   const NEB = {};
   function nebula(hb) { if (NEB[hb]) return NEB[hb]; const S = 160, cv = document.createElement('canvas'); cv.width = cv.height = S; const x = cv.getContext('2d'), hue = 190 + hb * 28, g = x.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2); g.addColorStop(0, 'hsla(' + hue + ',70%,45%,0.17)'); g.addColorStop(0.5, 'hsla(' + (hue + 30) + ',70%,35%,0.07)'); g.addColorStop(1, 'hsla(' + hue + ',70%,30%,0)'); x.fillStyle = g; x.fillRect(0, 0, S, S); return (NEB[hb] = cv); }
-  /** a far pond, painted once: its light, its water, its shore, and its rim dissolving the way ours does */
-  const BODY = {};
+  /** a far pond, painted once. It is a pond like ours, seen from too far to make out who lives in it: the same shape, a shore along the top, water below,
+   *  soft lights where its life is, and the same ending, its rim breaking up into grains that drift off into space. */
+  const BODY = {}, FW = 400, FH = 240, FM = 120;      // the pond in its picture: wide, tall, and the margin round it
+  let FMASK = null;
   function bodyOf(p) {
     const key = p.i + ',' + p.j; if (BODY[key]) return BODY[key];
-    const S = 288, c = S / 2, pr = 60, cv = document.createElement('canvas'); cv.width = cv.height = S; const x = cv.getContext('2d'), h = p.hue, col = function (dh, s, l, a) { return 'hsla(' + ((h + dh + 360) % 360) + ',' + s + '%,' + l + '%,' + a + ')'; };
-    const halo = x.createRadialGradient(c, c, pr * 0.6, c, c, S / 2); halo.addColorStop(0, col(0, 90, 62, 0.36)); halo.addColorStop(0.45, col(30, 90, 55, 0.11)); halo.addColorStop(1, col(0, 90, 50, 0)); x.fillStyle = halo; x.fillRect(0, 0, S, S);
-    const disc = document.createElement('canvas'); disc.width = disc.height = pr * 2; const d = disc.getContext('2d');
-    d.beginPath(); d.arc(pr, pr, pr, 0, TAU); d.clip();
-    const body = d.createRadialGradient(pr * 0.65, pr * 0.6, pr * 0.05, pr, pr, pr); body.addColorStop(0, col(-10, 75, 62, 1)); body.addColorStop(0.55, col(10, 70, 34, 1)); body.addColorStop(1, col(35, 70, 14, 1)); d.fillStyle = body; d.fillRect(0, 0, pr * 2, pr * 2);
-    d.fillStyle = col(-110, 45, 62, 0.75); d.beginPath(); d.ellipse(pr, pr * 0.04, pr * 1.1, pr * 0.34, 0, 0, TAU); d.fill();
-    const sh = d.createRadialGradient(pr * 0.6, pr * 0.55, 0, pr * 0.6, pr * 0.55, pr * 0.9); sh.addColorStop(0, 'rgba(255,255,255,0.3)'); sh.addColorStop(1, 'rgba(255,255,255,0)'); d.fillStyle = sh; d.fillRect(0, 0, pr * 2, pr * 2);
-    d.globalCompositeOperation = 'destination-out'; d.drawImage(ringMask(), 0, 0, pr * 2, pr * 2); d.globalCompositeOperation = 'source-over';      // its rim breaks up into grains: the water itself is eaten away there, so its glow and the stars show through
-    x.drawImage(disc, c - pr, c - pr);
-    for (let k = 0; k < 90; k++) { const a = hash(p.i * 7 + k, p.j, 201) * TAU, u = hash(p.i, p.j * 5 + k, 202), rr = pr * (0.9 + 0.75 * u * u); x.fillStyle = col(20 * (k % 3), 85, 70, 0.75 * (1 - u)); x.fillRect(c + Math.cos(a) * rr, c + Math.sin(a) * rr, 1.6, 1.6); }      // and scatters
-    if (Object.keys(BODY).length > 70) for (const q in BODY) { delete BODY[q]; break; }
-    return (BODY[key] = { cv: cv, k: S / (pr * 2) });      // k: how many pond-widths wide the picture is
+    const SW = FW + 2 * FM, SH = FH + 2 * FM, cv = document.createElement('canvas'); cv.width = SW; cv.height = SH; const x = cv.getContext('2d'), h = p.hue, col = function (dh, s, l, a) { return 'hsla(' + ((h + dh + 360) % 360) + ',' + s + '%,' + l + '%,' + a + ')'; };
+    // its light in the dark
+    x.save(); x.translate(SW / 2, SH / 2); x.scale(1, SH / SW); const halo = x.createRadialGradient(0, 0, FW * 0.25, 0, 0, SW / 2); halo.addColorStop(0, col(0, 85, 58, 0.3)); halo.addColorStop(0.55, col(25, 85, 50, 0.1)); halo.addColorStop(1, col(0, 85, 50, 0)); x.fillStyle = halo; x.fillRect(-SW / 2, -SW / 2, SW, SW); x.restore();
+    // the pond itself, on a sheet of its own so that its rim can be eaten away
+    const pc = document.createElement('canvas'); pc.width = SW; pc.height = SH; const d = pc.getContext('2d'), shore = FH * (0.2 + 0.1 * hash(p.i, p.j, 210));
+    d.save(); d.beginPath(); d.rect(FM, FM, FW, FH); d.clip();
+    const wg = d.createLinearGradient(0, FM, 0, FM + FH); wg.addColorStop(0, col(0, 55, 34, 1)); wg.addColorStop(0.5, col(8, 60, 24, 1)); wg.addColorStop(1, col(18, 65, 12, 1)); d.fillStyle = wg; d.fillRect(FM, FM, FW, FH);
+    try { d.filter = 'blur(4.5px)'; } catch (e) { /* no blur here: the lights are simply sharper */ }
+    // what lives in it, too far to make out: soft lights of many colours
+    for (let k = 0; k < 46; k++) { const lx = FM + hash(p.i + k, p.j, 211) * FW, ly = FM + shore + hash(p.i, p.j + k, 212) * (FH - shore), big = hash(p.i - k, p.j, 213) < 0.2; d.fillStyle = 'hsla(' + ((h + 60 + k * 53) % 360) + ',90%,' + (big ? 70 : 76) + '%,' + (big ? 0.55 : 0.85) + ')'; d.beginPath(); d.arc(lx, ly, big ? 9 : 3 + 2.4 * hash(k, p.i, 214), 0, TAU); d.fill(); }
+    // the shore along the top, with its uneven waterline
+    d.fillStyle = col(-115 + 30 * hash(p.i, p.j, 215), 38, 58, 1); d.beginPath(); d.moveTo(FM, FM); d.lineTo(FM + FW, FM); d.lineTo(FM + FW, FM + shore);
+    for (let q = 24; q >= 0; q--) d.lineTo(FM + FW * q / 24, FM + shore + Math.sin(q * 1.3 + p.i) * 3.2 + Math.sin(q * 0.5 + p.j) * 2.8); d.closePath(); d.fill();
+    for (let k = 0; k < 16; k++) { d.fillStyle = 'hsla(' + ((h + 100 + k * 71) % 360) + ',75%,68%,0.8)'; d.beginPath(); d.arc(FM + hash(k, p.j, 216) * FW, FM + hash(p.i, k, 217) * shore * 0.9, 2.8, 0, TAU); d.fill(); }
+    d.filter = 'none'; d.restore();
+    if (!FMASK) FMASK = buildMask(FW, FH, FM, FH * 0.2, FH * 0.16, SW);
+    d.globalCompositeOperation = 'destination-out'; d.drawImage(FMASK, 0, 0, SW, SH); d.globalCompositeOperation = 'source-over';      // the water itself is eaten away at the rim, so its glow and the stars show through
+    x.drawImage(pc, 0, 0);
+    // and its last grains, loose in space
+    for (let k = 0; k < 150; k++) { const a = hash(p.i * 7 + k, p.j, 201) * TAU, u = hash(p.i, p.j * 5 + k, 202), ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / (FW / 2), Math.abs(sa) / (FH / 2)), kk = k0 * 0.92 + FM * 0.85 * u * u; x.fillStyle = col(20 * (k % 3), 80, 68, 0.8 * (1 - u)); x.fillRect(SW / 2 + ca * kk, SH / 2 + sa * kk, 2.6, 2.6); }
+    if (Object.keys(BODY).length > 24) for (const q in BODY) { delete BODY[q]; break; }      /* only the ponds lately in view are kept: far space costs no memory */
+    return (BODY[key] = cv);
   }
 
   function farPondDraw(ctx, p, px, py, pr, t) {
     const h = p.hue, col = function (dh, s, l, a) { return 'hsla(' + ((h + dh + 360) % 360) + ',' + s + '%,' + l + '%,' + a + ')'; };
-    if (p.rings && pr > 6) { ctx.save(); ctx.translate(px, py); ctx.rotate(-0.35); ctx.strokeStyle = col(40, 95, 78, 0.5); ctx.lineWidth = Math.max(1, pr * 0.05); ctx.beginPath(); ctx.ellipse(0, 0, pr * 1.75, pr * 0.5, 0, 0.08 * TAU, 0.42 * TAU); ctx.stroke(); ctx.restore(); }
-    const B = bodyOf(p), w = pr * 2 * B.k; ctx.drawImage(B.cv, px - w / 2, py - w / 2, w, w);
+    // p.r is half the pond's height; the picture carries the pond and its margin
+    const k = pr * 2 / FH, w = (FW + 2 * FM) * k, hh = (FH + 2 * FM) * k, hw2 = FW * k / 2, hh2 = FH * k / 2;
+    ctx.drawImage(bodyOf(p), px - w / 2, py - hh / 2, w, hh);
     if (pr > 9) {
-      // life in it: lights moving about; and grains of it drifting slowly off into space
-      const n = Math.min(12, Math.floor(pr / 3)); for (let q = 0; q < n; q++) { const a = hash(p.i, p.j, 40 + q) * TAU + t * (0.1 + 0.14 * hash(p.i, p.j, 60 + q)) * (q % 2 ? 1 : -1), d = 0.1 + 0.5 * hash(p.i, p.j, 80 + q); ctx.fillStyle = 'hsla(' + (h + 70 + q * 47) % 360 + ',95%,78%,0.95)'; ctx.beginPath(); ctx.arc(px + Math.cos(a) * pr * d, py + pr * 0.12 + Math.sin(a) * pr * 0.7 * d, Math.max(0.8, pr * 0.04), 0, TAU); ctx.fill(); }
-      for (let q = 0; q < 14; q++) { const a = hash(p.i, p.j, 140 + q) * TAU, u = (t * (0.02 + 0.02 * hash(p.i, p.j, 160 + q)) + hash(p.i, p.j, 180 + q)) % 1, rr = pr * (0.92 + 0.9 * u), sz = Math.max(1, pr * 0.035) * (1 - u * 0.6); ctx.fillStyle = col(15, 85, 72, 0.7 * (1 - u)); ctx.fillRect(px + Math.cos(a) * rr - sz / 2, py + Math.sin(a) * rr - sz / 2, sz, sz); }
+      // a few of its lights wander, and grains of it drift slowly off into space
+      const n = Math.min(9, Math.floor(pr / 4)); for (let q = 0; q < n; q++) { const a = hash(p.i, p.j, 40 + q) * TAU + t * (0.09 + 0.12 * hash(p.i, p.j, 60 + q)) * (q % 2 ? 1 : -1), d = 0.15 + 0.6 * hash(p.i, p.j, 80 + q); ctx.fillStyle = 'hsla(' + (h + 70 + q * 47) % 360 + ',95%,80%,0.55)'; ctx.beginPath(); ctx.arc(px + Math.cos(a) * hw2 * 0.8 * d, py + hh2 * 0.22 + Math.sin(a) * hh2 * 0.6 * d, Math.max(1, pr * 0.045), 0, TAU); ctx.fill(); }
+      for (let q = 0; q < 18; q++) { const a = hash(p.i, p.j, 140 + q) * TAU, u = (t * (0.015 + 0.02 * hash(p.i, p.j, 160 + q)) + hash(p.i, p.j, 180 + q)) % 1, ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / hw2, Math.abs(sa) / hh2), kk = k0 * 0.95 + FM * k * 0.9 * u, sz = Math.max(1, pr * 0.03) * (1.2 - u * 0.6); ctx.fillStyle = col(15, 85, 72, 0.75 * (1 - u)); ctx.fillRect(px + ca * kk - sz / 2, py + sa * kk - sz / 2, sz, sz); }
     }
-    if (p.rings && pr > 6) { ctx.save(); ctx.translate(px, py); ctx.rotate(-0.35); ctx.strokeStyle = col(40, 95, 82, 0.8); ctx.lineWidth = Math.max(1, pr * 0.05); ctx.beginPath(); ctx.ellipse(0, 0, pr * 1.75, pr * 0.5, 0, 0.58 * TAU, 0.92 * TAU); ctx.stroke(); ctx.restore(); }
-    for (let k = 0; k < p.moons && pr > 8; k++) { const a = t * (0.25 + 0.1 * k) + k * 2.4 + p.j, d = pr * (1.45 + 0.35 * k); ctx.fillStyle = col(60 * k + 40, 95, 80, 0.95); ctx.beginPath(); ctx.arc(px + Math.cos(a) * d, py + Math.sin(a) * d * 0.45, Math.max(1.2, pr * 0.07), 0, TAU); ctx.fill(); }
-    if (pr > 22) {
-      const K = kindsOf(p), sz = clamp(pr * 0.95, 34, 96), gap = sz * 0.82, x0 = px - (K.length - 1) * gap / 2;
-      for (let k = 0; k < K.length; k++) { const bob = Math.sin(t * 1.3 + k * 2 + p.i) * sz * 0.05; ctx.drawImage(K[k], x0 + k * gap - sz / 2, py - pr - sz * 0.92 + bob, sz, sz); }
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const fs = Math.round(clamp(pr * 0.2, 12, 18)); ctx.font = '800 ' + fs + 'px system-ui, sans-serif';
-      const tw = ctx.measureText(p.name).width + 26, ty = py + pr * 1.25 + 22; ctx.fillStyle = 'rgba(9,20,33,0.85)'; G.roundRect(ctx, px - tw / 2, ty - fs * 0.85, tw, fs * 1.7, fs * 0.85); ctx.fill(); ctx.strokeStyle = col(20, 90, 75, 0.7); ctx.lineWidth = 1.2; ctx.stroke();
+    if (pr > 16) {
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const fs = Math.round(clamp(pr * 0.24, 12, 18)); ctx.font = '800 ' + fs + 'px system-ui, sans-serif';
+      const tw = ctx.measureText(p.name).width + 26, ty = py + hh2 + FM * k * 0.55 + 14; ctx.fillStyle = 'rgba(9,20,33,0.85)'; G.roundRect(ctx, px - tw / 2, ty - fs * 0.85, tw, fs * 1.7, fs * 0.85); ctx.fill(); ctx.strokeStyle = col(20, 90, 75, 0.7); ctx.lineWidth = 1.2; ctx.stroke();
       ctx.fillStyle = '#fff'; ctx.fillText(p.name, px, ty + 0.5);
-      ctx.font = '700 10px system-ui, sans-serif'; ctx.fillStyle = col(20, 80, 80, 0.9); ctx.fillText(K.length + (K.length === 1 ? ' KIND LIVES HERE' : ' KINDS LIVE HERE'), px, ty + fs * 1.5);
+      ctx.font = '700 10px system-ui, sans-serif'; ctx.fillStyle = col(20, 80, 80, 0.9); ctx.fillText(p.kinds + (p.kinds === 1 ? ' KIND LIVES HERE' : ' KINDS LIVE HERE'), px, ty + fs * 1.5);
     }
   }
 
@@ -211,9 +223,9 @@
         ctx.fillStyle = 'rgb(' + Math.round(sh * 0.95) + ',' + Math.round(sh * 0.9) + ',' + Math.round(sh * 1.05) + ')'; ctx.fill(); if (ar > 4) { ctx.strokeStyle = 'rgba(190,200,225,0.35)'; ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(ax + ar * 0.2, ay + ar * 0.15, ar * 0.28, 0, TAU); ctx.fill(); } } }
     // the other ponds, and the lanes between neighbours: a map of where one could travel
     const P = visiblePonds();
-    { const byCell = {}; for (let k = 0; k < P.length; k++) byCell[P[k].i + ',' + P[k].j] = P[k]; byCell['0,0'] = { i: 0, j: 0, x: ww / 2, y: wh / 2, r: Math.max(ww, wh) * 0.5 };
+    { const byCell = {}; for (let k = 0; k < P.length; k++) byCell[P[k].i + ',' + P[k].j] = P[k]; byCell['0,0'] = { i: 0, j: 0, x: ww / 2, y: wh / 2, r: wh * 0.5 };
       ctx.lineCap = 'round'; ctx.setLineDash([2, 9]); ctx.lineDashOffset = -t * 6; ctx.lineWidth = 1.3;
-      for (const key in byCell) { const a = byCell[key]; for (let d = 0; d < 4; d++) { const b = byCell[(a.i + [1, 0, 1, 1][d]) + ',' + (a.j + [0, 1, 1, -1][d])]; if (!b) continue; const ax = a.x * v.scale + v.ox, ay = a.y * v.scale + v.oy, bx = b.x * v.scale + v.ox, by = b.y * v.scale + v.oy, len = Math.hypot(bx - ax, by - ay); if (len < 60) continue; const ux = (bx - ax) / len, uy = (by - ay) / len, ra = a.r * v.scale * 1.6 + 8, rb = b.r * v.scale * 1.6 + 8; if (len < ra + rb + 10) continue;
+      for (const key in byCell) { const a = byCell[key]; for (let d = 0; d < 4; d++) { const b = byCell[(a.i + [1, 0, 1, 1][d]) + ',' + (a.j + [0, 1, 1, -1][d])]; if (!b) continue; const ax = a.x * v.scale + v.ox, ay = a.y * v.scale + v.oy, bx = b.x * v.scale + v.ox, by = b.y * v.scale + v.oy, len = Math.hypot(bx - ax, by - ay); if (len < 60) continue; const ux = (bx - ax) / len, uy = (by - ay) / len, ra = a.r * v.scale * 2.3 + 8, rb = b.r * v.scale * 2.3 + 8; if (len < ra + rb + 10) continue;
         const mine = (!a.i && !a.j) || (!b.i && !b.j); ctx.strokeStyle = mine ? 'rgba(246,211,101,0.42)' : 'rgba(150,190,235,0.2)'; ctx.beginPath(); ctx.moveTo(ax + ux * ra, ay + uy * ra); ctx.lineTo(bx - ux * rb, by - uy * rb); ctx.stroke(); } }
       ctx.setLineDash([]); }
     for (let k = 0; k < P.length; k++) { const p = P[k], px = p.x * v.scale + v.ox, py = p.y * v.scale + v.oy, pr = p.r * v.scale;
@@ -265,10 +277,10 @@
     const W = G.W; if (!W || W.title || G.mode !== 'play' || !c) return;
     if (c.x > 0 && c.x < W.ww && c.y > 0 && c.y < W.wh) { if (shown) hideCard(); return; }
     const P = visiblePonds(), v = G.view; let hit = null;
-    for (let i = 0; i < P.length; i++) { const p = P[i], reach = Math.max(p.r * 1.3, 16 / v.scale); if (Math.hypot(c.x - p.x, c.y - p.y) < reach) { hit = p; break; } }
+    for (let i = 0; i < P.length; i++) { const p = P[i], pad = Math.max(p.r * 0.25, 14 / v.scale); if (Math.abs(c.x - p.x) < p.r * 1.67 + pad && Math.abs(c.y - p.y) < p.r + pad) { hit = p; break; } }
     if (!hit) { if (shown) hideCard(); return; }
     ui(); if (G.sfx) G.sfx('click');
-    G.flyTo(hit.x, hit.y - hit.r * 0.5, clamp(v.h * 0.15 / (hit.r * v.base), ZMIN, 1.2), 1.0);
+    G.flyTo(hit.x, hit.y + hit.r * 0.7, clamp(v.h * 0.17 / (hit.r * v.base), ZMIN, 1.2), 1.0);
     shown = hit.name;
     const K = kindsOf(hit); let pics = ''; for (let k = 0; k < K.length; k++) { try { pics += '<img alt="" src="' + K[k].toDataURL('image/png') + '">'; } catch (e) { /* no picture */ } }
     card.innerHTML = '<div class="k">A far pond</div><b>' + G.escapeHtml(hit.name) + '</b>' + (pics ? '<div class="ks">' + pics + '</div>' : '') + K.length + (K.length === 1 ? ' kind lives' : ' kinds live') + ' here. One day this will be somebody else\'s living pond, and you will be able to go in, look around and meet them. For now it is only a place on the map: visiting is not open yet.<div class="r"><button class="btn sm" id="farHome">BACK TO MY POND</button><button class="btn sm" id="farClose">CLOSE</button></div>';
