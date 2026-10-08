@@ -96,10 +96,13 @@
   let rs = 987654321; const rnd = function () { rs = (rs * 1664525 + 1013904223) >>> 0; return rs / 4294967296; };
   /** how a pond ends: not at a line. Its water thins into grains, the grains scatter, and the last of them drift off into the dark. This is the picture of
    *  that ending for a pond of one shape (wide w, tall h, with margin mg round it and corners of radius R): space-coloured, see-through where the pond is. */
-  let EDGE = null;
+  let EDGE = null, SHEET = null;
+  function sheet(w, h) { if (!SHEET || SHEET.width !== w || SHEET.height !== h) { SHEET = document.createElement('canvas'); SHEET.width = w; SHEET.height = h; } return SHEET; }
+  /** the same picture turned inside out: solid where the pond is, clear where space is (what wears the sheet of space away) */
+  function inverse(cv) { const c2 = document.createElement('canvas'); c2.width = cv.width; c2.height = cv.height; const x = c2.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, c2.width, c2.height); x.globalCompositeOperation = 'destination-out'; x.drawImage(cv, 0, 0); return c2; }
   function edgeMask(w, h, mg, R, fadeIn, land) {
     const key = Math.round(w / h * 200) + ':' + Math.round(mg / h * 200) + ':' + Math.round(land * 40); if (EDGE && EDGE.key === key) return EDGE.cv;
-    EDGE = { key: key, cv: buildMask(w, h, mg, R, fadeIn, 1500, land) }; return EDGE.cv;
+    { const cv = buildMask(w, h, mg, R, fadeIn, 1500, land); EDGE = { key: key, cv: cv, inv: inverse(cv) }; } return EDGE.cv;
   }
   // The dust picture, as brightness 0..1 (read once it has loaded; until then a plain soft noise stands in)
   let DUST = null;
@@ -118,15 +121,15 @@
    *  Everything the pond's renderer stops at the edge (the shore, a tint that lies over the whole pond, the weather) is already under mist there. */
   function buildMask(w, h, mg, R, fadeIn, TW, land) {
     const k = TW / (w + 2 * mg), TH = Math.max(8, Math.round((h + 2 * mg) * k)), cv = document.createElement('canvas'); cv.width = TW; cv.height = TH;
-    const x = cv.getContext('2d'), im = x.createImageData(TW, TH), D = im.data, hw = w / 2, hh = h / 2, S1 = Math.min(w, h) * 1.15, S2 = S1 * 0.41, out = mg * 0.92, ly = land ? -hh + h * land : -1e9;
+    const x = cv.getContext('2d'), im = x.createImageData(TW, TH), D = im.data, hw = w / 2, hh = h / 2, S1 = Math.max(w + 2 * mg, h + 2 * mg) * 1.04, S2 = S1 * 0.29, out = mg * 0.92,      /* the dust picture is laid once over the whole pond and its margin (a repeat of it would show as a mirror line down the mist); only the fine grain repeats */ ly = land ? -hh + h * land : -1e9;
     for (let py = 0; py < TH; py++) for (let px = 0; px < TW; px++) {
       const wx = px / k - mg - hw, wy = py / k - mg - hh, qx = Math.abs(wx) - (hw - R), qy = Math.abs(wy) - (hh - R);
       const d = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - R;      // how far outside the pond's edge this point is (inside: below zero)
-      const n0 = dust(wx / (S1 * 2.6) + 0.11, wy / (S1 * 2.6) + 0.63), n1 = dust(wx / S1 + 0.31, wy / S1 + 0.17), n2 = dust(wx / S2 + 0.77, wy / S2 + 0.53), o = (py * TW + px) * 4;
+      const n0 = dust(wx / (S1 * 2.6) + 0.11, wy / (S1 * 2.6) + 0.63), n1 = dust(wx / S1 + 0.5, wy / S1 + 0.5), n2 = dust(wx / S2 + 0.77, wy / S2 + 0.53), o = (py * TW + px) * 4;
       // how deep into the pond the mist reaches here: a little where the dust is thin, far where it is thick, and a slow swell so that no side runs straight
       const reach = fadeIn * (0.3 + 0.55 * n0 + 0.7 * n1 * n1 + 0.15 * n2), e = -d, u = e <= 0 ? 0 : Math.min(1, e / reach), a = 1 - u * u * (3 - 2 * u);
       // the mist's own light: brightest in the band, fading outward to nothing; plus motes
-      const g = clamp(1 - (d + fadeIn * 0.4) / (out + fadeIn * 0.4), 0, 1), mist = clamp((0.2 + 0.55 * n1 + 0.35 * n2) * g * g * 1.15, 0, 0.92) * (d > 0 ? 1 : 0.55 + 0.45 * a), mote = d > 0 ? clamp((n1 - 0.74) * 3.4, 0, 1) * g * 0.8 : 0, hz = Math.min(1, mist + mote);
+      const g = clamp(1 - (d + fadeIn * 0.4) / (out + fadeIn * 0.4), 0, 1), mist = clamp((0.2 + 0.55 * n1 + 0.35 * n2) * g * g * 1.15, 0, 0.92) * (0.55 + 0.45 * a), mote = clamp((n1 - 0.74) * 3.4, 0, 1) * g * 0.8 * sm(-fadeIn * 0.3, fadeIn * 0.5, d), hz = Math.min(1, mist + mote);
       const onLand = sm(ly + 24, ly - 24, wy), tr = 58 + (118 - 58) * onLand, tg = 132 + (140 - 132) * onLand, tb = 142 + (84 - 142) * onLand;
       D[o] = SP[0] + (tr - SP[0]) * hz; D[o + 1] = SP[1] + (tg - SP[1]) * hz; D[o + 2] = SP[2] + (tb - SP[2]) * hz; D[o + 3] = Math.round(a * 255);
     }
@@ -200,7 +203,7 @@
 
   function draw() {
     const W = G.W, ctx = G.ctx; if (!W || W.title || !ctx || G.mode !== 'play') { asleep = false; if (home) home.classList.add('hide'); return; }
-    const v = G.view, s = v.scale * v.dpr, t = G.rt || 0, ww = W.ww, wh = W.wh, m = Math.min(ww, wh), R = m * 0.2, IN = m * 0.15, MG = m * 0.34;      /* the mist takes the outer sixth or so of the pond, and thins away over a third of a pond beyond it */
+    const v = G.view, s = v.scale * v.dpr, t = G.rt || 0, ww = W.ww, wh = W.wh, m = Math.min(ww, wh), R = m * 0.14, IN = m * 0.1, MG = m * 0.34;      /* the mist takes the outer sixth or so of the pond, and thins away over a third of a pond beyond it */
     const x0 = -v.ox / v.scale, y0 = -v.oy / v.scale, x1 = x0 + v.w / v.scale, y1 = y0 + v.h / v.scale;
     hud(x0, y0, x1, y1);
     { const seen = x1 > 0 && x0 < ww && y1 > 0 && y0 < wh;
@@ -222,15 +225,17 @@
       if (x1 > ww + MG - ov) ctx.fillRect(ww + MG - ov, y0 - 9, x1 - ww - MG + ov + 9, y1 - y0 + 18);
       if (y0 < -MG + ov) ctx.fillRect(x0 - 9, y0 - 9, x1 - x0 + 18, -MG + ov - y0 + 9);
       if (y1 > wh + MG - ov) ctx.fillRect(x0 - 9, wh + MG - ov, x1 - x0 + 18, y1 - wh - MG + ov + 9); }
-    // 2. everything of space is drawn outside the pond (a little way in over its fading rim, so stars show through where the water has thinned)
-    ctx.beginPath(); ctx.rect(x0 - 20, y0 - 20, x1 - x0 + 40, y1 - y0 + 40);
-    { const q = IN * 0.55, rr = Math.max(1, R - q);      /* stars and the rest show from where the mist is already thick, a little inside the edge */ ctx.moveTo(q + rr, q); ctx.lineTo(ww - q - rr, q); ctx.quadraticCurveTo(ww - q, q, ww - q, q + rr); ctx.lineTo(ww - q, wh - q - rr); ctx.quadraticCurveTo(ww - q, wh - q, ww - q - rr, wh - q); ctx.lineTo(q + rr, wh - q); ctx.quadraticCurveTo(q, wh - q, q, wh - q - rr); ctx.lineTo(q, q + rr); ctx.quadraticCurveTo(q, q, q + rr, q); ctx.closePath(); }
-    ctx.clip('evenodd');
     // grains of our own water, drifting slowly off into space; brighter for a moment when the pond has just grown
     { const hw = ww / 2, hh = wh / 2, px1 = 1 / v.scale; for (let i = 0; i < 260; i++) { const a = hash(i, 9, 301) * TAU, u = (t * (0.006 + 0.01 * hash(i, 9, 302)) + hash(i, 9, 303)) % 1, ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / hw, Math.abs(sa) / hh), kk = k0 * 0.9 + MG * 1.05 * u, sz = px1 * (0.9 + 1.3 * hash(i, 9, 304)) * (1.15 - 0.5 * u);
         ctx.fillStyle = 'rgba(' + (i % 5 ? '110,205,205' : '215,245,240') + ',' + (0.55 * Math.sin(3.1416 * Math.min(1, u * 1.15)) * (0.7 + 0.5 * pulse)) + ')'; ctx.beginPath(); ctx.arc(hw + ca * kk, hh + sa * kk, sz, 0, TAU); ctx.fill(); } pulse = Math.max(0, pulse - 0.006); }
+    ctx.restore();
+    // 2. everything of space (clouds, stars, rocks, lanes, the other ponds) is painted on a sheet of its own, and that sheet is then worn away where the pond
+    // is: wholly where the pond is solid, partly where it is mist. So there is no line anywhere at which space begins: stars show faintly through thin mist and
+    // fully in the dark, exactly as much as the mist lets them.
+    const O = sheet(ctx.canvas.width, ctx.canvas.height), main = ctx;
+    (function (ctx) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, O.width, O.height); ctx.globalCompositeOperation = 'source-over';
     ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
-    // drifting clouds of colour    ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
     // drifting clouds of colour, far off
     { const cs = cellSize() * 1.6, cx = ww / 2, cy = wh / 2, i0 = Math.floor((x0 - cx) / cs - 0.7), i1 = Math.ceil((x1 - cx) / cs + 0.7), j0 = Math.floor((y0 - cy) / cs - 0.7), j1 = Math.ceil((y1 - cy) / cs + 0.7);
       if ((i1 - i0) * (j1 - j0) < 300) { ctx.globalCompositeOperation = 'lighter';
@@ -272,7 +277,9 @@
     { const T = 23, n = Math.floor(t / T), u = (t - n * T) / 9; if (u < 1) { const fromL = hash(n, 8, 81) < 0.5, an = (fromL ? 0.25 : 2.9) + (hash(n, 8, 82) - 0.5) * 0.5, sx = fromL ? -80 : v.w + 80, sy = hash(n, 8, 83) * v.h * 0.6, D = Math.hypot(v.w, v.h) * 1.2, hx = sx + Math.cos(an) * D * u, hy = sy + Math.sin(an) * D * u, L = 260, fade = Math.sin(3.1416 * u);
         const g = ctx.createLinearGradient(hx, hy, hx - Math.cos(an) * L, hy - Math.sin(an) * L); g.addColorStop(0, 'rgba(190,240,255,' + 0.8 * fade + ')'); g.addColorStop(1, 'rgba(120,200,255,0)'); ctx.strokeStyle = g; ctx.lineCap = 'round'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx - Math.cos(an) * L, hy - Math.sin(an) * L); ctx.stroke();
         ctx.fillStyle = 'rgba(240,252,255,' + fade + ')'; ctx.beginPath(); ctx.arc(hx, hy, 4.5, 0, TAU); ctx.fill(); } }
-    ctx.restore();
+    ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); ctx.globalCompositeOperation = 'destination-out'; ctx.imageSmoothingEnabled = true; ctx.drawImage(EDGE.inv, -MG, -MG, ww + 2 * MG, wh + 2 * MG); ctx.globalCompositeOperation = 'source-over';
+    })(O.getContext('2d'));
+    main.setTransform(1, 0, 0, 1, 0, 0); main.drawImage(O, 0, 0);
     // seen from afar, our own is named
     if (G.cam.z < 0.45) { ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); const px = ww / 2 * v.scale + v.ox, py = (wh + MG * 0.55) * v.scale + v.oy + 14; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = '800 14px system-ui, sans-serif'; ctx.fillStyle = '#f6d365'; ctx.fillText('YOUR POND', px, py); ctx.font = '600 11px system-ui, sans-serif'; ctx.fillStyle = 'rgba(207,232,255,0.85)'; ctx.fillText('generation ' + W.gen + ' · ' + W.cre.length + ' alive' + (asleep ? ' · waiting for you' : ''), px, py + 17); ctx.restore(); }
