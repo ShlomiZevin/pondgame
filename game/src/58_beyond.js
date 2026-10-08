@@ -182,7 +182,7 @@
   }
 
   function draw() {
-    const W = G.W, ctx = G.ctx; if (!W || W.title || !ctx || G.mode !== 'play') { if (home) home.classList.add('hide'); return; }
+    const W = G.W, ctx = G.ctx; if (!W || W.title || !ctx || G.mode !== 'play') { asleep = false; if (home) home.classList.add('hide'); return; }
     const v = G.view, s = v.scale * v.dpr, t = G.rt || 0, ww = W.ww, wh = W.wh, m = Math.min(ww, wh), R = m * 0.14, IN = m * 0.02, MG = m * 0.5;      /* the pond is whole right up to its edge; it thins out over the half-pond of space beyond */
     const x0 = -v.ox / v.scale, y0 = -v.oy / v.scale, x1 = x0 + v.w / v.scale, y1 = y0 + v.h / v.scale;
     hud(x0, y0, x1, y1);
@@ -252,11 +252,18 @@
     ctx.restore();
     // seen from afar, our own is named
     if (G.cam.z < 0.45) { ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); const px = ww / 2 * v.scale + v.ox, py = (wh + MG * 0.55) * v.scale + v.oy + 14; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = '800 14px system-ui, sans-serif'; ctx.fillStyle = '#f6d365'; ctx.fillText('YOUR POND', px, py); ctx.font = '600 11px system-ui, sans-serif'; ctx.fillStyle = 'rgba(207,232,255,0.85)'; ctx.fillText('generation ' + W.gen + ' · ' + W.cre.length + ' alive', px, py + 17); ctx.restore(); }
+      ctx.font = '800 14px system-ui, sans-serif'; ctx.fillStyle = '#f6d365'; ctx.fillText('YOUR POND', px, py); ctx.font = '600 11px system-ui, sans-serif'; ctx.fillStyle = 'rgba(207,232,255,0.85)'; ctx.fillText('generation ' + W.gen + ' · ' + W.cre.length + ' alive' + (asleep ? ' · waiting for you' : ''), px, py + 17); ctx.restore(); }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
   // the camera's flight is stepped BEFORE the pond is drawn, so the pond and the space round it are always drawn from the same place
   G.addSystem({ name: 'beyond', update: function (dt) { flyStep(Math.min(0.1, dt || 0.016)); }, draw: function () { draw(); } });      // and space is painted last, after the pond's own renderer
+
+  // ── while you are out in space your pond waits ──
+  // Once it is out of sight, or only a speck on the screen, nobody is watching it, so it stands still, as it does when you leave the game: nothing is
+  // born, nothing dies, nothing is spent. It goes on from where it was the moment it is back in view.
+  let asleep = false;
+  { const blocked0 = G.isBlocked; G.isBlocked = function () { return asleep || blocked0(); }; }
+  G.pondAsleep = function () { return asleep; };
 
   // ── the way home, and a word about a far pond ──
   let home = null, card = null, shown = '';
@@ -280,6 +287,7 @@
     const W = G.W, v = G.view, on = G.mode === 'play' && !(G.ui && G.ui.modal);
     // "home" shows only when the pond is out of sight, or so small on the screen that it is hard to find
     const seen = x1 > 0 && x0 < W.ww && y1 > 0 && y0 < W.wh, small = W.wh * v.scale < v.h * 0.16, away = on && (!seen || small) && !fly;
+    asleep = G.mode === 'play' && (!seen || small);      /* nobody is watching it: the pond stands still until you are back */
     home.classList.toggle('hide', !away);
     if (away) { const cx = W.ww / 2, cy = W.wh / 2, dx = cx - G.cam.x, dy = cy - G.cam.y, d = Math.hypot(dx, dy) / unit(); home.firstChild.style.transform = seen ? 'rotate(-90deg)' : 'rotate(' + Math.atan2(dy, dx) + 'rad)'; home.lastChild.textContent = seen ? '' : Math.max(1, Math.round(d)) + (Math.round(d) <= 1 ? ' pond away' : ' ponds away');
       const top = ['wish', 'wxnow'].reduce(function (y, id) { const e = document.getElementById(id); return e && !e.classList.contains('hide') && e.offsetHeight ? Math.max(y, e.getBoundingClientRect().bottom + 8) : y; }, 14); home.style.top = Math.round(top) + 'px'; }
@@ -298,5 +306,5 @@
     card.innerHTML = '<div class="k">A far pond</div><b>' + G.escapeHtml(hit.name) + '</b>' + (pics ? '<div class="ks">' + pics + '</div>' : '') + K.length + (K.length === 1 ? ' kind lives' : ' kinds live') + ' here. One day this will be somebody else\'s living pond, and you will be able to go in, look around and meet them. For now it is only a place on the map: visiting is not open yet.<div class="r"><button class="btn sm" id="farHome">BACK TO MY POND</button><button class="btn sm" id="farClose">CLOSE</button></div>';
     card.classList.remove('hide');
   });
-  G.on('new-pond', function () { fly = null; hideCard(); for (const q in KIND) delete KIND[q]; });
+  G.on('new-pond', function () { fly = null; asleep = false; hideCard(); for (const q in KIND) delete KIND[q]; });
 })();
