@@ -325,3 +325,15 @@ The owner's pond at about generation 780: bodies 30 times their first size in a 
 - **The whole pond.** The two ends differ less (every food grows at both, the deep has 77% of the shallows' air where it had 57%), so a pond's life is not shut into one end.
 - **No god:** the pond's own guess no longer reaches a ceiling (`F.soft`): at 10 out of 10 for everyone nothing was being chosen.
 - **Land:** a land line with no legs grows them even when its body is full (in place of tentacles or fins), a swimming tail slows a body on land, and wings lift bodies that are small for their pond (not small in absolute terms).
+
+### Round 7b (2026-10-08): who the god is matters; Haiku 5.5 is the default
+
+One sheet of twelve (four plain bodies: a bare cell, a ball with eyes, a ball with ears, a ball with feet; and the eight commonest kinds of a free pond at generation 110) marked by three judges (`scripts/judges.jpg`):
+
+| judge | cost of the look | plain ball with feet | the pond's kinds | spread |
+|---|---|---|---|---|
+| Haiku 4.5 | $0.0042 | beauty 8, whole 7 | beauty 6–8, whole 5–8 | lenient: nearly everything 7–8 |
+| Haiku 5.5 | $0.0010 | beauty 5, whole 3 | beauty 2–6, whole 3–5 | strict; two runs agree within a point |
+| Sonnet 5.5 | $0.0090 | beauty 5–6, whole 3–4 | beauty 4–7, whole 4–5 | strict |
+
+So Haiku 4.5 could not steer a pond (a ball with feet scored as high as its best creatures), and the strict judges put a pond evolved with no god no higher than a plain ball: they mark down scowls, clutter and tentacle legs. Haiku 5.5 is now the default (`MODEL`, first in `CATALOG`). It thinks before it answers, so its calls get 3,000 tokens more room (`anthropicCaller`): without that its answer as the god was cut off and came back empty. It also invents well (a Dewbud for the head, a Bubblewand to hold, the condition Sun Freckles; 4 calls, $0.003).
