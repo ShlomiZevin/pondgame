@@ -206,6 +206,7 @@
     const v = G.view, s = v.scale * v.dpr, t = G.rt || 0, ww = W.ww, wh = W.wh, m = Math.min(ww, wh), R = m * 0.14, IN = m * 0.1, MG = m * 0.34;      /* the mist takes the outer sixth or so of the pond, and thins away over a third of a pond beyond it */
     const x0 = -v.ox / v.scale, y0 = -v.oy / v.scale, x1 = x0 + v.w / v.scale, y1 = y0 + v.h / v.scale;
     hud(x0, y0, x1, y1);
+    let showSnap = false;
     { const seen = x1 > 0 && x0 < ww && y1 > 0 && y0 < wh;
       if (!asleep) { snap = null; skip = false; }
       else if (!skip) {      /* it has just fallen still (this frame was still drawn in full): keep its picture if all of it is on the screen, and stop drawing it */
@@ -213,14 +214,16 @@
         if (!seen) { snap = null; skip = true; }
         else if (sx >= 0 && sy >= 0 && sx + sw <= cv.width && sy + sh <= cv.height && sw >= 2 && sh >= 2) { try { const c2 = document.createElement('canvas'); c2.width = Math.max(2, Math.round(sw)); c2.height = Math.max(2, Math.round(sh)); c2.getContext('2d').drawImage(cv, sx, sy, sw, sh, 0, 0, c2.width, c2.height); snap = c2; skip = true; } catch (e) { console.error(e); } }
       }
-      if (skip) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = 'rgb(' + SPACE + ')'; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); if (snap && seen) { ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); ctx.imageSmoothingEnabled = true; ctx.drawImage(snap, 0, 0, ww, wh); } } }
-    { const wx = document.getElementById('wxfx'); if (wx) { const q = function (n) { return Math.round(n / 8) * 8; }, cx = q(ww / 2 * v.scale + v.ox), cy = q(wh / 2 * v.scale + v.oy), rx = q(ww * v.scale * 0.56), ry = q(wh * v.scale * 0.6), all = v.ox <= 0 && v.oy <= 0 && ww * v.scale + v.ox >= v.w && wh * v.scale + v.oy >= v.h, mk = all ? '' : 'radial-gradient(ellipse ' + rx + 'px ' + ry + 'px at ' + cx + 'px ' + cy + 'px, #000 55%, transparent 96%)'; if (wx._mk !== mk) { wx._mk = mk; wx.style.clipPath = ''; wx.style.maskImage = mk; wx.style.webkitMaskImage = mk; } } }      // the pond's weather (snow, bubbles, embers) is the pond's: it thins out towards the edge, softly, and does not fall in space
+      if (skip) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = 'rgb(' + SPACE + ')'; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); showSnap = !!(snap && seen); } }
+    if (!asleep) { const wx = document.getElementById('wxfx'); if (wx) { const q = function (n) { return Math.round(n / 8) * 8; }, cx = q(ww / 2 * v.scale + v.ox), cy = q(wh / 2 * v.scale + v.oy), rx = q(ww * v.scale * 0.56), ry = q(wh * v.scale * 0.6), all = v.ox <= 0 && v.oy <= 0 && ww * v.scale + v.ox >= v.w && wh * v.scale + v.oy >= v.h, mk = all ? '' : 'radial-gradient(ellipse ' + rx + 'px ' + ry + 'px at ' + cx + 'px ' + cy + 'px, #000 55%, transparent 96%)'; if (wx._mk !== mk) { wx._mk = mk; wx.style.clipPath = ''; wx.style.maskImage = mk; wx.style.webkitMaskImage = mk; } } }      // the pond's weather (snow, bubbles, embers) is the pond's: it thins out towards the edge, softly, and does not fall in space
     if (x0 > IN && y0 > IN && x1 < ww - IN && y1 < wh - IN) return;      // looking at the middle of the pond: nothing of the outside is in view
+    const main = ctx;
+    const edgePart = function () {
     ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr);
     // 1. the pond's ending, laid over its edges; and plain dark beyond that picture
     ctx.imageSmoothingEnabled = true; ctx.drawImage(edgeMask(ww, wh, MG, R, IN, G.shoreY ? G.shoreY(W) / wh : 0), -MG, -MG, ww + 2 * MG, wh + 2 * MG);
     ctx.fillStyle = 'rgb(' + SPACE + ')';
-    { const ov = 3 / v.scale;      /* the plain dark overlaps the picture's own dark border by a few pixels, so no seam shows between them */
+    if (!skip) { const ov = 3 / v.scale;      /* the plain dark overlaps the picture's own dark border by a few pixels, so no seam shows between them */
       if (x0 < -MG + ov) ctx.fillRect(x0 - 9, y0 - 9, -MG + ov - x0 + 9, y1 - y0 + 18);
       if (x1 > ww + MG - ov) ctx.fillRect(ww + MG - ov, y0 - 9, x1 - ww - MG + ov + 9, y1 - y0 + 18);
       if (y0 < -MG + ov) ctx.fillRect(x0 - 9, y0 - 9, x1 - x0 + 18, -MG + ov - y0 + 9);
@@ -229,12 +232,14 @@
     { const hw = ww / 2, hh = wh / 2, px1 = 1 / v.scale; for (let i = 0; i < 260; i++) { const a = hash(i, 9, 301) * TAU, u = (t * (0.006 + 0.01 * hash(i, 9, 302)) + hash(i, 9, 303)) % 1, ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / hw, Math.abs(sa) / hh), kk = k0 * 0.9 + MG * 1.05 * u, sz = px1 * (0.9 + 1.3 * hash(i, 9, 304)) * (1.15 - 0.5 * u);
         ctx.fillStyle = 'rgba(' + (i % 5 ? '110,205,205' : '215,245,240') + ',' + (0.55 * Math.sin(3.1416 * Math.min(1, u * 1.15)) * (0.7 + 0.5 * pulse)) + ')'; ctx.beginPath(); ctx.arc(hw + ca * kk, hh + sa * kk, sz, 0, TAU); ctx.fill(); } pulse = Math.max(0, pulse - 0.006); }
     ctx.restore();
+    };
     // 2. everything of space (clouds, stars, rocks, lanes, the other ponds) is painted on a sheet of its own, and that sheet is then worn away where the pond
     // is: wholly where the pond is solid, partly where it is mist. So there is no line anywhere at which space begins: stars show faintly through thin mist and
     // fully in the dark, exactly as much as the mist lets them.
-    const O = sheet(ctx.canvas.width, ctx.canvas.height), main = ctx;
-    (function (ctx) {
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, O.width, O.height); ctx.globalCompositeOperation = 'source-over';
+    // (While the pond waits there is no need for the sheet: the pond is a small still picture, so space is painted straight onto the screen, the picture and its
+    // mist go on top, and two whole-screen copies a frame are saved. That is what keeps wandering far out light.)
+    const spacePart = function (ctx, own, O) {
+    if (own) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, O.width, O.height); ctx.globalCompositeOperation = 'source-over'; }
     ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
     // drifting clouds of colour, far off
     { const cs = cellSize() * 1.6, cx = ww / 2, cy = wh / 2, i0 = Math.floor((x0 - cx) / cs - 0.7), i1 = Math.ceil((x1 - cx) / cs + 0.7), j0 = Math.floor((y0 - cy) / cs - 0.7), j1 = Math.ceil((y1 - cy) / cs + 0.7);
@@ -277,9 +282,10 @@
     { const T = 23, n = Math.floor(t / T), u = (t - n * T) / 9; if (u < 1) { const fromL = hash(n, 8, 81) < 0.5, an = (fromL ? 0.25 : 2.9) + (hash(n, 8, 82) - 0.5) * 0.5, sx = fromL ? -80 : v.w + 80, sy = hash(n, 8, 83) * v.h * 0.6, D = Math.hypot(v.w, v.h) * 1.2, hx = sx + Math.cos(an) * D * u, hy = sy + Math.sin(an) * D * u, L = 260, fade = Math.sin(3.1416 * u);
         const g = ctx.createLinearGradient(hx, hy, hx - Math.cos(an) * L, hy - Math.sin(an) * L); g.addColorStop(0, 'rgba(190,240,255,' + 0.8 * fade + ')'); g.addColorStop(1, 'rgba(120,200,255,0)'); ctx.strokeStyle = g; ctx.lineCap = 'round'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx - Math.cos(an) * L, hy - Math.sin(an) * L); ctx.stroke();
         ctx.fillStyle = 'rgba(240,252,255,' + fade + ')'; ctx.beginPath(); ctx.arc(hx, hy, 4.5, 0, TAU); ctx.fill(); } }
-    ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); ctx.globalCompositeOperation = 'destination-out'; ctx.imageSmoothingEnabled = true; ctx.drawImage(EDGE.inv, -MG, -MG, ww + 2 * MG, wh + 2 * MG); ctx.globalCompositeOperation = 'source-over';
-    })(O.getContext('2d'));
-    main.setTransform(1, 0, 0, 1, 0, 0); main.drawImage(O, 0, 0);
+    if (own) { ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); ctx.globalCompositeOperation = 'destination-out'; ctx.imageSmoothingEnabled = true; ctx.drawImage(EDGE.inv, -MG, -MG, ww + 2 * MG, wh + 2 * MG); ctx.globalCompositeOperation = 'source-over'; }
+    };
+    if (skip) { spacePart(main, false, null); if (showSnap) { main.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); main.imageSmoothingEnabled = true; main.drawImage(snap, 0, 0, ww, wh); edgePart(); } }
+    else { edgePart(); const O = sheet(main.canvas.width, main.canvas.height); spacePart(O.getContext('2d'), true, O); main.setTransform(1, 0, 0, 1, 0, 0); main.drawImage(O, 0, 0); }
     // seen from afar, our own is named
     if (G.cam.z < 0.45) { ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); const px = ww / 2 * v.scale + v.ox, py = (wh + MG * 0.55) * v.scale + v.oy + 14; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = '800 14px system-ui, sans-serif'; ctx.fillStyle = '#f6d365'; ctx.fillText('YOUR POND', px, py); ctx.font = '600 11px system-ui, sans-serif'; ctx.fillStyle = 'rgba(207,232,255,0.85)'; ctx.fillText('generation ' + W.gen + ' · ' + W.cre.length + ' alive' + (asleep ? ' · waiting for you' : ''), px, py + 17); ctx.restore(); }
@@ -306,11 +312,11 @@
   G.pondAsleep = function () { return asleep; };
 
   // ── the way home, and a word about a far pond ──
-  let home = null, card = null, shown = '';
+  let home = null, card = null, shown = '', wasAsleep = null, wasAway = null, lastRot = '', lastTxt = '';
   function ui() {
     if (home) return;
     const st = document.createElement('style');
-    st.textContent = '#gohome{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:7;display:flex;align-items:center;gap:9px;padding:9px 18px 9px 12px;border-radius:999px;cursor:pointer;font:800 11px system-ui,sans-serif;letter-spacing:.16em;color:#1a2433;background:#f6d365;border:1px solid #f6d365;box-shadow:0 6px 24px rgba(0,0,0,.5)}#gohome i{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;font-style:normal;font-size:15px;transition:transform .2s}#gohome small{font:700 11px system-ui,sans-serif;letter-spacing:.02em;color:#1a2433;opacity:.8;text-transform:none;white-space:nowrap}#gohome small:empty{display:none}#gohome small:before{content:"· "}' +
+    st.textContent = '#ui.exploring > *:not(#gohome):not(#farcard):not(#zoom){opacity:0 !important;pointer-events:none !important;transition:opacity .35s}#ui > *{transition:opacity .35s}#gohome{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:7;display:flex;align-items:center;gap:9px;padding:9px 18px 9px 12px;border-radius:999px;cursor:pointer;font:800 11px system-ui,sans-serif;letter-spacing:.16em;color:#1a2433;background:#f6d365;border:1px solid #f6d365;box-shadow:0 6px 24px rgba(0,0,0,.5)}#gohome i{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;font-style:normal;font-size:15px;transition:transform .2s}#gohome small{font:700 11px system-ui,sans-serif;letter-spacing:.02em;color:#1a2433;opacity:.8;text-transform:none;white-space:nowrap}#gohome small:empty{display:none}#gohome small:before{content:"· "}' +
       '#farcard{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:8;width:min(440px,calc(100vw - 28px));padding:13px 16px 14px;border-radius:18px;font:500 12.5px/1.45 system-ui,sans-serif;color:#cfe8ff;text-align:center}#farcard b{display:block;font:800 18px system-ui,sans-serif;color:#fff;margin:2px 0 4px}#farcard .k{font:700 9.5px system-ui,sans-serif;letter-spacing:.2em;color:#f6d365;text-transform:uppercase}#farcard .ks{display:flex;justify-content:center;gap:6px;margin:4px 0 6px}#farcard .ks img{width:76px;height:76px}#farcard .r{display:flex;gap:8px;margin-top:10px}#farcard .r .btn{flex:1;min-height:34px}';
     document.head.appendChild(st);
     const host = document.getElementById('ui') || document.body;
@@ -328,9 +334,11 @@
     // "home" shows only when the pond is out of sight, or so small on the screen that it is hard to find
     const seen = x1 > 0 && x0 < W.ww && y1 > 0 && y0 < W.wh, small = W.wh * v.scale < v.h * 0.16, away = on && (!seen || small) && !fly;
     asleep = G.mode === 'play' && (!seen || small);      /* nobody is watching it: the pond stands still until you are back */
-    home.classList.toggle('hide', !away);
-    if (away) { const cx = W.ww / 2, cy = W.wh / 2, dx = cx - G.cam.x, dy = cy - G.cam.y, d = Math.hypot(dx, dy) / unit(); home.firstChild.style.transform = seen ? 'rotate(-90deg)' : 'rotate(' + Math.atan2(dy, dx) + 'rad)'; home.lastChild.textContent = seen ? '' : Math.max(1, Math.round(d)) + (Math.round(d) <= 1 ? ' pond away' : ' ponds away');
-      const top = ['wish', 'wxnow'].reduce(function (y, id) { const e = document.getElementById(id); return e && !e.classList.contains('hide') && e.offsetHeight ? Math.max(y, e.getBoundingClientRect().bottom + 8) : y; }, 14); home.style.top = Math.round(top) + 'px'; }
+    // out in space the pond's own panels step aside: only the way home, the card of a far place and the zoom buttons stay. They come back with the pond.
+    if (asleep !== wasAsleep) { wasAsleep = asleep; const host = document.getElementById('ui'); if (host) host.classList.toggle('exploring', asleep); const wx = document.getElementById('wxfx'); if (wx) wx.style.visibility = asleep ? 'hidden' : ''; }
+    if (away !== wasAway) { wasAway = away; home.classList.toggle('hide', !away); }
+    if (away) { const cx = W.ww / 2, cy = W.wh / 2, dx = cx - G.cam.x, dy = cy - G.cam.y, d = Math.hypot(dx, dy) / unit(), rot = seen ? 'rotate(-90deg)' : 'rotate(' + (Math.round(Math.atan2(dy, dx) * 20) / 20) + 'rad)', txt = seen ? '' : Math.max(1, Math.round(d)) + (Math.round(d) <= 1 ? ' pond away' : ' ponds away');
+      if (rot !== lastRot) { lastRot = rot; home.firstChild.style.transform = rot; } if (txt !== lastTxt) { lastTxt = txt; home.lastChild.textContent = txt; } }
     if (!on && shown) hideCard();
   }
   G.on('pond-click', function (c) {
@@ -347,5 +355,5 @@
     card.innerHTML = '<div class="k">A far pond</div><b>' + G.escapeHtml(hit.name) + '</b>' + (pics ? '<div class="ks">' + pics + '</div>' : '') + K.length + (K.length === 1 ? ' kind lives' : ' kinds live') + ' here. One day this will be somebody else\'s living pond, and you will be able to go in, look around and meet them. For now it is only a place on the map: visiting is not open yet.<div class="r"><button class="btn sm" id="farHome">BACK TO MY POND</button><button class="btn sm" id="farClose">CLOSE</button></div>';
     card.classList.remove('hide');
   });
-  G.on('new-pond', function () { fly = null; asleep = false; snap = null; skip = false; hideCard(); for (const q in KIND) delete KIND[q]; });
+  G.on('new-pond', function () { fly = null; asleep = false; snap = null; skip = false; wasAsleep = null; wasAway = null; hideCard(); for (const q in KIND) delete KIND[q]; });
 })();
