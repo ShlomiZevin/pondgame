@@ -11,7 +11,7 @@
   Object.assign(G, { NIN, NOUT, MAXH, MAXP, PT, TAGHUE, INAMES, ONAMES });
 
   G.K = Object.assign(G.K, {
-    mut: 0.08,            // per-gene mutation chance (times the world slider)
+    mut: 0.1,             // per-gene mutation chance (times the world slider)
     dt: 1 / 30,
     foodRate: 12,        // food drops per second in a 1600x1000 pond at light 1
     foodMax: 380,
@@ -210,6 +210,8 @@
     let digSum = 0; for (let i = 0; i < 6; i++) digSum += c[i];
     let tolSum = 0; for (let i = 9; i < 15; i++) tolSum += c[i] || 0;
     up += 0.035 * digSum + 0.02 * (c[6] + c[7] + c[8]) + 0.022 * tolSum + 0.0035 * g.w.length + 0.012 * g.h;
+    if ((t[5] || 0) >= 0.5) up += r10 * (0.06 * (tail ? 1 : 0) + 0.03 * Math.min(3, k[3]) + (r > 18 ? 0.03 * Math.min(3, k[1]) : 0));      // on land: a swimming tail, tentacles, and fins too big to be wings
+    else up += r10 * 0.035 * Math.min(6, cn.legSites);                                                                                                      // in the water: legs
     if (f.bd) { const over = Math.max(0, G.body.busy(f) - 6); up += r10 * (0.07 * over + 0.012 * over * over); ph.pneed += 0.035 * over; }
     ph.upkeep = up * (1 - 0.2 * stall);      // while the pond is growing, being big costs less
     // compile the brain: wires grouped by target (hidden 0..h-1, then outputs)
@@ -288,7 +290,8 @@
     const r = G.rand, n = G.randn;
     // A line of creatures carries its own rate of change (t[6]). A line whose changes pay keeps changing boldly; one that has found something good
     // settles and refines it. Nobody sets it: it is inherited, it drifts, and selection keeps the lines whose rate suits them.
-    const mu = clamp(+parent.t[6] || 1, 0.4, 2.2); wild = wild * mu;
+    const stuckV = (G.W && G.W.stall) || 0;
+    const mu = clamp(+parent.t[6] || 1, 0.4, 2.2); wild = wild * mu * (1 + 0.6 * stuckV);      // a pond whose looks have stopped rising changes more readily
     const m = G.K.mut * wild;
     const g = G.cloneGenome(parent);
     g.t[6] = clamp(mu * Math.exp(n() * 0.12), 0.4, 2.2);
@@ -306,12 +309,17 @@
     // breath: how far out of the water it can live. It drifts like any gene, and now and then takes a real step either way
     if (r() < m * 2.5) { g.t[5] = (g.t[5] || 0) + n() * 0.06; note('t', 5, 'breath', false); }
     if (r() < 0.03 * wild) { const up = r() < 0.5; g.t[5] = clamp((g.t[5] || 0) + (up ? 0.18 : -0.18), 0, 1); note('t', 5, up ? 'can stay longer out of the water' : 'keeps more to the water', true); }
+    { const was = (+parent.t[5] || 0) >= 0.5, now = (g.t[5] || 0) >= 0.5, Wd = G.W;
+      if (was !== now && Wd) { const sh = Wd.shore || G.SHORE0 || 0.24, lu = Wd.landUse || 0, full = now ? lu / sh : (1 - lu) / (1 - sh);      // how lived-in the side it would be born into is
+        if (r() < clamp(full * 1.6 - 0.1, 0, 0.97)) g.t[5] = was ? Math.max(0.5, +parent.t[5] || 0.5) : Math.min(0.49, +parent.t[5] || 0); } }
     if (r() < m * 2.5) { g.t[4] = (g.t[4] || 0.12) + n() * 0.14; note('t', 4, 'temper', false); }
     for (let i = 0; i < 15; i++) {
       if (r() < m * 1.2) { g.c[i] += n() * 0.17 + (press ? press.c[i] * 0.06 : 0); note('c', i, i < 6 ? 'diet' : i < 9 ? 'resistance' : 'tolerance', i < 6); }
     }
     // the body: its rules change, and the whole animal changes with them
     G.form.mutate(g.f, m, wild, press, function (text, big) { note('f', 0, text, big); });
+    // a leap: now and then, in a pond that is stuck, a child is born with much changed at once. Most such children fail; one in a while founds something new.
+    if (stuckV > 0.5 && r() < 0.035 * stuckV) { for (let k = 0; k < 3; k++) G.form.mutate(g.f, m * 2, wild * 5, press, function () {}); note('f', 0, 'a leap: much about it changed at once', true); }
     // organs invented for this pond can be picked up, resized and lost
     for (let i = 0; i < g.p.length; i++) if (r() < m) { g.p[i].s += n() * 0.2; note('p', i, 'organ size', false); }
     const orgs = G.W && G.W.organs ? G.W.organs : [];

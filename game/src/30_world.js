@@ -319,7 +319,7 @@
       } else if (!(z.p.vault > 0.2) && !G.isBad(z)) z.life -= dt;
       const fade = clamp(z.life / 18, 0, 1), grow = clamp(z.age / 3, 0.2, 1);
       z.k = fade * grow * (living ? clamp(0.35 + z.health * 0.65, 0.3, 1) : 1);
-      z.r = z.r0 * (0.55 + 0.45 * grow) * (0.7 + 0.3 * fade) * (1 + (z.p.spread || 0) * clamp(z.age / 40, 0, 1) * 0.5) * (living ? 0.55 + 0.35 * z.health : 1);
+      z.r = z.r0 * (0.55 + 0.45 * grow) * (0.7 + 0.3 * fade) * (1 + (z.p.spread || 0) * clamp(z.age / 40, 0, 1) * 0.5) * (living ? 0.55 + 0.35 * z.health : 1) * (z.haven ? clamp((W.meanR || 12) / 12, 1, 14) : 1);      // a Marvel Garden is as big as the pond's creatures need it to be
       if (z.life <= 0) {
         W.zones.splice(i, 1);
         if (z.hit > 0.15) G.emit('zone-killed', z);
@@ -541,7 +541,7 @@
           if (dx * dx + dy * dy < z.r * z.r) sticky += z.p.sticky * 2.2 * z.k * (1 - ph.cnt[8] * 0.08);
         }
       }
-      const sp = ph.speed * (sprint ? 1.7 : 1) * thrust / sticky * (c.colony ? 0.85 : 1) * (c.land ? (0.5 + 0.22 * Math.min(ph.limbs, 4) + 0.2 * (ph.air || 0) + 0.45 * Math.min(1, ph.cnt[1]) * clamp((18 - ph.r) / 8, 0, 1)) * (ph.warm ? 1.3 : 1) : (1 - 0.45 * clamp(((ph.air || 0) - 0.5) / 0.5, 0, 1)) * (1 - 0.09 * Math.min(ph.limbs, 4)))      /* on land legs carry a body, and what were fins are wings that lift a small one; a swimming tail does nothing there; in the water legs only drag */ * (season === 3 && !ph.warm ? 0.68 : 1);      // winter makes the cold-blooded sluggish
+      const sp = ph.speed * (sprint ? 1.7 : 1) * thrust / sticky * (c.colony ? 0.85 : 1) * (c.land ? (0.2 + 0.32 * Math.min(ph.limbs, 4) + 0.15 * (ph.air || 0) + 0.45 * Math.min(1, ph.cnt[1]) * clamp((18 - ph.r) / 8, 0, 1)) * (ph.warm ? 1.3 : 1) : (1 - 0.45 * clamp(((ph.air || 0) - 0.5) / 0.5, 0, 1)) * (1 - 0.14 * Math.min(ph.limbs, 4)))      /* on land legs carry a body, and what were fins are wings that lift a small one; a swimming tail does nothing there; in the water legs only drag */ * (season === 3 && !ph.warm ? 0.68 : 1);      // winter makes the cold-blooded sluggish
       const tx = Math.cos(c.ang) * sp, ty = Math.sin(c.ang) * sp;
       const k = Math.min(1, 2.6 * dt);
       c.vx += (tx - c.vx) * k; c.vy += (ty - c.vy) * k;
@@ -1026,6 +1026,22 @@
         const want = rn ? clamp(Math.pow(rs / rn / 12, 0.6), 1, 1.8) : 1; W.landRich = (W.landRich || 1) + clamp(want - (W.landRich || 1), -0.05, 0.1); }
       W.landShare = share; W.shore = was + clamp(want - was, -0.0015, 0.008);
       if (W.shore > 0.2 && !(W.shoreNote > 0)) { W.shoreNote = W.gen; W.discLog.push({ key: 'land' + W.gen, text: 'So many of them live out of the water now that the land is spreading: the shore has moved down, and there is more ground to live on.', gen: W.gen }); } }
+    // FASHION. A thing worn, carried, or a condition caught is not only handed down from parents: now and then a creature takes to what the most admired
+    // creature near it has on (of its own side of the shore). So a look can sweep a neighbourhood and fade again, and the land and the water come to
+    // dress differently. What it took up is then its own, and its children's.
+    if (G.designOf) { const wornD = function (q) { if (!q || q.k !== 8 || q.on >= 0) return null; const d = G.designOf(q.t); return d && (d.place === 'top' || d.place === 'face' || d.place === 'held' || d.place === 'wrap' || d.place === 'skin') ? d : null; };
+      for (let i = 0; i < cre.length; i++) { const c = cre[i]; if (c.dead || !c.g.f.bd || G.rand() > 0.035) continue;
+        let best = null, bs = G.charmOf(c);
+        for (let t = 0; t < 6; t++) { const o = cre[(G.rand() * cre.length) | 0]; if (o === c || o.dead || !o.g.f.bd || o.ph.home !== c.ph.home) continue; const dx = o.x - c.x, dy = o.y - c.y; if (dx * dx + dy * dy > 600 * 600) continue; const a = G.charmOf(o); if (a > bs) { bs = a; best = o; } }
+        if (!best) continue;
+        const Rw = best.g.f.rules.filter(wornD); if (!Rw.length) continue;
+        const q = Rw[(G.rand() * Rw.length) | 0], d = wornD(q), f = c.g.f;
+        if (f.rules.some(function (x) { return x.k === 8 && x.t === q.t; })) continue;
+        let at = -1; for (let k = 0; k < f.rules.length; k++) { const dk = wornD(f.rules[k]); if (dk && dk.place === d.place && !f.rules.some(function (x) { return x.on === k; })) at = k; }
+        const nq = { k: 8, a: 0, b: 0, e: 1, l: q.l, w: q.w, j: 2, g: q.g, c: q.c, t: q.t, p: q.p, on: -1, u: 0.5, f: 1 };
+        if (at >= 0) f.rules[at] = nq; else if (f.rules.length < 6) f.rules.push(nq); else continue;
+        G.form.fix(f); c.lv = null; c.fv = null; W.stats.fashion = (W.stats.fashion || 0) + 1;
+        c.muts = (c.muts || []).concat([{ kind: 'f', i: 0, text: (d.place === 'skin' ? 'caught the ' : 'took to the ') + d.name.toLowerCase() + ', as an admired neighbour has it', big: true }]); c.mutAge = 2.5; } }
     // how much there is to a body (its joined parts and all that grows on it, counted as the pond counts clutter) and how big it is: what an old pond grows into
     let bodySum = 0, bodyTop = 0, sizeSum = 0, sizeTop = 0; for (let i = 0; i < cre.length; i++) { const f = cre[i].g.f, b = f.bd ? G.body.busy(f) : f.n + f.rules.length, z = cre[i].g.t[0]; bodySum += b; if (b > bodyTop) bodyTop = b; sizeSum += z; if (z > sizeTop) sizeTop = z; }
     W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop, body: bodySum / n, bodyTop: bodyTop, size: sizeSum / n, sizeTop: sizeTop, mx: (function () { const o = {}, X = G.MARKS_X || []; for (let k = 0; k < X.length; k++) { let t = 0, top = 0; for (let i = 0; i < cre.length; i++) { const v = G.markOf(cre[i], X[k].id); t += v; if (v > top) top = v; } o[X[k].id] = [t / n, top]; } return o; })(), room: W.room || 0 });

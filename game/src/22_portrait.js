@@ -64,7 +64,7 @@
     if (build === 'free') {
       const BD = G.body, bd = f.bd, PI = Math.PI, LS = BD.lay(f, null), L0 = BD.lay(f, B), I = L0.I, gnd = BD.ground(LS);
       const xs = Math.pow(plump, 0.4);
-      const legOn = {}, armOn = {};
+      const legOn = {}, armOn = {}; let heldAt = null;      // heldAt: where the first hand is, once the arms are drawn (something carried goes there)
       // Which limbs are legs and which are arms follows from the body: on a mass that rests on the floor the first limbs are legs, and so are further ones
       // that end in a foot (a stump or a paddle): two pairs, three pairs, as many as it grew. Limbs that end in a hand or a claw, and any limbs on a
       // mass held off the floor, are arms. So a body can be a biped with arms, a four-legged beast, a six-legged insect, a thing with four arms.
@@ -107,7 +107,7 @@
       if (f.crest > 0.25) { const o = fm, k = kk(o); for (let j = -2; j <= 2; j++) { const th = -PI / 2 + j * 0.25 - (bd.v ? 0.35 : 0); if (!open(o, th)) continue; const b = P(o, th, 0.94), up = (9 + 16 * f.crest) * k, c = Math.cos(th), sn = Math.sin(th); ctx.lineCap = 'round'; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.frill : INK; ctx.lineWidth = pass ? 8 * k : 11.6 * k; ctx.beginPath(); ctx.moveTo(b[0], b[1]); ctx.lineTo(b[0] + c * up * 0.75, b[1] + sn * up * 0.75); ctx.stroke(); } } }
       for (let ri = 0; ri < R.length; ri++) { const q = R[ri]; if (q.on >= 0) continue; const d = q.k === 8 ? F._dsg(q) : null;
         for (let a = q.a; a <= q.b && a < f.n; a += q.e) { const os = of(a); for (let n = 0; n < os.length; n++) { const o = os[n], k = kk(o), sds = sidesOf(o);
-          if (q.k === 1) finOn(o, q, k, sds, ri); else if (q.k === 2) spikesOn(o, q, k); else if (q.k === 3) tentaclesOn(o, q, k, ri); else if (q.k === 6) frillOn(o, q, k, sds); else if (d && d.pts && d.place !== 'head') designOn(o, q, d, k, sds, ri);
+          if (q.k === 1) finOn(o, q, k, sds, ri); else if (q.k === 2) spikesOn(o, q, k); else if (q.k === 3) tentaclesOn(o, q, k, ri); else if (q.k === 6) frillOn(o, q, k, sds); else if (d && d.pts && d.place !== 'head' && d.place !== 'top' && d.place !== 'face' && d.place !== 'held' && d.place !== 'skin') designOn(o, q, d, k, sds, ri);
         } } }
       limbs(bd.v ? true : false);
       for (let k = 1; k < I.length; k++) { const o = I[k]; if (!o.stalk) continue; const p = o.par, w = Math.max(7, Math.min(px(o), px(p)) * 0.5); strokeLimb(X(p.x), Y(p.y), (X(p.x) + X(o.x)) / 2 + Math.sin(B(2.2) + k) * 3, (Y(p.y) + Y(o.y)) / 2, X(o.x), Y(o.y), w, o.far ? col.dark : col.body); }
@@ -147,7 +147,15 @@
           ctx.save(); ctx.translate(cx, top[1] + (q.k === 7 ? 9 : 5) * k); ctx.scale(k, k); if (q.k === 7) hornsAt(0, 0, px(o) * xs * 0.42 / k, q); else feelersAt(0, 0, px(o) * xs * 0.3 / k, q, bd.v ? 1 : 0); ctx.restore();
         } } }
       { const Rf = px(fm), hr = Math.min(clamp(Rf * 0.78 * Math.pow(f.hd, 0.5), 13, 54), Rf * 0.96) * Math.min(1, xs + 0.1);
-        face(X(fm.x) + (bd.v ? Rf * xs * 0.18 : 0), Y(fm.y) + Rf * (f.shell > 0.25 && fm === I[0] ? 0.26 : 0.13), hr, bd.v, false); }
+        face(X(fm.x) + (bd.v ? Rf * xs * 0.18 : 0), Y(fm.y) + Rf * (f.shell > 0.25 && fm === I[0] ? 0.26 : 0.13), hr, bd.v, false);
+        // What this pond's creatures wear, carry and have become (kinds of part invented for it: see 45_parts). One on top of the head, one on the face, one in
+        // the hand; a condition leaves its mark in a few places on the body.
+        { const hx = X(fm.x) + (bd.v ? Rf * xs * 0.18 : 0), hy = Y(fm.y), kf = kk(fm), seen = {};
+          for (let ri = 0; ri < R.length; ri++) { const q = R[ri], d = q.k === 8 && q.on < 0 ? F._dsg(q) : null; if (!d || !d.pts || seen[d.place]) continue;
+            if (d.place === 'top') { seen.top = 1; const tp = P(fm, -PI / 2, 1); F._design(ctx, d, hx, tp[1] + Rf * 0.2, -PI / 2, (30 + 26 * q.l) * kf, Math.max(0.9, q.w * 2), col, 1); }
+            else if (d.place === 'face') { seen.face = 1; F._design(ctx, d, hx + (bd.v ? hr * 0.4 : 0), hy + Rf * 0.13 + hr * 0.42, PI / 2, (20 + 18 * q.l) * kf, Math.max(0.9, q.w * 2), col, 1); }
+            else if (d.place === 'held') { seen.held = 1; const h = heldAt || [hx + Rf * xs * 1.02, hy + Rf * 0.45, -0.5, kf]; F._design(ctx, d, h[0], h[1], h[2] - 0.8, (34 + 26 * q.l) * h[3], q.w, col, 1); }
+            else if (d.place === 'skin') { seen.skin = 1; const sp = [[-0.55, -0.35, 0.6], [0.5, 0.3, 2.4], [-0.2, 0.62, 1.4], [0.6, -0.5, -0.4]]; for (let s = 0; s < sp.length; s++) { const o2 = s % 2 && I.length > 1 ? I[I[0] === fm ? 1 : 0] : fm, R2 = px(o2); F._design(ctx, d, X(o2.x) + sp[s][0] * R2 * xs, Y(o2.y) + sp[s][1] * R2, sp[s][2], 15 * kk(o2), 0.9, col, 1); } } } } }
       if (leanA) ctx.restore();
       return;
 
@@ -225,6 +233,7 @@
         if (kid && kid.k === 0) { const a2 = ang + sd * (0.25 + (kid.c || 0) * 0.9), L2 = (20 * kid.l + 8) * k * f.ll; ex += Math.cos(a2) * L2; ey += Math.sin(a2) * L2; pts.push([ex, ey]); ws.push(lw * (0.6 + 0.4 * (kid.w || 0.5))); tip = kid.t; ha = a2; hk = kid.f || 1; }
         limbN(pts, ws, fc);
         for (let j = 1; j + 1 < pts.length; j++) { ctx.beginPath(); ctx.arc(pts[j][0], pts[j][1], ws[j - 1] * 0.52, 0, TAU); ink(fc, 1.8); }
+        if (!heldAt && !far) heldAt = [ex, ey, ha, k];
         hand(ex, ey, ha, tip, k * 1.2 * f.hs * hk);
         ctx.globalAlpha = 1;
       }
@@ -516,7 +525,7 @@
     function eyeAt(ex, ey, r, ring, sdm) {
       const lid = o.sleep ? 1 : ((B(0.31) + (f.seed % 13)) % 3.7 < 0.1 ? 1 : 0);
       const lx = o.lx === undefined ? Math.sin(B(0.7)) * 0.5 : o.lx, ly = o.ly === undefined ? 0.15 + Math.cos(B(0.9)) * 0.25 : o.ly;
-      const asp = f.ex || 1, ax = Math.sqrt(asp), ay = 1 / ax, rot = (sdm || 0) * (f.et || 0), el = f.el || 0;
+      const asp = f.ex || 1, ax = Math.sqrt(asp), ay = 1 / ax, rot = (sdm || 0) * (f.et || 0), cnd = F._cond ? F._cond(f) : null, el = Math.max(f.el || 0, cnd && cnd.lid ? cnd.lid : 0);
       ctx.save(); ctx.translate(ex, ey); ctx.rotate(rot); ctx.scale(ax, ay);
       if (o.collect) { ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4); ctx.restore(); if (leanA) { const dx = ex, dy = ey - (GROUND - 4), cs = Math.cos(leanA), sn = Math.sin(leanA); o.collect.push([dx * cs - dy * sn, GROUND - 4 + dx * sn + dy * cs, r, ax, ay, rot + leanA, el]); } else o.collect.push([ex, ey, r, ax, ay, rot, el]); return; }
       if (lid) { ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ink(col.dark, 2.4); ctx.beginPath(); ctx.moveTo(-r * 0.7, 0); ctx.quadraticCurveTo(0, r * 0.6, r * 0.7, 0); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); ctx.restore(); return; }

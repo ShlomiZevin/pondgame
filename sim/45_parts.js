@@ -8,7 +8,7 @@
   'use strict';
   const clamp = G.clamp;
   const ABIL = ['speed', 'agility', 'reach', 'senses', 'armour', 'attack'];
-  const PLACES = ['sides', 'back', 'head', 'wrap'], STYLES = ['knit', 'plates', 'stripes', 'fluff', 'plain'], HITS = ['spike', 'toxin', 'bite', 'glow', 'armor'], MOTIONS = ['flap', 'sway', 'pulse', 'bristle', 'still'], COLOURS = ['accent', 'body', 'pale', 'dark', 'glow'];
+  const PLACES = ['sides', 'back', 'head', 'wrap', 'top', 'face', 'held', 'skin'],      /* top, face, held: one thing worn on the head, on the face, or carried; skin: a condition of the whole creature */ STYLES = ['knit', 'plates', 'stripes', 'fluff', 'plain'], HITS = ['spike', 'toxin', 'bite', 'glow', 'armor'], MOTIONS = ['flap', 'sway', 'pulse', 'bristle', 'still'], COLOURS = ['accent', 'body', 'pale', 'dark', 'glow'];
   const MAX = 8;
 
   G.designOf = function (id) {
@@ -112,7 +112,8 @@
     const f = raw.fx && typeof raw.fx === 'object' ? raw.fx : {}, fx = {};
     let pos = 0, neg = 0;
     for (let i = 0; i < 6; i++) { let v = +f[ABIL[i]]; if (!isFinite(v)) v = 0; v = clamp(v, -0.3, 0.5); fx[ABIL[i]] = v; if (v > 0) pos += v; else neg -= v; }
-    if (pos < 0.1) return null;
+    const wornP = raw.place === 'top' || raw.place === 'face' || raw.place === 'held' || raw.place === 'skin';
+    if (pos < 0.1 && !wornP) return null;      // (what is only worn, held or caught need do nothing)
     if (pos > 0.8) for (let i = 0; i < 6; i++) if (fx[ABIL[i]] > 0) fx[ABIL[i]] *= 0.8 / pos;
     if (neg < 0.05) { let worst = 0; for (let i = 1; i < 6; i++) if (fx[ABIL[i]] < fx[ABIL[worst]]) worst = i; fx[ABIL[worst]] = -0.08; }
     const name = String(raw.name || 'New part').replace(/[<>"]/g, '').trim().slice(0, 22) || 'New part';
@@ -121,6 +122,7 @@
       note: String(raw.note || '').replace(/[<>]/g, '').slice(0, 110), because: String(raw.because || '').replace(/[<>]/g, '').slice(0, 90), res: res3(), hits: hitsOf(),
       place: PLACES.indexOf(raw.place) >= 0 ? raw.place : 'sides', motion: MOTIONS.indexOf(raw.motion) >= 0 ? raw.motion : 'sway', colour: COLOURS.indexOf(raw.colour) >= 0 ? raw.colour : 'accent',
       pts: pts, smooth: raw.smooth !== false, ribs: ribs, dots: dots, fx: fx,
+      tone: raw.place === 'skin' ? (function () { const t = Array.isArray(raw.tone) ? raw.tone : [0, 1, 1]; return [clamp(+t[0] || 0, -180, 180), clamp(+t[1] || 1, 0.2, 1.6), clamp(+t[2] || 1, 0.55, 1.35)]; })() : undefined, lid: raw.place === 'skin' ? clamp(+raw.lid || 0, 0, 0.5) : undefined,
       by: String(raw.by || raw.model || '').slice(0, 60),
     };
   };
@@ -191,14 +193,16 @@
   let busy = false;
   G.designTick = function (gen) {
     const W = G.W;
-    if (!W || W.title || gen < 6 || gen % 7 !== 3) return;
+    const stuck = (W.stall || 0) >= 0.6;
+    if (!W || W.title || gen < 6 || (gen % 7 !== 3 && !(stuck && gen % 3 === 0))) return;
     const live = G.mode === 'play' && !G.catching && G.ai && G.ai.provider === 'server' && G.ai.available && G.ai.available();
-    if (!live) { const d = G.offlineDesign(); if (d) G.addDesign(d); return; }
+    if (!live) { if (gen % 7 === 3) { const d = G.offlineDesign(); if (d) G.addDesign(d); } return; }
     if (busy || !G.ai.allow('design')) return;          // not now: with an AI, nothing is taken from the stock
     busy = true;
     // the AI is shown the pond: what was dropped in, what is killing, who lives here and how they were graded, which ideas caught on
     const info = G.worldBrief();
     info.admired = G.form.fashionText(W.fashion);
+    if (stuck || gen % 14 === 3) { W.wantN = (W.wantN || 0) + 1; info.want = W.wantN % 3 === 0 ? 'condition' : 'worn'; }
     info.have = W.designs.map(function (d) { return d.name; }).concat(['leg', 'fin', 'spike', 'tentacle', 'feeler', 'armour plate', 'frill', 'horn']);
     const own = function () { /* with an AI, nothing is taken from the stock: the next idea comes at the next asking */ };
     G.ai.ask('design', info).then(function (raw) {

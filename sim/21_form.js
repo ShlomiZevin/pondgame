@@ -112,7 +112,7 @@
     const r = G.rand, n = G.randn;
     // (nothing makes a busy body shed its parts: whether much on a body is a muddle or a marvel is for the god to mark, and every part has to be fed)
     // a change of structure: at most one a birth
-    if (r() < (f.bd ? 0.11 : 0.16) * wild) {
+    if (r() < (f.bd ? 0.14 : 0.16) * wild) {
       const roll = r();
       if (roll < 0.13) { if (f.bd) G.body.bud(f, note); else if (f.n < MAXN) { f.n++; note('body grew to ' + f.n + ' segments', true); } }
       else if (roll < 0.17) { if (f.bd) G.body.drop(f, note); else if (f.n > 1) { f.n--; note('body shrank to ' + f.n + (f.n === 1 ? ' segment' : ' segments'), true); } }
@@ -163,7 +163,7 @@
     if (r() < 0.03 * wild * (G.pondDna && G.pondDna() ? G.pondDna().jump : 1)) { f.hue += 50 + r() * 260; if (r() < 0.5) { f.sat = 40 + r() * 54; f.lit = 46 + r() * 32; } if (r() < 0.5) f.hue2 = (r() < 0.5 ? -1 : 1) * (40 + r() * 140); note('was born a new colour', true); }
     // a whole new way of carrying the body: one of the builds this pond has been given
     // a shape of body imagined for this pond: now and then a child is born some way towards one of them
-    if (f.bd) { const pls = G.W && G.W.plans ? G.W.plans : []; if (pls.length && r() < 0.026 * wild) { const p = pls[Math.floor(r() * pls.length)]; if (p.id !== f.pl && p.bd) { const tt = 0.65 + r() * 0.35; G.body.adopt(f, p.bd, tt); f.pl = p.id; if (p.face) for (const k in p.face) if (p.face[k] !== undefined) f[k] += (p.face[k] - f[k]) * Math.min(1, tt + 0.1);
+    if (f.bd) { const pls = G.W && G.W.plans ? G.W.plans : []; if (pls.length && r() < 0.026 * wild * (1 + 2 * ((G.W && G.W.stall) || 0))) { const p = pls[Math.floor(r() * pls.length)]; if (p.id !== f.pl && p.bd) { const tt = 0.65 + r() * 0.35; G.body.adopt(f, p.bd, tt); f.pl = p.id; if (p.face) for (const k in p.face) if (p.face[k] !== undefined) f[k] += (p.face[k] - f[k]) * Math.min(1, tt + 0.1);
       if (p.tail && tt > 0.7) { f.tk = p.tail.tk; f.ts = p.tail.ts; }
       if (p.outfit && tt > 0.7) f.cl = p.outfit;
       if (p.kit && tt > 0.7) for (let ki = 0; ki < p.kit.length; ki++) F.nudge(f, p.kit[ki], null);      /* a plush shape comes with its stubby legs and little arms */ note('its body took a new shape: the ' + p.name.toLowerCase() + (p.because ? ' (' + p.because + ')' : ''), true); } } }
@@ -171,7 +171,7 @@
     if (f.bd && r() < 0.025 * wild) { if (f.sn > 0.2) { f.sn = 0; note('its muzzle flattened away', true); } else { f.sn = 0.35 + r() * 0.5; note('grew a muzzle', true); } }
     if (f.bd && r() < 0.025 * wild) { const k = Math.floor(r() * 4); if (k !== (f.nz | 0)) { f.nz = k; note(['lost its nose', 'grew a button nose', 'grew a soft triangle of a nose', 'grew a pair of nostrils'][k], true); } }
     // heads, necks and coats
-    if (f.bd && r() < 0.02 * wild) { const k = r() < 0.2 ? 0 : 1 + Math.floor(r() * 4); if (k !== f.cl) { f.cl = k; note(['took off its outfit', 'put on a scarf', 'put on a belt', 'put on gloves and boots', 'grew a tuft of hair'][k], true); } }
+    if (f.bd && f.cl && r() < 0.02 * wild) { const k = 0; if (k !== f.cl) { f.cl = k; note(['took off its outfit', 'put on a scarf', 'put on a belt', 'put on gloves and boots', 'grew a tuft of hair'][k], true); } }
     if (r() < 0.022 * wild) { const k = Math.floor(r() * 4); if (k !== f.coat) { f.coat = k; note(['lost its coat: bare skin again', 'grew scales', 'grew fur', 'grew feathers'][k], true); } }
     if (f.n > 1 && !f.sym && !f.bd && r() < 0.025 * wild) { const up = r() < 0.65; f.nk = clamp(f.nk + (up ? 0.25 : -0.25), 0, 0.7); note(up ? 'its neck narrowed: a head set apart from the body' : 'its neck thickened', true); }
     if (!f.bd && r() < 0.02 * wild) { f.hx = 0.72 + r() * 0.73; f.hq = 1.5 + r() * 2.5; note(f.hq > 3 ? 'its head grew square' : f.hq < 1.8 ? 'its head grew pointed' : f.hx > 1.2 ? 'its head grew wide' : f.hx < 0.85 ? 'its head grew tall' : 'its head changed shape', true); }
@@ -179,8 +179,9 @@
     // a kind of part the pond was given gets its trial: now and then a child grows one, in place of an old growth if the body is full.
     // From there it is graded like everything else: by what it does for the body, by its cost, and by whether mates like the look.
     const dsl = G.W && G.W.designs ? G.W.designs : [];
-    if (dsl.length && r() < 0.035 * wild) {
+    if (dsl.length && r() < 0.035 * wild * (1 + 2 * ((G.W && G.W.stall) || 0))) {
       const d = dsl[Math.floor(r() * dsl.length)];
+      if (d.place === 'skin') for (let i = f.rules.length - 1; i >= 0; i--) { const dq = dsgOf(f.rules[i]); if (dq && dq.place === 'skin' && f.rules[i].t !== d.id) dropRule(f, i); }      // one condition at a time: the new one takes the old one's place
       if (!f.rules.some(function (q) { return q.k === 8 && q.t === d.id; })) {
         const q = newRule(f.n, 8); q.t = d.id; if (d.place === 'head') { q.a = 0; q.b = 0; q.e = 1; }
         if (f.rules.length < (f.bd ? Math.min(MAXR, 4 + Math.round(F.room() * 0.67)) : MAXR)) f.rules.push(q); else { let at = Math.floor(r() * f.rules.length); for (let t = 0; t < 4 && f.rules[at].k === 8; t++) at = Math.floor(r() * f.rules.length); dropRule(f, at); f.rules.push(q); }
@@ -207,10 +208,10 @@
       else if (life.diet === 3 && hitL(0.05)) { if (f.en < 2) { f.en++; note('grew an eye, to find the blue food of the deep', true); } else if (!has(f, 4) && room && r() < 0.4) { f.rules.push(newRule(f.n, 4)); note('grew feelers, to find the blue food of the deep', true); } else { f.es += 0.05; note('its eyes grew, for the blue food of the deep', false); } }
       else if (life.diet === 4 && hitL(0.05)) { if (f.mk !== 2) { f.mk = 2; note('grew jaws, for the tough violet food', true); } else if (!has(f, 2) && room) { f.rules.push(newRule(f.n, 2)); note('grew spikes, for the tough violet food', true); } }
       else if (life.diet === 5 && hitL(0.05)) { if (!f.tk) { f.tk = 1 + Math.floor(r() * 2); note('grew a tail, to chase the quick pink food', true); } else if (!has(f, 1) && room) { f.rules.push(newRule(f.n, 1)); note('grew fins, to chase the quick pink food', true); } }
-      if (life.land > 0.3 && hitL(0.1)) { const Lg = legR(); if (!Lg && room) { f.rules.push(newRule(f.n, 0)); note('grew legs, living on the land', true); } else if (has(f, 1) && r() < 0.2) { for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k === 1 && f.rules[i].on < 0) { dropRule(f, i); break; } note('its fins withered on dry land', true); } else if (f.tk && r() < 0.3) { f.tk = 0; note('lost its swimming tail on dry land', true); } else if (f.coat !== 2) { f.coat = 2; note('grew fur, living on the shore', true); } else if (Lg && Lg.t !== 1) { Lg.t = 1; note('its feet grew fingers, living on the shore', true); } }
+      if ((f._air || 0) >= 0.5 && hitL(0.22)) { const Lg = legR(); if (!Lg && room) { f.rules.push(newRule(f.n, 0)); note('grew legs, living on the land', true); } else if (has(f, 1) && r() < 0.2) { for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k === 1 && f.rules[i].on < 0) { dropRule(f, i); break; } note('its fins withered on dry land', true); } else if (f.tk && r() < 0.3) { f.tk = 0; note('lost its swimming tail on dry land', true); } else if (f.coat !== 2) { f.coat = 2; note('grew fur, living on the shore', true); } else if (Lg && Lg.t !== 1) { Lg.t = 1; note('its feet grew fingers, living on the shore', true); } }
       else if (life.shore > 0.3 && life.land < 0.05 && hitL(0.06)) { const Lg = legR(); if (!Lg && room) { f.rules.push(newRule(f.n, 0)); note('grew legs, living by the shore', true); } else if (Lg && Lg.b < f.n - 1) { Lg.b++; note('grew more legs, living by the shore', true); } }
       else if (life.deep > 0.5 && hitL(0.05)) { if (f.glow < 0.6) { f.glow = clamp(f.glow + 0.4, 0, 1); note('began to glow, living in the dark deep', true); } else { f.es += 0.05; note('its eyes grew, living in the dark deep', false); } }
-      else if (life.land < 0.02 && (f._air || 0) < 0.25 && has(f, 0) && hitL(0.08)) { for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.k === 0 && q.on < 0 && !f.rules.some(function (x) { return x.on === i; })) { q.k = 1; q.t = 0; note('its legs flattened into fins, living in the water', true); break; } } }
+      else if ((f._air || 0) < 0.5 && has(f, 0) && hitL(0.16)) { for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.k === 0 && q.on < 0 && !f.rules.some(function (x) { return x.on === i; })) { q.k = 1; q.t = 0; note('its legs flattened into fins, living in the water', true); break; } } }
       else if (life.land < 0.02 && life.shore < 0.1 && life.deep < 0.3 && hitL(0.03)) { if (!has(f, 1) && room) { f.rules.push(newRule(f.n, 1)); note('grew fins, living in open water', true); } else if (!f.tk) { f.tk = 1 + Math.floor(r() * 2); note('grew a tail, living in open water', true); } }
     }
     // what the pond is up against makes the fitting answer a likelier thing to stumble on
@@ -329,7 +330,7 @@
       let k = par ? N[q.on] : f.sym ? Math.ceil(f.sym / q.e) : (Math.floor((q.b - q.a) / q.e) + 1) * 2;
       if (par) c.nested++;
       HEAD[i] = par ? HEAD[q.on] : !!(f.sym || q.a === 0);
-      if (dsg) { if (dsg.place === 'back' || dsg.place === 'wrap') k = f.sym ? 1 : k / 2; if (dsg.hits >= 0) c.dwk[dsg.hits] += Math.min(1.5, k / 2 + 0.5) * Math.min(1.3, q.l); const mul = Math.min(2, k / 2 + 0.5) * Math.min(1.3, q.l); for (const ab in c.dfx) c.dfx[ab] += (dsg.fx[ab] || 0) * mul; if (dsg.res) for (let j = 0; j < 3; j++) c.dres[j] += (dsg.res[j] || 0) * Math.min(1.3, mul); if (!c.dAdj) c.dAdj = dsg.adj; }
+      if (dsg) { if (dsg.place === 'back' || dsg.place === 'wrap') k = f.sym ? 1 : k / 2; else if (dsg.place === 'top' || dsg.place === 'face' || dsg.place === 'held' || dsg.place === 'skin') k = 1; if (dsg.hits >= 0) c.dwk[dsg.hits] += Math.min(1.5, k / 2 + 0.5) * Math.min(1.3, q.l); const mul = Math.min(2, k / 2 + 0.5) * Math.min(1.3, q.l); for (const ab in c.dfx) c.dfx[ab] += (dsg.fx[ab] || 0) * mul; if (dsg.res) for (let j = 0; j < 3; j++) c.dres[j] += (dsg.res[j] || 0) * Math.min(1.3, mul); if (!c.dAdj) c.dAdj = dsg.adj; }
       N[i] = k; RL[i] = (par ? RL[q.on] + q.l * 0.7 : q.l);
       c.k[q.k] += k * q.l; c.sites += k; c.mass += k * q.l * (0.5 + q.w);
       if (!seen[q.k]) { seen[q.k] = 1; c.kinds++; }
@@ -669,11 +670,14 @@
     if (!tip) return;
     for (let ci = qi + 1; ci < f.rules.length; ci++) if (f.rules[ci].on === qi) limb(ctx, f, ci, { x: tip.x, y: tip.y, r: 0, nx: Math.cos(tip.a) * side, ny: Math.sin(tip.a) * side, dx: -Math.sin(tip.a), dy: Math.cos(tip.a) }, side, col, t, idx + ci, m, al);
   }
+  /** the condition a body is in, if any (a kind of 'part' this pond invented that changes the whole creature: see 45_parts, place 'skin') */
+  F._cond = function (f) { for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.k !== 8) continue; const d = dsgOf(q); if (d && d.place === 'skin') return d; } return null; };
   function colours(f) {
     const HARM = [30, 120, 150, 180], ah = Math.abs(f.hue2); let near = HARM[0]; for (let i = 1; i < 4; i++) if (Math.abs(HARM[i] - ah) < Math.abs(near - ah)) near = HARM[i];
     const h2 = (f.hue + (f.hue2 < 0 ? -1 : 1) * (near * 0.8 + ah * 0.2) + 720) % 360, hs = function (h, s, l, a) { return 'hsla(' + Math.round(h) + ',' + Math.round(clamp(s, 0, 100)) + '%,' + Math.round(clamp(l, 0, 100)) + '%,' + (a === undefined ? 1 : a) + ')'; };
-    INK = hs(f.hue, Math.min(60, f.sat * 0.7), 15);
-    return { body: hs(f.hue, f.sat, f.lit), dark: hs(f.hue, f.sat, f.lit - 22), light: hs(f.hue, f.sat + 10, Math.min(90, f.lit + 20)), limb: hs(h2, f.sat, f.lit - 2), fin: hs(h2, f.sat + 8, f.lit + 8, 0.93), frill: hs(h2 + 30, f.sat + 12, f.lit + 4), mark: hs(h2, f.sat + 10, f.lit - 12), glow: '#fff3a8' };
+    const cd = F._cond(f), T = cd && cd.tone ? cd.tone : [0, 1, 1], hue = f.hue + T[0], sat = f.sat * T[1], lit = f.lit * T[2], hb = h2 + T[0];
+    INK = hs(hue, Math.min(60, sat * 0.7), 15);
+    return { body: hs(hue, sat, lit), dark: hs(hue, sat, lit - 22), light: hs(hue, sat + 10, Math.min(90, lit + 20)), limb: hs(hb, sat, lit - 2), fin: hs(hb, sat + 8, lit + 8, 0.93), frill: hs(hb + 30, sat + 12, lit + 4), mark: hs(hb, sat + 10, lit - 12), glow: '#fff3a8' };
   }
   function eye(ctx, x, y, es, lx, ly, lid, col) {
     if (lid) { ctx.beginPath(); ctx.arc(x, y, es, 0, TAU); inked(ctx, col.dark, 2.2); ctx.beginPath(); ctx.moveTo(x - es * 0.7, y); ctx.quadraticCurveTo(x, y + es * 0.5, x + es * 0.7, y); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke(); return; }      // a closed eye: blinking, or asleep

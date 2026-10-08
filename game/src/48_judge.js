@@ -127,7 +127,7 @@
   G.LOOK_S = 1.7; G.LOOK_K = 0.5;
   G.lvOf = function (c) { return c.lv || (c.lv = G.lookVec(c.g)); };
   G.believe = function (g, lv) {
-    const W = G.W, FM = G.form, T = W.taste, x = FM.looks(g.f), v0 = FM.whole(g.f).v, B = W.eyeBank;
+    const W = G.W, FM = G.form, T = (g.t[5] || 0) >= 0.5 ? (W.tasteL || W.taste) : W.taste, x = FM.looks(g.f), v0 = FM.whole(g.f).v, B = W.eyeBank;
     let b = FM.beautyX(x, T), w = FM.wholeX(x, T, v0), near = 0;
     if (B && B.length) {
       let sw = 0, rb = 0, rw = 0;
@@ -166,7 +166,7 @@
         // its further marks (body, balance, grandeur) reach the living creatures that look like it
         if (G.marksToward) for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x === c || x.real || x.dead || !x.g.f.bd) continue; const d = G.fdist(lv, G.lvOf(x)), wt = Math.exp(-d * d / G.LOOK_S); if (wt >= 0.05) G.marksToward(x, g.m, wt); }
         // the look is remembered
-        if (c.g.f.bd) { (W.eyeBank = W.eyeBank || []).push({ lv: lv, m: g.m, b: g.b, w: g.w, f: c.g.f, x: FM.looks(c.g.f), v0: FM.whole(c.g.f).v, pb: c.b0, pw: c.w0 }); if (W.eyeBank.length > 240) W.eyeBank.shift(); }
+        if (c.g.f.bd) { (W.eyeBank = W.eyeBank || []).push({ lv: lv, m: g.m, b: g.b, w: g.w, f: c.g.f, x: FM.looks(c.g.f), v0: FM.whole(c.g.f).v, pb: c.b0, pw: c.w0, home: (c.g.t[5] || 0) >= 0.5 ? 1 : 0 }); if (W.eyeBank.length > 240) W.eyeBank.shift(); }
         const sp = c.sp ? G.speciesById(c.sp) : null;
         if (c.sp) (W.spLook = W.spLook || {})[c.sp] = W.gen;
         // the best the watcher has really seen are kept (a hall of fame): they can be bred again if the pond loses what they had
@@ -178,10 +178,12 @@
       if (W.taste && W.eyeBank && W.eyeBank.length) {
         const B = W.eyeBank;
         // the pond's own taste is taught by everything the watcher has really said: a few passes over its recent marks, newest last
-        if (B.length >= 8 && FM.fitTaste && !G.FIT_OFF) FM.fitTaste(T, B);
+        if (B.length >= 8 && FM.fitTaste && !G.FIT_OFF) { const BW = B.filter(function (e) { return !e.home; }), BL = B.filter(function (e) { return e.home; });
+          FM.fitTaste(T, BW.length >= 8 ? BW : B);
+          if (BL.length >= 8) { W.tasteL = W.tasteL || FM.newTaste(); FM.fitTaste(W.tasteL, BL); } }
         else if (B.length >= 8) for (let ep = 0; ep < 3; ep++) for (let i = 0; i < B.length; i++) { const e = B[i]; FM.learn(T, e.f, e.b, 0.025, e.x); FM.learnWhole(T, e.x, e.w, 0.03, e.v0); }
         // how far that taste is still off for each creature really seen: what the look-alikes are corrected by (see G.believe)
-        for (let i = 0; i < B.length; i++) { const e = B[i]; e.rb = e.b - FM.beautyX(e.x, T); e.rw = e.w - FM.wholeX(e.x, T, e.v0); }
+        for (let i = 0; i < B.length; i++) { const e = B[i], Te = e.home && W.tasteL ? W.tasteL : T; e.rb = e.b - FM.beautyX(e.x, Te); e.rw = e.w - FM.wholeX(e.x, Te, e.v0); }
         { const P = B.filter(function (e) { return e.pb !== undefined && e.pw !== undefined; }).slice(-90);
           if (P.length >= 20) { const fit = function (kp, km) { let mp = 0, mm = 0; for (let i = 0; i < P.length; i++) { mp += P[i][kp]; mm += P[i][km]; } mp /= P.length; mm /= P.length; let sxy = 0, sxx = 0; for (let i = 0; i < P.length; i++) { sxy += (P[i][kp] - mp) * (P[i][km] - mm); sxx += (P[i][kp] - mp) * (P[i][kp] - mp); } return [mp, mm, G.clamp(sxx > 1e-6 ? sxy / sxx : 1, 0.3, 1)]; };
             const cb = fit('pb', 'b'), cw = fit('pw', 'w'); W.cal = { pb: cb[0], mb: cb[1], sb: cb[2], pw: cw[0], mw: cw[1], sw: cw[2] }; } }
