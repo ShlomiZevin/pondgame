@@ -10,24 +10,6 @@
   'use strict';
   G.drawBeyond = function () {};
   if (typeof document === 'undefined') return;
-  // The pond's renderer calls this just after it has drawn the water and the shore, before the creatures. The renderer stops the shore at the pond's edge; here
-  // it is carried on past the edge, in the same colours, so that the land (like the water, which already fills the screen) has no edge of its own: the
-  // only ending either has is the dust (drawn last, below). Being drawn here, it takes every tint and shadow the shore itself takes.
-  G.drawBeyond = function (ctx) {
-    const W = G.W; if (!W || W.title || G.mode !== 'play' || !G.shoreY) return;
-    const v = G.view, s = v.scale * v.dpr, ww = W.ww, wh = W.wh, MG = Math.min(ww, wh) * 0.5, sy = G.shoreY(W), x0 = -v.ox / v.scale, y0 = -v.oy / v.scale, x1 = x0 + v.w / v.scale;
-    if (sy < 4 || (x0 >= 0 && x1 <= ww && y0 >= 0)) return;
-    ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr);
-    const g = ctx.createLinearGradient(0, 0, 0, sy + 30); g.addColorStop(0, 'rgba(70,96,58,0.96)'); g.addColorStop(0.72, 'rgba(120,128,78,0.9)'); g.addColorStop(0.9, 'rgba(196,180,120,0.7)'); g.addColorStop(1, 'rgba(196,180,120,0)');
-    // (the renderer's own shore runs from 50 before the pond to 50 past it, down to a waterline that waves: this takes up exactly where that leaves off, with the same wave)
-    const wave = function (x) { return sy + 9 * Math.sin(x * 0.011 + G.rt * 0.5) + 6 * Math.sin(x * 0.031); };
-    ctx.fillStyle = g;
-    { const xl = ww + 50 - 40 * Math.floor((ww + 100) / 40);      /* the renderer's shore does not end square on the left: its last step of the waterline stops short of -50 and the outline slants back up. This side is cut to fit that slant exactly, so no sliver of water shows between them */
-      ctx.beginPath(); ctx.moveTo(-MG, -52); ctx.lineTo(-49.2, -52); ctx.lineTo(xl + 0.8, wave(xl)); for (let x = xl - 40; x >= -MG - 40; x -= 40) ctx.lineTo(x, wave(x)); ctx.lineTo(-MG, -52); } ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(ww + MG, -52); ctx.lineTo(ww + 48.5, -52); ctx.lineTo(ww + 48.5, wave(ww + 48.5)); for (let x = ww + 50; x <= ww + MG + 40; x += 40) ctx.lineTo(x, wave(x)); ctx.lineTo(ww + MG, -52); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = 'rgba(70,96,58,0.96)'; ctx.fillRect(-MG - 40, -MG, ww + 2 * MG + 80, MG - 48.5);
-    ctx.restore();
-  };
   const TAU = 6.2832, clamp = G.clamp, ZMIN = 0.02, SPACE = '5,7,16';
   let pulse = 0;          // 1 just after the pond grew, fading: its edge glows for a moment
   G.on('pond-grew', function () { pulse = 1; });
@@ -113,9 +95,9 @@
   /** how a pond ends: not at a line. Its water thins into grains, the grains scatter, and the last of them drift off into the dark. This is the picture of
    *  that ending for a pond of one shape (wide w, tall h, with margin mg round it and corners of radius R): space-coloured, see-through where the pond is. */
   let EDGE = null;
-  function edgeMask(w, h, mg, R, fadeIn) {
-    const key = Math.round(w / h * 200) + ':' + Math.round(mg / h * 200); if (EDGE && EDGE.key === key) return EDGE.cv;
-    EDGE = { key: key, cv: buildMask(w, h, mg, R, fadeIn, 1500) }; return EDGE.cv;
+  function edgeMask(w, h, mg, R, fadeIn, land) {
+    const key = Math.round(w / h * 200) + ':' + Math.round(mg / h * 200) + ':' + Math.round(land * 40); if (EDGE && EDGE.key === key) return EDGE.cv;
+    EDGE = { key: key, cv: buildMask(w, h, mg, R, fadeIn, 1500, land) }; return EDGE.cv;
   }
   // The dust picture, as brightness 0..1 (read once it has loaded; until then a plain soft noise stands in)
   let DUST = null;
@@ -127,20 +109,24 @@
     const x = u * (N - 1), y = v * (N - 1), x0 = x | 0, y0 = y | 0, x1 = Math.min(N - 1, x0 + 1), y1 = Math.min(N - 1, y0 + 1), fx = x - x0, fy = y - y0;
     return (A[y0 * N + x0] * (1 - fx) + A[y0 * N + x1] * fx) * (1 - fy) + (A[y1 * N + x0] * (1 - fx) + A[y1 * N + x1] * fx) * fy;
   }
-  /** the picture of a pond's ending: space-coloured, clear where the pond is. The pond does not stop at its edge: beyond it the water goes on as thin
-   *  veils that follow the dust (far where the dust is thick, hardly at all where it is thin), and past the veils a faint haze of it and single motes. */
-  function buildMask(w, h, mg, R, fadeIn, TW) {
+  /** The picture of a pond's ending: space-coloured, clear where the pond is.
+   *  The pond does not stop at a line. Over a band inside its edge it turns to mist: first a thin haze over the water (or the land), then thicker, in veils that
+   *  follow the dust picture, until at the edge itself there is only mist; and the mist goes on outward, thinning, with single motes, into the dark. The mist
+   *  has the pond's own colours (green where the land is, the water's colour below), so the eye is carried from pond to mist to nothing with no step anywhere.
+   *  Everything the pond's renderer stops at the edge (the shore, a tint that lies over the whole pond, the weather) is already under mist there. */
+  function buildMask(w, h, mg, R, fadeIn, TW, land) {
     const k = TW / (w + 2 * mg), TH = Math.max(8, Math.round((h + 2 * mg) * k)), cv = document.createElement('canvas'); cv.width = TW; cv.height = TH;
-    const x = cv.getContext('2d'), im = x.createImageData(TW, TH), D = im.data, hw = w / 2, hh = h / 2, S1 = Math.min(w, h) * 1.15, S2 = S1 * 0.41, out = mg * 0.44;      /* how far the veils may reach */
+    const x = cv.getContext('2d'), im = x.createImageData(TW, TH), D = im.data, hw = w / 2, hh = h / 2, S1 = Math.min(w, h) * 1.15, S2 = S1 * 0.41, out = mg * 0.92, ly = land ? -hh + h * land : -1e9;
     for (let py = 0; py < TH; py++) for (let px = 0; px < TW; px++) {
       const wx = px / k - mg - hw, wy = py / k - mg - hh, qx = Math.abs(wx) - (hw - R), qy = Math.abs(wy) - (hh - R);
       const d = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - R;      // how far outside the pond's edge this point is (inside: below zero)
-      const n1 = dust(wx / S1 + 0.31, wy / S1 + 0.17), n2 = dust(wx / S2 + 0.77, wy / S2 + 0.53), o = (py * TW + px) * 4;
-      // the veils. The pond never begins to fade AT its edge (that would draw the edge): everywhere it first goes on past it, a little where the dust is thin and
-      // far where it is thick, and only then thins away. A slow swell (n0) moves that distance about, so no side of the pond runs straight.
-      const n0 = dust(wx / (S1 * 2.6) + 0.11, wy / (S1 * 2.6) + 0.63), reach = out * (0.1 + 0.55 * n0 + 0.75 * n1 * n1 + 0.2 * n2), a = Math.max(sm(0, out * 0.5 + reach * 0.5, d - reach), sm(mg * 0.72, mg * 0.96, d));
-      const far = clamp(1 - d / (mg * 0.97), 0, 1), haze = d > reach * 0.6 ? clamp((n2 - 0.3) * 1.15, 0, 1) * far * far * 0.5 * sm(reach * 0.6, reach * 1.4 + 1, d) + clamp((n1 - 0.72) * 3.2, 0, 1) * far * 0.75 : 0;      // a haze of it, and motes
-      D[o] = SP[0] + (62 - SP[0]) * haze; D[o + 1] = SP[1] + (150 - SP[1]) * haze; D[o + 2] = SP[2] + (158 - SP[2]) * haze; D[o + 3] = Math.round(a * 255);
+      const n0 = dust(wx / (S1 * 2.6) + 0.11, wy / (S1 * 2.6) + 0.63), n1 = dust(wx / S1 + 0.31, wy / S1 + 0.17), n2 = dust(wx / S2 + 0.77, wy / S2 + 0.53), o = (py * TW + px) * 4;
+      // how deep into the pond the mist reaches here: a little where the dust is thin, far where it is thick, and a slow swell so that no side runs straight
+      const reach = fadeIn * (0.3 + 0.55 * n0 + 0.7 * n1 * n1 + 0.15 * n2), e = -d, u = e <= 0 ? 0 : Math.min(1, e / reach), a = 1 - u * u * (3 - 2 * u);
+      // the mist's own light: brightest in the band, fading outward to nothing; plus motes
+      const g = clamp(1 - (d + fadeIn * 0.4) / (out + fadeIn * 0.4), 0, 1), mist = clamp((0.2 + 0.55 * n1 + 0.35 * n2) * g * g * 1.15, 0, 0.92) * (d > 0 ? 1 : 0.55 + 0.45 * a), mote = d > 0 ? clamp((n1 - 0.74) * 3.4, 0, 1) * g * 0.8 : 0, hz = Math.min(1, mist + mote);
+      const onLand = sm(ly + 24, ly - 24, wy), tr = 58 + (118 - 58) * onLand, tg = 132 + (140 - 132) * onLand, tb = 142 + (84 - 142) * onLand;
+      D[o] = SP[0] + (tr - SP[0]) * hz; D[o + 1] = SP[1] + (tg - SP[1]) * hz; D[o + 2] = SP[2] + (tb - SP[2]) * hz; D[o + 3] = Math.round(a * 255);
     }
     x.putImageData(im, 0, 0);
     return cv;
@@ -176,7 +162,7 @@
     for (let q = 24; q >= 0; q--) d.lineTo(SW * q / 24, FM + shore + Math.sin(q * 1.3 + p.i) * 3.2 + Math.sin(q * 0.5 + p.j) * 2.8); d.closePath(); d.fill();
     for (let k = 0; k < 16; k++) { d.fillStyle = 'hsla(' + ((h + 100 + k * 71) % 360) + ',75%,68%,0.8)'; d.beginPath(); d.arc(FM + hash(k, p.j, 216) * FW, FM + hash(p.i, k, 217) * shore * 0.9, 2.8, 0, TAU); d.fill(); }
     d.filter = 'none'; d.restore();
-    if (!FMASK) FMASK = buildMask(FW, FH, FM, FH * 0.14, FH * 0.02, SW);
+    if (!FMASK) FMASK = buildMask(FW, FH, FM, FH * 0.2, FH * 0.3, SW);
     d.globalCompositeOperation = 'destination-out'; d.drawImage(FMASK, 0, 0, SW, SH); d.globalCompositeOperation = 'source-over';      // the water itself is eaten away at the rim, so its glow and the stars show through
     x.drawImage(pc, 0, 0);
     if (Object.keys(BODY).length > 24) for (const q in BODY) { delete BODY[q]; break; }      /* only the ponds lately in view are kept: far space costs no memory */
@@ -191,7 +177,7 @@
     if (pr > 9) {
       // a few of its lights wander, and grains of it drift slowly off into space
       const n = Math.min(9, Math.floor(pr / 4)); for (let q = 0; q < n; q++) { const a = hash(p.i, p.j, 40 + q) * TAU + t * (0.09 + 0.12 * hash(p.i, p.j, 60 + q)) * (q % 2 ? 1 : -1), d = 0.15 + 0.6 * hash(p.i, p.j, 80 + q); ctx.fillStyle = 'hsla(' + (h + 70 + q * 47) % 360 + ',95%,80%,0.55)'; ctx.beginPath(); ctx.arc(px + Math.cos(a) * hw2 * 0.8 * d, py + hh2 * 0.22 + Math.sin(a) * hh2 * 0.6 * d, Math.max(1, pr * 0.045), 0, TAU); ctx.fill(); }
-      for (let q = 0; q < 40; q++) { const a = hash(p.i, p.j, 140 + q) * TAU, u = (t * (0.006 + 0.01 * hash(p.i, p.j, 160 + q)) + hash(p.i, p.j, 180 + q)) % 1, ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / hw2, Math.abs(sa) / hh2), kk = k0 * 1.02 + FM * k * 0.9 * u; ctx.fillStyle = col(15, 80, 76, 0.5 * Math.sin(3.1416 * Math.min(1, u * 1.15))); ctx.beginPath(); ctx.arc(px + ca * kk, py + sa * kk, 0.7 + 0.8 * hash(p.i, q, 190), 0, TAU); ctx.fill(); }
+      for (let q = 0; q < 40; q++) { const a = hash(p.i, p.j, 140 + q) * TAU, u = (t * (0.006 + 0.01 * hash(p.i, p.j, 160 + q)) + hash(p.i, p.j, 180 + q)) % 1, ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / hw2, Math.abs(sa) / hh2), kk = k0 * 0.85 + FM * k * 0.9 * u; ctx.fillStyle = col(15, 80, 76, 0.5 * Math.sin(3.1416 * Math.min(1, u * 1.15))); ctx.beginPath(); ctx.arc(px + ca * kk, py + sa * kk, 0.7 + 0.8 * hash(p.i, q, 190), 0, TAU); ctx.fill(); }
     }
     if (pr > 16) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const fs = Math.round(clamp(pr * 0.24, 12, 18)); ctx.font = '800 ' + fs + 'px system-ui, sans-serif';
@@ -203,14 +189,14 @@
 
   function draw() {
     const W = G.W, ctx = G.ctx; if (!W || W.title || !ctx || G.mode !== 'play') { asleep = false; if (home) home.classList.add('hide'); return; }
-    const v = G.view, s = v.scale * v.dpr, t = G.rt || 0, ww = W.ww, wh = W.wh, m = Math.min(ww, wh), R = m * 0.14, IN = m * 0.02, MG = m * 0.5;      /* the pond is whole right up to its edge; it thins out over the half-pond of space beyond */
+    const v = G.view, s = v.scale * v.dpr, t = G.rt || 0, ww = W.ww, wh = W.wh, m = Math.min(ww, wh), R = m * 0.2, IN = m * 0.15, MG = m * 0.34;      /* the mist takes the outer sixth or so of the pond, and thins away over a third of a pond beyond it */
     const x0 = -v.ox / v.scale, y0 = -v.oy / v.scale, x1 = x0 + v.w / v.scale, y1 = y0 + v.h / v.scale;
     hud(x0, y0, x1, y1);
-    { const wx = document.getElementById('wxfx'); if (wx) { const q = function (n) { return Math.round(n / 8) * 8; }, cx = q(ww / 2 * v.scale + v.ox), cy = q(wh / 2 * v.scale + v.oy), rx = q(ww * v.scale * 0.62), ry = q(wh * v.scale * 0.66), all = v.ox <= 0 && v.oy <= 0 && ww * v.scale + v.ox >= v.w && wh * v.scale + v.oy >= v.h, mk = all ? '' : 'radial-gradient(ellipse ' + rx + 'px ' + ry + 'px at ' + cx + 'px ' + cy + 'px, #000 62%, transparent 100%)'; if (wx._mk !== mk) { wx._mk = mk; wx.style.clipPath = ''; wx.style.maskImage = mk; wx.style.webkitMaskImage = mk; } } }      // the pond's weather (snow, bubbles, embers) is the pond's: it thins out towards the edge, softly, and does not fall in space
+    { const wx = document.getElementById('wxfx'); if (wx) { const q = function (n) { return Math.round(n / 8) * 8; }, cx = q(ww / 2 * v.scale + v.ox), cy = q(wh / 2 * v.scale + v.oy), rx = q(ww * v.scale * 0.56), ry = q(wh * v.scale * 0.6), all = v.ox <= 0 && v.oy <= 0 && ww * v.scale + v.ox >= v.w && wh * v.scale + v.oy >= v.h, mk = all ? '' : 'radial-gradient(ellipse ' + rx + 'px ' + ry + 'px at ' + cx + 'px ' + cy + 'px, #000 55%, transparent 96%)'; if (wx._mk !== mk) { wx._mk = mk; wx.style.clipPath = ''; wx.style.maskImage = mk; wx.style.webkitMaskImage = mk; } } }      // the pond's weather (snow, bubbles, embers) is the pond's: it thins out towards the edge, softly, and does not fall in space
     if (x0 > IN && y0 > IN && x1 < ww - IN && y1 < wh - IN) return;      // looking at the middle of the pond: nothing of the outside is in view
     ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr);
     // 1. the pond's ending, laid over its edges; and plain dark beyond that picture
-    ctx.imageSmoothingEnabled = true; ctx.drawImage(edgeMask(ww, wh, MG, R, IN), -MG, -MG, ww + 2 * MG, wh + 2 * MG);
+    ctx.imageSmoothingEnabled = true; ctx.drawImage(edgeMask(ww, wh, MG, R, IN, G.shoreY ? G.shoreY(W) / wh : 0), -MG, -MG, ww + 2 * MG, wh + 2 * MG);
     ctx.fillStyle = 'rgb(' + SPACE + ')';
     { const ov = 3 / v.scale;      /* the plain dark overlaps the picture's own dark border by a few pixels, so no seam shows between them */
       if (x0 < -MG + ov) ctx.fillRect(x0 - 9, y0 - 9, -MG + ov - x0 + 9, y1 - y0 + 18);
@@ -219,10 +205,10 @@
       if (y1 > wh + MG - ov) ctx.fillRect(x0 - 9, wh + MG - ov, x1 - x0 + 18, y1 - wh - MG + ov + 9); }
     // 2. everything of space is drawn outside the pond (a little way in over its fading rim, so stars show through where the water has thinned)
     ctx.beginPath(); ctx.rect(x0 - 20, y0 - 20, x1 - x0 + 40, y1 - y0 + 40);
-    { const q = -MG * 0.2, rr = R + MG * 0.2;      /* stars and the rest begin a little way out, where the veils are thin */ ctx.moveTo(q + rr, q); ctx.lineTo(ww - q - rr, q); ctx.quadraticCurveTo(ww - q, q, ww - q, q + rr); ctx.lineTo(ww - q, wh - q - rr); ctx.quadraticCurveTo(ww - q, wh - q, ww - q - rr, wh - q); ctx.lineTo(q + rr, wh - q); ctx.quadraticCurveTo(q, wh - q, q, wh - q - rr); ctx.lineTo(q, q + rr); ctx.quadraticCurveTo(q, q, q + rr, q); ctx.closePath(); }
+    { const q = IN * 0.55, rr = Math.max(1, R - q);      /* stars and the rest show from where the mist is already thick, a little inside the edge */ ctx.moveTo(q + rr, q); ctx.lineTo(ww - q - rr, q); ctx.quadraticCurveTo(ww - q, q, ww - q, q + rr); ctx.lineTo(ww - q, wh - q - rr); ctx.quadraticCurveTo(ww - q, wh - q, ww - q - rr, wh - q); ctx.lineTo(q + rr, wh - q); ctx.quadraticCurveTo(q, wh - q, q, wh - q - rr); ctx.lineTo(q, q + rr); ctx.quadraticCurveTo(q, q, q + rr, q); ctx.closePath(); }
     ctx.clip('evenodd');
     // grains of our own water, drifting slowly off into space; brighter for a moment when the pond has just grown
-    { const hw = ww / 2, hh = wh / 2, px1 = 1 / v.scale; for (let i = 0; i < 260; i++) { const a = hash(i, 9, 301) * TAU, u = (t * (0.006 + 0.01 * hash(i, 9, 302)) + hash(i, 9, 303)) % 1, ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / hw, Math.abs(sa) / hh), kk = k0 * 1.02 + MG * 0.95 * u, sz = px1 * (0.9 + 1.3 * hash(i, 9, 304)) * (1.15 - 0.5 * u);
+    { const hw = ww / 2, hh = wh / 2, px1 = 1 / v.scale; for (let i = 0; i < 260; i++) { const a = hash(i, 9, 301) * TAU, u = (t * (0.006 + 0.01 * hash(i, 9, 302)) + hash(i, 9, 303)) % 1, ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / hw, Math.abs(sa) / hh), kk = k0 * 0.9 + MG * 1.05 * u, sz = px1 * (0.9 + 1.3 * hash(i, 9, 304)) * (1.15 - 0.5 * u);
         ctx.fillStyle = 'rgba(' + (i % 5 ? '110,205,205' : '215,245,240') + ',' + (0.55 * Math.sin(3.1416 * Math.min(1, u * 1.15)) * (0.7 + 0.5 * pulse)) + ')'; ctx.beginPath(); ctx.arc(hw + ca * kk, hh + sa * kk, sz, 0, TAU); ctx.fill(); } pulse = Math.max(0, pulse - 0.006); }
     ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
     // drifting clouds of colour    ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
