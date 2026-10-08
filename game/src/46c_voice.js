@@ -55,6 +55,17 @@
     };
     if (sings) { const r = TUNE[(note || 0) % TUNE.length]; one(r, 0.42); one(r * 1.25, 0.26); } else one(1, 0.36);
   });
+  // A creature's own sound (a newborn's peep, a hunter's growl): not a recording that is the same for all, but made from the creature itself: its kind's
+  // name gives the syllables and its size the pitch, so every kind in every pond sounds like itself.
+  let lastUtter = 0;
+  G.utter = function (c, how) {
+    if (G.mode !== 'play' || G.speed > 4 || !window.PXS || !c || !c.ph) return;
+    const t0 = now(); if (t0 - lastUtter < 700) return; lastUtter = t0;
+    const sp = c.sp && G.speciesById ? G.speciesById(c.sp) : null, word = String(sp ? sp.name : 'la').split(' ')[0].slice(0, how === 'growl' ? 5 : 3), sizeF = Math.max(0.5, Math.min(2, Math.pow(12 / Math.max(6, c.ph.r || 12), 0.55))), toneF = how === 'growl' ? 0.5 : 1.7;
+    const key = 'utt:' + how + ':' + Math.round(sizeF * 6) + ':' + word.toLowerCase();
+    if (made[key] !== 'ready') { try { const d = {}; d[key] = 'data:audio/wav;base64,' + babble(word + (how === 'growl' ? '' : '!'), toneF, sizeF); PXS.define(d); made[key] = 'ready'; } catch (e) { made[key] = 'none'; console.error(e); return; } }
+    try { PXS.play(key, { volume: how === 'growl' ? 0.38 : 0.3, pan: G.W ? Math.max(-1, Math.min(1, (c.x / G.W.ww - 0.5) * 1.6)) : 0 }); } catch (e) { console.error(e); }
+  };
   G.on('say', function (c, word) {
     if (G.mode !== 'play' || G.speed > 4 || !window.PXS) return;
     const mv = c.ph && c.ph.mv; if (!mv) return;

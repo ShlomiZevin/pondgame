@@ -186,7 +186,7 @@
     let tolSum = 0; for (let i = 9; i < 15; i++) tolSum += c[i] || 0;
     up += 0.035 * digSum + 0.02 * (c[6] + c[7] + c[8]) + 0.022 * tolSum + 0.0035 * g.w.length + 0.012 * g.h;
     if (f.bd) up += r10 * 0.05 * Math.max(0, G.body.busy(f) - 6);
-    ph.upkeep = up * (1 - 0.2 * stall);      // with nothing else left to improve, being big costs less
+    ph.upkeep = up;
     // compile the brain: wires grouped by target (hidden 0..h-1, then outputs)
     const nt = g.h + NOUT;
     const groups = [];
@@ -268,9 +268,8 @@
     const press = G.W && G.W.press ? G.W.press : null;
     // nudge traits
     // size answers the pond: danger favours bigger bodies, hunger and thin air smaller ones; chance does the rest
-    if (r() < m * 2) { g.t[0] += n() * 1.1 + 0.06 + 0.6 * (G.W && G.W.grow || 0) - 1.5 * clamp((0.62 - (G.W && G.W.popR !== undefined ? G.W.popR : 1)) / 0.3, 0, 1) + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
+    if (r() < m * 2) { g.t[0] += n() * 1.1 - 1.5 * clamp((0.62 - (G.W && G.W.popR !== undefined ? G.W.popR : 1)) / 0.3, 0, 1) + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
     { const pr = G.W && G.W.popR !== undefined ? G.W.popR : 1; if (pr < 0.5 && r() < 0.1 * wild) { g.t[0] = Math.max(6, g.t[0] * 0.9); note('t', 0, 'grew smaller: there were too few of them', true); } }
-    { const st = G.W && G.W.grow || 0; if (st > 0.2 && r() < 0.05 * st * wild) { g.t[0] = Math.min(64, g.t[0] * 1.08); note('t', 0, 'grew bigger: nothing else was left to improve', true); } }
     if (press && Math.abs(press.size) > 0.2 && r() < 0.06 * Math.abs(press.size) * wild) { const up = press.size > 0; g.t[0] = Math.max(5, g.t[0] * (up ? 1.12 : 0.9)); note('t', 0, (up ? 'grew bigger, ' : 'grew smaller, ') + (press.sizeWhy || 'to suit the pond'), true); }
     if (r() < m * 2) { g.t[1] += n() * 0.07; note('t', 1, 'speed', false); }
     if (r() < m * 2.5) { g.t[4] = (g.t[4] || 0.12) + n() * 0.14; note('t', 4, 'temper', false); }
@@ -385,6 +384,8 @@
     v.push(g.w.length * 0.04, g.h * 0.25, (g.t[4] || 0) * 1.0);
     return v;
   };
+  /** what a creature looks like, as numbers (its body's looks and its size): see F.lookVec */
+  G.lookVec = function (g) { const v = G.form.lookVec(g.f); v.push((g.t[0] - 10) / 10); return v; };
   G.fdist = function (a, b) {
     let s = 0;
     for (let i = 0; i < a.length; i++) { const d = a[i] - b[i]; s += d * d; }

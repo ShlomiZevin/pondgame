@@ -239,8 +239,6 @@
     if (drift) note('body shape', false);
     if (f.bd) {
       G.body.mutate(f, m, wild, note);
-      // what the eye for beauty said of its kind is a change its children are likelier to be born with
-      if (F._fix && r() < 0.4 * wild) F.nudge(f, F._fix, note);
       if (f.pl && G.planOf) { const p = G.planOf(f.pl); if (!p || !p.bd || G.body.dist(f.bd, p.bd) > 1.7) f.pl = 0; }      // it has drifted away from the shape it once took
     }
     return F.fix(f);
@@ -294,8 +292,10 @@
   };
   /** a child's body from two parents: whole features come from one or the other */
   F.cross = function (a, b) {
-    const r = G.rand, g = F.clone(r() < 0.5 ? a : b), o = r() < 0.5 ? a : b;
-    if (a.bd && b.bd) g.bd = G.body.cross(a.bd, b.bd);
+    // the plan of the body (which mass grows from which) and the growths that sit on those masses come from the SAME parent, so legs stay on the mass they
+    // belong to; the other parent gives shapes, sizes, the face, colours, and perhaps one growth of its own
+    const r = G.rand, sw = r() < 0.5, base = sw ? a : b, o = sw ? b : a, g = F.clone(base);
+    if (a.bd && b.bd) g.bd = G.body.cross(base.bd, o.bd, true);
     if (r() < 0.5) g.prof = o.prof.slice();
     if (r() < 0.5) { g.en = o.en; g.es = o.es; g.ek = o.ek; g.eg = o.eg; g.ey = o.ey; g.ep = o.ep; }
     if (r() < 0.5) { g.mk = o.mk; g.ms = o.ms; g.sm = o.sm; g.bl = o.bl; }
@@ -486,6 +486,27 @@
     let nest = 0; for (let i = 0; i < f.rules.length; i++) if (f.rules[i].on >= 0) nest++;
     v.push(Math.min(2, nest) * 0.5);
     if (f.bd) { const bm = G.body.measure(f), R = f.bd.m[0].r; v.push(f.bd.v ? 0.9 : 0, Math.min(2, bm.pairs) * 0.55, bm.hollow ? 0.6 : 0, bm.cls === 'T' ? 0.6 : bm.cls === 'W' ? -0.6 : 0, bm.lobed ? 0.5 : 0, (R[0] - 1) * 0.9, (R[2] - 1) * 0.9, (R[4] - 1) * 0.9, (R[6] - 1) * 0.9, (R[8] - 1) * 0.9); }
+    return v;
+  };
+  /** everything the eye can tell two bodies apart by, as numbers: about 1 apart is clearly a different look. It says which creatures LOOK alike when the
+   *  god's marks are spread from the ones it saw to the rest (sorting into species is F.features, which also counts what cannot be seen) */
+  F.lookVec = function (f) {
+    const v = [f.n * 0.3], cnt = [0, 0, 0, 0, 0, 0, 0, 0, 0], len = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; cnt[q.k]++; len[q.k] = Math.max(len[q.k], q.l * (0.6 + q.w)); }
+    for (let i = 0; i < 9; i++) v.push(Math.min(2, cnt[i]) * 0.6, len[i] * 0.3);
+    const ne = f.en ? 1 : 0;
+    v.push(f.en * 0.35, ne * (f.es - 0.34) * 2.2, ne * (f.eg - 0.5) * 1.6, ne * (f.ey - 0.1) * 1.6, ne * (f.ep - 0.5) * 1.4, f.ek * 0.5, f.sm * 0.5, f.bl * 0.4, (f.hd - 1) * 0.8);
+    for (let i = 1; i < 5; i++) v.push(f.mk === i ? 0.5 : 0);
+    for (let i = 1; i < 5; i++) v.push(f.tk === i ? 0.5 : 0);
+    for (let i = 1; i < 6; i++) v.push(f.pat === i ? 0.5 : 0);
+    for (let i = 1; i < 4; i++) v.push(f.coat === i ? 0.6 : 0);
+    for (let i = 1; i < 5; i++) v.push(f.cl === i ? 0.4 : 0);
+    const hr = f.hue * Math.PI / 180, h2 = (f.hue + f.hue2) * Math.PI / 180;
+    v.push(Math.cos(hr) * 0.6, Math.sin(hr) * 0.6, Math.cos(h2) * 0.3, Math.sin(h2) * 0.3, (f.sat - 70) / 40, (f.lit - 62) / 25, f.shell > 0.25 ? 0.6 : 0, f.crest > 0.25 ? 0.5 : 0, f.glow > 0.3 ? 0.5 : 0);
+    v.push((f.ll - 1) * 1.2, (f.lw - 1) * 1.2, (f.hs - 1) * 0.8, (f.st || 0) * 1.2);
+    const M = f.bd ? f.bd.m : [];
+    v.push(f.bd && f.bd.v ? 0.9 : 0, f.bd ? f.bd.e * 0.4 : 0, Math.max(0, M.length - 4) * 0.5);
+    for (let i = 0; i < 4; i++) { const q = M[i]; if (!q) { v.push(0, 0, 0, 0, 0, 0, 0); continue; } v.push(0.5, q.s * 0.8, q.pr ? 0.5 : 0, q.h ? 0.5 : 0, (q.r[0] + q.r[5] - 2) * 0.6, (q.r[2] + q.r[3] - 2) * 0.6, (q.r[7] + q.r[8] - 2) * 0.6 + (q.lb && q.la > 0.1 ? 0.5 : 0)); }
     return v;
   };
   const r2 = function (x) { return Math.round(x * 100) / 100; };

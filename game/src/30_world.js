@@ -121,13 +121,12 @@
     // How nice to the eye and how whole it is. Where a watcher is at work, a newborn is taken to be like its parents as the watcher saw
     // them, moved a little by how its own genes differ from theirs; then the watcher looks at it and its marks are its own.
     if (genome.f.bd) {
-      const FM = G.form, T = W.taste, mb = ph.charm, mw = ph.whole, A = parentA && parentA.eb !== undefined && parentA.g ? parentA : null, B = parentB && parentB.eb !== undefined && parentB.g ? parentB : A;
+      const FM = G.form, mb = ph.charm, mw = ph.whole;
       const hit = W.eyeSeen ? W.eyeSeen[FM.key(genome.f)] : null;
       if (hit) { c.real = { b: hit.b, w: hit.w, why: hit.why || '', gen: W.gen }; c.eb = hit.b; c.ew = hit.w; c.st = 0; }
-      else if (A && (W.eyeN || (W.eyeBank && W.eyeBank.length))) { c.eb = clamp((A.eb + B.eb) / 2 + 0.5 * (mb - (FM.beauty(A.g.f, T) + FM.beauty(B.g.f, T)) / 2), 0, 1); c.ew = clamp((A.ew + B.ew) / 2 + 0.5 * (mw - (FM.wholeBelief(A.g.f, T) + FM.wholeBelief(B.g.f, T)) / 2), 0, 1); c.st = Math.min(A.st || 0, B.st || 0) + 1; }
+      // the pond's own guess for this body, set against what the god really said of the creatures that look like it (G.believe)
+      else if (W.eyeBank && W.eyeBank.length && G.believe) { const bel = G.believe(genome, c.lv = G.lookVec(genome)); c.eb = bel.b; c.ew = bel.w; c.st = bel.near ? 1 : 3; }
       else { c.eb = mb; c.ew = mw; c.st = 3; }
-      // and it is held against the creatures the watcher has really looked at: the more it resembles some of them, the more their marks count
-      if (!hit && W.eyeBank && W.eyeBank.length) { const fv = c.fv = G.features(genome); let sw = 0, sb = 0, sh = 0; for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i], d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; sb += wt * q.b; sh += wt * q.w; } if (sw > 0.15) { const k = Math.min(0.85, sw / (sw + 0.6)); c.eb += k * (sb / sw - c.eb); c.ew += k * (sh / sw - c.ew); c.st = Math.min(c.st, 1); } }
       ph.charm = c.eb; ph.whole = c.ew;
     }
     if (G.marksBorn) G.marksBorn(c, parentA, parentB);      // its further marks (body, balance, grandeur...): see G.MARKS
@@ -871,9 +870,7 @@
         const mateC = findMate(p, surv);
         if (mateC && G.rand() < 0.85) { genome = G.crossover(p.g, mateC.g); mate = mateC; }      // two parents whenever a mate is near; alone, it copies itself
         else genome = G.cloneGenome(p.g);
-        { const sp0 = p.sp ? G.speciesById(p.sp) : null; G.form._fix = p.real && p.real.fix ? p.real.fix : sp0 && sp0.judge && sp0.judge.fix ? sp0.judge.fix : null;
-          // what the watcher has lately said of the pond's creatures is advice for the whole pond, not only for the ones it happened to see
-          if (!G.form._fix && W.advice && W.advice.length && G.rand() < 0.6) { const fvp = p.fv || (p.fv = G.features(p.g)); let best = null, bd = 2.2; for (let q = 0; q < W.advice.length; q++) { const a = W.advice[q]; if (W.gen - a.gen > 40 || !a.fv) continue; const dd = G.fdist(fvp, a.fv); if (dd < bd) { bd = dd; best = a; } } if (best) G.form._fix = best.fix; } }      // what the judge wished for its kind
+        // (the god's marks decide who breeds; they are not turned into mutations: nature proposes, the god only chooses)
         G._mvHaven = p.havenGen === W.gen;      /* born in the safe garden: far likelier to carry its parent's marvel */
         G.form._life = G.lifeOf(p);      // what its parent ate and where it lived tilt what the child may grow
         const res = G.mutate(genome, wild, idea);
@@ -937,7 +934,7 @@
     const W1 = G.W;
     if (!c.real && W1 && W1.eyeBank && W1.eyeBank.length >= 6) {
       if (W1._emGen !== W1.gen) { let t = 0; for (let i = 0; i < W1.eyeBank.length; i++) t += G.appealOfLook ? G.appealOfLook(W1.eyeBank[i]) : (W1.eyeBank[i].b + W1.eyeBank[i].w) / 2; W1._em = t / W1.eyeBank.length; W1._emGen = W1.gen; }
-      const k = clamp(0.3 + 0.12 * (c.st === undefined ? 3 : c.st), 0.3, 0.75);
+      const k = clamp(0.1 + 0.1 * (c.st === undefined ? 3 : c.st), 0.1, 0.4);
       v = W1._em + (v - W1._em) * (1 - k);
     }
     return v;      // a kind the pond's wish or the player kept is remembered (s.loved) but breeds on its marks like any other: a fixed mark would stop it improving
@@ -1033,16 +1030,21 @@
     for (let i = 0; i < cre.length; i++) { const c = cre[i], k = G.kindOf(c.g).kind; c.kd = k; share[k] = (share[k] || 0) + 1; c.shp = G.shapeOf(c.g); shapes[c.shp] = (shapes[c.shp] || 0) + 1; c.hb = G.hueOf(c.g); hues[c.hb]++; }
     // who lasts the winter: the well fed, the rare, and the good-looking (the pond is kind to what is admired)
     const meanR = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12;
-    for (let i = 0; i < cre.length; i++) cre[i].sel = cre[i].fit * (1 + (W.grow || 0) * 0.4 * clamp((cre[i].ph.r - meanR) / meanR, -0.5, 1)) * (1.2 - 0.6 * shapes[cre[i].shp] / cre.length - 0.8 * hues[cre[i].hb] / cre.length) ;
+    // Marks from one god sit close together (most creatures of a pond are within a point of each other), so the raw mark is a weak voice next to rarity.
+    // What counts is a creature's PLACE among the others: the nicest of the pond is worth four of the plainest, whatever the scale of the marks. Rarity of
+    // shape and colour still tilts it, so several kinds live side by side, but it can no longer outvote the looks.
+    { const ord = cre.map(function (c, i) { return [G.charmOf(c), i]; }).sort(function (a, b) { return a[0] - b[0]; }), nn = Math.max(1, cre.length - 1);
+      for (let k = 0; k < ord.length; k++) { let j = k; while (j + 1 < ord.length && ord[j + 1][0] - ord[k][0] < 1e-9) j++; for (let q = k; q <= j; q++) cre[ord[q][1]].rk = (k + j) / 2 / nn; k = j; } }
+    for (let i = 0; i < cre.length; i++) cre[i].sel = clamp((cre[i].fed === undefined ? 0.5 : cre[i].fed) / 0.5, 0, 1) * (0.25 + 0.75 * cre[i].rk) * (1.15 - 0.35 * shapes[cre[i].shp] / cre.length - 0.45 * hues[cre[i].hb] / cre.length);
     if (cre.length > 8) {
       // fitness sharing: a creature in a crowd of look-alikes counts for less, however it is measured, so no single look can take the whole pond
       for (let i = 0; i < cre.length; i++) if (!cre[i].fv) cre[i].fv = G.features(cre[i].g);
-      for (let i = 0; i < cre.length; i++) { let cr = 0; for (let j = 0; j < cre.length; j++) { if (i === j) continue; const d = G.fdist(cre[i].fv, cre[j].fv); cr += Math.exp(-d * d / 1.2); } cre[i].sel *= Math.max(0.2, 1.1 - 0.9 * cr / (cre.length - 1) * 3); }
+      for (let i = 0; i < cre.length; i++) { let cr = 0; for (let j = 0; j < cre.length; j++) { if (i === j) continue; const d = G.fdist(cre[i].fv, cre[j].fv); cr += Math.exp(-d * d / 1.2); } cre[i].sel *= Math.max(0.55, 1.1 - 0.9 * cr / (cre.length - 1) * 3); }
     }
     let topK = '', topN = 0; for (const k in share) if (share[k] > topN) { topN = share[k]; topK = k; }
     const crowd = topN / Math.max(1, cre.length);
     let sick = 0;
-    { const ap = cre.map(G.charmOf).sort(function (a, b) { return b - a; }), cut = ap[Math.floor(ap.length * 0.15)] || 1; for (let i = 0; i < cre.length; i++) { cre[i].elite = cre.length >= 12 && G.charmOf(cre[i]) >= cut && cre[i].fed > 0.2; if (cre[i].elite) cre[i].sel += 1; if (G.marvelBlessed && G.marvelBlessed(cre[i])) { cre[i].elite = true; cre[i].sel += 2; } }      /* a marvel is looked after */ }
+    { const ap = cre.map(G.charmOf).sort(function (a, b) { return b - a; }), cut = ap[Math.floor(ap.length * 0.15)] || 1; for (let i = 0; i < cre.length; i++) { cre[i].elite = cre.length >= 12 && G.charmOf(cre[i]) >= cut && cre[i].fed > 0.2; if (cre[i].elite) cre[i].sel += 0.5; if (G.marvelBlessed && G.marvelBlessed(cre[i])) { cre[i].elite = true; cre[i].sel += 2; } }      /* a marvel is looked after */ }
     if (crowd > 0.5 && cre.length > 30) { const pr = (crowd - 0.5) * 0.9; for (let i = 0; i < cre.length; i++) if (cre[i].kd === topK && !cre[i].elite && G.rand() < pr) { cre[i].sel = -1; cre[i].sick = true; sick++; } }
     if (sick > 4 && (W.gen - (W.sickGen || 0)) > 6) { W.sickGen = W.gen; W.discLog.push({ key: 'sick' + W.gen, text: 'A sickness is going round the ' + topK.toLowerCase() + 's: there are so many of them (' + Math.round(crowd * 100) + '% of the pond) that it spreads easily. ' + sick + ' will not see spring. The rarer kinds are hardly touched.', gen: W.gen }); G.emit('sickness', topK, sick, crowd); }
     const sorted = cre.slice().sort(function (a, b) { return a.sel - b.sel; });

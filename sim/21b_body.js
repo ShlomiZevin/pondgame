@@ -183,10 +183,10 @@
     if (drift) note('body shape', false);
   };
   /** a child's body from two: the plan of one parent; each mass that both have is one parent's, the other's, or between them */
-  B.cross = function (a, b) {
-    const r = G.rand, sw = r() < 0.5, g = B.clone(sw ? a : b), o = sw ? b : a;
+  B.cross = function (a, b, keepA) {
+    const r = G.rand, sw = keepA || r() < 0.5, g = B.clone(sw ? a : b), o = sw ? b : a;
     for (let i = 0; i < g.m.length; i++) {
-      const p = o.m[i]; if (!p) continue;
+      const p = o.m[i]; if (!p || (i && (p.on !== g.m[i].on || p.pr !== g.m[i].pr))) continue;      // only a mass that plays the same part in both bodies is blended
       const q = g.m[i], t = r() < 0.4 ? r() : r() < 0.5 ? 0 : 1;
       for (let j = 0; j < K; j++) q.r[j] = q.r[j] * (1 - t) + p.r[j] * t;
       q.s = q.s * (1 - t) + p.s * t;

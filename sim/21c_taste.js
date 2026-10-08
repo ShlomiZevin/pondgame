@@ -56,6 +56,9 @@
     // a soft ceiling, not a wall: two good bodies stay in order instead of both scoring the top mark
     return s < 0 ? 0 : s < 0.8 ? s : 0.8 + 0.2 * Math.tanh((s - 0.8) / 0.2);
   };
+  /** the same two guesses from a body's looks already measured (x = F.looks(f); v0 = F.whole(f).v) */
+  F.beautyX = function (x, T) { T = T || F.TASTE0; let s = T.b; for (let i = 0; i < x.length; i++) s += T.w[i] * x[i]; return s < 0 ? 0 : s < 0.8 ? s : 0.8 + 0.2 * Math.tanh((s - 0.8) / 0.2); };
+  F.wholeX = function (x, T, v0) { let s = v0; if (T && T.ww) { s += T.wb; for (let i = 0; i < x.length; i++) s += T.ww[i] * x[i]; } return clamp(s, 0, 1); };
   /** the eye graded this body: the taste is corrected a little towards what it said */
   F.learn = function (T, f, grade, rate, x0) {
     const x = x0 || F.looks(f); let s = T.b;
@@ -169,8 +172,8 @@
     if (A) { const pa = G.markPrior(A.g), pb = B === A ? pa : G.markPrior(B.g); c.mx = {}; for (let i = 0; i < X.length; i++) { const id = X[i].id; c.mx[id] = clamp((A.mx[id] + B.mx[id]) / 2 + 0.5 * (pr[id] - (pa[id] + pb[id]) / 2), 0, 1); } }
     else c.mx = pr;
     if (W && W.eyeBank && W.eyeBank.length && c.g.f.bd) {
-      const fv = c.fv || (c.fv = G.features(c.g)); let sw = 0; const acc = {};
-      for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i]; if (!q.m) continue; const d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; for (let k = 0; k < X.length; k++) { const id = X[k].id; if (q.m[id] !== undefined) acc[id] = (acc[id] || 0) + wt * q.m[id]; } }
+      const fv = G.lvOf(c); let sw = 0; const acc = {};
+      for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i]; if (!q.m) continue; const d = G.fdist(fv, q.lv), wt = Math.exp(-d * d / G.LOOK_S); if (wt < 0.03) continue; sw += wt; for (let k = 0; k < X.length; k++) { const id = X[k].id; if (q.m[id] !== undefined) acc[id] = (acc[id] || 0) + wt * q.m[id]; } }
       if (sw > 0.15) { const k = Math.min(0.85, sw / (sw + 0.6)); for (let i = 0; i < X.length; i++) { const id = X[i].id; if (acc[id] !== undefined) c.mx[id] += k * (acc[id] / sw - c.mx[id]); } }
     }
   };

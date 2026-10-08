@@ -64,7 +64,7 @@
     box.classList.toggle('hide', !c);
     if (!c) { shown = 0; sig = ''; return; }
     const mv = c.ph.mv || {}, left = G.marvelSavesLeft(c), s2 = c.id + why + left;
-    if (!rang[c.id + ':' + W.gen]) { rang[c.id + ':' + W.gen] = 1; if (G.sfx && G.speed <= 16) G.sfx('squeak'); }
+    if (!rang[c.id + ':' + W.gen]) { rang[c.id + ':' + W.gen] = 1; if (G.sfx && G.speed <= 16) G.sfx('season'); }
     if (s2 === sig) return; sig = s2; shown = c.id;
     const sp = G.speciesById(c.sp);
     box.innerHTML = '<div class="ak"><span>★ A marvel is in danger</span><u id="mvaX" title="Not now">✕</u></div>' +
