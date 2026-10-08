@@ -603,7 +603,11 @@
     if (d.smooth) { ctx.moveTo(X(P[0][0], P[0][1]), Y(P[0][0], P[0][1])); for (let i = 1; i < n - 1; i++) { const p = P[i], q = P[i + 1], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2; ctx.quadraticCurveTo(X(p[0], p[1]), Y(p[0], p[1]), i === n - 2 ? X(q[0], q[1]) : X(mx, my), i === n - 2 ? Y(q[0], q[1]) : Y(mx, my)); } }
     else { ctx.moveTo(X(P[0][0], P[0][1]), Y(P[0][0], P[0][1])); for (let i = 1; i < n; i++) ctx.lineTo(X(P[i][0], P[i][1]), Y(P[i][0], P[i][1])); }
     ctx.closePath();
-    inked(ctx, d.colour === 'body' ? col.body : d.colour === 'pale' ? '#f4f7fb' : d.colour === 'dark' ? col.dark : d.colour === 'glow' ? col.glow : col.fin, 2.2);
+    const wornP = d.place === 'top' || d.place === 'face' || d.place === 'held';
+    let fill = d.colour === 'body' ? col.body : d.colour === 'pale' ? '#f4f7fb' : d.colour === 'dark' ? col.dark : d.colour === 'glow' ? col.glow : col.fin;
+    if (wornP && d.colour !== 'body' && d.colour !== 'glow') { let th = d.tint; if (!(th >= 0)) { th = 0; const nm = String(d.name || ''); for (let i = 0; i < nm.length; i++) th = (th * 31 + nm.charCodeAt(i)) % 360; } fill = 'hsl(' + Math.round(th) + ',' + (d.colour === 'pale' ? 50 : d.colour === 'dark' ? 45 : 74) + '%,' + (d.colour === 'pale' ? 80 : d.colour === 'dark' ? 32 : 58) + '%)'; }
+    inked(ctx, fill, wornP ? 2.6 : 2.2);
+    if (wornP) { ctx.save(); ctx.clip(); ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.ellipse(X(0.6, -0.2), Y(0.6, -0.2), Math.abs(len) * 0.36, Math.abs(len) * 0.15, ang, 0, TAU); ctx.fill(); ctx.fillStyle = 'rgba(7,18,31,0.14)'; ctx.beginPath(); ctx.ellipse(X(0.3, 0.3), Y(0.3, 0.3), Math.abs(len) * 0.5, Math.abs(len) * 0.16, ang, 0, TAU); ctx.fill(); ctx.restore(); }
     ctx.strokeStyle = 'rgba(7,18,31,0.4)'; ctx.lineWidth = 1.3;
     for (let i = 0; i < d.ribs.length; i++) { const q = d.ribs[i]; ctx.beginPath(); ctx.moveTo(X(q[0], q[1]), Y(q[0], q[1])); ctx.lineTo(X(q[2], q[3]), Y(q[2], q[3])); ctx.stroke(); }
     for (let i = 0; i < d.dots.length; i++) { const q = d.dots[i], inner = i > 0 && q[2] < d.dots[0][2] * 0.7 && Math.abs(q[0] - d.dots[0][0]) < 0.12; ctx.beginPath(); ctx.arc(X(q[0], q[1]), Y(q[0], q[1]), q[2] * len, 0, TAU); if (inner) { ctx.fillStyle = INK; ctx.fill(); } else inked(ctx, d.colour === 'glow' || d.colour === 'body' ? col.glow : '#fff', 2); }

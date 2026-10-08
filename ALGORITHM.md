@@ -310,3 +310,9 @@ Land plants were made through `G.spawnFood`, which refuses when the pond's food 
 **Marvel Garden** scales with the mean size of the pond's creatures.
 
 **Open.** Clutter: with food made rich, the upkeep of extra parts no longer bites (a free pond reached 14 parts a body); only the marks hold it back. Worn things are drawn plainly (mostly pale shapes). None of this round has run in a long live pond with the god.
+
+### Round 6b (2026-10-08): worn things drawn properly; clutter has weight; first live run of Round 6
+
+- **Worn and carried things** have a colour of their own (`tint`, from the AI, else from the thing's name), a shine and a shadow (`drawDesign`); before they were pale cut-outs.
+- **Clutter has weight.** Each part over six takes 5.5% off speed and 4% off turning (down to half): with food rich, upkeep no longer held bodies back.
+- **Live, Haiku 4.5, god and inventions on, 200 generations, $0.08** (`evo-n-g200.jpg`): water 36, near the shore line 63, land 81, land 48% of the map. The two sides are plainly different: water kinds are crab-like with jointed arms and legs in purples and reds; land kinds are broad-hatted, yellow, and nearly all wear the same invented orange cap (fashion spread it). Still open: the land kinds kept fish tails and no legs; the god's marks did not rise (beauty 6.4 then 6.1, whole 5.8 then 5.3); parts 10.4.

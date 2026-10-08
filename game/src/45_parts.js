@@ -122,6 +122,7 @@
       note: String(raw.note || '').replace(/[<>]/g, '').slice(0, 110), because: String(raw.because || '').replace(/[<>]/g, '').slice(0, 90), res: res3(), hits: hitsOf(),
       place: PLACES.indexOf(raw.place) >= 0 ? raw.place : 'sides', motion: MOTIONS.indexOf(raw.motion) >= 0 ? raw.motion : 'sway', colour: COLOURS.indexOf(raw.colour) >= 0 ? raw.colour : 'accent',
       pts: pts, smooth: raw.smooth !== false, ribs: ribs, dots: dots, fx: fx,
+      tint: isFinite(+raw.tint) && raw.tint !== null && raw.tint !== '' ? ((+raw.tint % 360) + 360) % 360 : undefined,
       tone: raw.place === 'skin' ? (function () { const t = Array.isArray(raw.tone) ? raw.tone : [0, 1, 1]; return [clamp(+t[0] || 0, -180, 180), clamp(+t[1] || 1, 0.2, 1.6), clamp(+t[2] || 1, 0.55, 1.35)]; })() : undefined, lid: raw.place === 'skin' ? clamp(+raw.lid || 0, 0, 0.5) : undefined,
       by: String(raw.by || raw.model || '').slice(0, 60),
     };

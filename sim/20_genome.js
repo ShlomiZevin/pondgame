@@ -212,7 +212,7 @@
     up += 0.035 * digSum + 0.02 * (c[6] + c[7] + c[8]) + 0.022 * tolSum + 0.0035 * g.w.length + 0.012 * g.h;
     if ((t[5] || 0) >= 0.5) up += r10 * (0.06 * (tail ? 1 : 0) + 0.03 * Math.min(3, k[3]) + (r > 18 ? 0.03 * Math.min(3, k[1]) : 0));      // on land: a swimming tail, tentacles, and fins too big to be wings
     else up += r10 * 0.035 * Math.min(6, cn.legSites);                                                                                                      // in the water: legs
-    if (f.bd) { const over = Math.max(0, G.body.busy(f) - 6); up += r10 * (0.07 * over + 0.012 * over * over); ph.pneed += 0.035 * over; }
+    if (f.bd) { const over = Math.max(0, G.body.busy(f) - 6); up += r10 * (0.07 * over + 0.012 * over * over); ph.pneed += 0.035 * over; ph.speed *= Math.max(0.5, 1 - 0.055 * over); ph.turn *= Math.max(0.55, 1 - 0.04 * over); }
     ph.upkeep = up * (1 - 0.2 * stall);      // while the pond is growing, being big costs less
     // compile the brain: wires grouped by target (hidden 0..h-1, then outputs)
     const nt = g.h + NOUT;

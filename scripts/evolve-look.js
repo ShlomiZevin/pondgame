@@ -12,7 +12,7 @@ const tag = process.argv[2] || 'a', MARKS = (process.argv[3] || '40,100,200').sp
   await page.waitForTimeout(3000);
   const fr = page.frames().find((f) => f !== page.mainFrame());
   await fr.locator('#tBegin').click(); await page.waitForTimeout(1200);
-  await fr.evaluate((model) => { for (const k of ['wishcheck', 'plan', 'design', 'organ', 'story', 'wish', 'nature', 'deed', 'marvel', 'icon', 'voice', 'paint', 'figure', 'sound', 'ideas']) { G.ai.caps[k] = 0; } for (const k in G.ai.caps) if (k !== 'watch') G.ai.caps[k] = 0; if (G.ai.labelOf && G.ai.labelOf(model)) G.ai.model = model; if (model === 'offline') G.ai.provider = 'offline'; { const al = G.ai.allow; G.ai.allow = function (k) { return k === 'watch' && al.call(G.ai, k); }; } G.setSpeed(64); }, model);
+  await fr.evaluate((model) => { for (const k of ['wishcheck', 'plan', 'design', 'organ', 'story', 'wish', 'nature', 'deed', 'marvel', 'icon', 'voice', 'paint', 'figure', 'sound', 'ideas']) { G.ai.caps[k] = 0; } for (const k in G.ai.caps) if (k !== 'watch') G.ai.caps[k] = 0; if (G.ai.labelOf && G.ai.labelOf(model)) G.ai.model = model; if (model === 'offline') G.ai.provider = 'offline'; { const al = G.ai.allow; G.ai.allow = function (k) { return (k === 'watch' || k === 'design' || k === 'check') && al.call(G.ai, k); }; } G.setSpeed(64); }, model);
   for (const mark of MARKS) {
     for (let t = 0; t < 900; t++) { const g = await fr.evaluate(() => G.W.gen); if (g >= mark || errs.length) break; await page.waitForTimeout(1500); }
     const out = await fr.evaluate(() => {
