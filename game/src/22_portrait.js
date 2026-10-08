@@ -65,8 +65,15 @@
       const BD = G.body, bd = f.bd, PI = Math.PI, LS = BD.lay(f, null), L0 = BD.lay(f, B), I = L0.I, gnd = BD.ground(LS);
       const xs = Math.pow(plump, 0.4);
       const legOn = {}, armOn = {};
-      for (let i = 0; i < legs.length; i++) for (let a = legs[i].a; a <= legs[i].b && a < f.n; a += legs[i].e) { if (gnd[a] && !legOn[a]) legOn[a] = legs[i]; else if (!armOn[a]) armOn[a] = legs[i]; }
-      let stands = false, legL = 0; for (const a in legOn) { stands = true; legL = Math.max(legL, (16 + 17 * Math.min(1.6, legOn[a].l)) * f.ll); }
+      // Which limbs are legs and which are arms follows from the body: on a mass that rests on the floor the first limbs are legs, and so are further ones
+      // that end in a foot (a stump or a paddle): two pairs, three pairs, as many as it grew. Limbs that end in a hand or a claw, and any limbs on a
+      // mass held off the floor, are arms. So a body can be a biped with arms, a four-legged beast, a six-legged insect, a thing with four arms.
+      for (let i = 0; i < legs.length; i++) for (let a = legs[i].a; a <= legs[i].b && a < f.n; a += legs[i].e) {
+        const L = legOn[a] || [], A = armOn[a] || [];
+        if (gnd[a] && L.length < 3 && (!L.length || legs[i].t === 0 || legs[i].t === 3)) { L.push(legs[i]); legOn[a] = L; }
+        else if (A.length < 2) { A.push(legs[i]); armOn[a] = A; }
+      }
+      let stands = false, legL = 0; for (const a in legOn) for (let k = 0; k < legOn[a].length; k++) { stands = true; legL = Math.max(legL, (16 + 17 * Math.min(1.6, legOn[a][k].l)) * f.ll); }
       const hover = stands ? 0 : 30;
       const bw = Math.max(0.6, (LS.x1 - LS.x0) * xs), bh = Math.max(0.6, LS.y1 - LS.y0);
       const Sc = Math.min(50, 222 / bw, (208 - legL - hover) / bh);
@@ -180,29 +187,55 @@
         else if (tip === 1) { ctx.beginPath(); ctx.arc(ex, ey, 8 * k, 0, TAU); ink(lcol, 2.2); for (let h = -1; h <= 1; h++) { ctx.beginPath(); ctx.arc(ex + Math.cos(a + h * 0.7) * 9 * k, ey + Math.sin(a + h * 0.7) * 9 * k, 3.6 * k, 0, TAU); ink(lcol, 1.8); } }
         else { ctx.beginPath(); ctx.arc(ex, ey, 7 * k, 0, TAU); ink(lcol, 2.2); }
       }
-      function legOf(o, q, th, sd, far, idx) {
-        const hip = P(o, th, 0.8), w = (12 + 7 * q.w) * kk(o) * f.lw, st = Math.sin(B(5) + idx * 2.2 + (far || sd < 0 ? 3.14 : 0)) * 5, fx = hip[0] + (bd.v ? 0 : sd * 4) + st, fy = GROUND - 5;
+      // A limb is drawn from its own genes: where its joint sits along it (q.u), which way and how far it bends (q.c), how many joints it has (q.j: a
+      // straight peg, a knee, or a knee and an ankle), how it tapers (q.p), and how big its hand or foot is (q.f). Two limbs with different genes look different.
+      function limbN(P0, W0, fill) {
+        for (let pass = 0; pass < 3; pass++) {
+          ctx.strokeStyle = pass === 2 ? 'rgba(255,255,255,0.3)' : pass ? fill : INK; ctx.lineCap = 'round';
+          for (let s = 0; s + 1 < P0.length; s++) { const sw = W0[s], ox = pass === 2 ? -sw * 0.2 : 0; ctx.lineWidth = pass === 2 ? sw * 0.26 : pass ? sw : sw + 4.4; ctx.beginPath(); ctx.moveTo(P0[s][0] + ox, P0[s][1]); ctx.lineTo(P0[s + 1][0] + ox, P0[s + 1][1]); ctx.stroke(); }
+        }
+        ctx.lineCap = 'butt';
+      }
+      function legOf(o, q, th, sd, far, idx, nth) {
+        const hip = P(o, th, 0.8), w = (12 + 7 * q.w) * kk(o) * f.lw, st = Math.sin(B(5) + idx * 2.2 + (far || sd < 0 ? 3.14 : 0)) * 5, fx = hip[0] + (bd.v ? (nth || 0) * 0 : sd * (4 + 15 * (nth || 0))) + st, fy = GROUND - 5;
+        const u = q.u === undefined ? 0.5 : q.u, bendK = 0.35 + 1.3 * ((q.c || 0) + 0.85) / 1.7, lw = w * (0.5 + 0.62 * (q.p === undefined ? 0.5 : q.p)), fc = far ? col.dark : col.limb;
         if (far) ctx.globalAlpha = 0.75;
-        { ctx.beginPath(); ctx.arc(hip[0], hip[1], w * 0.78, 0, TAU); ink(far ? col.dark : col.limb, 2); }
-        { const kx = (hip[0] + fx) / 2 + (bd.v ? 7 : sd * 8), ky = (hip[1] + fy) / 2 + 2; limb2(hip[0], hip[1], kx, ky, fx, fy, w, far ? col.dark : col.limb); ctx.beginPath(); ctx.arc(kx, ky, w * 0.6, 0, TAU); ink(far ? col.dark : col.limb, 1.8); } foot(fx, fy + 1, bd.v ? 1 : sd, q.t, f.hs);
+        { ctx.beginPath(); ctx.arc(hip[0], hip[1], w * 0.78, 0, TAU); ink(fc, 2); }
+        if (q.j <= 1) limbN([hip, [fx, fy]], [(w + lw) / 2], fc);
+        else {
+          const off = (bd.v ? 7 : sd * 8) * bendK, kx = hip[0] + (fx - hip[0]) * u + off, ky = hip[1] + (fy - hip[1]) * u + 2;
+          if (q.j >= 3) { const ax = kx + (fx - kx) * 0.62 - off * 1.1, ay = ky + (fy - ky) * 0.62; limbN([hip, [kx, ky], [ax, ay], [fx, fy]], [w, (w + lw) / 2, lw], fc); ctx.beginPath(); ctx.arc(ax, ay, lw * 0.5, 0, TAU); ink(fc, 1.6); }
+          else limbN([hip, [kx, ky], [fx, fy]], [w, lw], fc);
+          ctx.beginPath(); ctx.arc(kx, ky, w * 0.6, 0, TAU); ink(fc, 1.8);
+        }
+        foot(fx, fy + 1, bd.v ? 1 : sd, q.t, f.hs * (q.f || 1));
         ctx.globalAlpha = 1;
       }
       function armOf(o, q, th, a, sd, far, idx) {
-        const s0 = P(o, th, 0.85), k = kk(o), La = (30 * q.l + 16) * k * f.ll, wv = Math.sin(B(2.6) + idx + (sd > 0 ? 0 : 1.4)) * 0.18, ang = a + sd * wv - (f.st && sd * f.st > 0 ? Math.min(0.5, Math.abs(f.st) * 1.2) * sd : 0), ex = s0[0] + Math.cos(ang) * La, ey = s0[1] + Math.sin(ang) * La, kid = kidOf(q), tip = kid && kid.k === 0 && kid.t ? kid.t : q.t;
+        const s0 = P(o, th, 0.85), k = kk(o), La = (30 * q.l + 16) * k * f.ll, wv = Math.sin(B(2.6) + idx + (sd > 0 ? 0 : 1.4)) * 0.18, ang = a + sd * wv - (f.st && sd * f.st > 0 ? Math.min(0.5, Math.abs(f.st) * 1.2) * sd : 0), kid = kidOf(q);
+        const u = q.u === undefined ? 0.55 : q.u, bend = 0.15 + 0.75 * ((q.c || 0) + 0.85) / 1.7, wA = (13 + 5 * q.w) * k * f.lw, lw = wA * (0.5 + 0.62 * (q.p === undefined ? 0.5 : q.p)), fc = far ? col.dark : col.limb;
+        let ex = s0[0] + Math.cos(ang) * La, ey = s0[1] + Math.sin(ang) * La, tip = q.t, ha = ang, hk = q.f || 1;
         if (far) ctx.globalAlpha = 0.75;
-        { const wA0 = (13 + 5 * q.w) * k * f.lw; ctx.beginPath(); ctx.arc(s0[0], s0[1], wA0 * 0.8, 0, TAU); ink(far ? col.dark : col.limb, 2); }
-        { const wA = (13 + 5 * q.w) * k * f.lw, elx = s0[0] + Math.cos(ang - sd * 0.5) * La * 0.55, ely = s0[1] + Math.sin(ang - sd * 0.5) * La * 0.55; limb2(s0[0], s0[1], elx, ely, ex, ey, wA, far ? col.dark : col.limb); ctx.beginPath(); ctx.arc(elx, ely, wA * 0.55, 0, TAU); ink(far ? col.dark : col.limb, 1.8); }
-        hand(ex, ey, ang, tip, k * 1.2 * f.hs);
+        { ctx.beginPath(); ctx.arc(s0[0], s0[1], wA * 0.8, 0, TAU); ink(fc, 2); }
+        const pts = [s0], ws = [];
+        if (q.j <= 1) ws.push((wA + lw) / 2);
+        else { pts.push([s0[0] + Math.cos(ang - sd * bend) * La * u, s0[1] + Math.sin(ang - sd * bend) * La * u]); ws.push(wA, lw); }
+        pts.push([ex, ey]);
+        // a limb that grew a limb of its own: a forearm on the arm, with its own length, bend and hand
+        if (kid && kid.k === 0) { const a2 = ang + sd * (0.25 + (kid.c || 0) * 0.9), L2 = (20 * kid.l + 8) * k * f.ll; ex += Math.cos(a2) * L2; ey += Math.sin(a2) * L2; pts.push([ex, ey]); ws.push(lw * (0.6 + 0.4 * (kid.w || 0.5))); tip = kid.t; ha = a2; hk = kid.f || 1; }
+        limbN(pts, ws, fc);
+        for (let j = 1; j + 1 < pts.length; j++) { ctx.beginPath(); ctx.arc(pts[j][0], pts[j][1], ws[j - 1] * 0.52, 0, TAU); ink(fc, 1.8); }
+        hand(ex, ey, ha, tip, k * 1.2 * f.hs * hk);
         ctx.globalAlpha = 1;
       }
       function limbs(far) {
         let idx = 0;
-        for (const a in legOn) { const os = of(+a), q = legOn[a]; for (let n = 0; n < os.length; n++) { const o = os[n]; idx++;
-          if (bd.v) legOf(o, q, PI / 2 + (far ? 0.42 : -0.42), 1, far, idx);
-          else { const sds = sidesOf(o); for (let m = 0; m < sds.length; m++) legOf(o, q, PI / 2 - sds[m] * (0.55 + 0.2 * q.g), sds[m], false, idx); } } }
-        for (const a in armOn) { const os = of(+a), q = armOn[a]; for (let n = 0; n < os.length; n++) { const o = os[n]; idx++;
-          if (bd.v) armOf(o, q, far ? 0.1 : 0.5, 0.5, 1, far, idx);
-          else { const sds = sidesOf(o); for (let m = 0; m < sds.length; m++) armOf(o, q, sds[m] > 0 ? 0.25 : PI - 0.25, sds[m] > 0 ? 0.45 : PI - 0.45, sds[m], false, idx); } } }
+        for (const a in legOn) { const os = of(+a), Q = legOn[a]; for (let n = 0; n < os.length; n++) { const o = os[n]; for (let k = 0; k < Q.length; k++) { const q = Q[k]; idx++;
+          if (bd.v) legOf(o, q, PI / 2 + (far ? 0.42 : -0.42) + (k - (Q.length - 1) / 2) * 0.62, 1, far, idx, k);
+          else { const sds = sidesOf(o); for (let m = 0; m < sds.length; m++) legOf(o, q, PI / 2 - sds[m] * Math.min(1.35, 0.55 + 0.2 * q.g + 0.36 * k), sds[m], false, idx, k); } } } }
+        for (const a in armOn) { const os = of(+a), Q = armOn[a]; for (let n = 0; n < os.length; n++) { const o = os[n]; for (let k = 0; k < Q.length; k++) { const q = Q[k], up = k * 0.55 + (q.g || 0) * 0.5; idx++;
+          if (bd.v) armOf(o, q, (far ? 0.1 : 0.5) - up, 0.5 - up, 1, far, idx);
+          else { const sds = sidesOf(o); for (let m = 0; m < sds.length; m++) armOf(o, q, sds[m] > 0 ? 0.25 - up : PI - 0.25 + up, sds[m] > 0 ? 0.45 - up : PI - 0.45 + up, sds[m], false, idx); } } } }
       }
     }
 
@@ -478,13 +511,19 @@
       if (q.k === 4) { ctx.beginPath(); ctx.arc(ex, ey, 5.5, 0, TAU); ink(col.glow, 1.8); } else if (q.k === 0) { ctx.beginPath(); ctx.arc(ex, ey, 6.5, 0, TAU); ink(col.limb, 2); }
     }
     // one eye. For the kept picture only the white is painted and its place noted: the pupil is drawn live, on top.
-    function eyeAt(ex, ey, r, ring) {
+    // An eye is drawn from its genes: how wide or tall it is (f.ex), how it slants (f.et, mirrored on the other side), and how far its lid comes down (f.el).
+    // sdm: -1 the left eye, 1 the right, 0 one in the middle
+    function eyeAt(ex, ey, r, ring, sdm) {
       const lid = o.sleep ? 1 : ((B(0.31) + (f.seed % 13)) % 3.7 < 0.1 ? 1 : 0);
       const lx = o.lx === undefined ? Math.sin(B(0.7)) * 0.5 : o.lx, ly = o.ly === undefined ? 0.15 + Math.cos(B(0.9)) * 0.25 : o.ly;
-      if (o.collect) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4); if (leanA) { const dx = ex, dy = ey - (GROUND - 4), cs = Math.cos(leanA), sn = Math.sin(leanA); o.collect.push([dx * cs - dy * sn, GROUND - 4 + dx * sn + dy * cs, r]); } else o.collect.push([ex, ey, r]); return; }
-      if (lid) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(col.dark, 2.4); ctx.beginPath(); ctx.moveTo(ex - r * 0.7, ey); ctx.quadraticCurveTo(ex, ey + r * 0.6, ex + r * 0.7, ey); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); return; }
-      ctx.beginPath(); ctx.arc(ex, ey, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4);
-      F._pupil(ctx, ex, ey, r, lx, ly, hsl(f.hue + f.hue2, 68, 44, 1), INK, f.ep || 0.46);
+      const asp = f.ex || 1, ax = Math.sqrt(asp), ay = 1 / ax, rot = (sdm || 0) * (f.et || 0), el = f.el || 0;
+      ctx.save(); ctx.translate(ex, ey); ctx.rotate(rot); ctx.scale(ax, ay);
+      if (o.collect) { ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4); ctx.restore(); if (leanA) { const dx = ex, dy = ey - (GROUND - 4), cs = Math.cos(leanA), sn = Math.sin(leanA); o.collect.push([dx * cs - dy * sn, GROUND - 4 + dx * sn + dy * cs, r, ax, ay, rot + leanA, el]); } else o.collect.push([ex, ey, r, ax, ay, rot, el]); return; }
+      if (lid) { ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ink(col.dark, 2.4); ctx.beginPath(); ctx.moveTo(-r * 0.7, 0); ctx.quadraticCurveTo(0, r * 0.6, r * 0.7, 0); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke(); ctx.restore(); return; }
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ink(ring ? hsl(f.hue + f.hue2, 90, 62, 1) : '#fff', 2.4);
+      F._pupil(ctx, 0, 0, r, lx, ly, hsl(f.hue + f.hue2, 68, 44, 1), INK, f.ep || 0.46);
+      F._lid(ctx, r, el, col.body, INK);
+      ctx.restore();
     }
     // the face. side 0: it looks straight at you. side 1: its head points to the right; you see the eye on this side
     function face(x, y, hr, side, isStar) {
@@ -493,9 +532,17 @@
       const stalk = function (ex, ey) { if (!st) return ey; for (let pass = 0; pass < 2; pass++) { ctx.strokeStyle = pass ? col.body : INK; ctx.lineWidth = pass ? 6 : 10; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex, ey - st); ctx.stroke(); } return ey - st; };
       if (side) { if (ne >= 1) eyeAt(cx, ey0, Math.min(er * 1.5, hr * 0.7), false); if (ne >= 3) eyeAt(cx - hr * 0.5, ey0 - hr * 0.35, er * 0.45, false); }
       else if (ne === 1) eyeAt(cx, ey0, er * 1.3, false);
-      else if (ne >= 2) { eyeAt(cx - gap, stalk(cx - gap, ey0), er, false); eyeAt(cx + gap, stalk(cx + gap, ey0), er, false); if (ne === 3) eyeAt(cx, y - hr * 0.64, er * 0.42, false);
-        if (!st) for (let sd = -1; sd <= 1; sd += 2) { const bx = cx + sd * gap, by = ey0 - er * 1.2; ctx.strokeStyle = INK; ctx.globalAlpha = 0.7; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(bx - sd * er * 0.75, by - er * 0.02); ctx.quadraticCurveTo(bx, by - er * 0.3, bx + sd * er * 0.8, by + er * 0.14); ctx.stroke(); ctx.globalAlpha = 1; } }
+      else if (ne >= 2) { eyeAt(cx - gap, stalk(cx - gap, ey0), er, false, -1); eyeAt(cx + gap, stalk(cx + gap, ey0), er, false, 1); if (ne === 3) eyeAt(cx, y - hr * 0.64, er * 0.42, false, 0);
+        // brows from their genes: how heavy (f.bw: none at all up to thick) and how they slope (f.ba: lifted and gentle, level, or drawn down and fierce)
+        { const bw = f.bw === undefined ? 0.35 : f.bw, ba = f.ba === undefined ? 0.1 : f.ba; if (!st && bw > 0.08) for (let sd = -1; sd <= 1; sd += 2) { const bx = cx + sd * gap, by = ey0 - er * (1.12 + 0.2 * bw) / Math.sqrt(f.ex || 1); ctx.strokeStyle = INK; ctx.globalAlpha = 0.55 + 0.45 * bw; ctx.lineWidth = 1.6 + 4.4 * bw; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(bx - sd * er * 0.75, by + er * 0.55 * ba); ctx.quadraticCurveTo(bx, by - er * 0.3 * (1 - Math.abs(ba)), bx + sd * er * 0.8, by - er * 0.55 * ba + er * 0.1); ctx.stroke(); ctx.lineCap = 'butt'; ctx.globalAlpha = 1; } } }
       { const bl = f.bl === undefined ? 0.4 : f.bl; ctx.globalAlpha = 0.1 + 0.5 * bl; ctx.fillStyle = '#ff7fa8'; for (let sd = (side ? 1 : -1); sd <= 1; sd += 2) { ctx.beginPath(); ctx.ellipse(cx + sd * hr * (side ? 0.05 : 0.72), y + hr * 0.42, hr * (0.12 + 0.1 * bl), hr * (0.08 + 0.06 * bl), 0, 0, TAU); ctx.fill(); } ctx.globalAlpha = 1; }
+      // a muzzle and a nose, from their genes (f.sn: how far the muzzle stands out; f.nz: no nose, a button, a soft triangle, or two nostrils)
+      { const sn = f.sn || 0, nzk = f.nz | 0, sx = cx + (side ? hr * 0.42 : 0), sy = y + hr * 0.4;
+        if (sn > 0.2) { ctx.beginPath(); ctx.ellipse(sx, sy, hr * (0.24 + 0.3 * sn), hr * (0.17 + 0.2 * sn), 0, 0, TAU); ink(col.light || col.body, 2); }
+        if (nzk) { const ny = sy - hr * (sn > 0.2 ? 0.1 + 0.12 * sn : 0.14), nr = hr * 0.07 * (1 + sn); ctx.fillStyle = INK;
+          if (nzk === 1) { ctx.beginPath(); ctx.arc(sx, ny, nr, 0, TAU); ctx.fill(); }
+          else if (nzk === 2) { ctx.beginPath(); ctx.moveTo(sx - nr * 1.5, ny - nr * 0.7); ctx.quadraticCurveTo(sx, ny - nr * 1.2, sx + nr * 1.5, ny - nr * 0.7); ctx.quadraticCurveTo(sx, ny + nr * 1.9, sx - nr * 1.5, ny - nr * 0.7); ctx.fill(); }
+          else for (let sd = -1; sd <= 1; sd += 2) { ctx.beginPath(); ctx.ellipse(sx + sd * nr * 1.1, ny, nr * 0.5, nr * 0.8, sd * 0.4, 0, TAU); ctx.fill(); } } }
       const mx = cx + (side ? hr * 0.5 : 0), my = y + hr * (side ? 0.42 : 0.5), m = hr * (0.16 + f.ms * 0.3);
       ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.fillStyle = INK;
       if (f.mk === 1) { ctx.beginPath(); if (side) { ctx.moveTo(mx - m * 0.2, my - m * 0.8); ctx.lineTo(mx + m * 1.9, my - m * 0.1); ctx.lineTo(mx - m * 0.2, my + m * 0.6); } else { ctx.moveTo(mx - m * 0.8, my - m * 0.3); ctx.lineTo(mx, my + m * 0.9); ctx.lineTo(mx + m * 0.8, my - m * 0.3); ctx.quadraticCurveTo(mx, my - m * 0.7, mx - m * 0.8, my - m * 0.3); } ctx.closePath(); ink('#f6b34a', 2.2); }
@@ -506,6 +553,14 @@
     }
   };
 
+  /** the upper lid: skin coming down over the eye (drawn in the eye's own frame, the eye at the origin). el: how far, 0 none .. 0.55 half shut */
+  F._lid = function (ctx, r, el, fill, ink) {
+    if (!(el > 0.04)) return;
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r * 1.01, 0, TAU); ctx.clip();
+    ctx.beginPath(); ctx.rect(-r * 1.2, -r * 1.2, r * 2.4, r * (0.2 + 2 * el)); ctx.fillStyle = fill; ctx.fill();
+    ctx.strokeStyle = ink; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(-r * 1.1, -r + 2 * r * el); ctx.lineTo(r * 1.1, -r + 2 * r * el); ctx.stroke();
+    ctx.restore();
+  };
   /** the living part of an eye: iris, pupil, two lights, and the soft shade of the upper lid */
   F._pupil = function (ctx, ex, ey, r, lx, ly, iris, ink, pup) {
     const px = ex + lx * r * 0.2, py = ey + ly * r * 0.2 + r * 0.04;
@@ -531,7 +586,7 @@
     if (s) { s.used = G.rt || 0; return s; }
     if (keptN > 150) { const now = G.rt || 0; for (const k in kept) if (now - kept[k].used > 3) { delete kept[k]; keptN--; } if (keptN > 230) { for (const k in kept) delete kept[k]; keptN = 0; } }
     s = kept[key] = { fr: [frame(f, 0)], ink: '', dark: '', build: F.build(f), used: G.rt || 0 }; keptN++;
-    s.pup = f.ep || 0.46; s.ink = F._ink(); s.dark = F._colours(f).dark; s.iris = 'hsl(' + Math.round((((f.hue + f.hue2) % 360) + 360) % 360) + ',68%,44%)';
+    s.pup = f.ep || 0.46; s.ink = F._ink(); s.dark = F._colours(f).dark; s.lidc = F._colours(f).body; s.iris = 'hsl(' + Math.round((((f.hue + f.hue2) % 360) + 360) % 360) + ',68%,44%)';
     return s;
   };
   /** the kept character at the origin at this point of its loop (phase 0..1), then its eyes, alive. mood: { lx, ly, lid 0..1, wide } */
@@ -549,9 +604,12 @@
     const lx = mood.lx || 0, ly = mood.ly || 0, pup = mood.wide ? 0.42 : 0.62;
     for (let q = 0; q < fr.eyes.length; q++) {
       const e = fr.eyes[q], r = e[2];
-      if (mood.lid >= 1) { ctx.beginPath(); ctx.arc(e[0], e[1], r, 0, TAU); ctx.fillStyle = s.dark; ctx.fill(); ctx.strokeStyle = s.ink; ctx.lineWidth = 2.4; ctx.stroke(); ctx.beginPath(); ctx.moveTo(e[0] - r * 0.7, e[1]); ctx.quadraticCurveTo(e[0], e[1] + r * 0.6, e[0] + r * 0.7, e[1]); ctx.stroke(); continue; }
-      F._pupil(ctx, e[0], e[1], r, lx, ly, s.iris, s.ink, mood.wide ? s.pup * 0.65 : s.pup);
-      if (mood.lid > 0) { ctx.save(); ctx.beginPath(); ctx.arc(e[0], e[1], r * 1.02, 0, TAU); ctx.clip(); ctx.fillStyle = s.dark; ctx.fillRect(e[0] - r * 1.1, e[1] - r * 1.1, r * 2.2, r * 2.2 * mood.lid * 0.75); ctx.restore(); }      // heavy lids: tired, or sick
+      ctx.save(); ctx.translate(e[0], e[1]); if (e[5]) ctx.rotate(e[5]); if (e[3]) ctx.scale(e[3], e[4]);
+      if (mood.lid >= 1) { ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fillStyle = s.dark; ctx.fill(); ctx.strokeStyle = s.ink; ctx.lineWidth = 2.4; ctx.stroke(); ctx.beginPath(); ctx.moveTo(-r * 0.7, 0); ctx.quadraticCurveTo(0, r * 0.6, r * 0.7, 0); ctx.stroke(); ctx.restore(); continue; }
+      F._pupil(ctx, 0, 0, r, lx, ly, s.iris, s.ink, mood.wide ? s.pup * 0.65 : s.pup);
+      F._lid(ctx, r, e[6] || 0, s.lidc || s.dark, s.ink);
+      if (mood.lid > 0) { ctx.beginPath(); ctx.arc(0, 0, r * 1.02, 0, TAU); ctx.clip(); ctx.fillStyle = s.dark; ctx.fillRect(-r * 1.1, -r * 1.1, r * 2.2, r * 2.2 * mood.lid * 0.75); }      // heavy lids: tired, or sick
+      ctx.restore();
     }
     return s;
   };

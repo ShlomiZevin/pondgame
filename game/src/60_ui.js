@@ -102,7 +102,7 @@
     refs.pop = null;
     // zoom: the pond is bigger than the screen
     const zm = el('div', 'glass hide', '', ui); zm.id = 'zoom';
-    [['+', 'Zoom in', function () { G.zoomAt(1.35); }], ['−', 'Zoom out', function () { G.zoomAt(1 / 1.35); }], ['⤢', 'See the whole pond', function () { G.cam.z = 1; G.applyCam(); }]].forEach(function (b) {
+    [['+', 'Zoom in', function () { G.zoomAt(1.35); }], ['−', 'Zoom out', function () { G.zoomAt(1 / 1.35); }], ['⤢', 'Back to the middle of the pond, all of it in view', function () { G.camHome(); }]].forEach(function (b) {
       const bt = el('button', 'btn', b[0], zm); bt.setAttribute('aria-label', b[1]); bt.title = b[1]; bt.onclick = function () { G.sfx('click'); b[2](); };
     });
     refs.zoom = zm;

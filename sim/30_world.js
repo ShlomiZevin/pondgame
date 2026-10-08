@@ -29,9 +29,10 @@
   let creIdx = new Map();
 
   /** a bigger pond holds more food */
-  function foodCap(W) { return Math.round(K.foodMax * Math.max(1, W.ww * W.wh / 1.6e6 / Math.pow(G.view.grow || 1, 2))); }      // (a pond that GREW for room has the food it had: more water, not more mouths)
+  function foodCap(W) { return Math.round(K.foodMax * Math.max(1, W.ww * W.wh / 1.6e6 / Math.pow(G.view.grow || 1, 1.5))); }      // a wider world holds more food (as much more as it is wider), so it can hold more life      // (a pond that GREW for room has the food it had: more water, not more mouths)
   /** the shore is the top strip of the pond: land. Only what can breathe air may go there. */
-  G.shoreY = function (W) { return W.wh * 0.16; };
+  G.SHORE0 = 0.24;      // how much of the map is land to begin with (it was 0.16): the one number for it, used wherever the land's first size matters
+  G.shoreY = function (W) { return W.wh * (W.shore || G.SHORE0); };      // the land is the top of the map; it widens as more of the pond's life lives on it (see endAutumn)
   const FOODS = ['gold', 'lime', 'green', 'blue', 'violet', 'pink'];
   /** how a creature has lived: the food it mostly ate (a kind, or -1 when it ate a bit of everything) and the share of its life on the shore, by the shore, in the deep */
   G.lifeOf = function (c) {
@@ -125,7 +126,7 @@
       const hit = W.eyeSeen ? W.eyeSeen[FM.key(genome.f)] : null;
       if (hit) { c.real = { b: hit.b, w: hit.w, why: hit.why || '', gen: W.gen }; c.eb = hit.b; c.ew = hit.w; c.st = 0; }
       // the pond's own guess for this body, set against what the god really said of the creatures that look like it (G.believe)
-      else if (W.eyeBank && W.eyeBank.length && G.believe) { const bel = G.believe(genome, c.lv = G.lookVec(genome)); c.eb = bel.b; c.ew = bel.w; c.st = bel.near ? 1 : 3; }
+      else if (W.eyeBank && W.eyeBank.length && G.believe) { const bel = G.believe(genome, c.lv = G.lookVec(genome)); c.eb = bel.b; c.ew = bel.w; c.b0 = bel.b0; c.w0 = bel.w0; c.st = bel.near ? 1 : 3; }
       else { c.eb = mb; c.ew = mw; c.st = 3; }
       ph.charm = c.eb; ph.whole = c.ew;
     }
@@ -163,7 +164,7 @@
   /** oxygen in the water here: less in the deep, less when it is hot, plenty in the air of the shore */
   G.o2At = function (x, y) {
     const W = G.W, e = W.env;
-    if (y < W.wh * 0.16) return 1.4;
+    if (y < G.shoreY(W)) return 1.4;
     return (e ? e.o2 : 1) * (1.15 - 0.5 * clamp(x / W.ww, 0, 1)) * (env.temp > 0.35 ? 0.85 : 1);
   };
   G.envText = function (W) {
@@ -180,7 +181,7 @@
 
   G.tempAt = function (x, y) {
     const W = G.W;
-    let t = W.set.temp + (W.env ? W.env.warm : 0) + SEASON_TEMP[W.season] + (W.drought > 0 ? 0.2 : 0) + (y < W.wh * 0.16 ? 0.08 : (y / W.wh - 0.5) * 0.3) + (W.mods.length ? G.modSum('temp') : 0);
+    let t = W.set.temp + (W.env ? W.env.warm : 0) + SEASON_TEMP[W.season] + (W.drought > 0 ? 0.2 : 0) + (y < G.shoreY(W) ? 0.08 : (y / W.wh - 0.5) * 0.3) + (W.mods.length ? G.modSum('temp') : 0);
     for (let i = 0; i < W.zones.length; i++) {
       const z = W.zones[i];
       if (z.p.heat) {
@@ -269,10 +270,11 @@
       if (f && W.gen > 12 && G.rand() < 0.3) { f.big = 1; f.v = 60; f.tag = 3; }
     }
     // plants grow on the shore, untouched until something can breathe air
-    W.landAcc = (W.landAcc || 0) + K.foodRate * (W.ww * W.wh / 1.6e6) * 0.42 * dt;      // land plants do not care about the pond's seasons much
+    W.landAcc = (W.landAcc || 0) + K.foodRate * (W.ww * W.wh / 1.6e6) * 0.5 * (W.landRich || 1) * Math.pow((W.shore || G.SHORE0) / 0.16, 0.7) * dt;      // land plants do not care about the pond's seasons much
     while (W.landAcc >= 1) {
       W.landAcc -= 1;
-      if ((W.landFood || 0) < 110) { const f = G.spawnFood(W, G.rand() * W.ww, 14 + G.rand() * (G.shoreY(W) - 28), G.rand() < 0.6 ? 1 : 5); if (f) { f.land = 1; f.v = 40 + G.rand() * 16; W.landFood = (W.landFood || 0) + 1; } }
+      // the land grows plants of several colours (so whatever the pond's first life eats, something up there is food for it), and more of them as the land widens
+      if ((W.landFood || 0) < Math.max(110, 0.16 * foodCap(W)) * (W.landRich || 1) * Math.pow((W.shore || G.SHORE0) / 0.16, 0.7)) {      /* the land keeps its share of the world's food as the world widens */ const f = G.spawnFood(W, G.rand() * W.ww, 14 + G.rand() * (G.shoreY(W) - 28), (function () { const rc = W.cre.length && G.rand() < 0.7 ? W.cre[(G.rand() * W.cre.length) | 0] : null; return rc && rc.ph && rc.ph.fav >= 0 ? rc.ph.fav : [1, 5, 2, 0][(G.rand() * 4) | 0]; })());      /* plants grow thickest by the water: the first step out of it is a short one */ if (f) { f.land = 1; f.v = 34 + G.rand() * 14 + 34 * (1 - f.y / G.shoreY(W));      /* the further from the water, the richer: fewer mouths have ever reached it */ W.landFood = (W.landFood || 0) + 1; } }
     }
   }
 
@@ -417,6 +419,8 @@
       const c = cre[ci];
       if (c.dead) continue;
       const ph = c.ph, g = c.g;
+      // how far up the land it can go: a breath of air lets it onto the wet edge, more takes it further inland, and only a body made wholly for air reaches the far side
+      const shoreNow = G.shoreY(W), landTop = ph.home ? 0 : shoreNow * (1 - 0.1 * Math.min(1, (ph.air || 0) / 0.5)), botLim = ph.home ? Math.min(wh - ph.r, shoreNow + (wh - shoreNow) * 0.06) : wh - ph.r;
       c.px = c.x; c.py = c.y; c.pang = c.ang;
       // doomed by selection
       if (c.doomed && W.st >= c.doomAt && season === 3) { kill(c, 'selected'); continue; }
@@ -435,7 +439,7 @@
               const o = food[j];
               if (o.dead) continue;
               if (o.tag === ph.bane) { const dx = o.x - c.x, dy = o.y - c.y, d2 = dx * dx + dy * dy; if (d2 < bt && d2 < range * range * 0.36) { bt = d2; btx = dx; bty = dy; } continue; }
-              if (dig[o.tag] < dmin || (o.big && !ph.jaws) || (o.land && !ph.lungs)) continue;
+              if (dig[o.tag] < dmin || (o.big && !ph.jaws) || (o.land && o.y < landTop) || o.y > botLim + ph.r) continue;
               const dx = o.x - c.x, dy = o.y - c.y, d2 = dx * dx + dy * dy;
               if (d2 < bf && d2 < range * range) { bf = d2; bfx = dx; bfy = dy; }
             }
@@ -535,7 +539,7 @@
           if (dx * dx + dy * dy < z.r * z.r) sticky += z.p.sticky * 2.2 * z.k * (1 - ph.cnt[8] * 0.08);
         }
       }
-      const sp = ph.speed * (sprint ? 1.7 : 1) * thrust / sticky * (c.colony ? 0.85 : 1) * (c.land ? (0.6 + 0.2 * Math.min(ph.limbs, 4)) * (ph.warm ? 1.3 : 1) : 1) * (season === 3 && !ph.warm ? 0.68 : 1);      // winter makes the cold-blooded sluggish
+      const sp = ph.speed * (sprint ? 1.7 : 1) * thrust / sticky * (c.colony ? 0.85 : 1) * (c.land ? (0.5 + 0.22 * Math.min(ph.limbs, 4) + 0.2 * (ph.air || 0) + 0.45 * Math.min(1, ph.cnt[1]) * clamp((18 - ph.r) / 8, 0, 1)) * (ph.warm ? 1.3 : 1) : (1 - 0.45 * clamp(((ph.air || 0) - 0.5) / 0.5, 0, 1)) * (1 - 0.09 * Math.min(ph.limbs, 4)))      /* on land legs carry a body, and what were fins are wings that lift a small one; a swimming tail does nothing there; in the water legs only drag */ * (season === 3 && !ph.warm ? 0.68 : 1);      // winter makes the cold-blooded sluggish
       const tx = Math.cos(c.ang) * sp, ty = Math.sin(c.ang) * sp;
       const k = Math.min(1, 2.6 * dt);
       c.vx += (tx - c.vx) * k; c.vy += (ty - c.vy) * k;
@@ -565,9 +569,10 @@
       c.x += c.vx * dt; c.y += c.vy * dt;
       if (c.x < ph.r) { c.x = ph.r; c.vx = Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; }
       else if (c.x > ww - ph.r) { c.x = ww - ph.r; c.vx = -Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; }
-      const top = ph.lungs ? ph.r : G.shoreY(W) + ph.r;
+      // a creature of the water stops at the shore; a creature of the land only paddles in the shallows; one at home in both goes where it likes
+      const top = landTop + ph.r, bot = botLim;
       if (c.y < top) { c.y = top; c.vy = Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
-      else if (c.y > wh - ph.r) { c.y = wh - ph.r; c.vy = -Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
+      else if (c.y > bot) { c.y = bot; c.vy = -Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
       c.land = c.y < G.shoreY(W);
       c.liveT = (c.liveT || 0) + dt; if (c.land) c.landT = (c.landT || 0) + dt; else if (c.y < G.shoreY(W) + W.wh * 0.14) c.shoreT = (c.shoreT || 0) + dt; else if (c.x > W.ww * 0.62) c.deepT = (c.deepT || 0) + dt;      // where it lived
       c.thrust = thrust * (sprint ? 1.7 : 1);
@@ -576,7 +581,7 @@
 
       // ── energy ──
       const r10 = ph.r / 10;
-      const o2need = Math.pow(r10, 1.1) * (0.35 + 0.45 * thrust), o2short = o2need - G.o2At(c.x, c.y) * ph.gill;
+      const o2need = Math.pow(r10, 1.1) * (0.35 + 0.45 * thrust), o2short = o2need - (c.land ? 1.5 + 1.5 * (ph.air || 0) : G.o2At(c.x, c.y) * ph.gill);      // on land there is only air: a body takes as much of it as its breath allows (and a body made for air breathes water badly, see G.derive)
       W.stats.breaths++; if (o2short > 0) { c.gasp = o2short; W.stats.gasp++; } else c.gasp = 0;
       let cost = ph.upkeep * (c.asleep ? 0.6 : 1) + (o2short > 0 ? 0.22 * o2short * r10 : 0) + thrust * (sprint ? 1.6 : 0.30) * r10 * (1 - 0.2 * ph.flag) + (ph.lamp > 0 ? out[3] * 0.10 * ph.lamp : 0) + (out[4] > 0.5 ? 0.03 : 0);
       // temperature, zones
@@ -645,7 +650,7 @@
               if (bx * bx + by * by < ph.r * ph.r * 1.2) { c.E -= o.v * 0.45 * ph.baneS; c.illT = 2.2; c.ill = (c.ill || 0) + 1; o.dead = true; W.stats.ill = (W.stats.ill || 0) + 1; G.learn(c, -0.8); G.emit('ill', c, o); if (c.E <= 0) { kill(c, 'starved'); break; } }
               continue;
             }
-            if (dig[o.tag] < dmin || (o.big && !ph.jaws) || (o.land && !ph.lungs)) continue;
+            if (dig[o.tag] < dmin || (o.big && !ph.jaws) || (o.land && o.y < landTop) || o.y > botLim + ph.r) continue;
             const dx = o.x - c.x, dy = o.y - c.y;
             if (dx * dx + dy * dy < er * er && c.E < ph.Emax) {
               const gain = o.v * ph.forage[o.tag] * (o.land ? Math.max(0.7, dig[o.tag]) : dig[o.tag]) * (ph.nh >= 4 ? 1 + 0.08 * Math.min(c.kin || 0, 5) : 1) * (o.land ? (ph.warm ? 1.25 : 1) * (ph.hands ? 1.3 : 1) : 1) * (o.tag === ph.fav ? 1 + 0.3 * ph.love : 1);
@@ -829,6 +834,8 @@
         if (plan[i].n > 1 && ss > 0.3 && G.rand() < (ss - 0.3) * 1.5) plan[i].n--;
         if (plan[i].n > 1 && hs > 0.4 && G.rand() < (hs - 0.4) * 1.3) plan[i].n--;
         if ((ss < 0.1 || hs < 0.1) && plan[i].n > 0 && plan[i].n < 3 && p.E > p.ph.Emax * 0.25) plan[i].n++;
+        // and so does living where there is room: on the land while few live there, in the water while few live there
+        { const lf = (p.liveT || 0) > 2 ? (p.landT || 0) / p.liveT : 0, sh = W.shore || G.SHORE0, lu = W.landUse || 0; if (plan[i].n > 0 && plan[i].n < 3 && ((lf > 0.5 && lu < 0.6 * sh) || (lf < 0.2 && 1 - lu < 0.6 * (1 - sh)))) plan[i].n++; }
       }
     }
     // nobody wants the ugly ones: a creature much less charming than the rest finds no mate
@@ -837,16 +844,16 @@
       const bs = surv.map(beauty).sort(function (a, b) { return a - b; });
       const median = bs[bs.length >> 1];
       // looks alone decide who is passed over: the whole finished body, all its parts together. The ugliest quarter find no mate and leave no children.
-      const looks = surv.map(G.charmOf).sort(function (a, b) { return a - b; });
-      const ugly = looks[Math.floor(looks.length * 0.33)], mid = looks[looks.length >> 1], nice = looks[Math.floor(looks.length * 0.67)];
+      const TH = [0, 1].map(function (h) { const looks = surv.filter(function (c) { return (c.ph.home | 0) === h; }).map(G.charmOf).sort(function (a, b) { return a - b; }); return looks.length >= 6 ? [looks[Math.floor(looks.length * 0.33)], looks[looks.length >> 1], looks[Math.floor(looks.length * 0.67)]] : [-1, 0, 2]; });      // (a side with only a handful on it passes nobody over)
       for (let i = 0; i < plan.length; i++) {
+        const th = TH[plan[i].p.ph.home | 0], ugly = th[0], mid = th[1], nice = th[2];
         const bq = beauty(plan[i].p), lk = G.charmOf(plan[i].p);
         if (!(G.marvelBlessed && G.marvelBlessed(plan[i].p)) && lk <= ugly && lk < mid * 0.97) { W.stats.snubbed++; plan[i].n = G.rand() < 0.08 ? 1 : 0; plan[i].p.snub = true; }
         else { plan[i].p.snub = false; if (lk >= nice) { if (plan[i].n < 3 && plan[i].p.E > plan[i].p.ph.Emax * 0.3) plan[i].n++; } else if (plan[i].n > 1) plan[i].n = 1; }
       }
     }
     // a creature with too much on it does not breed (nearly never): clutter is the commonest way to be unlovable, and it creeps in by chance and by the pond's pressures
-    for (let i = 0; i < plan.length; i++) if (plan[i].p.g.f.bd && !(G.marvelBlessed && G.marvelBlessed(plan[i].p)) && G.body.busy(plan[i].p.g.f) > 7.2 + G.form.room() && G.rand() < 0.85) plan[i].n = 0;
+    // (no rule bars a busy body from breeding: whether a body with much on it is a muddle or a marvel is for the god's marks to say, and it pays for its parts in food) 
     // too many for the pond: only the fittest parents may breed
     let total = surv.length;
     for (let i = 0; i < plan.length; i++) total += plan[i].n;
@@ -951,7 +958,7 @@
         if (!p.fv) p.fv = G.features(p.g);
         if (!o.fv) o.fv = G.features(o.g);
         // of the compatible ones nearby, the most charming and healthy is chosen
-        if (G.fdist(p.fv, o.fv) < 1.7) { const b = 2.2 * G.charmOf(o) + 0.3 * clamp(o.E / o.ph.Emax, 0, 1) + (G.kindOf(o.g).kind === G.kindOf(p.g).kind ? 1 : 0) + (Math.abs(((o.g.f.hue - p.g.f.hue + 540) % 360) - 180) < 35 ? 0.6 : 0); if (!best || b > bd2) { best = o; bd2 = b; } }
+        if (o.ph.home === p.ph.home && G.fdist(p.fv, o.fv) < 1.7) { const b = 2.2 * G.charmOf(o) + 0.3 * clamp(o.E / o.ph.Emax, 0, 1) + (G.kindOf(o.g).kind === G.kindOf(p.g).kind ? 1 : 0) - 4 * Math.abs((o.g.t[5] || 0) - (p.g.t[5] || 0)) + (Math.abs(((o.g.f.hue - p.g.f.hue + 540) % 360) - 180) < 35 ? 0.6 : 0); if (!best || b > bd2) { best = o; bd2 = b; } }
       }
     }
     return best;
@@ -962,7 +969,7 @@
     let rc = 0;
     for (let i = 0; i < W.cre.length; i++) rc += W.cre[i].ph.r * (0.55 + 0.45 * W.cre[i].ph.reach);
     const crowd = clamp((W.cre.length ? rc / W.cre.length : 11) / 14, 1, 2.4);
-    return clamp(Math.round(K.capBase * (W.ww * W.wh) / 1.6e6 / crowd), 50, 115);
+    return clamp(Math.round(K.capBase * (W.ww * W.wh) / 1.6e6 / crowd), 50, Math.round(115 + 20 * clamp((W.wh / 1400 - 1) / 1.6, 0, 1)));      // a wider world holds more life
   }
   G.capNow = capNow;
 
@@ -1000,6 +1007,15 @@
         if (W.stall >= 0.6 && was < 0.6 && W.gen - (W.stallNote || -99) > 40) { W.stallNote = W.gen; W.discLog.push({ key: 'stall' + W.gen, text: 'The pond has stopped getting nicer, so its creatures turn to growing bigger: size is what there is left to improve.', gen: W.gen }); G.emit('stall'); } } }
     // the drive to grow is only as strong as the pond can bear: it eases off when the pond is below its capacity (the big need feeding) and as the average size gets large
     { const popR = W.popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12; W.grow = (W.stall || 0) * clamp((popR - 0.6) / 0.3, 0, 1) * (1 - clamp((mr - 26) / 14, 0, 1)); }
+    // THE LAND GROWS with the life on it: the share of creatures that spend their days out of the water sets how much of the map is land (a sixth to a half),
+    // and it moves there slowly, a little each generation
+    { let onLand = 0; for (let i = 0; i < cre.length; i++) if ((cre[i].liveT || 0) > 2 && (cre[i].landT || 0) / cre[i].liveT > 0.4) onLand++;
+      const share = cre.length ? onLand / cre.length : 0, want = clamp(G.SHORE0 + 0.55 * share, G.SHORE0, 0.48), was = W.shore || G.SHORE0;
+      { let lt = 0, tt = 0; for (let i = 0; i < cre.length; i++) { lt += cre[i].landT || 0; tt += cre[i].liveT || 0; } W.landUse = tt > 0 ? lt / tt : 0;
+        let rs = 0, rn = 0; for (let i = 0; i < cre.length; i++) if ((cre[i].liveT || 0) > 2 && (cre[i].landT || 0) / cre[i].liveT > 0.3) { rs += cre[i].ph.r; rn++; }
+        const want = rn ? clamp(Math.pow(rs / rn / 12, 1.4), 1, 4) : 1; W.landRich = (W.landRich || 1) + clamp(want - (W.landRich || 1), -0.05, 0.1); }
+      W.landShare = share; W.shore = was + clamp(want - was, -0.0015, 0.008);
+      if (W.shore > 0.2 && !(W.shoreNote > 0)) { W.shoreNote = W.gen; W.discLog.push({ key: 'land' + W.gen, text: 'So many of them live out of the water now that the land is spreading: the shore has moved down, and there is more ground to live on.', gen: W.gen }); } }
     // how much there is to a body (its joined parts and all that grows on it, counted as the pond counts clutter) and how big it is: what an old pond grows into
     let bodySum = 0, bodyTop = 0, sizeSum = 0, sizeTop = 0; for (let i = 0; i < cre.length; i++) { const f = cre[i].g.f, b = f.bd ? G.body.busy(f) : f.n + f.rules.length, z = cre[i].g.t[0]; bodySum += b; if (b > bodyTop) bodyTop = b; sizeSum += z; if (z > sizeTop) sizeTop = z; }
     W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop, body: bodySum / n, bodyTop: bodyTop, size: sizeSum / n, sizeTop: sizeTop, mx: (function () { const o = {}, X = G.MARKS_X || []; for (let k = 0; k < X.length; k++) { let t = 0, top = 0; for (let i = 0; i < cre.length; i++) { const v = G.markOf(cre[i], X[k].id); t += v; if (v > top) top = v; } o[X[k].id] = [t / n, top]; } return o; })(), room: W.room || 0 });
@@ -1033,9 +1049,16 @@
     // Marks from one god sit close together (most creatures of a pond are within a point of each other), so the raw mark is a weak voice next to rarity.
     // What counts is a creature's PLACE among the others: the nicest of the pond is worth four of the plainest, whatever the scale of the marks. Rarity of
     // shape and colour still tilts it, so several kinds live side by side, but it can no longer outvote the looks.
-    { const ord = cre.map(function (c, i) { return [G.charmOf(c), i]; }).sort(function (a, b) { return a[0] - b[0]; }), nn = Math.max(1, cre.length - 1);
-      for (let k = 0; k < ord.length; k++) { let j = k; while (j + 1 < ord.length && ord[j + 1][0] - ord[k][0] < 1e-9) j++; for (let q = k; q <= j; q++) cre[ord[q][1]].rk = (k + j) / 2 / nn; k = j; } }
-    for (let i = 0; i < cre.length; i++) cre[i].sel = clamp((cre[i].fed === undefined ? 0.5 : cre[i].fed) / 0.5, 0, 1) * (0.25 + 0.75 * cre[i].rk) * (1.15 - 0.35 * shapes[cre[i].shp] / cre.length - 0.45 * hues[cre[i].hb] / cre.length);
+    for (let h = 0; h < 2; h++) { const ord = []; for (let i = 0; i < cre.length; i++) if ((cre[i].ph.home | 0) === h) ord.push([G.charmOf(cre[i]), i]); ord.sort(function (a, b) { return a[0] - b[0]; }); const nn = Math.max(1, ord.length - 1);
+      for (let k = 0; k < ord.length; k++) { let j = k; while (j + 1 < ord.length && ord[j + 1][0] - ord[k][0] < 1e-9) j++; for (let q = k; q <= j; q++) cre[ord[q][1]].rk = ord.length < 4 ? 0.8 : (k + j) / 2 / nn; k = j; } }
+    if (cre.length > 8 && G.lvOf && G.bdist) {
+      const n = cre.length, ap = cre.map(G.charmOf), LV = cre.map(function (c) { return c.g.f.bd ? G.lvOf(c) : null; });
+      for (let i = 0; i < n; i++) { cre[i].crowd = 0; if (!LV[i]) continue; let sw = 0, win = 0;
+        for (let j = 0; j < n; j++) { if (i === j || !LV[j] || cre[j].ph.home !== cre[i].ph.home) continue; const d = G.bdist(LV[i], LV[j]), w = Math.exp(-d * d / 1.4); if (w < 0.02) continue; sw += w; win += w * (ap[i] > ap[j] + 1e-9 ? 1 : ap[i] < ap[j] - 1e-9 ? 0 : 0.5); }
+        cre[i].crowd = sw / (n - 1);
+        if (sw > 0.5) cre[i].rk = 0.4 * cre[i].rk + 0.6 * win / sw; }
+    }
+    for (let i = 0; i < cre.length; i++) cre[i].sel = clamp((cre[i].fed === undefined ? 0.5 : cre[i].fed) / 0.5, 0, 1) * (0.25 + 0.75 * cre[i].rk) * (cre[i].crowd === undefined ? 1 : Math.max(0.4, 1.2 - 1.6 * cre[i].crowd)) * (1.5 / (0.6 + 2 * shapes[cre[i].shp] / cre.length)) * (1.1 - 0.4 * hues[cre[i].hb] / cre.length) * (function (c) { const lf = (c.liveT || 0) > 2 ? (c.landT || 0) / c.liveT : 0, sh = W.shore || 0.16, lu = W.landUse || 0; return 1 + 1.6 * lf * clamp(1 - lu / sh, 0, 1) + 1.6 * (1 - lf) * clamp(1 - (1 - lu) / (1 - sh), 0, 1); })(cre[i]);
     if (cre.length > 8) {
       // fitness sharing: a creature in a crowd of look-alikes counts for less, however it is measured, so no single look can take the whole pond
       for (let i = 0; i < cre.length; i++) if (!cre[i].fv) cre[i].fv = G.features(cre[i].g);
@@ -1057,10 +1080,13 @@
       if (!die && G.rand() < 0.04) die = true;      // bad luck happens
       if (die) doom.push(c);
     }
-    let left = sorted.length - doom.length;
-    for (let i = 0; i < sorted.length && left > room; i++) {
+    // The land and the water each hold their own life: a creature that spends its days on land competes for the land's room, not the water's. So the first
+    // ones out of the water find a place nobody is fighting over, and land life can take hold; as the land widens (endAutumn) it holds more.
+    const landRoom = Math.max(8, Math.round(room * 1.3 * (W.shore || G.SHORE0))), left = { L: 0, W: 0 }, lim = { L: landRoom, W: room };
+    for (let i = 0; i < sorted.length; i++) { const c = sorted[i]; c.hab = c.ph.home ? 'L' : 'W'; if (doom.indexOf(c) < 0) left[c.hab]++; }
+    for (let i = 0; i < sorted.length; i++) {
       const c = sorted[i];
-      if (!c.doomed && doom.indexOf(c) < 0) { doom.push(c); left--; }
+      if (left[c.hab] > lim[c.hab] && !c.doomed && doom.indexOf(c) < 0) { doom.push(c); left[c.hab]--; }
     }
     doom.sort(function (a, b) { return a.fit - b.fit; });
     for (let i = 0; i < doom.length; i++) {
@@ -1094,7 +1120,7 @@
     eye: 'First eye! Something can really see.', eyes3: 'Three eyes or more! Something sees all around.', mouth1: 'First beak!', mouth2: 'First jaws! Teeth, and the big prey of the deep to use them on.', mouth3: 'First sucker mouth!', mouth4: 'First whiskers!',
     tail: 'First tail! A body built to swim.', pair: 'A matching pair! One part of the body doubled, one on each side.', ring: 'A ring! A part of the body opened into a hollow.', lobes: 'Lobes! An outline that swells and dips all the way round.', stalk: 'A stalk! A part of the body held out away from the rest.', sideways: 'Sideways on! A body with a front and a back.', faceaway: 'A head! The face moved onto a part of its own.', seg2: 'More than one part! A second mass budded from the body.', seg5: 'A body of five parts.', seg8: 'A very long body: eight segments.', seg11: 'A giant: a body of eleven segments.', coat1: 'Scales! A coat of small hard plates.', coat2: 'Fur! A warm coat.', coat3: 'Feathers!', neck: 'A neck! A head set apart from the body.', bighead: 'A big head!', nested: 'A part growing on a part! Something like a hand on an arm.', star: 'A new body plan! A star, with arms all around.',
     shell: 'First shell!', crest: 'First crest!', glow: 'First glow! A creature that makes its own light.', venom: 'First poison glands!', pattern: 'First markings! Skin with a pattern.',
-    walker: 'Walkers! Two pairs of legs: they can climb onto the shore.', hands: 'Hands! Fingers at the front of the body.', biter: 'A real bite: jaws strong enough for big prey.',
+    walker: 'Out of the water! Something can breathe air and live on the shore.', hands: 'Hands! Fingers at the front of the body.', biter: 'A real bite: jaws strong enough for big prey.',
     hidden: 'First thought! A brain grew a hidden cell.', hidden3: 'A bigger brain: three hidden cells.',
     photo: 'Light-eaters! Some creatures now live on sunlight, like plants.',
     giant: 'First giant! A much bigger creature.', tiny: 'First speck! A very tiny creature.',
@@ -1341,7 +1367,7 @@
     if (s.kills > 3) bits.push('A hunter: it has eaten ' + s.kills + ' other creatures.');
     else if (g.c[best[0]] > 0.6 && g.c[best[1]] > 0.5) bits.push('Eats ' + names[best[0]] + ' and ' + names[best[1]] + ' food.');
     else bits.push('Eats ' + names[best[0]] + ' food.');
-    if (ph.lungs) bits.push('Walks: it can climb onto the shore.');
+    bits.push(ph.home ? 'A creature of the land: it lives, feeds and breeds out of the water, and only paddles in the shallows.' : (ph.air || 0) > 0.3 ? 'A creature of the water that comes out onto the wet edge of the shore.' : 'A creature of the water.');
     if (ph.jaws) bits.push('Its bite can take the big prey of the deep.');
     if (g.h >= 2) bits.push('A thinking brain with ' + g.h + ' hidden cells.');
     if (g.c[6] > 0.5) bits.push('Likes it hot.');

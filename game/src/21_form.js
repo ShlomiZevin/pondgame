@@ -23,7 +23,7 @@
   const CHAIN = [1, 0, 0, 1, 1, 0, 0, 0, 0];    // kinds with a tip that something else can grow from: legs, tentacles, feelers
   const COATS = ['bare', 'scales', 'fur', 'feathers'];
   const GLIM = [[-0.55, 0.55], [0.05, 0.85], [-0.3, 0.5], [-1.0, 1.0], [-1.1, -0.25], [-1, 1], [-0.4, 0.6], [-1.0, 0.1], [-0.8, 0.8]];
-  const cpRule = function (q) { return { k: q.k, a: q.a, b: q.b, e: q.e, l: q.l, w: q.w, j: q.j, g: q.g, c: q.c, t: q.t, p: q.p, on: q.on === undefined ? -1 : q.on }; };
+  const cpRule = function (q) { return { k: q.k, a: q.a, b: q.b, e: q.e, l: q.l, w: q.w, j: q.j, g: q.g, c: q.c, t: q.t, p: q.p, on: q.on === undefined ? -1 : q.on, u: q.u, f: q.f }; };
   // take a growth away; whatever grew from it falls back onto the body
   const dropRule = function (f, i) { f.rules.splice(i, 1); for (let k = 0; k < f.rules.length; k++) { const q = f.rules[k]; if (q.on === i) q.on = -1; else if (q.on > i) q.on--; } };
   const F = G.form = { MAXN: MAXN, MAXR: MAXR, COATS: COATS, KINDS: KINDS, KMANY: KMANY, MOUTHS: MOUTHS, TAILS: TAILS, PATTERNS: PATTERNS, ABIL: ABIL, U: U };
@@ -66,7 +66,7 @@
     for (let i = 0; i < f.rules.length; i++) {
       const q = f.rules[i];
       q.k = clamp(q.k | 0, 0, 8); q.a = clamp(q.a | 0, 0, f.n - 1); q.b = clamp(q.b | 0, q.a, f.n - 1); q.e = clamp(q.e | 0, 1, 2);
-      q.l = num(q.l, 0.4, 2.2, 1); q.w = num(q.w, 0.2, 0.9, 0.5); q.j = clamp(q.j | 0, 1, 3); q.g = num(q.g, -1.2, 1.2, 0); q.c = num(q.c, -1.2, 1.2, 0); q.t = clamp(q.t | 0, 0, q.k === 8 ? 1e6 : 3); q.p = num(q.p, 0.2, 0.9, 0.5);
+      q.l = num(q.l, 0.4, 2.2, 1); q.w = num(q.w, 0.2, 0.9, 0.5); q.j = clamp(q.j | 0, 1, 3); q.g = num(q.g, -1.2, 1.2, 0); q.c = num(q.c, -1.2, 1.2, 0); q.t = clamp(q.t | 0, 0, q.k === 8 ? 1e6 : 3); q.p = num(q.p, 0.2, 0.9, 0.5); q.u = num(q.u, 0.3, 0.7, 0.5); q.f = num(q.f, 0.6, 1.7, 1);      /* u: where a limb's joint sits along it; f: how big its hand or foot is */
       // a part may grow from the tip of an earlier leg, tentacle or feeler; at most three deep (arm, forearm, hand)
       //  · every kind of growth points the way such things point: fins sweep back, feelers reach forward, legs stand out to the side
       { const lim = q.on >= 0 ? [-0.9, 0.9] : GLIM[q.k]; q.g = clamp(q.g, lim[0], lim[1]); q.c = clamp(q.c, -0.85, 0.85); }
@@ -76,19 +76,21 @@
     f.en = clamp(f.en | 0, f.bd && (f.bd.m.length > 1 || f.rules.length > 2) ? 1 : 0, 3); f.es = num(f.es, f.bd ? 0.34 : 0.2, f.bd ? 0.9 : 0.62, 0.4); f.ek = num(f.ek, 0, 1.2, 0);
     f.mk = clamp(f.mk | 0, 0, 4); f.ms = num(f.ms, 0.14, 0.7, 0.25); f.tk = clamp(f.tk | 0, 0, 4); f.ts = num(f.ts, 0.3, 1.5, 0.6);
     f.hue = ((num(f.hue, -1e6, 1e6, 200) % 360) + 360) % 360; f.hue2 = num(f.hue2, -180, 180, 90); if (Math.abs(f.hue2) < 40) f.hue2 = f.hue2 < 0 ? -40 : 40;
-    f.sat = num(f.sat, 52, 88, 70); f.lit = num(f.lit, 52, 72, 62); f.pat = clamp(f.pat | 0, 0, 5); f.psc = num(f.psc, 0.15, 1, 0.5);
+    f.sat = num(f.sat, 40, 94, 70); f.lit = num(f.lit, 46, 78, 62); f.pat = clamp(f.pat | 0, 0, 5); f.psc = num(f.psc, 0.15, 1, 0.5);
     f.crest = num(f.crest, 0, 1, 0); f.shell = num(f.shell, 0, 1, 0); f.glow = num(f.glow, 0, 1, 0); f.venom = num(f.venom, 0, 1, 0); f.seed = (f.seed | 0) || 1;
     f.hd = num(f.hd, 0.7, f.bd ? 2.5 : 1.9, 1);
     f.eg = num(f.eg, 0.3, 0.8, 0.5); f.ey = num(f.ey, -0.2, 0.36, 0.14); f.ep = num(f.ep, 0.36, 0.78, 0.46); f.bl = num(f.bl, 0, 1, 0.4); f.sm = num(f.sm, -0.2, 1, 0.5);
-    f.ll = num(f.ll, 0.7, 1.4, 1); f.lw = num(f.lw, 0.85, 1.4, 1); f.hs = num(f.hs, 0.8, 1.5, 1); f.st = num(f.st, -0.35, 0.35, 0); f.cl = clamp(f.cl | 0, 0, 4); f.nk = num(f.nk, 0, 0.7, 0); f.coat = clamp(f.coat | 0, 0, 3);
+    // the face in more detail: ex an eye's shape (tall .. wide), et its slant, el how far the lid comes down, bw how heavy the brows, ba how they slope, sn a muzzle, nz a nose (0 none, 1 button, 2 triangle, 3 nostrils)
+    f.ex = num(f.ex, 0.7, 1.4, 1); f.et = num(f.et, -0.45, 0.45, 0); f.el = num(f.el, 0, 0.55, 0); f.bw = num(f.bw, 0, 1, 0.35); f.ba = num(f.ba, -0.6, 0.6, 0.1); f.sn = num(f.sn, 0, 1, 0); f.nz = clamp(f.nz | 0, 0, 3);
+    f.ll = num(f.ll, 0.6, 1.9, 1); f.lw = num(f.lw, 0.6, 1.8, 1); f.hs = num(f.hs, 0.8, 1.5, 1); f.st = num(f.st, -0.35, 0.35, 0); f.cl = clamp(f.cl | 0, 0, 4); f.nk = num(f.nk, 0, 0.7, 0); f.coat = clamp(f.coat | 0, 0, 3);
     f.hx = num(f.hx, 0.72, 1.45, 1); f.hq = num(f.hq, 1.5, 4, 2); f.pl = Math.max(0, f.pl | 0);
-    if (f.bd) while (f.rules.length > 4) dropRule(f, f.rules.length - 1);
+    if (f.bd) while (f.rules.length > 6) dropRule(f, f.rules.length - 1);      // how many it may GROW is the pond's room (see F.mutate); six is only what a body can be drawn with
     delete f._k; delete f._b;
     return f;
   };
   function newRule(n, k) {
     const r = G.rand, a = Math.floor(r() * n);
-    return { k: k === undefined ? Math.floor(r() * 8) : k, a: a, b: clamp(a + Math.floor(r() * 3), a, n - 1), e: 1 + Math.floor(r() * 2), l: 0.7 + r() * 1.0, w: 0.35 + r() * 0.45, j: 2 + Math.floor(r() * 2), g: (r() - 0.5) * 1.4, c: (r() - 0.5) * 1.4, t: Math.floor(r() * 4), p: 0.3 + r() * 0.5, on: -1 };
+    return { k: k === undefined ? Math.floor(r() * 8) : k, a: a, b: clamp(a + Math.floor(r() * 3), a, n - 1), e: 1 + Math.floor(r() * 2), l: 0.7 + r() * 1.0, w: 0.35 + r() * 0.45, j: 2 + Math.floor(r() * 2), g: (r() - 0.5) * 1.4, c: (r() - 0.5) * 1.4, t: Math.floor(r() * 4), p: 0.3 + r() * 0.5, on: -1, u: 0.38 + r() * 0.26, f: 0.8 + r() * 0.5 };
   }
   // sometimes the new growth sprouts from the tip of one that is already there: a hand on an arm, a claw on a tentacle
   const perch = function (f, q) {
@@ -108,24 +110,17 @@
   F.room = function () { const W = G.W; return G.ROOM_OFF ? 0 : G.ROOM_FORCE !== undefined ? G.ROOM_FORCE : (W && W.room) || 0; };
   F.mutate = function (f, m, wild, press, note) {
     const r = G.rand, n = G.randn;
-    if (f.bd) { const busy = G.body.busy(f), lim = 6 + F.room(); if (busy > lim && r() < Math.min(0.7, 0.2 * (busy - lim)) * wild) {
-      const roll = r();
-      if (roll < 0.5 && f.rules.length) { const i = Math.floor(r() * f.rules.length); note('shed its ' + KMANY[f.rules[i].k] + ': a simpler body', true); dropRule(f, i); }
-      else if (roll < 0.7 && G.body.drop(f, null)) note('lost a part of its body: a simpler shape', true);
-      else if (roll < 0.8 && f.pat) { f.pat = 0; note('its markings faded to plain skin', true); }
-      else if (roll < 0.88 && f.crest > 0.25) { f.crest = 0; note('lost its crest', true); }
-      else if (roll < 0.94 && f.en > 2) { f.en = 2; note('lost an eye: two now', true); }
-      else if (f.rules.length) { const q = f.rules[Math.floor(r() * f.rules.length)]; if (q.b > q.a) { q.b = q.a; note(KMANY[q.k] + ' now grow from one place only', true); } }
-    } }
+    // (nothing makes a busy body shed its parts: whether much on a body is a muddle or a marvel is for the god to mark, and every part has to be fed)
     // a change of structure: at most one a birth
-    if (r() < (f.bd ? 0.07 : 0.16) * wild) {
+    if (r() < (f.bd ? 0.11 : 0.16) * wild) {
       const roll = r();
       if (roll < 0.13) { if (f.bd) G.body.bud(f, note); else if (f.n < MAXN) { f.n++; note('body grew to ' + f.n + ' segments', true); } }
       else if (roll < 0.17) { if (f.bd) G.body.drop(f, note); else if (f.n > 1) { f.n--; note('body shrank to ' + f.n + (f.n === 1 ? ' segment' : ' segments'), true); } }
       else if (roll < 0.33) {
         if (f.rules.length < (f.bd ? Math.min(MAXR, 4 + Math.round(F.room() * 0.67)) : MAXR)) {
           // what sprouts next leans towards what the pond is up against
-          const w = [1, 1, 1, 1, 1, 1, 1, 1], pp = press ? press.part : null;
+          const w = [1, 1, 1, 1, 1, 1, 1, 1], pp = press ? press.part : null, D0 = G.pondDna ? G.pondDna() : null;
+          if (D0) { const KW = (f._air || 0) >= 0.5 && D0.kwL ? D0.kwL : D0.kw; for (let i = 0; i < 8; i++) w[i] = KW[i]; }      // this pond's own leaning: some kinds of growth turn up more often here
           if (press && press.o2) { w[1] += press.o2; w[6] += press.o2 * 1.5; w[3] += press.o2 * 0.5; }
           if (pp) { w[1] += pp[1] + pp[7] * 0.5; w[2] += pp[2]; w[7] += pp[2] * 0.7; w[5] += pp[3]; w[4] += pp[5] + pp[4] * 0.5; w[3] += pp[8]; w[0] += pp[0] * 0.5; }
           let tot = 0; for (let i = 0; i < 8; i++) tot += w[i];
@@ -140,7 +135,8 @@
       else if (roll < 0.46) {
         if (f.rules.length && f.rules.length < (f.bd ? Math.min(MAXR, 4 + Math.round(F.room() * 0.67)) : MAXR)) {
           const src = f.rules[Math.floor(r() * f.rules.length)], c = cpRule(src);
-          c.a = src.a + (r() < 0.5 ? 1 : -1);
+          c.a = src.a + (r() < 0.5 ? 0 : r() < 0.5 ? 1 : -1);
+          c.l *= 0.8 + r() * 0.4; c.g = (c.g || 0) + (r() - 0.5) * 0.6; c.u = 0.38 + r() * 0.26; if (r() < 0.4) c.j = 1 + Math.floor(r() * 3);
           c.b = c.a; if (r() < 0.5) c.k = Math.floor(r() * 8);
           f.rules.push(c); note(c.k === src.k ? 'a second set of ' + KMANY[c.k] : 'its ' + KMANY[src.k] + ' were copied and became ' + KMANY[c.k], true);
         }
@@ -164,13 +160,16 @@
       if (ok.length) { const pi = ok[Math.floor(r() * ok.length)], c = cpRule(f.rules[pi]); c.on = pi; c.l *= 0.7; c.w *= 0.85; c.g = (r() - 0.5) * 1.2; if (c.k === 0) c.t = 1 + Math.floor(r() * 3); f.rules.push(c); note('its ' + KMANY[c.k] + ' grew a joint: a part on a part', true); }
     }
     // a child of a new colour: rare, but it is how a pond comes to hold several colours
-    if (r() < (f.bd ? 0.03 : 0.03) * wild) { f.hue += 50 + r() * 260; if (r() < 0.5) f.hue2 = (r() < 0.5 ? -1 : 1) * (40 + r() * 140); note('was born a new colour', true); }
+    if (r() < 0.03 * wild * (G.pondDna && G.pondDna() ? G.pondDna().jump : 1)) { f.hue += 50 + r() * 260; if (r() < 0.5) { f.sat = 40 + r() * 54; f.lit = 46 + r() * 32; } if (r() < 0.5) f.hue2 = (r() < 0.5 ? -1 : 1) * (40 + r() * 140); note('was born a new colour', true); }
     // a whole new way of carrying the body: one of the builds this pond has been given
     // a shape of body imagined for this pond: now and then a child is born some way towards one of them
     if (f.bd) { const pls = G.W && G.W.plans ? G.W.plans : []; if (pls.length && r() < 0.026 * wild) { const p = pls[Math.floor(r() * pls.length)]; if (p.id !== f.pl && p.bd) { const tt = 0.65 + r() * 0.35; G.body.adopt(f, p.bd, tt); f.pl = p.id; if (p.face) for (const k in p.face) if (p.face[k] !== undefined) f[k] += (p.face[k] - f[k]) * Math.min(1, tt + 0.1);
       if (p.tail && tt > 0.7) { f.tk = p.tail.tk; f.ts = p.tail.ts; }
       if (p.outfit && tt > 0.7) f.cl = p.outfit;
       if (p.kit && tt > 0.7) for (let ki = 0; ki < p.kit.length; ki++) F.nudge(f, p.kit[ki], null);      /* a plush shape comes with its stubby legs and little arms */ note('its body took a new shape: the ' + p.name.toLowerCase() + (p.because ? ' (' + p.because + ')' : ''), true); } } }
+    // a muzzle, a nose
+    if (f.bd && r() < 0.025 * wild) { if (f.sn > 0.2) { f.sn = 0; note('its muzzle flattened away', true); } else { f.sn = 0.35 + r() * 0.5; note('grew a muzzle', true); } }
+    if (f.bd && r() < 0.025 * wild) { const k = Math.floor(r() * 4); if (k !== (f.nz | 0)) { f.nz = k; note(['lost its nose', 'grew a button nose', 'grew a soft triangle of a nose', 'grew a pair of nostrils'][k], true); } }
     // heads, necks and coats
     if (f.bd && r() < 0.02 * wild) { const k = r() < 0.2 ? 0 : 1 + Math.floor(r() * 4); if (k !== f.cl) { f.cl = k; note(['took off its outfit', 'put on a scarf', 'put on a belt', 'put on gloves and boots', 'grew a tuft of hair'][k], true); } }
     if (r() < 0.022 * wild) { const k = Math.floor(r() * 4); if (k !== f.coat) { f.coat = k; note(['lost its coat: bare skin again', 'grew scales', 'grew fur', 'grew feathers'][k], true); } }
@@ -208,9 +207,10 @@
       else if (life.diet === 3 && hitL(0.05)) { if (f.en < 2) { f.en++; note('grew an eye, to find the blue food of the deep', true); } else if (!has(f, 4) && room && r() < 0.4) { f.rules.push(newRule(f.n, 4)); note('grew feelers, to find the blue food of the deep', true); } else { f.es += 0.05; note('its eyes grew, for the blue food of the deep', false); } }
       else if (life.diet === 4 && hitL(0.05)) { if (f.mk !== 2) { f.mk = 2; note('grew jaws, for the tough violet food', true); } else if (!has(f, 2) && room) { f.rules.push(newRule(f.n, 2)); note('grew spikes, for the tough violet food', true); } }
       else if (life.diet === 5 && hitL(0.05)) { if (!f.tk) { f.tk = 1 + Math.floor(r() * 2); note('grew a tail, to chase the quick pink food', true); } else if (!has(f, 1) && room) { f.rules.push(newRule(f.n, 1)); note('grew fins, to chase the quick pink food', true); } }
-      if (life.land > 0.3 && hitL(0.06)) { const Lg = legR(); if (f.coat !== 2) { f.coat = 2; note('grew fur, living on the shore', true); } else if (Lg && Lg.t !== 1) { Lg.t = 1; note('its feet grew fingers, living on the shore', true); } }
+      if (life.land > 0.3 && hitL(0.1)) { const Lg = legR(); if (!Lg && room) { f.rules.push(newRule(f.n, 0)); note('grew legs, living on the land', true); } else if (has(f, 1) && r() < 0.2) { for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k === 1 && f.rules[i].on < 0) { dropRule(f, i); break; } note('its fins withered on dry land', true); } else if (f.tk && r() < 0.3) { f.tk = 0; note('lost its swimming tail on dry land', true); } else if (f.coat !== 2) { f.coat = 2; note('grew fur, living on the shore', true); } else if (Lg && Lg.t !== 1) { Lg.t = 1; note('its feet grew fingers, living on the shore', true); } }
       else if (life.shore > 0.3 && life.land < 0.05 && hitL(0.06)) { const Lg = legR(); if (!Lg && room) { f.rules.push(newRule(f.n, 0)); note('grew legs, living by the shore', true); } else if (Lg && Lg.b < f.n - 1) { Lg.b++; note('grew more legs, living by the shore', true); } }
       else if (life.deep > 0.5 && hitL(0.05)) { if (f.glow < 0.6) { f.glow = clamp(f.glow + 0.4, 0, 1); note('began to glow, living in the dark deep', true); } else { f.es += 0.05; note('its eyes grew, living in the dark deep', false); } }
+      else if (life.land < 0.02 && (f._air || 0) < 0.25 && has(f, 0) && hitL(0.08)) { for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.k === 0 && q.on < 0 && !f.rules.some(function (x) { return x.on === i; })) { q.k = 1; q.t = 0; note('its legs flattened into fins, living in the water', true); break; } } }
       else if (life.land < 0.02 && life.shore < 0.1 && life.deep < 0.3 && hitL(0.03)) { if (!has(f, 1) && room) { f.rules.push(newRule(f.n, 1)); note('grew fins, living in open water', true); } else if (!f.tk) { f.tk = 1 + Math.floor(r() * 2); note('grew a tail, living in open water', true); } }
     }
     // what the pond is up against makes the fitting answer a likelier thing to stumble on
@@ -229,13 +229,13 @@
     }
     // and a little drift in the numbers
     let drift = false;
-    const d = function () { if (r() < m * 2) { drift = true; return n(); } return 0; };
+    const d = function () { if (r() < m * 2) { drift = true; return n() * (r() < 0.12 ? 3 : 1); } return 0; };      // now and then a leap, not a step
     f.len *= 1 + d() * 0.08;
     for (let i = 0; i < 5; i++) f.prof[i] *= 1 + d() * 0.14;
     f.bend += d() * 0.05; f.hd *= 1 + d() * 0.07; f.nk += d() * 0.04; f.hx *= 1 + d() * 0.08; f.hq *= 1 + d() * 0.1;
     f.hue += d() * 12; f.hue2 += d() * 14; f.sat += d() * 5; f.lit += d() * 4;
-    f.es += d() * 0.04; f.eg += d() * 0.03; f.ey += d() * 0.04; f.ep += d() * 0.03; f.bl += d() * 0.08; f.sm += d() * 0.08; f.ll *= 1 + d() * 0.07; f.lw *= 1 + d() * 0.07; f.hs *= 1 + d() * 0.07; f.st += d() * 0.1; f.ek += d() * 0.12; f.ms += d() * 0.05; f.ts += d() * 0.1; f.psc += d() * 0.1;
-    for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; q.l *= 1 + d() * 0.12; q.w *= 1 + d() * 0.1; q.g += d() * 0.15; q.c += d() * 0.15; }
+    f.es += d() * 0.04; f.eg += d() * 0.03; f.ey += d() * 0.04; f.ep += d() * 0.03; f.bl += d() * 0.08; f.sm += d() * 0.08; f.ll *= 1 + d() * 0.07; f.lw *= 1 + d() * 0.07; f.hs *= 1 + d() * 0.07; f.st += d() * 0.1; f.ek += d() * 0.12; f.ms += d() * 0.05; f.ts += d() * 0.1; f.psc += d() * 0.1; f.ex = (f.ex || 1) * (1 + d() * 0.07); f.et = (f.et || 0) + d() * 0.06; f.el = (f.el || 0) + d() * 0.05; f.bw = (f.bw === undefined ? 0.35 : f.bw) + d() * 0.1; f.ba = (f.ba === undefined ? 0.1 : f.ba) + d() * 0.1; if (f.sn > 0.2) f.sn += d() * 0.08;
+    for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; q.l *= 1 + d() * 0.12; q.w *= 1 + d() * 0.1; q.g += d() * 0.15; q.c += d() * 0.15; q.u = (q.u === undefined ? 0.5 : q.u) + d() * 0.05; q.f = (q.f || 1) * (1 + d() * 0.1); q.p += d() * 0.08; if (r() < m * 0.25) { q.j = 1 + Math.floor(r() * 3); drift = true; } }
     if (drift) note('body shape', false);
     if (f.bd) {
       G.body.mutate(f, m, wild, note);
@@ -297,8 +297,9 @@
     const r = G.rand, sw = r() < 0.5, base = sw ? a : b, o = sw ? b : a, g = F.clone(base);
     if (a.bd && b.bd) g.bd = G.body.cross(base.bd, o.bd, true);
     if (r() < 0.5) g.prof = o.prof.slice();
-    if (r() < 0.5) { g.en = o.en; g.es = o.es; g.ek = o.ek; g.eg = o.eg; g.ey = o.ey; g.ep = o.ep; }
-    if (r() < 0.5) { g.mk = o.mk; g.ms = o.ms; g.sm = o.sm; g.bl = o.bl; }
+    if (r() < 0.5) { g.en = o.en; g.es = o.es; g.ek = o.ek; g.eg = o.eg; g.ey = o.ey; g.ep = o.ep; g.ex = o.ex; g.et = o.et; g.el = o.el; }
+    if (r() < 0.5) { g.bw = o.bw; g.ba = o.ba; }
+    if (r() < 0.5) { g.mk = o.mk; g.ms = o.ms; g.sm = o.sm; g.bl = o.bl; g.sn = o.sn; g.nz = o.nz; }
     if (r() < 0.5) { g.ll = o.ll; g.lw = o.lw; g.hs = o.hs; g.st = o.st; }
     if (r() < 0.5) g.cl = o.cl;
     if (r() < 0.5) { g.tk = o.tk; g.ts = o.ts; }
@@ -502,8 +503,11 @@
     for (let i = 1; i < 4; i++) v.push(f.coat === i ? 0.6 : 0);
     for (let i = 1; i < 5; i++) v.push(f.cl === i ? 0.4 : 0);
     const hr = f.hue * Math.PI / 180, h2 = (f.hue + f.hue2) * Math.PI / 180;
+    F.LV_COL = v.length;      // the six entries from here are colour
     v.push(Math.cos(hr) * 0.6, Math.sin(hr) * 0.6, Math.cos(h2) * 0.3, Math.sin(h2) * 0.3, (f.sat - 70) / 40, (f.lit - 62) / 25, f.shell > 0.25 ? 0.6 : 0, f.crest > 0.25 ? 0.5 : 0, f.glow > 0.3 ? 0.5 : 0);
     v.push((f.ll - 1) * 1.2, (f.lw - 1) * 1.2, (f.hs - 1) * 0.8, (f.st || 0) * 1.2);
+    v.push(ne * ((f.ex || 1) - 1) * 1.6, ne * (f.et || 0) * 1.5, ne * (f.el || 0) * 1.3, (f.bw === undefined ? 0.35 : f.bw) * 0.5, (f.ba === undefined ? 0.1 : f.ba) * 0.7, (f.sn || 0) * 0.9, (f.nz | 0) === 1 ? 0.4 : 0, (f.nz | 0) === 2 ? 0.4 : 0, (f.nz | 0) === 3 ? 0.4 : 0);
+    { let jn = 0, un = 0, nl = 0; for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.k !== 0) continue; nl++; jn += q.j; un += (q.c || 0); } v.push(nl ? jn / nl * 0.3 : 0, nl ? un / nl * 0.5 : 0); }
     const M = f.bd ? f.bd.m : [];
     v.push(f.bd && f.bd.v ? 0.9 : 0, f.bd ? f.bd.e * 0.4 : 0, Math.max(0, M.length - 4) * 0.5);
     for (let i = 0; i < 4; i++) { const q = M[i]; if (!q) { v.push(0, 0, 0, 0, 0, 0, 0); continue; } v.push(0.5, q.s * 0.8, q.pr ? 0.5 : 0, q.h ? 0.5 : 0, (q.r[0] + q.r[5] - 2) * 0.6, (q.r[2] + q.r[3] - 2) * 0.6, (q.r[7] + q.r[8] - 2) * 0.6 + (q.lb && q.la > 0.1 ? 0.5 : 0)); }
@@ -511,14 +515,14 @@
   };
   const r2 = function (x) { return Math.round(x * 100) / 100; };
   F.pack = function (f) {
-    return [f.sym, f.n, r2(f.len), f.prof.map(r2), r2(f.bend), f.rules.map(function (q) { return [q.k, q.a, q.b, q.e, r2(q.l), r2(q.w), q.j, r2(q.g), r2(q.c), q.t, r2(q.p), q.on === undefined ? -1 : q.on]; }),
-      f.en, r2(f.es), r2(f.ek), f.mk, r2(f.ms), f.tk, r2(f.ts), Math.round(f.hue), Math.round(f.hue2), Math.round(f.sat), Math.round(f.lit), f.pat, r2(f.psc), r2(f.crest), r2(f.shell), r2(f.glow), r2(f.venom), f.seed, r2(f.hd), r2(f.nk), f.coat, r2(f.hx), r2(f.hq), f.pl | 0, f.bd ? G.body.pack(f.bd) : 0, r2(f.eg), r2(f.ey), r2(f.ep), r2(f.bl), r2(f.sm), r2(f.ll), r2(f.lw), r2(f.hs), r2(f.st), f.cl | 0];
+    return [f.sym, f.n, r2(f.len), f.prof.map(r2), r2(f.bend), f.rules.map(function (q) { return [q.k, q.a, q.b, q.e, r2(q.l), r2(q.w), q.j, r2(q.g), r2(q.c), q.t, r2(q.p), q.on === undefined ? -1 : q.on, r2(q.u === undefined ? 0.5 : q.u), r2(q.f || 1)]; }),
+      f.en, r2(f.es), r2(f.ek), f.mk, r2(f.ms), f.tk, r2(f.ts), Math.round(f.hue), Math.round(f.hue2), Math.round(f.sat), Math.round(f.lit), f.pat, r2(f.psc), r2(f.crest), r2(f.shell), r2(f.glow), r2(f.venom), f.seed, r2(f.hd), r2(f.nk), f.coat, r2(f.hx), r2(f.hq), f.pl | 0, f.bd ? G.body.pack(f.bd) : 0, r2(f.eg), r2(f.ey), r2(f.ep), r2(f.bl), r2(f.sm), r2(f.ll), r2(f.lw), r2(f.hs), r2(f.st), f.cl | 0, r2(f.ex || 1), r2(f.et || 0), r2(f.el || 0), r2(f.bw === undefined ? 0.35 : f.bw), r2(f.ba === undefined ? 0.1 : f.ba), r2(f.sn || 0), f.nz | 0];
   };
   F.unpack = function (a) {
     if (!Array.isArray(a) || a.length < 24) return null;
     return F.fix({ sym: a[0], n: a[1], len: a[2], prof: Array.isArray(a[3]) ? a[3].map(Number) : null, bend: a[4],
-      rules: (Array.isArray(a[5]) ? a[5] : []).map(function (q) { return { k: q[0], a: q[1], b: q[2], e: q[3], l: q[4], w: q[5], j: q[6], g: q[7], c: q[8], t: q[9], p: q[10], on: q[11] === undefined ? -1 : q[11] }; }),
-      en: a[6], es: a[7], ek: a[8], mk: a[9], ms: a[10], tk: a[11], ts: a[12], hue: a[13], hue2: a[14], sat: a[15], lit: a[16], pat: a[17], psc: a[18], crest: a[19], shell: a[20], glow: a[21], venom: a[22], seed: a[23], hd: a[24], nk: a[25], coat: a[26], hx: a[27], hq: a[28], pl: a[29], bd: G.body.unpack(a[30]) || undefined, eg: a[31], ey: a[32], ep: a[33], bl: a[34], sm: a[35], ll: a[36], lw: a[37], hs: a[38], st: a[39], cl: a[40] });
+      rules: (Array.isArray(a[5]) ? a[5] : []).map(function (q) { return { k: q[0], a: q[1], b: q[2], e: q[3], l: q[4], w: q[5], j: q[6], g: q[7], c: q[8], t: q[9], p: q[10], on: q[11] === undefined ? -1 : q[11], u: q[12], f: q[13] }; }),
+      en: a[6], es: a[7], ek: a[8], mk: a[9], ms: a[10], tk: a[11], ts: a[12], hue: a[13], hue2: a[14], sat: a[15], lit: a[16], pat: a[17], psc: a[18], crest: a[19], shell: a[20], glow: a[21], venom: a[22], seed: a[23], hd: a[24], nk: a[25], coat: a[26], hx: a[27], hq: a[28], pl: a[29], bd: G.body.unpack(a[30]) || undefined, eg: a[31], ey: a[32], ep: a[33], bl: a[34], sm: a[35], ll: a[36], lw: a[37], hs: a[38], st: a[39], cl: a[40], ex: a[41], et: a[42], el: a[43], bw: a[44], ba: a[45], sn: a[46], nz: a[47] });
   };
   F.key = function (f) { return f._k || (f._k = JSON.stringify(F.pack(f))); };
 

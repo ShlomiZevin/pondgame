@@ -114,11 +114,14 @@
   // ── the camera: zoom 1 shows the whole pond; zoom in to watch them closely, drag to move ──
   G.applyCam = function () {
     const v = G.view, c = G.cam;
-    c.z = G.clamp(c.z, 1, 6);
+    c.z = G.clamp(c.z, 0.5, 6);
     v.scale = v.base * c.z;
     const hw = v.w / 2 / v.scale, hh = v.h / 2 / v.scale;
-    c.x = v.ww * v.scale <= v.w ? v.ww / 2 : G.clamp(c.x, hw, v.ww - hw);
-    c.y = v.wh * v.scale <= v.h ? v.wh / 2 : G.clamp(c.y, hh, v.wh - hh);
+    // the view may be dragged past every edge, out over the emptiness round the pond, at any zoom: only a sliver of the pond has to stay in sight
+    // (G.camHome brings it back to the middle)
+    c.x = G.clamp(c.x, -hw * 0.8, v.ww + hw * 0.8);
+    c.y = G.clamp(c.y, -hh * 0.8, v.wh + hh * 0.8);
+    c.away = Math.abs(c.x - v.ww / 2) > Math.max(hw, v.ww / 2) * 0.6 + 1 || Math.abs(c.y - v.wh / 2) > Math.max(hh, v.wh / 2) * 0.6 + 1;
     v.ox = v.w / 2 - c.x * v.scale; v.oy = v.h / 2 - c.y * v.scale;
   };
   /** zoom by a factor, keeping the point under (sx, sy) where it is */
@@ -126,11 +129,13 @@
     const v = G.view, c = G.cam;
     if (sx === undefined) { sx = v.w / 2; sy = v.h / 2; }
     const wx = (sx - v.ox) / v.scale, wy = (sy - v.oy) / v.scale;
-    c.z = G.clamp(c.z * factor, 1, 6);
+    c.z = G.clamp(c.z * factor, 0.5, 6);
     const s = v.base * c.z;
     c.x = wx - (sx - v.w / 2) / s; c.y = wy - (sy - v.h / 2) / s;
     G.applyCam();
   };
+  /** back to the middle of the pond, all of it in view */
+  G.camHome = function () { const v = G.view; G.cam.z = 1; G.cam.x = v.ww / 2; G.cam.y = v.wh / 2; G.applyCam(); };
   G.focusOn = function (x, y, z) { G.cam.x = x; G.cam.y = y; if (z) G.cam.z = Math.max(G.cam.z, z); G.applyCam(); };
 
   // ── input ──

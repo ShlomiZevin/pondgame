@@ -27,13 +27,13 @@
     for (let i = 0; i < M.length; i++) {
       const q = M[i] = mass(M[i] && typeof M[i] === 'object' ? M[i] : null);
       let r = Array.isArray(q.r) ? q.r.slice(0, K) : [];
-      for (let j = 0; j < K; j++) r[j] = num(r[j], 0.5, 1.6, 1);
+      for (let j = 0; j < K; j++) r[j] = num(r[j], 0.4, 2, 1);
       if (!bd.v) { const s = r.slice(); for (let j = 0; j < K; j++) r[j] = (s[j] + s[(5 - j + K) % K]) / 2; }        // the two sides match
       for (let pass = 0; pass < 2; pass++) { const s = r.slice(); for (let j = 0; j < K; j++) { const av = (s[(j + K - 1) % K] + s[(j + 1) % K]) / 2; r[j] = clamp(s[j], av * 0.74, av * 1.3); } }
       let mean = 0; for (let j = 0; j < K; j++) mean += r[j]; mean /= K;
-      for (let j = 0; j < K; j++) r[j] = clamp(r[j] / mean, 0.55, 1.5);
+      for (let j = 0; j < K; j++) r[j] = clamp(r[j] / mean, 0.45, 1.9);
       q.r = r;
-      q.s = i ? num(q.s, 0.3, 1.25, 0.7) : 1;
+      q.s = i ? num(q.s, 0.28, 1.5, 0.7) : 1;
       q.on = i ? clamp(q.on | 0, 0, i - 1) : -1;
       q.pr = i && q.pr ? 1 : 0; q.h = q.h ? 1 : 0;
       q.lb = (q.lb | 0) < 3 ? 0 : clamp(q.lb | 0, 3, 8); q.la = q.lb ? num(q.la, 0.04, 0.26, 0.12) : 0;
@@ -140,9 +140,9 @@
   B.bud = function (f, note) {
     const r = G.rand, bd = f.bd, M = bd.m;
     if (M.length >= Math.min(MAXM, 3 + Math.round(G.form.room() / 2))) return false;      /* three parts in a young pond, up to six in an old one */
-    const par = Math.floor(r() * M.length), src = M[par], pr = r() < 0.32 ? 1 : 0;
+    const D = G.pondDna ? G.pondDna() : null, par = Math.floor(r() * M.length), src = M[par], pr = r() < (D ? D.pair : 0.32) ? 1 : 0;
     const rr = src.r.map(function (v) { return 1 + (v - 1) * (r() < 0.5 ? 1 : 0.3) + (r() - 0.5) * 0.12; });
-    M.push(mass({ r: rr, s: 0.42 + r() * 0.55, on: par, at: bd.v ? r() * TAU - PI : pr ? (r() - 0.5) * 2 : (r() < 0.35 ? -PI / 2 : PI / 2), d: 0.6 + r() * 0.75, pr: pr, lb: r() < 0.15 ? 3 + Math.floor(r() * 5) : 0, la: 0.12 }));
+    M.push(mass({ r: rr, s: 0.42 + r() * 0.55, on: par, at: bd.v ? r() * TAU - PI : pr ? (r() - 0.5) * 2 : (r() < (D ? D.up : 0.35) ? -PI / 2 : PI / 2), d: 0.6 + r() * 0.75, pr: pr, lb: r() < (D ? D.lobe : 0.15) ? 3 + Math.floor(r() * 5) : 0, la: 0.12 }));
     if (note) note(pr ? 'a pair of new parts budded from its body' : 'a new part budded from its body', true);
     return true;
   };
@@ -161,7 +161,7 @@
   /** chance reshapes a body. m: chance of a nudge per gene; wild: the world's mutation slider */
   B.mutate = function (f, m, wild, note) {
     const r = G.rand, n = G.randn, bd = f.bd, M = bd.m;
-    if (r() < 0.04 * wild) {
+    if (r() < 0.07 * wild) {
       const roll = r(), pick = function () { return M.length > 1 ? M[1 + Math.floor(r() * (M.length - 1))] : null; };
       if (roll < 0.34) B.bud(f, note);
       else if (roll < 0.44) B.drop(f, note);
@@ -173,7 +173,7 @@
       else { const ok = []; for (let i = 0; i < M.length; i++) if (!M[i].pr && i !== bd.e) ok.push(i); if (ok.length) { bd.e = ok[Math.floor(r() * ok.length)]; note('its face moved to another part of its body', true); } }
     }
     // an outline is pushed out or pressed in at one place, and its neighbours follow
-    if (r() < 0.14 * wild) { const q = M[Math.floor(r() * M.length)], i = Math.floor(r() * K), a = (r() < 0.5 ? 1 : -1) * (0.08 + r() * 0.16); q.r[i] += a; q.r[(i + 1) % K] += a * 0.55; q.r[(i + K - 1) % K] += a * 0.55; note('body shape', false); }
+    if (r() < 0.2 * wild) { const q = M[Math.floor(r() * M.length)], i = Math.floor(r() * K), a = (r() < 0.5 ? 1 : -1) * (0.08 + r() * 0.2); q.r[i] += a; q.r[(i + 1) % K] += a * 0.55; q.r[(i + K - 1) % K] += a * 0.55; note('body shape', false); }
     let drift = false;
     for (let i = 0; i < M.length; i++) {
       const q = M[i];

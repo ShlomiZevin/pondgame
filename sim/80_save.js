@@ -9,7 +9,7 @@
     const W = G.W;
     if (!W || W.title) return null;
     const out = {
-      v: 1, at: Date.now(), room: +(W.room || 0).toFixed(1), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
+      v: 1, at: Date.now(), room: +(W.room || 0).toFixed(1), shore: +(W.shore || G.SHORE0).toFixed(3), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
       set: W.set, disc: W.disc, nextSp: W.nextSp, ai: G.ai && G.ai.model ? G.ai.model : '', drawn: G.ai && G.ai.drawn ? 1 : 0, spend: G.ai ? G.ai.life : {},
       hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species, +(h.look || 0).toFixed(3), +(h.lookTop || 0).toFixed(2), +(h.whole || 0).toFixed(3), +(h.wholeTop || 0).toFixed(2), +(h.body || 0).toFixed(1), +(h.bodyTop || 0).toFixed(1), +(h.size || 0).toFixed(1), +(h.sizeTop || 0).toFixed(1), (G.MARKS_X || []).map(function (m) { const q = h.mx && h.mx[m.id]; return q ? [+q[0].toFixed(3), +q[1].toFixed(2)] : 0; }), +(h.room || 0).toFixed(1)]; }),
       discLog: W.discLog.slice(-40),
@@ -45,13 +45,14 @@
     const sp = W.species.filter(function (s) { return s.rep; }).sort(function (a, b) { return (b.extinct ? 0 : 1) - (a.extinct ? 0 : 1) || b.peak - a.peak; }).slice(0, 26);
     sp.forEach(function (s) { out.species.push([s.id, s.name, s.born, s.parent, s.extinct ? s.diedGen || 1 : 0, s.peak, s.kills || 0, Math.round(s.hue), G.packGenome(s.rep), s.hist.slice(-40), s.judge && !s.extinct ? { score: +s.judge.score.toFixed(2), why: s.judge.why, gen: s.judge.gen, fix: s.judge.fix || '', loved: s.loved ? 1 : 0 } : s.loved ? { loved: 1 } : null]); });
     W.fossils.slice(-12).forEach(function (f) { if (f.g) out.fossils.push([f.id, f.name, f.born, f.died, f.peak, G.packGenome(f.g)]); });
-    // keep it well under 100 kB
+    // keep it under the server's limit (400 kB). It used to be 100 kB, and a long game's collection, marvels and charts filled that: the living creatures were
+    // then the first thing cut, so a pond came back with a couple of dozen of them. Creatures are the last thing to go now, and there is room for all of them.
     let s = JSON.stringify(out);
-    if (s.length > 92000) { out.zones.forEach(function (z) { z.svg = ''; }); s = JSON.stringify(out); }
-    if (s.length > 92000) { out.history = out.history.slice(-30); s = JSON.stringify(out); }
-    for (let i = out.species.length - 1; i >= 0 && s.length > 92000; i--) { if (out.species[i][10]) { out.species[i][10] = null; s = JSON.stringify(out); } }
-    if (s.length > 92000 && out.discLog && out.discLog.length > 20) { out.discLog = out.discLog.slice(-20); s = JSON.stringify(out); }
-    while (s.length > 92000 && (all.length > 10 || out.species.length > 8 || out.fossils.length > 4)) {
+    if (s.length > 360000) { out.zones.forEach(function (z) { z.svg = ''; }); s = JSON.stringify(out); }
+    if (s.length > 360000) { out.history = out.history.slice(-30); s = JSON.stringify(out); }
+    for (let i = out.species.length - 1; i >= 0 && s.length > 360000; i--) { if (out.species[i][10]) { out.species[i][10] = null; s = JSON.stringify(out); } }
+    if (s.length > 360000 && out.discLog && out.discLog.length > 20) { out.discLog = out.discLog.slice(-20); s = JSON.stringify(out); }
+    while (s.length > 360000 && (all.length > 10 || out.species.length > 8 || out.fossils.length > 4)) {
       if (out.fossils.length > 4) out.fossils.length = Math.max(4, out.fossils.length - 4);
       else if (out.species.length > 16) out.species.length = 16;
       else if (out.species.length > 12) out.species.length = Math.max(12, out.species.length - 4);
@@ -161,6 +162,7 @@
     const W = G.W;
     W.gen = Math.floor(num(d.gen, 1, 1e6, 1));
     W.room = num(d.room, 0, G.ROOM_MAX || 10, 0);
+    W.shore = num(d.shore, G.SHORE0, 0.5, G.SHORE0);      // a pond saved when the land began smaller comes back with the bigger land
     W.season = Math.floor(num(d.season, 0, 3, 0));
     W.st = num(d.st, 0, G.PH[W.season] - 0.01, 0);
     W.t = num(d.t, 0, 1e7, 0);

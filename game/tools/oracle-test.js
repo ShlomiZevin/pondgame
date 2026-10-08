@@ -38,9 +38,14 @@ const rnd = (() => { let s = 12345; return () => (s = (s * 1664525 + 1013904223)
 G.sheet = (forms) => { G._sheet = forms; return 'x'; };
 G.mode = 'play'; G.catching = false;
 G.ai.provider = 'server'; G.ai.available = () => true; G.ai.hasFuel = () => true; G.ai.allow = () => true;
-G.ai.ask = (task, input) => { const forms = G._sheet || []; return Promise.resolve({ scores: forms.map((f, i) => { const t = truth(f); return { id: i + 1, score: clamp(t.b * 0.72 + (rnd() - 0.5) * 0.16, 0, 1), whole: clamp(t.w * 0.6 + (rnd() - 0.5) * 0.16, 0, 1), why: 'x', fix: t.fix, m: process.env.NOMARKS ? undefined : { body: clamp(0.64 - 0.02 * Math.max(0, t.busy - 9) + (rnd() - 0.5) * 0.14, 0, 1), balance: clamp(0.66 + (rnd() - 0.5) * 0.14, 0, 1), grand: clamp(0.25 + 0.035 * t.busy + (rnd() - 0.5) * 0.1, 0, 1) } }; }) }); };
+G.ai.ask = (task, input) => { const forms = (G._sheet || []).slice(input && input.refs || 0);      /* the first row of a sheet is the reference row: it is not graded */ return Promise.resolve({ scores: forms.map((f, i) => { const t = truth(f); return { id: i + 1, score: clamp(t.b * 0.72 + (rnd() - 0.5) * 0.16, 0, 1), whole: clamp(t.w * 0.6 + (rnd() - 0.5) * 0.16, 0, 1), why: 'x', fix: t.fix, m: process.env.NOMARKS ? undefined : { body: clamp(0.64 - 0.02 * Math.max(0, t.busy - 9) + (rnd() - 0.5) * 0.14, 0, 1), balance: clamp(0.66 + (rnd() - 0.5) * 0.14, 0, 1), grand: clamp(0.25 + 0.035 * t.busy + (rnd() - 0.5) * 0.1, 0, 1) } }; }) }); };
 if (process.env.ROOM_RULE) G.ROOM_RULE = process.env.ROOM_RULE;
 if (process.env.ROOM_OFF) G.ROOM_OFF = true;
+if (process.env.LOOK_S) G.LOOK_S = +process.env.LOOK_S;
+if (process.env.FIT_OFF) G.FIT_OFF = true;
+if (process.env.FIT_AGE) G.form.FIT_AGE = +process.env.FIT_AGE;
+if (process.env.LOOK_K) G.LOOK_K = +process.env.LOOK_K;
+if (process.env.FIT_LAM) G.form.FIT_LAM = +process.env.FIT_LAM;
 (async () => {
   for (const seed of seeds) {
     G.newWorld({ seed }); G.founderPond();
@@ -53,11 +58,21 @@ if (process.env.ROOM_OFF) G.ROOM_OFF = true;
       if (G.W.gen !== last) {
         last = G.W.gen;
         if (last % every === 0) { G.watchTick(); await flush(); looks++; }
+        if (process.env.DIAG && last % 40 === 0 && G.W.eyeBank && G.W.eyeBank.length > 60) {
+  const FM = G.form, B = G.W.eyeBank, cre = G.W.cre.filter((c) => c.g.f.bd);
+  const cor = (X, Y) => { const n = X.length, mx = X.reduce((p, v) => p + v, 0) / n, my = Y.reduce((p, v) => p + v, 0) / n; let sxy = 0, sxx = 0, syy = 0; for (let i = 0; i < n; i++) { sxy += (X[i] - mx) * (Y[i] - my); sxx += (X[i] - mx) ** 2; syy += (Y[i] - my) ** 2; } return (sxy / Math.sqrt(sxx * syy + 1e-12)).toFixed(2); };
+  const T = G.W.taste, pt = cre.map((c) => truth(c.g.f).b), px = cre.map((c) => FM.looks(c.g.f));
+  const bt = B.map((e) => truth(e.f).b), bm = B.map((e) => e.b);
+  const T0 = FM.newTaste(), Tb = FM.newTaste(); FM.fitTaste(Tb, B.map((e) => ({ x: e.x, v0: e.v0, b: truth(e.f).b * 0.72, w: e.w })), 0.5);
+  const Tp = FM.newTaste(); FM.fitTaste(Tp, cre.map((c, i) => ({ x: px[i], v0: 0, b: pt[i] * 0.72, w: 0 })), 0.05);
+  const recent = B.slice(-36);
+  console.log('DIAG g' + last + ' bank ' + B.length + ' | bank: mark~truth ' + cor(bm, bt) + ' taste~mark ' + cor(B.map((e) => FM.beautyX(e.x, T)), bm) + ' taste~truth ' + cor(B.map((e) => FM.beautyX(e.x, T)), bt) + ' | pop: taste~truth ' + cor(px.map((x) => FM.beautyX(x, T)), pt) + ' start-taste ' + cor(px.map((x) => FM.beautyX(x, T0)), pt) + ' fit-on-noisefree-bank ' + cor(px.map((x) => FM.beautyX(x, Tb)), pt) + ' fit-on-pop-itself ' + cor(px.map((x) => FM.beautyX(x, Tp)), pt) + ' | sd pop ' + Math.sqrt(pt.reduce((p, v) => p + (v - pt.reduce((a, b) => a + b, 0) / pt.length) ** 2, 0) / pt.length).toFixed(3) + ' sd bank ' + Math.sqrt(bt.reduce((p, v) => p + (v - bt.reduce((a, b) => a + b, 0) / bt.length) ** 2, 0) / bt.length).toFixed(3) + ' recent36 mark~truth ' + cor(recent.map((e) => e.b), recent.map((e) => truth(e.f).b)));
+}
         if (last === 1 || last % Math.max(10, Math.round(gens / 15)) === 0) {
           const cre = G.W.cre, n = cre.length || 1; let tb = 0, tw = 0, bb = 0, bel = 0, belw = 0, es = 0, hdv = 0, sz = 0, sp = 0; const kc = {}, hb = [0, 0, 0, 0, 0, 0]; for (const c of cre) { const k = G.shapeOf(c.g) + '|' + G.hueOf(c.g); kc[k] = (kc[k] || 0) + 1; hb[G.hueOf(c.g)]++; } let sq2 = 0; for (const k in kc) sq2 += (kc[k] / n) * (kc[k] / n); const effK = 1 / sq2, hues = hb.filter((v) => v / n >= 0.08).length;
           for (const c of cre) { const t = truth(c.g.f); tb += t.b; tw += t.w; bb = Math.max(bb, t.b); bel += c.ph.charm; belw += c.ph.whole; es += c.g.f.es; sz += c.ph.r; }
           if (last > gens / 2) { acc.b += tb / n; acc.w += tw / n; acc.d += effK; acc.n++; }
-          line.push('g' + String(last).padEnd(4) + ' TRUE beauty ' + (tb / n * 10).toFixed(1) + ' (best ' + (bb * 10).toFixed(1) + ') whole ' + (tw / n * 10).toFixed(1) + ' | believed ' + (bel / n * 10).toFixed(1) + '/' + (belw / n * 10).toFixed(1) + ' | eyes ' + (es / n).toFixed(2) + ' size ' + (sz / n).toFixed(1) + ' (grow ' + (G.W.grow || 0).toFixed(1) + ')' + ' ROOM ' + (G.W.room || 0).toFixed(1) + ' parts ' + (cre.reduce((a, c) => a + G.body.busy(c.g.f), 0) / n).toFixed(1) + ' DIVERSITY ' + effK.toFixed(1) + ' looks, ' + hues + ' colours; kinds ' + G.W.species.filter((q) => !q.extinct).length + ' pop ' + cre.length);
+          line.push('g' + String(last).padEnd(4) + ' TRUE beauty ' + (tb / n * 10).toFixed(1) + ' (best ' + (bb * 10).toFixed(1) + ') whole ' + (tw / n * 10).toFixed(1) + ' | believed ' + (bel / n * 10).toFixed(1) + '/' + (belw / n * 10).toFixed(1) + ' | eyes ' + (es / n).toFixed(2) + ' size ' + (sz / n).toFixed(1) + ' (grow ' + (G.W.grow || 0).toFixed(1) + ')' + ' ROOM ' + (G.W.room || 0).toFixed(1) + ' parts ' + (cre.reduce((a, c) => a + G.body.busy(c.g.f), 0) / n).toFixed(1) + ' DIVERSITY ' + effK.toFixed(1) + ' looks, ' + hues + ' colours; kinds ' + G.W.species.filter((q) => !q.extinct).length + ' pop ' + cre.length + ' | AIR ' + (cre.reduce((q, c) => q + (c.g.t[5] || 0), 0) / n).toFixed(2) + ' max ' + Math.max.apply(null, cre.map((c) => c.g.t[5] || 0)).toFixed(2) + ' onland ' + cre.filter((c) => c.land).length + ' landkind ' + cre.filter((c) => (c.g.t[5] || 0) > 0.6).length + ' shore ' + (G.W.shore || 0.16).toFixed(2) + ' BUILDS ' + (() => { const L = cre.map((c) => G.lvOf(c)), used = []; let k = 0; for (let i = 0; i < L.length; i++) { if (used[i]) continue; k++; let m = 0; for (let j = i; j < L.length; j++) if (!used[j] && G.bdist(L[i], L[j]) < 1.2) { used[j] = 1; m++; } } return k; })() + ' | near ' + (cre.filter((c) => c.st === 1).length / n).toFixed(2) + ' err ' + (cre.reduce((q, c) => q + Math.abs(c.ph.charm - truth(c.g.f).b * 0.72), 0) / n).toFixed(3) + ' corrT ' + (() => { const X = cre.map((c) => G.form.beauty(c.g.f, G.W.taste)), Y = cre.map((c) => truth(c.g.f).b), mx = X.reduce((p, v) => p + v, 0) / n, my = Y.reduce((p, v) => p + v, 0) / n; let sxy = 0, sxx = 0, syy = 0; for (let i = 0; i < X.length; i++) { sxy += (X[i] - mx) * (Y[i] - my); sxx += (X[i] - mx) ** 2; syy += (Y[i] - my) ** 2; } return (sxy / Math.sqrt(sxx * syy + 1e-12)).toFixed(2) + ' sdTrue ' + Math.sqrt(syy / n).toFixed(3); })() + ' corr ' + (() => { const X = cre.map((c) => c.ph.charm), Y = cre.map((c) => truth(c.g.f).b), mx = X.reduce((p, v) => p + v, 0) / n, my = Y.reduce((p, v) => p + v, 0) / n; let sxy = 0, sxx = 0, syy = 0; for (let i = 0; i < X.length; i++) { sxy += (X[i] - mx) * (Y[i] - my); sxx += (X[i] - mx) ** 2; syy += (Y[i] - my) ** 2; } return (sxy / Math.sqrt(sxx * syy + 1e-12)).toFixed(2); })());
         }
       }
     }

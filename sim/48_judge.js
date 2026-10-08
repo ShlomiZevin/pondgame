@@ -33,7 +33,9 @@
     ctx.fillStyle = '#0d2f3d'; ctx.fillRect(0, 0, cv.width, cv.height);
     for (let i = 0; i < n; i++) {
       const x = (i % cols) * CW, y = Math.floor(i / cols) * CH;
-      ctx.save(); ctx.translate(x + CW / 2, y + 190 * SC + 6); ctx.scale(SC, SC);
+      { const a = forms[i]._air || 0; if (a >= 0.5) { ctx.fillStyle = '#9cc3d4'; ctx.fillRect(x, y, CW, CH * 0.6); ctx.fillStyle = '#8a7648'; ctx.fillRect(x, y + CH * 0.6, CW, CH * 0.4); } }
+      const zk = o.sizes && o.sizes[i] > 0 && o.sizeTop > 0 ? G.clamp(Math.sqrt(o.sizes[i] / o.sizeTop), 0.55, 1) : 1;
+      ctx.save(); ctx.translate(x + CW / 2, y + 190 * SC + 6 - (1 - zk) * 40 * SC); ctx.scale(SC * zk, SC * zk);
       try { G.form.portrait(ctx, forms[i], 1.3 + i, {}); } catch (e) { console.error(e); }
       ctx.restore();
       ctx.fillStyle = i < rf ? 'rgba(160,120,10,0.95)' : 'rgba(7,18,31,0.85)'; ctx.beginPath(); ctx.arc(x + 22, y + 22, 15, 0, 6.2832); ctx.fill();
@@ -122,7 +124,7 @@
   // guess: for every creature it really looked at, the pond remembers how far its guess was off (q.rb, q.rw), and a creature that LOOKS like those
   // (G.lookVec: face, proportions, colours, shapes, growths) is corrected by the same amount. So one look at a kind sets the level of the whole kind,
   // while the differences between its members (bigger eyes, a rounder head, sturdier limbs) stay, and selection can still work on them.
-  G.LOOK_S = 1.7;
+  G.LOOK_S = 1.7; G.LOOK_K = 0.5;
   G.lvOf = function (c) { return c.lv || (c.lv = G.lookVec(c.g)); };
   G.believe = function (g, lv) {
     const W = G.W, FM = G.form, T = W.taste, x = FM.looks(g.f), v0 = FM.whole(g.f).v, B = W.eyeBank;
@@ -130,9 +132,11 @@
     if (B && B.length) {
       let sw = 0, rb = 0, rw = 0;
       for (let i = 0; i < B.length; i++) { const q = B[i]; if (q.rb === undefined) continue; const d = G.fdist(lv, q.lv), wt = Math.exp(-d * d / G.LOOK_S); if (wt < 0.03) continue; sw += wt; rb += wt * q.rb; rw += wt * q.rw; }
-      if (sw > 0.15) { const k = Math.min(0.9, sw / (sw + 0.5)); b += k * rb / sw; w += k * rw / sw; near = 1; }
+      if (sw > 0.15) { const k = Math.min(0.9, sw / (sw + G.LOOK_K)); b += k * rb / sw; w += k * rw / sw; near = 1; }
     }
-    return { b: clamp01(b), w: clamp01(w), near: near };
+    const b0 = b, w0 = w, C = W.cal;
+    if (C) { b = C.mb + C.sb * (b - C.pb); w = C.mw + C.sw * (w - C.pw); }
+    return { b: clamp01(b), w: clamp01(w), near: near, b0: b0, w0: w0 };
   };
   G.watchTick = function () {
     const W = G.W;
@@ -144,7 +148,7 @@
     if (picks.length < 4 || !G.ai.allow('watch')) return;
     W.lastLookGen = W.gen;
     // each creature is drawn large enough for its face to be read (a picture costs little; it is the words that cost)
-    const refs = G.referenceForms(), img = G.sheet(refs.concat(picks.map(function (c) { return c.g.f; })), { cw: 248, ch: 256, sc: 0.68, cols: 4, refs: refs.length });
+    const refs = G.referenceForms(), img = G.sheet(refs.concat(picks.map(function (c) { return c.g.f; })), { cw: 248, ch: 256, sc: 0.68, cols: 4, refs: refs.length, sizeTop: Math.max.apply(null, picks.map(function (c) { return c.ph.r; })), sizes: refs.map(function () { return 0; }).concat(picks.map(function (c) { return c.ph.r; })) });
     if (!img) return;
     watching = true;
     G.ai.ask('judge', { image: img, mime: 'image/jpeg', lean: 1, count: picks.length, refs: refs.length, kind: 'watch' }).then(function (res) {
@@ -162,7 +166,7 @@
         // its further marks (body, balance, grandeur) reach the living creatures that look like it
         if (G.marksToward) for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x === c || x.real || x.dead || !x.g.f.bd) continue; const d = G.fdist(lv, G.lvOf(x)), wt = Math.exp(-d * d / G.LOOK_S); if (wt >= 0.05) G.marksToward(x, g.m, wt); }
         // the look is remembered
-        if (c.g.f.bd) { (W.eyeBank = W.eyeBank || []).push({ lv: lv, m: g.m, b: g.b, w: g.w, f: c.g.f, x: FM.looks(c.g.f), v0: FM.whole(c.g.f).v }); if (W.eyeBank.length > 160) W.eyeBank.shift(); }
+        if (c.g.f.bd) { (W.eyeBank = W.eyeBank || []).push({ lv: lv, m: g.m, b: g.b, w: g.w, f: c.g.f, x: FM.looks(c.g.f), v0: FM.whole(c.g.f).v, pb: c.b0, pw: c.w0 }); if (W.eyeBank.length > 240) W.eyeBank.shift(); }
         const sp = c.sp ? G.speciesById(c.sp) : null;
         if (c.sp) (W.spLook = W.spLook || {})[c.sp] = W.gen;
         // the best the watcher has really seen are kept (a hall of fame): they can be bred again if the pond loses what they had
@@ -174,10 +178,14 @@
       if (W.taste && W.eyeBank && W.eyeBank.length) {
         const B = W.eyeBank;
         // the pond's own taste is taught by everything the watcher has really said: a few passes over its recent marks, newest last
-        if (B.length >= 8) for (let ep = 0; ep < 3; ep++) for (let i = 0; i < B.length; i++) { const e = B[i]; FM.learn(T, e.f, e.b, 0.025, e.x); FM.learnWhole(T, e.x, e.w, 0.03, e.v0); }
+        if (B.length >= 8 && FM.fitTaste && !G.FIT_OFF) FM.fitTaste(T, B);
+        else if (B.length >= 8) for (let ep = 0; ep < 3; ep++) for (let i = 0; i < B.length; i++) { const e = B[i]; FM.learn(T, e.f, e.b, 0.025, e.x); FM.learnWhole(T, e.x, e.w, 0.03, e.v0); }
         // how far that taste is still off for each creature really seen: what the look-alikes are corrected by (see G.believe)
         for (let i = 0; i < B.length; i++) { const e = B[i]; e.rb = e.b - FM.beautyX(e.x, T); e.rw = e.w - FM.wholeX(e.x, T, e.v0); }
-        for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x.real || x.dead || !x.g.f.bd) continue; const bel = G.believe(x.g, G.lvOf(x)); x.eb = bel.b; x.ew = bel.w; x.st = bel.near ? 1 : 3; x.ph.charm = x.eb; x.ph.whole = x.ew; }
+        { const P = B.filter(function (e) { return e.pb !== undefined && e.pw !== undefined; }).slice(-90);
+          if (P.length >= 20) { const fit = function (kp, km) { let mp = 0, mm = 0; for (let i = 0; i < P.length; i++) { mp += P[i][kp]; mm += P[i][km]; } mp /= P.length; mm /= P.length; let sxy = 0, sxx = 0; for (let i = 0; i < P.length; i++) { sxy += (P[i][kp] - mp) * (P[i][km] - mm); sxx += (P[i][kp] - mp) * (P[i][kp] - mp); } return [mp, mm, G.clamp(sxx > 1e-6 ? sxy / sxx : 1, 0.3, 1)]; };
+            const cb = fit('pb', 'b'), cw = fit('pw', 'w'); W.cal = { pb: cb[0], mb: cb[1], sb: cb[2], pw: cw[0], mw: cw[1], sw: cw[2] }; } }
+        for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x.real || x.dead || !x.g.f.bd) continue; const bel = G.believe(x.g, G.lvOf(x)); x.eb = bel.b; x.ew = bel.w; x.b0 = bel.b0; x.w0 = bel.w0; x.st = bel.near ? 1 : 3; x.ph.charm = x.eb; x.ph.whole = x.ew; }
       }
       if (G.roomAfterLook) G.roomAfterLook(looks);      // room to grow opens while the god finds the pond's bodies read well, and closes when they do not
       G.emit('watched', n);

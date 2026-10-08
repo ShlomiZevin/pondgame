@@ -42,6 +42,22 @@
   // w: [{f, t, v}] brain wires. f: 0..11 inputs or 100+n hidden. t: 200+o outputs or 100+n hidden.
   function W(f, t, v) { return { f: f, t: t, v: v }; }
 
+  /** The nature of this pond: how chance leans here. It is drawn once from the pond's seed and never chosen by anyone: which kinds of growth turn up more
+   *  often, how readily a part doubles or grows lobes, the outline, face and colours its first life starts from. Chance still proposes everything and
+   *  selection still chooses; but two ponds start from different places and are offered different things, so they grow different creatures. */
+  G.pondDna = function () {
+    const W = G.W; if (!W) return null;
+    if (W._dna && W._dna.seed === W.seed) return W._dna;
+    let s = (((W.seed | 0) ^ 0x9e3779b9) >>> 0) || 1;
+    const r = function () { s = (s + 0x6D2B79F5) >>> 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const kw = []; for (let i = 0; i < 8; i++) kw.push(0.25 + r() * r() * 3.4);
+    const rr = [], a1 = r() * 6.2832, a2 = r() * 6.2832, k1 = r() * 0.24, k2 = r() * 0.15; for (let j = 0; j < 10; j++) rr.push(1 + k1 * Math.cos(j / 10 * 6.2832 + a1) + k2 * Math.cos(2 * j / 10 * 6.2832 + a2));
+    // what the land leans to: legs, feelers, horns, plates and frills turn up oftener than in the water, fins and tentacles seldomer, each by this pond's own measure
+    const kwL = []; { let s2 = (((W.seed | 0) ^ 0x51ed270b) >>> 0) || 7; const r2 = function () { s2 = (s2 + 0x6D2B79F5) >>> 0; let t = Math.imul(s2 ^ (s2 >>> 15), 1 | s2); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      const lean = [2.4, 0.9, 1, 0.3, 1.6, 1.4, 1.2, 1.5]; for (let i = 0; i < 8; i++) kwL.push((0.25 + r2() * r2() * 3.4) * lean[i]); }
+    return (W._dna = { seed: W.seed, kw: kw, kwL: kwL, r: rr, pair: 0.14 + r() * 0.42, lobe: 0.03 + r() * 0.3, up: 0.2 + r() * 0.6, eg: 0.38 + r() * 0.34, ey: -0.05 + r() * 0.3, ep: 0.4 + r() * 0.3, sm: r() * 0.9, bl: r() * 0.8, es: 0.36 + r() * 0.22,
+      sat: 46 + r() * 42, lit: 50 + r() * 24, hue2: (r() < 0.5 ? -1 : 1) * (45 + r() * 130), jump: 0.6 + r() * 1.6, ex: 0.8 + r() * 0.5, et: (r() - 0.5) * 0.5, bw: r() * 0.8, ba: (r() - 0.5) * 0.8 });
+  };
   /** the first life of a pond: single cells, in this pond's own colour */
   G.founder = function () {
     const r = G.rand, n = G.randn;
@@ -54,6 +70,8 @@
       h: 0,
       w: [],
     };
+    { const D = G.pondDna(), f = g.f; if (D && f.bd) { f.bd.m[0].r = D.r.map(function (v) { return v * (1 + n() * 0.03); }); f.eg = D.eg; f.ey = D.ey; f.ep = D.ep; f.sm = D.sm; f.bl = D.bl; f.es = D.es; f.sat = D.sat + n() * 4; f.lit = D.lit + n() * 3; f.hue2 = D.hue2; f.ex = D.ex; f.et = D.et; f.bw = D.bw; f.ba = D.ba; } }
+    g.t[5] = clamp(0.22 + n() * 0.08, 0, 0.45);      // life begins in the water, not far from the air
     g.w.push(W(0, 200, 0.1 + n() * 0.15));
     g.w.push(W(1, 200, 0.35 + n() * 0.2));
     g.w.push(W(2, 201, 0.55 + n() * 0.3));
@@ -87,7 +105,10 @@
     g.t[1] = clamp(g.t[1], 0.05, 1);
     g.t[3] = 0.3;
     g.t[4] = clamp(g.t[4] === undefined || !isFinite(g.t[4]) ? 0.12 : +g.t[4], 0, 1);
-    g.t.length = 5;
+    g.t[5] = clamp(+g.t[5] || 0, 0, 1);
+    g.t[6] = clamp(+g.t[6] || 1, 0.4, 2.2);      // its own rate of change: how readily this line mutates (inherited, and itself open to change)
+    g.t.length = 7;
+    if (g.f && typeof g.f === 'object') g.f._air = g.t[5];
     if (!g.f || typeof g.f !== 'object') g.f = G.form.cell(isFinite(g.t[2]) ? g.t[2] : undefined); else G.form.fix(g.f);
     g.t[2] = g.f.hue;
     for (let i = 0; i < 6; i++) g.c[i] = clamp(g.c[i], 0, 1);
@@ -109,6 +130,7 @@
   // nothing here is assigned by a table of kinds: speed, senses, reach, armour and attack are measured from the body.
   G.derive = function (g) {
     const t = g.t, c = g.c, f = g.f, FM = G.form, U = FM.U;
+    f._air = t[5] || 0;      // where it lives is part of how it is looked at (see F.looks, G.sheet)
     const cn = FM.counts(f), A = FM.abilities(f, cn), ext = FM.extent(f), k = cn.k;
     const mvd = g.mv && G.marvelOf ? G.marvelOf(g.mv) : null;
     const stall = G.W && G.W.grow ? G.W.grow : 0;
@@ -167,7 +189,10 @@
     ph.lamp = Math.min(2, ph.lamp + FX.glow);
     // what the body opens up: nothing is unlocked by a list, each follows from the shape
     ph.jaws = bite >= 0.8;                       // can eat the big prey of the deep
-    ph.lungs = cn.legSites >= 4;                 // two pairs of legs carry it onto the shore
+    ph.air = t[5] || 0;                          // breath: 0 water only .. 1 land only
+    ph.home = ph.air >= 0.5 ? 1 : 0;             // 0 a creature of the water, 1 a creature of the land
+    ph.lungs = ph.home === 1;
+    ph.gill *= ph.home ? 0.3 : 1 - 0.3 * ph.air;      // a body made for air breathes water badly; the less of its breath a water creature spends on air, the better its gills
     ph.hands = cn.fingers >= 2;                  // fingers at the front pick the shore's food faster
     ph.warm = ph.res[1] >= 0.55;
     ph.plump = plump;                 // cold-proof life does not slow down in winter
@@ -185,7 +210,7 @@
     let digSum = 0; for (let i = 0; i < 6; i++) digSum += c[i];
     let tolSum = 0; for (let i = 9; i < 15; i++) tolSum += c[i] || 0;
     up += 0.035 * digSum + 0.02 * (c[6] + c[7] + c[8]) + 0.022 * tolSum + 0.0035 * g.w.length + 0.012 * g.h;
-    if (f.bd) up += r10 * 0.05 * Math.max(0, G.body.busy(f) - 6);
+    if (f.bd) { const over = Math.max(0, G.body.busy(f) - 6); up += r10 * (0.07 * over + 0.012 * over * over); ph.pneed += 0.035 * over; }
     ph.upkeep = up;
     // compile the brain: wires grouped by target (hidden 0..h-1, then outputs)
     const nt = g.h + NOUT;
@@ -261,8 +286,12 @@
   // returns { g, muts: [{kind, i, text, big}] }
   G.mutate = function (parent, wild, idea) {
     const r = G.rand, n = G.randn;
+    // A line of creatures carries its own rate of change (t[6]). A line whose changes pay keeps changing boldly; one that has found something good
+    // settles and refines it. Nobody sets it: it is inherited, it drifts, and selection keeps the lines whose rate suits them.
+    const mu = clamp(+parent.t[6] || 1, 0.4, 2.2); wild = wild * mu;
     const m = G.K.mut * wild;
     const g = G.cloneGenome(parent);
+    g.t[6] = clamp(mu * Math.exp(n() * 0.12), 0.4, 2.2);
     const muts = [];
     const note = function (kind, i, text, big) { muts.push({ kind: kind, i: i, text: text, big: !!big }); };
     const press = G.W && G.W.press ? G.W.press : null;
@@ -272,6 +301,9 @@
     { const pr = G.W && G.W.popR !== undefined ? G.W.popR : 1; if (pr < 0.5 && r() < 0.1 * wild) { g.t[0] = Math.max(6, g.t[0] * 0.9); note('t', 0, 'grew smaller: there were too few of them', true); } }
     if (press && Math.abs(press.size) > 0.2 && r() < 0.06 * Math.abs(press.size) * wild) { const up = press.size > 0; g.t[0] = Math.max(5, g.t[0] * (up ? 1.12 : 0.9)); note('t', 0, (up ? 'grew bigger, ' : 'grew smaller, ') + (press.sizeWhy || 'to suit the pond'), true); }
     if (r() < m * 2) { g.t[1] += n() * 0.07; note('t', 1, 'speed', false); }
+    // breath: how far out of the water it can live. It drifts like any gene, and now and then takes a real step either way
+    if (r() < m * 2.5) { g.t[5] = (g.t[5] || 0) + n() * 0.06; note('t', 5, 'breath', false); }
+    if (r() < 0.03 * wild) { const up = r() < 0.5; g.t[5] = clamp((g.t[5] || 0) + (up ? 0.18 : -0.18), 0, 1); note('t', 5, up ? 'can stay longer out of the water' : 'keeps more to the water', true); }
     if (r() < m * 2.5) { g.t[4] = (g.t[4] || 0.12) + n() * 0.14; note('t', 4, 'temper', false); }
     for (let i = 0; i < 15; i++) {
       if (r() < m * 1.2) { g.c[i] += n() * 0.17 + (press ? press.c[i] * 0.06 : 0); note('c', i, i < 6 ? 'diet' : i < 9 ? 'resistance' : 'tolerance', i < 6); }
@@ -352,6 +384,8 @@
     const c = G.cloneGenome(a);
     let cut = G.ri(1, 2);
     for (let i = cut; i < 5; i++) c.t[i] = b.t[i];
+    if (r() < 0.5) c.t[5] = b.t[5];
+    if (r() < 0.5) c.t[6] = b.t[6];
     cut = G.ri(1, 14);
     for (let i = cut; i < 15; i++) c.c[i] = b.c[i];
     c.f = G.form.cross(a.f, b.f);
@@ -375,7 +409,7 @@
   // ── distance between genomes, used to sort creatures into species: the body counts most ──
   G.features = function (g) {
     const v = G.form.features(g.f);
-    v.push((g.t[0] - 10) / 6, (g.t[1] - 0.35) * 2);
+    v.push((g.t[0] - 10) / 6, (g.t[1] - 0.35) * 2, ((g.t[5] || 0) >= 0.5 ? 2.2 : 0) + (g.t[5] || 0) * 0.3);      // (water and land creatures are kinds of their own)
     const org = [0, 0, 0, 0, 0];
     for (let i = 0; i < g.p.length; i++) org[g.p[i].k % 5] += 1;
     for (let i = 0; i < 5; i++) v.push(org[i] * 0.6);
@@ -385,7 +419,13 @@
     return v;
   };
   /** what a creature looks like, as numbers (its body's looks and its size): see F.lookVec */
-  G.lookVec = function (g) { const v = G.form.lookVec(g.f); v.push((g.t[0] - 10) / 10); return v; };
+  G.lookVec = function (g) { const v = G.form.lookVec(g.f); v.push((g.t[0] - 10) / 10, (g.t[5] || 0) >= 0.5 ? 1.6 : 0); return v; };
+  /** how unlike two creatures are in BUILD (their looks with colour left out): the same body in another colour is the same build */
+  G.bdist = function (a, b) {
+    let s = 0; const c0 = G.form.LV_COL || 0;
+    for (let i = 0; i < a.length; i++) { if (i >= c0 && i < c0 + 6) continue; const d = a[i] - b[i]; s += d * d; }
+    return Math.sqrt(s);
+  };
   G.fdist = function (a, b) {
     let s = 0;
     for (let i = 0; i < a.length; i++) { const d = a[i] - b[i]; s += d * d; }

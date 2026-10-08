@@ -540,7 +540,7 @@
     else if (k === '4') G.setSpeed(64);
     else if (k === '=' || k === '+') G.zoomAt(1.35);
     else if (k === '-') G.zoomAt(1 / 1.35);
-    else if (k === '0') { G.cam.z = 1; G.applyCam(); }
+    else if (k === '0') { G.camHome(); }
     else if (k === 't') G.act('add');
     else if (k === 'f') G.act('guide');
     else if (k === 'g') G.act('tree');
