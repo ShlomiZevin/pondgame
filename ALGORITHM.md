@@ -273,3 +273,22 @@ Hand-over note for whoever works on the algorithm next.
 **Taller, wider.** Mass outlines 0.45–1.9 (were 0.55–1.5), mass size up to 1.5, limb length 0.6–1.9 and width 0.6–1.8.
 
 **Models.** Added with prices checked 2026-10-08 and one real call each: `claude-haiku-5-5` ($0.10 / $0.50), `claude-fable-5-1`, `gpt-6.1-sol`, `gpt-6-sol`, `gpt-5.6-luna`, `gpt-6-astra`. Sonnet 5.5 cached input corrected to $0.10.
+
+### Round 5 (2026-10-08): an old pond no longer starves; steady growth with no end; land that lasts
+
+**What killed the land in long games.** A 420-generation free pond held 30–45 land creatures for hundreds of generations and lost them at whole-pond crashes (population 135 to about 30 near generations 280 and 380). The crashes were slow starvation: as the world widened and bodies grew, the same food fed less (water's food level 0.65 falling to 0.42). `scripts`-side tool: a free pond that logs, for the land, births, departures, arrivals and causes of death every 20 generations.
+
+**Richness.** `W.richS` builds up by 0.5% each generation the pond thrives (at least 80% peopled, mean fed at least 0.5) and loses 1% when it starves (mean fed under 0.35). Every morsel is worth `W.rich = richS × (world width)^0.8` (`creaturesStep`), so nothing more is simulated. It is saved (`rich`); an old save without it is taken as 3.8.
+
+**Size.** No fixed ceiling. A body is as big as its genes say up to `W.sizeCap = 6 + 17.6·richS^0.49` (`G.sizeCapOf`; about 24 at first). The stall drive is back (`W.grow`: size mutations lean up, upkeep 20% cheaper, the bigger last the winter a little better) with no size at which it stops, and grandeur's prior rewards being bigger than the pond's mean. Oxygen need flattens above twice the first size, and sight widens with size. Measured: mean size 18, 22, 30, 38, 44, 53 at generations 40, 120, 200, 280, 360, 440; richS reaches about 150 by generation 1000, a cap near 210. Three things tried and dropped: food following size at once (size ran away to 474 by generation 400: bigger bodies eat smaller ones), food lagging size (did not brake the water and starved the land), an absolute grandeur prior (growth stopped near 60).
+
+**Land.** Births are capped for land and water apart (`startSpring`: with the pond always full, land parents were losing every place to water parents), the land's winter room and birth room come out of the pond's total, and the land grows more food (rate 0.85, at least 150 or 26% of the food cap). Free pond, 300 generations: 25–58 land creatures throughout.
+
+### Round 5b (2026-10-08): using the whole pond; land that feeds its own
+
+From the owner's screenshots of a late pond: life bunched in one corner and along the top of the water, the widened pond lay empty, and the land was eaten bare.
+- **Speed keeps pace with the world.** `ph.speed` no longer falls with size past 24 and is multiplied by (world width)^0.75 and (size/24)^0.25. A big body in a pond three times as wide needed several lifetimes to cross it. Free pond, 320 generations: 43–57% of creatures in the right half, 27–37% in the far right third, 28–49% in the lower half.
+- **The land's plants are the land's.** Water creatures no longer reach the shore's edge (`landTop = shoreNow`): they were crowding the top of the water and grazing the land bare.
+- **The land breeds as its food allows.** Land births are capped at `12 + 0.45 × land food` (`startSpring`). Land starvation deaths fell from about 16 to 2 a generation; 16–57 land creatures throughout, fed 0.66–0.85.
+- **Pace of growth.** Richness builds 0.8% a thriving generation: mean size 18, 32, 42, 55, 63 at generations 40, 120, 200, 280, 320.
+- **Clicking a big creature.** The pick radius follows the drawn body (`60_ui.js`), not the circle it is reckoned as.

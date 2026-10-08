@@ -183,7 +183,7 @@
     { id: 'whole', label: 'Whole', w: 0.40, core: 'whole', note: 'Whole: how complete a creature it is, out of 10.' },
     { id: 'body', label: 'Body', w: 0.25, note: 'Body: does it have a real body that reads at a glance (one clear form, every part in its place) and not a heap of parts, out of 10.', prior: function (g) { return 0.25 + 0.4 * tidy(g); } },
     { id: 'balance', label: 'Balance', w: 0.05, extra: 1, note: 'Balance: proportion and poise: do the parts suit one another, out of 10.', prior: function (g) { return 0.4 + 0.25 * tidy(g); } },
-    { id: 'grand', label: 'Grandeur', w: 0.10, extra: 1, note: 'Grandeur: how much creature there is (big, tall, developed, elaborate), counting only what reads well, out of 10. This is what rewards growing.', prior: function (g) { return clamp(0.12 + 0.5 * clamp((g.t[0] - 9) / 40, 0, 1) + 0.25 * clamp((busyOf(g) - 2) / 8, 0, 1) * tidy(g), 0, 1); } },
+    { id: 'grand', label: 'Grandeur', w: 0.10, extra: 1, note: 'Grandeur: how much creature there is (big, tall, developed, elaborate), counting only what reads well, out of 10. This is what rewards growing.', prior: function (g) { const mr = (G.W && G.W.meanR) || 11; return clamp(0.12 + 0.5 * clamp(0.5 + 0.3 * (g.t[0] / mr - 1), 0, 1) + 0.25 * clamp((busyOf(g) - 2) / 8, 0, 1) * tidy(g), 0, 1); } },
   ];
   G.MARKS_X = G.MARKS.filter(function (m) { return !m.core; });      // the marks beyond the first two
   /** the pond's own guess of the further marks, from the genes alone */

@@ -101,7 +101,7 @@
     return true;
   }
   G.validateGenome = function (g) {
-    g.t[0] = clamp(g.t[0], 5, 64);
+    g.t[0] = clamp(g.t[0], 5, 600);
     g.t[1] = clamp(g.t[1], 0.05, 1);
     g.t[3] = 0.3;
     g.t[4] = clamp(g.t[4] === undefined || !isFinite(g.t[4]) ? 0.12 : +g.t[4], 0, 1);
@@ -134,7 +134,7 @@
     const cn = FM.counts(f), A = FM.abilities(f, cn), ext = FM.extent(f), k = cn.k;
     const mvd = g.mv && G.marvelOf ? G.marvelOf(g.mv) : null;
     const stall = G.W && G.W.grow ? G.W.grow : 0;
-    const r = Math.min(t[0], 26 + 9 * (f.n - 1)) * (mvd && mvd.sp === 'titan' ? 1.35 : 1);          // a body of more parts can be a bigger one; the ceiling is high, so size is limited by food and by the pond, not by a rule
+    const r = Math.min(t[0], (G.W && G.W.sizeCap) || 23.6) * (mvd && mvd.sp === 'titan' ? 1.35 : 1);      // as big as its genes say, up to what the pond can carry (W.sizeCap rises as the pond grows richer)          // a body of more parts can be a bigger one; the ceiling is high, so size is limited by food and by the pond, not by a rule
     const FX = { speed: 0, sense: 0, eat: 0, armor: 0, spike: 0, toxin: 0, photo: 0, glow: 0, heat: 0, cold: 0, poison: 0 };
     const dig = [c[0], c[1], c[2], c[3], c[4], c[5]];
     let orgCost = 0;
@@ -156,8 +156,8 @@
       r: r, ds: ds, A: A,
       cnt: [1 + f.ms, Math.min(3, k[1] * 0.5), Math.min(3, (k[2] + k[7]) * 0.5), 4 * A.armour, f.en, f.glow > 0.3 ? 2 * f.glow : 0, 2 * f.venom, tail ? 1 : 0, Math.min(3, k[3] * 0.5)],
       eyes: Math.min(f.en, 3),
-      sense: 38 + 185 * A.senses,
-      speed: (26 + 52 * t[1]) * (0.72 + 0.95 * A.speed) / (0.7 + 0.3 * r / 10),
+      sense: 38 + 185 * A.senses + 2 * Math.max(0, r - 12),      // a bigger body sees further, in step with its size
+      speed: (26 + 52 * t[1]) * (0.72 + 0.95 * A.speed) / (0.7 + 0.3 * Math.min(r, 24) / 10) * Math.pow(Math.max(1, ((G.W && G.W.wh) || 1400) / 1400), 0.75) * Math.pow(Math.max(1, r / 24), 0.25),
       turn: 2.2 + 3.4 * A.agility,
       eatR: r + 3 + 22 * A.reach,
       defense: 0.85 * A.armour,
@@ -211,7 +211,7 @@
     let tolSum = 0; for (let i = 9; i < 15; i++) tolSum += c[i] || 0;
     up += 0.035 * digSum + 0.02 * (c[6] + c[7] + c[8]) + 0.022 * tolSum + 0.0035 * g.w.length + 0.012 * g.h;
     if (f.bd) { const over = Math.max(0, G.body.busy(f) - 6); up += r10 * (0.07 * over + 0.012 * over * over); ph.pneed += 0.035 * over; }
-    ph.upkeep = up;
+    ph.upkeep = up * (1 - 0.2 * stall);      // while the pond is growing, being big costs less
     // compile the brain: wires grouped by target (hidden 0..h-1, then outputs)
     const nt = g.h + NOUT;
     const groups = [];
@@ -297,9 +297,11 @@
     const press = G.W && G.W.press ? G.W.press : null;
     // nudge traits
     // size answers the pond: danger favours bigger bodies, hunger and thin air smaller ones; chance does the rest
-    if (r() < m * 2) { g.t[0] += n() * 1.1 - 1.5 * clamp((0.62 - (G.W && G.W.popR !== undefined ? G.W.popR : 1)) / 0.3, 0, 1) + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
+    { const st = G.W && G.W.grow || 0; if (st > 0.2 && r() < 0.025 * st * wild) { g.t[0] = g.t[0] * 1.07; note('t', 0, 'grew bigger: the pond has turned to growing', true); } }
+    if (r() < m * 2) { g.t[0] += n() * (0.6 + 0.04 * g.t[0]) + (0.12 + 0.01 * g.t[0]) * (G.W && G.W.grow || 0) - (1 + 0.05 * g.t[0]) * clamp((0.62 - (G.W && G.W.popR !== undefined ? G.W.popR : 1)) / 0.3, 0, 1) + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
     { const pr = G.W && G.W.popR !== undefined ? G.W.popR : 1; if (pr < 0.5 && r() < 0.1 * wild) { g.t[0] = Math.max(6, g.t[0] * 0.9); note('t', 0, 'grew smaller: there were too few of them', true); } }
     if (press && Math.abs(press.size) > 0.2 && r() < 0.06 * Math.abs(press.size) * wild) { const up = press.size > 0; g.t[0] = Math.max(5, g.t[0] * (up ? 1.12 : 0.9)); note('t', 0, (up ? 'grew bigger, ' : 'grew smaller, ') + (press.sizeWhy || 'to suit the pond'), true); }
+    g.t[0] = Math.min(g.t[0], ((G.W && G.W.sizeCap) || 23.6) * 1.05);
     if (r() < m * 2) { g.t[1] += n() * 0.07; note('t', 1, 'speed', false); }
     // breath: how far out of the water it can live. It drifts like any gene, and now and then takes a real step either way
     if (r() < m * 2.5) { g.t[5] = (g.t[5] || 0) + n() * 0.06; note('t', 5, 'breath', false); }
@@ -409,7 +411,7 @@
   // ── distance between genomes, used to sort creatures into species: the body counts most ──
   G.features = function (g) {
     const v = G.form.features(g.f);
-    v.push((g.t[0] - 10) / 6, (g.t[1] - 0.35) * 2, ((g.t[5] || 0) >= 0.5 ? 2.2 : 0) + (g.t[5] || 0) * 0.3);      // (water and land creatures are kinds of their own)
+    v.push(Math.log(Math.max(5, g.t[0]) / 10) * 2.2, (g.t[1] - 0.35) * 2, ((g.t[5] || 0) >= 0.5 ? 2.2 : 0) + (g.t[5] || 0) * 0.3);      // (water and land creatures are kinds of their own)
     const org = [0, 0, 0, 0, 0];
     for (let i = 0; i < g.p.length; i++) org[g.p[i].k % 5] += 1;
     for (let i = 0; i < 5; i++) v.push(org[i] * 0.6);
@@ -419,7 +421,7 @@
     return v;
   };
   /** what a creature looks like, as numbers (its body's looks and its size): see F.lookVec */
-  G.lookVec = function (g) { const v = G.form.lookVec(g.f); v.push((g.t[0] - 10) / 10, (g.t[5] || 0) >= 0.5 ? 1.6 : 0); return v; };
+  G.lookVec = function (g) { const v = G.form.lookVec(g.f); v.push(Math.log(Math.max(5, g.t[0]) / 10) * 1.4, (g.t[5] || 0) >= 0.5 ? 1.6 : 0); return v; };
   /** how unlike two creatures are in BUILD (their looks with colour left out): the same body in another colour is the same build */
   G.bdist = function (a, b) {
     let s = 0; const c0 = G.form.LV_COL || 0;

@@ -329,7 +329,7 @@
     const cre = G.W.cre;
     for (let i = 0; i < cre.length; i++) {
       const o = cre[i], x = o.rx === undefined ? o.x : o.rx, y = o.ry === undefined ? o.y : o.ry;
-      const dx = x - c.x, dy = y - c.y, d = Math.sqrt(dx * dx + dy * dy) - o.ph.r;
+      const dx = x - c.x, dy = y - c.y, d = Math.sqrt(dx * dx + dy * dy) - Math.max(o.ph.r, (o.ph.rc || o.ph.r) * 1.25, o.ph.r * 1.7);
       if (d < bd) { bd = d; best = o; }
     }
     // a creature that was clicked ON wins; then whatever else is drawn under the click (a thing, something built, a wall, a plan); then the nearest creature
