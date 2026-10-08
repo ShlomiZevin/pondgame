@@ -148,10 +148,13 @@
   function nebula(hb) { if (NEB[hb]) return NEB[hb]; const S = 160, cv = document.createElement('canvas'); cv.width = cv.height = S; const x = cv.getContext('2d'), hue = 190 + hb * 28, g = x.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2); g.addColorStop(0, 'hsla(' + hue + ',70%,45%,0.17)'); g.addColorStop(0.5, 'hsla(' + (hue + 30) + ',70%,35%,0.07)'); g.addColorStop(1, 'hsla(' + hue + ',70%,30%,0)'); x.fillStyle = g; x.fillRect(0, 0, S, S); return (NEB[hb] = cv); }
   /** a far pond, painted once. It is a pond like ours, seen from too far to make out who lives in it: the same shape, a shore along the top, water below,
    *  soft lights where its life is, and the same ending, its rim breaking up into grains that drift off into space. */
-  const BODY = {}, FW = 320, FH = 192, FM = 150;      // the pond in its picture: wide, tall, and the margin round it
+  const BODY = {}, FW = 320, FH = 192, FM = 150;
+  let builtNow = 0, stamp = 0;      // the pond in its picture: wide, tall, and the margin round it
   let FMASK = null;
   function bodyOf(p) {
-    const key = p.i + ',' + p.j; if (BODY[key]) return BODY[key];
+    const key = p.i + ',' + p.j; if (BODY[key]) { BODY[key].used = stamp; return BODY[key]; }
+    if (builtNow >= 1) return null;      /* one new picture a frame: a sky full of ponds coming into view fills in over a few frames and never stalls one */
+    builtNow++;
     const SW = FW + 2 * FM, SH = FH + 2 * FM, cv = document.createElement('canvas'); cv.width = SW; cv.height = SH; const x = cv.getContext('2d'), h = p.hue, col = function (dh, s, l, a) { return 'hsla(' + ((h + dh + 360) % 360) + ',' + s + '%,' + l + '%,' + a + ')'; };
     // its light in the dark
     x.save(); x.translate(SW / 2, SH / 2); x.scale(1, SH / SW); const halo = x.createRadialGradient(0, 0, FW * 0.25, 0, 0, SW / 2); halo.addColorStop(0, col(0, 85, 58, 0.3)); halo.addColorStop(0.55, col(25, 85, 50, 0.1)); halo.addColorStop(1, col(0, 85, 50, 0)); x.fillStyle = halo; x.fillRect(-SW / 2, -SW / 2, SW, SW); x.restore();
@@ -170,8 +173,8 @@
     if (!FMASK) FMASK = buildMask(FW, FH, FM, FH * 0.2, FH * 0.3, SW);
     d.globalCompositeOperation = 'destination-out'; d.drawImage(FMASK, 0, 0, SW, SH); d.globalCompositeOperation = 'source-over';      // the water itself is eaten away at the rim, so its glow and the stars show through
     x.drawImage(pc, 0, 0);
-    if (Object.keys(BODY).length > 24) for (const q in BODY) { delete BODY[q]; break; }      /* only the ponds lately in view are kept: far space costs no memory */
-    return (BODY[key] = cv);
+    { const keys = Object.keys(BODY); if (keys.length >= 40) { let old = keys[0]; for (let q = 1; q < keys.length; q++) if (BODY[keys[q]].used < BODY[old].used) old = keys[q]; delete BODY[old]; } }      /* forty pictures at most; the one unused longest makes room */
+    cv.used = stamp; return (BODY[key] = cv);
   }
 
   /** an empty place: the outline of a pond that is not there yet, breathing slowly, with a plus in it */
@@ -187,7 +190,10 @@
     const h = p.hue, col = function (dh, s, l, a) { return 'hsla(' + ((h + dh + 360) % 360) + ',' + s + '%,' + l + '%,' + a + ')'; };
     // p.r is half the pond's height; the picture carries the pond and its margin
     const k = pr * 2 / FH, w = (FW + 2 * FM) * k, hh = (FH + 2 * FM) * k, hw2 = FW * k / 2, hh2 = FH * k / 2;
-    ctx.drawImage(bodyOf(p), px - w / 2, py - hh / 2, w, hh);
+    // seen small (or while its picture is still to be made) a far pond is a few strokes: a glow, its water, its shore
+    const pic = pr >= 11 ? bodyOf(p) : null;
+    if (!pic) { ctx.fillStyle = col(0, 85, 60, 0.16); ctx.beginPath(); ctx.arc(px, py, pr * 2.4, 0, TAU); ctx.fill(); ctx.fillStyle = col(8, 60, 30, 0.95); ctx.fillRect(px - hw2 * 0.9, py - hh2 * 0.8, hw2 * 1.8, hh2 * 1.6); ctx.fillStyle = col(-115, 40, 58, 0.95); ctx.fillRect(px - hw2 * 0.9, py - hh2 * 0.8, hw2 * 1.8, hh2 * 0.42); if (pr < 11) return; }
+    else ctx.drawImage(pic, px - w / 2, py - hh / 2, w, hh);
     if (pr > 9) {
       // a few of its lights wander, and grains of it drift slowly off into space
       const n = Math.min(9, Math.floor(pr / 4)); for (let q = 0; q < n; q++) { const a = hash(p.i, p.j, 40 + q) * TAU + t * (0.09 + 0.12 * hash(p.i, p.j, 60 + q)) * (q % 2 ? 1 : -1), d = 0.15 + 0.6 * hash(p.i, p.j, 80 + q); ctx.fillStyle = 'hsla(' + (h + 70 + q * 47) % 360 + ',95%,80%,0.55)'; ctx.beginPath(); ctx.arc(px + Math.cos(a) * hw2 * 0.8 * d, py + hh2 * 0.22 + Math.sin(a) * hh2 * 0.6 * d, Math.max(1, pr * 0.045), 0, TAU); ctx.fill(); }
@@ -245,7 +251,7 @@
     { const cs = cellSize() * 1.6, cx = ww / 2, cy = wh / 2, i0 = Math.floor((x0 - cx) / cs - 0.7), i1 = Math.ceil((x1 - cx) / cs + 0.7), j0 = Math.floor((y0 - cy) / cs - 0.7), j1 = Math.ceil((y1 - cy) / cs + 0.7);
       if ((i1 - i0) * (j1 - j0) < 300) { ctx.globalCompositeOperation = 'lighter';
         for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const nx = (cx + (i + hash(i, j, 31) - 0.5) * cs) * v.scale + v.ox, ny = (cy + (j + hash(i, j, 32) - 0.5) * cs) * v.scale + v.oy, nr = cs * (0.45 + 0.45 * hash(i, j, 33)) * v.scale;
-          if (nr < 6 || nx + nr < 0 || ny + nr < 0 || nx - nr > v.w || ny - nr > v.h) continue;
+          if (nr < 6 || nr > 2600 || nx + nr < 0 || ny + nr < 0 || nx - nr > v.w || ny - nr > v.h) continue;
           ctx.drawImage(nebula((hash(i, j, 34) * 6) | 0), nx - nr, ny - nr, nr * 2, nr * 2); }
         ctx.globalCompositeOperation = 'source-over'; } }
     // stars (a few of the brightest have rays)
@@ -267,6 +273,7 @@
         ctx.beginPath(); for (let q = 0; q < 8; q++) { const an = rot + q * TAU / 8, rr = ar * (0.7 + 0.45 * hash(i * 3 + q, j, 508)); ctx.lineTo(ax + Math.cos(an) * rr, ay + Math.sin(an) * rr); } ctx.closePath();
         ctx.fillStyle = 'rgb(' + Math.round(sh * 0.95) + ',' + Math.round(sh * 0.9) + ',' + Math.round(sh * 1.05) + ')'; ctx.fill(); if (ar > 4) { ctx.strokeStyle = 'rgba(190,200,225,0.35)'; ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(ax + ar * 0.2, ay + ar * 0.15, ar * 0.28, 0, TAU); ctx.fill(); } } }
     // the other ponds, and the lanes between neighbours: a map of where one could travel
+    builtNow = 0; stamp++;
     const P = visiblePonds();
     { const byCell = {}; for (let k = 0; k < P.length; k++) byCell[P[k].i + ',' + P[k].j] = P[k]; byCell['0,0'] = { i: 0, j: 0, x: ww / 2, y: wh / 2, r: wh * 0.5 };
       ctx.lineCap = 'round'; ctx.setLineDash([2, 9]); ctx.lineDashOffset = -t * 6; ctx.lineWidth = 1.3;
