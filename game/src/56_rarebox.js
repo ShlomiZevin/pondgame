@@ -88,7 +88,7 @@
     const vs = document.getElementById('versus');
     // on the left, at mid height: between the season card above and the zoom buttons below (it never covers either)
     { const se = document.getElementById('season'), zm = document.getElementById('zoom'), top = Math.max(se && !se.classList.contains('hide') ? se.getBoundingClientRect().bottom + 10 : 240, vs && !vs.classList.contains('hide') && vs.offsetHeight ? vs.getBoundingClientRect().bottom + 10 : 0),      /* below the 'pond versus' card when that is showing */ bot = zm ? zm.getBoundingClientRect().top - 10 : window.innerHeight - 240;
-      if (window.innerWidth > 720) { box.style.top = Math.round(top) + 'px'; box.style.transform = 'none'; box.style.maxHeight = Math.max(120, Math.round(bot - top)) + 'px';      /* it hangs from its top edge: opening and folding it does not move it */ } else { box.style.top = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
+      if (window.innerWidth > 720) { box.style.top = 'auto'; box.style.bottom = Math.round(window.innerHeight - bot) + 'px'; box.style.transform = 'none'; box.style.maxHeight = Math.max(120, Math.round(bot - top)) + 'px';      /* it hangs from its top edge: opening and folding it does not move it */ } else { box.style.top = ''; box.style.bottom = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
     box.style.zIndex = shut ? '2' : '9';
     const by = {}, order = [];
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i], mv = c.ph && c.ph.mv; if (!mv || c.dead) continue; if (!by[mv.id]) { by[mv.id] = { d: mv, n: 0 }; order.push(mv.id); } by[mv.id].n++; }

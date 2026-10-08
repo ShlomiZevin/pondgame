@@ -167,6 +167,28 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 .card small { display: block; font-size: 10.5px; }
 .card .btn { margin-top: 5px; }
 .card.dead { opacity: .8; filter: saturate(.55); }
+/* the Book of Life: its tabs in one row of their own, and each card with its picture on top and the words under it */
+#ov-guide .top { flex-wrap: wrap; }
+#ov-guide .top h2 { order: 1; }
+#ov-guide #gdClose { order: 2; }
+#ov-guide #gdTabs { order: 3; flex: 0 0 100%; min-width: 0 !important; flex-wrap: nowrap; gap: 6px; margin: 2px 0 0; overflow-x: auto; scrollbar-width: none; }
+#ov-guide #gdTabs::-webkit-scrollbar { display: none; }
+#ov-guide #gdTabs button { flex: 1 1 auto; white-space: nowrap; padding: 0 14px; min-height: 34px; font-size: 10px; }
+#ov-guide .cards { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+#ov-guide .card { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px; }
+#ov-guide .card > canvas, #ov-guide .card > img, #ov-guide .card > div:first-child:not(:last-child) { align-self: center; }
+#ov-guide .card > canvas { width: 132px; height: 132px; }
+#ov-guide .card b { font-size: 14px; }
+#ov-guide .card p { font-size: 12px; line-height: 1.45; }
+#ov-guide .card .btn { width: 100%; margin-top: 8px; }
+/* scroll bars in the pond's own look: thin, pale, no arrows, on every panel that scrolls */
+.sheet .body, #inspector, #zcard, #gbwin, #rarebox, .log, #panel, .pop { scrollbar-width: thin; scrollbar-color: rgba(207,232,255,.32) transparent; }
+.sheet .body::-webkit-scrollbar, #inspector::-webkit-scrollbar, #zcard::-webkit-scrollbar, #gbwin::-webkit-scrollbar, .log::-webkit-scrollbar, #panel::-webkit-scrollbar, .pop::-webkit-scrollbar { width: 8px; height: 8px; }
+.sheet .body::-webkit-scrollbar-track, #inspector::-webkit-scrollbar-track, #zcard::-webkit-scrollbar-track, #gbwin::-webkit-scrollbar-track, .log::-webkit-scrollbar-track, #panel::-webkit-scrollbar-track, .pop::-webkit-scrollbar-track { background: transparent; margin: 10px 0; }
+.sheet .body::-webkit-scrollbar-thumb, #inspector::-webkit-scrollbar-thumb, #zcard::-webkit-scrollbar-thumb, #gbwin::-webkit-scrollbar-thumb, .log::-webkit-scrollbar-thumb, #panel::-webkit-scrollbar-thumb, .pop::-webkit-scrollbar-thumb { background: rgba(207,232,255,.28); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+.sheet .body::-webkit-scrollbar-thumb:hover, #inspector::-webkit-scrollbar-thumb:hover, #gbwin::-webkit-scrollbar-thumb:hover { background: rgba(246,211,101,.6); background-clip: padding-box; }
+.sheet .body::-webkit-scrollbar-button, #inspector::-webkit-scrollbar-button, #zcard::-webkit-scrollbar-button, #gbwin::-webkit-scrollbar-button, .log::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.sheet .body { padding-right: 4px; }
 .empty { padding: 30px; text-align: center; color: rgba(207,232,255,.7); line-height: 1.5; }
 #treeCanvas { width: 100%; height: 340px; display: block; border-radius: 12px; background: rgba(7,18,31,.4); }
 

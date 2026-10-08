@@ -11,7 +11,7 @@
     const out = {
       v: 1, at: Date.now(), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
       set: W.set, disc: W.disc, nextSp: W.nextSp, ai: G.ai && G.ai.model ? G.ai.model : '', drawn: G.ai && G.ai.drawn ? 1 : 0, spend: G.ai ? G.ai.life : {},
-      hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species]; }),
+      hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species, +(h.look || 0).toFixed(3), +(h.lookTop || 0).toFixed(2), +(h.whole || 0).toFixed(3), +(h.wholeTop || 0).toFixed(2), +(h.body || 0).toFixed(1), +(h.bodyTop || 0).toFixed(1), +(h.size || 0).toFixed(1), +(h.sizeTop || 0).toFixed(1)]; }),
       discLog: W.discLog.slice(-40),
       hints: Object.keys(G.hints),
       cre: [], species: [], fossils: [],
@@ -197,7 +197,7 @@
     if (typeof d.ai === 'string' && d.ai && G.ai && (!G.ai.models.length || G.ai.labelOf(d.ai))) G.ai.model = d.ai.slice(0, 60);
     if (d.disc && typeof d.disc === 'object') { for (const k in d.disc) if (typeof k === 'string' && k.length < 20) W.disc[k] = num(d.disc[k], 0, 1e6, 0); }
     if (Array.isArray(d.discLog)) W.discLog = d.discLog.filter(function (e) { return e && typeof e.text === 'string'; }).slice(-40).map(function (e) { return { key: String(e.key).slice(0, 20), text: String(e.text).slice(0, 420), gen: num(e.gen, 0, 1e6, 0) }; });
-    if (Array.isArray(d.hist)) d.hist.forEach(function (h) { if (Array.isArray(h) && h.length >= 7) W.hist.push({ gen: num(h[0], 0, 1e6, 0), avg: num(h[1], 0, 1, 0), best: num(h[2], 0, 1, 0), pop: num(h[3], 0, 1e4, 0), genes: num(h[4], 0, 1e3, 0), intake: num(h[5], 0, 1e5, 0), species: num(h[6], 0, 1e3, 0) }); });
+    if (Array.isArray(d.hist)) d.hist.forEach(function (h) { if (Array.isArray(h) && h.length >= 7) W.hist.push({ gen: num(h[0], 0, 1e6, 0), avg: num(h[1], 0, 1, 0), best: num(h[2], 0, 1, 0), pop: num(h[3], 0, 1e4, 0), genes: num(h[4], 0, 1e3, 0), intake: num(h[5], 0, 1e5, 0), species: num(h[6], 0, 1e3, 0), look: num(h[7], 0, 1, 0), lookTop: num(h[8], 0, 1, 0), whole: num(h[9], 0, 1, 0), wholeTop: num(h[10], 0, 1, 0), body: num(h[11], 0, 99, 0), bodyTop: num(h[12], 0, 99, 0), size: num(h[13], 0, 99, 0), sizeTop: num(h[14], 0, 99, 0) }); });
     if (Array.isArray(d.hints)) d.hints.forEach(function (k) { if (typeof k === 'string') G.hints[k.slice(0, 20)] = 1; });
     if (Array.isArray(d.species)) d.species.forEach(function (s) {
       if (!Array.isArray(s) || s.length < 10) return;

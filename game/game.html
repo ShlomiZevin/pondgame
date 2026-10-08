@@ -167,6 +167,28 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 .card small { display: block; font-size: 10.5px; }
 .card .btn { margin-top: 5px; }
 .card.dead { opacity: .8; filter: saturate(.55); }
+/* the Book of Life: its tabs in one row of their own, and each card with its picture on top and the words under it */
+#ov-guide .top { flex-wrap: wrap; }
+#ov-guide .top h2 { order: 1; }
+#ov-guide #gdClose { order: 2; }
+#ov-guide #gdTabs { order: 3; flex: 0 0 100%; min-width: 0 !important; flex-wrap: nowrap; gap: 6px; margin: 2px 0 0; overflow-x: auto; scrollbar-width: none; }
+#ov-guide #gdTabs::-webkit-scrollbar { display: none; }
+#ov-guide #gdTabs button { flex: 1 1 auto; white-space: nowrap; padding: 0 14px; min-height: 34px; font-size: 10px; }
+#ov-guide .cards { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+#ov-guide .card { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px; }
+#ov-guide .card > canvas, #ov-guide .card > img, #ov-guide .card > div:first-child:not(:last-child) { align-self: center; }
+#ov-guide .card > canvas { width: 132px; height: 132px; }
+#ov-guide .card b { font-size: 14px; }
+#ov-guide .card p { font-size: 12px; line-height: 1.45; }
+#ov-guide .card .btn { width: 100%; margin-top: 8px; }
+/* scroll bars in the pond's own look: thin, pale, no arrows, on every panel that scrolls */
+.sheet .body, #inspector, #zcard, #gbwin, #rarebox, .log, #panel, .pop { scrollbar-width: thin; scrollbar-color: rgba(207,232,255,.32) transparent; }
+.sheet .body::-webkit-scrollbar, #inspector::-webkit-scrollbar, #zcard::-webkit-scrollbar, #gbwin::-webkit-scrollbar, .log::-webkit-scrollbar, #panel::-webkit-scrollbar, .pop::-webkit-scrollbar { width: 8px; height: 8px; }
+.sheet .body::-webkit-scrollbar-track, #inspector::-webkit-scrollbar-track, #zcard::-webkit-scrollbar-track, #gbwin::-webkit-scrollbar-track, .log::-webkit-scrollbar-track, #panel::-webkit-scrollbar-track, .pop::-webkit-scrollbar-track { background: transparent; margin: 10px 0; }
+.sheet .body::-webkit-scrollbar-thumb, #inspector::-webkit-scrollbar-thumb, #zcard::-webkit-scrollbar-thumb, #gbwin::-webkit-scrollbar-thumb, .log::-webkit-scrollbar-thumb, #panel::-webkit-scrollbar-thumb, .pop::-webkit-scrollbar-thumb { background: rgba(207,232,255,.28); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+.sheet .body::-webkit-scrollbar-thumb:hover, #inspector::-webkit-scrollbar-thumb:hover, #gbwin::-webkit-scrollbar-thumb:hover { background: rgba(246,211,101,.6); background-clip: padding-box; }
+.sheet .body::-webkit-scrollbar-button, #inspector::-webkit-scrollbar-button, #zcard::-webkit-scrollbar-button, #gbwin::-webkit-scrollbar-button, .log::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.sheet .body { padding-right: 4px; }
 .empty { padding: 30px; text-align: center; color: rgba(207,232,255,.7); line-height: 1.5; }
 #treeCanvas { width: 100%; height: 340px; display: block; border-radius: 12px; background: rgba(7,18,31,.4); }
 
@@ -3663,7 +3685,9 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     // the drive to grow is only as strong as the pond can bear: it eases off when the pond is below its capacity (the big need feeding) and as the average size gets large
     { const popR = W.popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12; W.room = 6 * clamp((W.gen - 60) / 360, 0, 1);      /* how much more a body may carry: none before generation 60, all of it from about generation 420 (see F.room) */
       W.grow = Math.max(W.stall || 0, G.ROOM_OFF ? 0 : 0.5 * W.room / 6) * clamp((popR - 0.6) / 0.3, 0, 1) * (1 - clamp((mr - 26) / 14, 0, 1)); }
-    W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop });
+    // how much there is to a body (its joined parts and all that grows on it, counted as the pond counts clutter) and how big it is: what an old pond grows into
+    let bodySum = 0, bodyTop = 0, sizeSum = 0, sizeTop = 0; for (let i = 0; i < cre.length; i++) { const f = cre[i].g.f, b = f.bd ? G.body.busy(f) : f.n + f.rules.length, z = cre[i].g.t[0]; bodySum += b; if (b > bodyTop) bodyTop = b; sizeSum += z; if (z > sizeTop) sizeTop = z; }
+    W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop, body: bodySum / n, bodyTop: bodyTop, size: sizeSum / n, sizeTop: sizeTop });
     if (W.hist.length > 600) W.hist.shift();
     G.updateSpecies();
     G.scanDiscoveries();
@@ -5907,7 +5931,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   function ui() {
     if (box) return box;
     const st = document.createElement('style');
-    st.textContent = '#mvalert{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:8;width:min(520px,calc(100vw - 28px));padding:11px 14px 12px;border-radius:18px;font:500 12.5px/1.4 system-ui,sans-serif;color:#cfe8ff;border-color:rgba(255,126,182,.75) !important;box-shadow:0 0 0 1px rgba(255,126,182,.25),0 10px 34px rgba(0,0,0,.45);animation:mvring 1.6s ease-in-out infinite}' +
+    st.textContent = '#mvalert{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:8;width:min(520px,calc(100vw - 28px));padding:11px 14px 12px;border-radius:18px;font:500 12.5px/1.4 system-ui,sans-serif;color:#cfe8ff;border-color:rgba(255,126,182,.75) !important;box-shadow:0 0 0 1px rgba(255,126,182,.25),0 10px 34px rgba(0,0,0,.45);animation:mvring 1.6s ease-in-out infinite}' +
       '@keyframes mvring{50%{box-shadow:0 0 0 4px rgba(255,126,182,.28),0 10px 34px rgba(0,0,0,.45)}}' +
       '#mvalert .ak{font:700 9.5px system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#ff9ec6;display:flex;justify-content:space-between;align-items:center}#mvalert .ak u{text-decoration:none;cursor:pointer;font-size:14px;color:#cfe8ff;opacity:.7;padding:0 2px}' +
       '#mvalert .ab{display:flex;align-items:center;gap:11px;margin-top:5px}#mvalert .ab .mic{flex:none;width:40px;height:40px;object-fit:contain}#mvalert .at{flex:1;min-width:0}#mvalert .at b{display:block;font:700 15px/1.25 system-ui,sans-serif;color:#fff}#mvalert .at span{display:block;color:#dcecff}' +
@@ -8385,7 +8409,7 @@ G.addSystem({
     const vs = document.getElementById('versus');
     // on the left, at mid height: between the season card above and the zoom buttons below (it never covers either)
     { const se = document.getElementById('season'), zm = document.getElementById('zoom'), top = Math.max(se && !se.classList.contains('hide') ? se.getBoundingClientRect().bottom + 10 : 240, vs && !vs.classList.contains('hide') && vs.offsetHeight ? vs.getBoundingClientRect().bottom + 10 : 0),      /* below the 'pond versus' card when that is showing */ bot = zm ? zm.getBoundingClientRect().top - 10 : window.innerHeight - 240;
-      if (window.innerWidth > 720) { box.style.top = Math.round(top) + 'px'; box.style.transform = 'none'; box.style.maxHeight = Math.max(120, Math.round(bot - top)) + 'px';      /* it hangs from its top edge: opening and folding it does not move it */ } else { box.style.top = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
+      if (window.innerWidth > 720) { box.style.top = 'auto'; box.style.bottom = Math.round(window.innerHeight - bot) + 'px'; box.style.transform = 'none'; box.style.maxHeight = Math.max(120, Math.round(bot - top)) + 'px';      /* it hangs from its top edge: opening and folding it does not move it */ } else { box.style.top = ''; box.style.bottom = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
     box.style.zIndex = shut ? '2' : '9';
     const by = {}, order = [];
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i], mv = c.ph && c.ph.mv; if (!mv || c.dead) continue; if (!by[mv.id]) { by[mv.id] = { d: mv, n: 0 }; order.push(mv.id); } by[mv.id].n++; }
@@ -8592,7 +8616,7 @@ G.addSystem({
     const p = el('div', 'glass hide', '', ui); p.id = 'panel';
     p.innerHTML = '<button class="phead" id="panelToggle" aria-label="Evolution panel">EVOLUTION<span id="phSum"></span>' + ICON.chev + '</button>' +
       '<div class="pbody"><div id="era" style="margin-bottom:10px"></div><div class="stats"><div><b id="stGen">1</b><small>Gen</small></div><div><b id="stPop">0</b><small>Alive</small></div><div><b id="stSp">1</b><small>Species</small></div><div><b id="stFit">0.00</b><small>Fitness</small></div></div>' +
-      '<div class="tabs" id="gtabs"><button data-m="look" class="on">BEAUTY</button><button data-m="whole">WHOLE</button><button data-m="fit">FITNESS</button><button data-m="skill">SKILL</button><button data-m="pop">POP</button><button data-m="genes">GENES</button></div>' +
+      '<div class="tabs" id="gtabs"><button data-m="look" class="on">BEAUTY</button><button data-m="whole">WHOLE</button><button data-m="fit">FITNESS</button><button data-m="skill">SKILL</button><button data-m="body">BODY</button><button data-m="size">SIZE</button><button data-m="pop">POP</button><button data-m="genes">GENES</button></div>' +
       '<canvas id="graph" width="560" height="184"></canvas><div class="gnote" id="gnote"></div><button class="gnote" id="aiLine" style="min-height:0;color:var(--gold);background:none;border:0;padding:0;font:inherit;font-size:11px;line-height:1.3;text-align:left;cursor:pointer;text-decoration:underline dotted;display:block" title="See what each kind of AI use cost"></button><div class="ilabel">What changed</div><div class="log" id="mutLog"></div></div>';
     refs.panel = p;
     if (window.innerWidth < 720) p.classList.add('min');
@@ -8944,10 +8968,12 @@ G.addSystem({
     const b = bannerQ.shift();
     if (!b) { bannerTimer = 0; return; }
     refs.banner.innerHTML = '<small>' + escapeHtml(b[0]) + '</small>' + escapeHtml(b[1]);
+    { let y = 78; ['wish', 'wxnow'].forEach(function (id) { const e = document.getElementById(id); if (e && !e.classList.contains('hide') && e.offsetHeight && window.innerWidth > 720) y = Math.max(y, e.getBoundingClientRect().bottom + 10 - 14); });
+      refs.banner.style.setProperty('transform', 'translate(-50%,' + Math.round(y) + 'px)', 'important'); }      /* just below the wish and the weather, never on them */
     refs.banner.classList.add('show');
     G.sfx('discovery');
     bannerTimer = setTimeout(function () {
-      refs.banner.classList.remove('show');
+      refs.banner.classList.remove('show'); refs.banner.style.removeProperty('transform');
       bannerTimer = setTimeout(nextBanner, 700);
     }, b[2] || 3800);
   }
@@ -8964,6 +8990,8 @@ G.addSystem({
     whole: { label: 'Whole: how much of a whole, full creature they are, out of 10: from a cell (1), through a ball with a face (3) and a simple critter (5), to a full character with head, body, legs and arms (9). The average; the dashed line is the most whole one alive.', get: function (h) { return (h.whole || 0) * 10; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 },
     look: { label: 'Beauty: how nice to the eye the creatures of this pond are, out of 10 (the average; the dashed line is the nicest one alive). This is what the pond evolves towards.', get: function (h) { return (h.look || 0) * 10; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 },
     fit: { label: 'Fitness = how nice to the eye and how whole a creature is, for those that have eaten well enough (half a tank). Higher scores survive winter and have more children.', get: function (h) { return h.avg; }, fmt: function (v) { return v.toFixed(2); }, min: 0, max: 1 },
+    body: { label: 'Body: how much there is to a body: its joined parts and everything that grows on it (legs, fins, horns, a tail, a coat...). The average; the dashed line is the most complex one alive. A young pond keeps bodies simple; from generation 60 to about 420 it is allowed, step by step, twice as much.', get: function (h) { return h.body || 0; }, top: function (h) { return h.bodyTop || 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
+    size: { label: 'Size: how big the creatures are (the first cells are about 10; the most a creature can reach is 64). The average; the dashed line is the biggest one alive. An old pond drifts bigger for as long as there is food for it.', get: function (h) { return h.size || 0; }, top: function (h) { return h.sizeTop || 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
     skill: { label: 'Skill: food eaten per creature each generation', get: function (h) { return h.intake; }, fmt: function (v) { return v.toFixed(0); }, min: 0 },
     pop: { label: 'How many creatures were alive at autumn', get: function (h) { return h.pop; }, fmt: function (v) { return v.toFixed(0); }, min: 0 },
     genes: { label: 'Genome size: parts, wires and brain cells per creature', get: function (h) { return h.genes; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
@@ -8982,14 +9010,17 @@ G.addSystem({
       return;
     }
     const vals = hist.map(m.get);
-    let lo = m.min === undefined ? Math.min.apply(null, vals) : m.min, hi = m.max === undefined ? Math.max.apply(null, vals) * 1.1 + 0.001 : m.max;
+    let lo = m.min === undefined ? Math.min.apply(null, vals) : m.min, hi = m.max === undefined ? Math.max.apply(null, m.top ? hist.map(m.top).concat(vals) : vals) * 1.1 + 0.001 : m.max;
     if (hi - lo < 1e-6) hi = lo + 1;
     const pad = 14, n = hist.length;
     const X = function (i) { return pad + (w - pad * 2) * (n === 1 ? 0 : i / (n - 1)); };
     const Y = function (v) { return h - pad - (h - pad * 2) * ((v - lo) / (hi - lo)); };
     ctx.strokeStyle = G.rgba(PAL.frost, 0.1); ctx.lineWidth = 1;
     for (let i = 0; i < 4; i++) { const y = pad + (h - pad * 2) * i / 3; ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w - pad, y); ctx.stroke(); }
-    if (UI.metric === 'fit' || UI.metric === 'look' || UI.metric === 'whole') {
+    if (m.top) {
+      ctx.strokeStyle = G.rgba(PAL.gold, 0.45); ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+      ctx.beginPath(); hist.forEach(function (q, i) { const x = X(i), y = Y(m.top(q)); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]);
+    } else if (UI.metric === 'fit' || UI.metric === 'look' || UI.metric === 'whole') {
       ctx.strokeStyle = G.rgba(PAL.gold, 0.45); ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
       ctx.beginPath(); hist.forEach(function (q, i) { const x = X(i), y = Y(UI.metric === 'look' ? (q.lookTop || 0) * 10 : UI.metric === 'whole' ? (q.wholeTop || 0) * 10 : q.best); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]);
     }
@@ -9415,7 +9446,7 @@ G.addSystem({
 //  · the BANNER (top, centre) is only for the few big moments: a marvel, a plan the creatures made and how it ended, a wish
 //    come true, a new age, an event in the world. One at a time, never more than two waiting, and never long.
 //  · everything smaller (evolution invented something, a new body, the story so far...) is a NOTE: one quiet line at a time
-//    in the bottom right corner. All of it is still in the log.
+//    at the bottom, in the middle. All of it is still in the log.
 (function () {
   'use strict';
   if (typeof document === 'undefined' || !G.banner) return;
@@ -9426,12 +9457,11 @@ G.addSystem({
   let box = null, Q = [], busy = 0;
   function show() {
     const n = Q.shift(); if (!n) { busy = 0; return; }
-    if (!box) { box = document.createElement('div'); box.id = 'note'; box.className = 'glass'; box.style.cssText = 'position:fixed;right:14px;bottom:70px;z-index:6;max-width:min(330px,calc(100vw - 28px));padding:9px 13px;border-radius:14px;font:500 12.5px/1.4 system-ui,sans-serif;color:#eaf4ff;pointer-events:none;transition:opacity .4s,transform .4s;opacity:0;transform:translateY(8px)'; (document.getElementById('ui') || document.body).appendChild(box); }
+    if (!box) { box = document.createElement('div'); box.id = 'note'; box.className = 'glass'; box.style.cssText = 'position:fixed;left:50%;bottom:86px;z-index:6;width:max-content;max-width:min(460px,calc(100vw - 28px));text-align:center;padding:9px 13px;border-radius:14px;font:500 12.5px/1.4 system-ui,sans-serif;color:#eaf4ff;pointer-events:none;transition:opacity .4s,transform .4s;opacity:0;transform:translate(-50%,8px)'; (document.getElementById('ui') || document.body).appendChild(box); }
     box.innerHTML = '<div style="font:800 9.5px system-ui,sans-serif;letter-spacing:.16em;color:#f6d365;text-transform:uppercase;margin-bottom:2px">' + esc(n[0]) + '</div>' + esc(short(n[1], 150));
-    const i = document.getElementById('inspector'), up = i && !i.classList.contains('hide') && window.innerWidth > 720;
-    box.style.right = up ? Math.round(i.getBoundingClientRect().width) + 28 + 'px' : '14px';
-    box.style.opacity = '1'; box.style.transform = 'none';
-    busy = setTimeout(function () { box.style.opacity = '0'; box.style.transform = 'translateY(8px)'; busy = setTimeout(show, 500); }, Q.length ? 3800 : 5500);
+    { const al = document.getElementById('mvalert'), up = al && !al.classList.contains('hide'); const hi = document.getElementById('hint'), hup = hi && hi.classList.contains('show'); box.style.bottom = up ? Math.round(window.innerHeight - al.getBoundingClientRect().top + 10) + 'px' : hup ? Math.round(window.innerHeight - hi.getBoundingClientRect().top + 10) + 'px' : '86px'; }      /* above the marvel alarm when that is showing */
+    box.style.opacity = '1'; box.style.transform = 'translate(-50%,0)';
+    busy = setTimeout(function () { box.style.opacity = '0'; box.style.transform = 'translate(-50%,8px)'; busy = setTimeout(show, 500); }, Q.length ? 3800 : 5500);
   }
   G.note = function (kicker, text) { if (Q.length >= 3) Q.shift(); Q.push([kicker, text]); if (!busy) show(); };
   // the banner: big moments only
@@ -9685,6 +9715,7 @@ G.addSystem({
     const s = order.join('|');
     if (!order.length) { if (!box.classList.contains('hide')) box.classList.add('hide'); sig = ''; return; }
     box.classList.remove('hide');
+    { const se = document.getElementById('season'); if (se && !se.classList.contains('hide') && window.innerWidth > 720) box.style.top = Math.round(se.getBoundingClientRect().bottom + 16) + 'px'; else box.style.top = ''; }      /* a clear gap under the seasons */
     // the heading folds the card away; under it, one line says what the card is
     if (shut === null) { try { shut = !!localStorage.getItem('primordia.versusShut'); } catch (e) { shut = false; } }
     let html = '<div id="vsHead" title="' + (shut ? 'Open' : 'Fold away') + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer"><span class="ilabel" style="margin:0;color:var(--gold)">' + (shut ? 'DANGERS' : 'DANGERS IN THE POND') + '</span><span style="display:flex;align-items:center;gap:6px">' + (shut ? '<small style="padding:1px 8px;border-radius:999px;border:1px solid rgba(255,126,182,.6);color:#ffd3e2">' + order.length + '</small>' : '') + '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;background:rgba(7,18,31,.55);border:1px solid rgba(207,232,255,.25)">' + (shut ? '▸' : '▾') + '</span></span></div>';
@@ -9961,7 +9992,7 @@ G.addSystem({
   // ── field guide ──
   G.openGuide = function () {
     const W = G.W; if (!W) return;
-    const o = openOverlay('guide', '<div class="glass sheet"><div class="top"><h2>BOOK OF LIFE</h2><div class="tabs" style="min-width:min(520px,100%)" id="gdTabs"><button data-t="hist">HISTORY</button><button data-t="live" class="on">LIVING</button><button data-t="coll">COLLECTION</button><button data-t="fossil">FOSSILS</button><button data-t="disc">DISCOVERIES</button><button data-t="story">STORY</button><button data-t="organ">ORGANS & PARTS</button></div><button class="btn sm" id="gdClose">' + ICON.close + 'CLOSE</button></div><div class="body" id="gdBody"></div></div>');
+    const o = openOverlay('guide', '<div class="glass sheet"><div class="top"><h2>BOOK OF LIFE</h2><div class="tabs" style="min-width:min(520px,100%)" id="gdTabs"><button data-t="hist">HISTORY</button><button data-t="live" class="on">LIVING</button><button data-t="coll">COLLECTION</button><button data-t="fossil">FOSSILS</button><button data-t="disc">DISCOVERIES</button><button data-t="story">STORY</button><button data-t="organ">ORGANS &amp; PARTS</button></div><button class="btn sm" id="gdClose">' + ICON.close + 'CLOSE</button></div><div class="body" id="gdBody"></div></div>');
     let tab = UI.guideTab || 'hist';
     const render = function () {
       const body = $('gdBody'); body.innerHTML = '';
@@ -10902,7 +10933,7 @@ G.addSystem({
     const out = {
       v: 1, at: Date.now(), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
       set: W.set, disc: W.disc, nextSp: W.nextSp, ai: G.ai && G.ai.model ? G.ai.model : '', drawn: G.ai && G.ai.drawn ? 1 : 0, spend: G.ai ? G.ai.life : {},
-      hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species]; }),
+      hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species, +(h.look || 0).toFixed(3), +(h.lookTop || 0).toFixed(2), +(h.whole || 0).toFixed(3), +(h.wholeTop || 0).toFixed(2), +(h.body || 0).toFixed(1), +(h.bodyTop || 0).toFixed(1), +(h.size || 0).toFixed(1), +(h.sizeTop || 0).toFixed(1)]; }),
       discLog: W.discLog.slice(-40),
       hints: Object.keys(G.hints),
       cre: [], species: [], fossils: [],
@@ -11088,7 +11119,7 @@ G.addSystem({
     if (typeof d.ai === 'string' && d.ai && G.ai && (!G.ai.models.length || G.ai.labelOf(d.ai))) G.ai.model = d.ai.slice(0, 60);
     if (d.disc && typeof d.disc === 'object') { for (const k in d.disc) if (typeof k === 'string' && k.length < 20) W.disc[k] = num(d.disc[k], 0, 1e6, 0); }
     if (Array.isArray(d.discLog)) W.discLog = d.discLog.filter(function (e) { return e && typeof e.text === 'string'; }).slice(-40).map(function (e) { return { key: String(e.key).slice(0, 20), text: String(e.text).slice(0, 420), gen: num(e.gen, 0, 1e6, 0) }; });
-    if (Array.isArray(d.hist)) d.hist.forEach(function (h) { if (Array.isArray(h) && h.length >= 7) W.hist.push({ gen: num(h[0], 0, 1e6, 0), avg: num(h[1], 0, 1, 0), best: num(h[2], 0, 1, 0), pop: num(h[3], 0, 1e4, 0), genes: num(h[4], 0, 1e3, 0), intake: num(h[5], 0, 1e5, 0), species: num(h[6], 0, 1e3, 0) }); });
+    if (Array.isArray(d.hist)) d.hist.forEach(function (h) { if (Array.isArray(h) && h.length >= 7) W.hist.push({ gen: num(h[0], 0, 1e6, 0), avg: num(h[1], 0, 1, 0), best: num(h[2], 0, 1, 0), pop: num(h[3], 0, 1e4, 0), genes: num(h[4], 0, 1e3, 0), intake: num(h[5], 0, 1e5, 0), species: num(h[6], 0, 1e3, 0), look: num(h[7], 0, 1, 0), lookTop: num(h[8], 0, 1, 0), whole: num(h[9], 0, 1, 0), wholeTop: num(h[10], 0, 1, 0), body: num(h[11], 0, 99, 0), bodyTop: num(h[12], 0, 99, 0), size: num(h[13], 0, 99, 0), sizeTop: num(h[14], 0, 99, 0) }); });
     if (Array.isArray(d.hints)) d.hints.forEach(function (k) { if (typeof k === 'string') G.hints[k.slice(0, 20)] = 1; });
     if (Array.isArray(d.species)) d.species.forEach(function (s) {
       if (!Array.isArray(s) || s.length < 10) return;

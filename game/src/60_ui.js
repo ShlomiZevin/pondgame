@@ -68,7 +68,7 @@
     const p = el('div', 'glass hide', '', ui); p.id = 'panel';
     p.innerHTML = '<button class="phead" id="panelToggle" aria-label="Evolution panel">EVOLUTION<span id="phSum"></span>' + ICON.chev + '</button>' +
       '<div class="pbody"><div id="era" style="margin-bottom:10px"></div><div class="stats"><div><b id="stGen">1</b><small>Gen</small></div><div><b id="stPop">0</b><small>Alive</small></div><div><b id="stSp">1</b><small>Species</small></div><div><b id="stFit">0.00</b><small>Fitness</small></div></div>' +
-      '<div class="tabs" id="gtabs"><button data-m="look" class="on">BEAUTY</button><button data-m="whole">WHOLE</button><button data-m="fit">FITNESS</button><button data-m="skill">SKILL</button><button data-m="pop">POP</button><button data-m="genes">GENES</button></div>' +
+      '<div class="tabs" id="gtabs"><button data-m="look" class="on">BEAUTY</button><button data-m="whole">WHOLE</button><button data-m="fit">FITNESS</button><button data-m="skill">SKILL</button><button data-m="body">BODY</button><button data-m="size">SIZE</button><button data-m="pop">POP</button><button data-m="genes">GENES</button></div>' +
       '<canvas id="graph" width="560" height="184"></canvas><div class="gnote" id="gnote"></div><button class="gnote" id="aiLine" style="min-height:0;color:var(--gold);background:none;border:0;padding:0;font:inherit;font-size:11px;line-height:1.3;text-align:left;cursor:pointer;text-decoration:underline dotted;display:block" title="See what each kind of AI use cost"></button><div class="ilabel">What changed</div><div class="log" id="mutLog"></div></div>';
     refs.panel = p;
     if (window.innerWidth < 720) p.classList.add('min');
@@ -420,10 +420,12 @@
     const b = bannerQ.shift();
     if (!b) { bannerTimer = 0; return; }
     refs.banner.innerHTML = '<small>' + escapeHtml(b[0]) + '</small>' + escapeHtml(b[1]);
+    { let y = 78; ['wish', 'wxnow'].forEach(function (id) { const e = document.getElementById(id); if (e && !e.classList.contains('hide') && e.offsetHeight && window.innerWidth > 720) y = Math.max(y, e.getBoundingClientRect().bottom + 10 - 14); });
+      refs.banner.style.setProperty('transform', 'translate(-50%,' + Math.round(y) + 'px)', 'important'); }      /* just below the wish and the weather, never on them */
     refs.banner.classList.add('show');
     G.sfx('discovery');
     bannerTimer = setTimeout(function () {
-      refs.banner.classList.remove('show');
+      refs.banner.classList.remove('show'); refs.banner.style.removeProperty('transform');
       bannerTimer = setTimeout(nextBanner, 700);
     }, b[2] || 3800);
   }
@@ -440,6 +442,8 @@
     whole: { label: 'Whole: how much of a whole, full creature they are, out of 10: from a cell (1), through a ball with a face (3) and a simple critter (5), to a full character with head, body, legs and arms (9). The average; the dashed line is the most whole one alive.', get: function (h) { return (h.whole || 0) * 10; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 },
     look: { label: 'Beauty: how nice to the eye the creatures of this pond are, out of 10 (the average; the dashed line is the nicest one alive). This is what the pond evolves towards.', get: function (h) { return (h.look || 0) * 10; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 },
     fit: { label: 'Fitness = how nice to the eye and how whole a creature is, for those that have eaten well enough (half a tank). Higher scores survive winter and have more children.', get: function (h) { return h.avg; }, fmt: function (v) { return v.toFixed(2); }, min: 0, max: 1 },
+    body: { label: 'Body: how much there is to a body: its joined parts and everything that grows on it (legs, fins, horns, a tail, a coat...). The average; the dashed line is the most complex one alive. A young pond keeps bodies simple; from generation 60 to about 420 it is allowed, step by step, twice as much.', get: function (h) { return h.body || 0; }, top: function (h) { return h.bodyTop || 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
+    size: { label: 'Size: how big the creatures are (the first cells are about 10; the most a creature can reach is 64). The average; the dashed line is the biggest one alive. An old pond drifts bigger for as long as there is food for it.', get: function (h) { return h.size || 0; }, top: function (h) { return h.sizeTop || 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
     skill: { label: 'Skill: food eaten per creature each generation', get: function (h) { return h.intake; }, fmt: function (v) { return v.toFixed(0); }, min: 0 },
     pop: { label: 'How many creatures were alive at autumn', get: function (h) { return h.pop; }, fmt: function (v) { return v.toFixed(0); }, min: 0 },
     genes: { label: 'Genome size: parts, wires and brain cells per creature', get: function (h) { return h.genes; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
@@ -458,14 +462,17 @@
       return;
     }
     const vals = hist.map(m.get);
-    let lo = m.min === undefined ? Math.min.apply(null, vals) : m.min, hi = m.max === undefined ? Math.max.apply(null, vals) * 1.1 + 0.001 : m.max;
+    let lo = m.min === undefined ? Math.min.apply(null, vals) : m.min, hi = m.max === undefined ? Math.max.apply(null, m.top ? hist.map(m.top).concat(vals) : vals) * 1.1 + 0.001 : m.max;
     if (hi - lo < 1e-6) hi = lo + 1;
     const pad = 14, n = hist.length;
     const X = function (i) { return pad + (w - pad * 2) * (n === 1 ? 0 : i / (n - 1)); };
     const Y = function (v) { return h - pad - (h - pad * 2) * ((v - lo) / (hi - lo)); };
     ctx.strokeStyle = G.rgba(PAL.frost, 0.1); ctx.lineWidth = 1;
     for (let i = 0; i < 4; i++) { const y = pad + (h - pad * 2) * i / 3; ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w - pad, y); ctx.stroke(); }
-    if (UI.metric === 'fit' || UI.metric === 'look' || UI.metric === 'whole') {
+    if (m.top) {
+      ctx.strokeStyle = G.rgba(PAL.gold, 0.45); ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+      ctx.beginPath(); hist.forEach(function (q, i) { const x = X(i), y = Y(m.top(q)); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]);
+    } else if (UI.metric === 'fit' || UI.metric === 'look' || UI.metric === 'whole') {
       ctx.strokeStyle = G.rgba(PAL.gold, 0.45); ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
       ctx.beginPath(); hist.forEach(function (q, i) { const x = X(i), y = Y(UI.metric === 'look' ? (q.lookTop || 0) * 10 : UI.metric === 'whole' ? (q.wholeTop || 0) * 10 : q.best); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]);
     }

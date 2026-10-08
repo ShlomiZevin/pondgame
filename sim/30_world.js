@@ -1003,7 +1003,9 @@
     // the drive to grow is only as strong as the pond can bear: it eases off when the pond is below its capacity (the big need feeding) and as the average size gets large
     { const popR = W.popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12; W.room = 6 * clamp((W.gen - 60) / 360, 0, 1);      /* how much more a body may carry: none before generation 60, all of it from about generation 420 (see F.room) */
       W.grow = Math.max(W.stall || 0, G.ROOM_OFF ? 0 : 0.5 * W.room / 6) * clamp((popR - 0.6) / 0.3, 0, 1) * (1 - clamp((mr - 26) / 14, 0, 1)); }
-    W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop });
+    // how much there is to a body (its joined parts and all that grows on it, counted as the pond counts clutter) and how big it is: what an old pond grows into
+    let bodySum = 0, bodyTop = 0, sizeSum = 0, sizeTop = 0; for (let i = 0; i < cre.length; i++) { const f = cre[i].g.f, b = f.bd ? G.body.busy(f) : f.n + f.rules.length, z = cre[i].g.t[0]; bodySum += b; if (b > bodyTop) bodyTop = b; sizeSum += z; if (z > sizeTop) sizeTop = z; }
+    W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop, body: bodySum / n, bodyTop: bodyTop, size: sizeSum / n, sizeTop: sizeTop });
     if (W.hist.length > 600) W.hist.shift();
     G.updateSpecies();
     G.scanDiscoveries();

@@ -60,7 +60,7 @@
   // ── field guide ──
   G.openGuide = function () {
     const W = G.W; if (!W) return;
-    const o = openOverlay('guide', '<div class="glass sheet"><div class="top"><h2>BOOK OF LIFE</h2><div class="tabs" style="min-width:min(520px,100%)" id="gdTabs"><button data-t="hist">HISTORY</button><button data-t="live" class="on">LIVING</button><button data-t="coll">COLLECTION</button><button data-t="fossil">FOSSILS</button><button data-t="disc">DISCOVERIES</button><button data-t="story">STORY</button><button data-t="organ">ORGANS & PARTS</button></div><button class="btn sm" id="gdClose">' + ICON.close + 'CLOSE</button></div><div class="body" id="gdBody"></div></div>');
+    const o = openOverlay('guide', '<div class="glass sheet"><div class="top"><h2>BOOK OF LIFE</h2><div class="tabs" style="min-width:min(520px,100%)" id="gdTabs"><button data-t="hist">HISTORY</button><button data-t="live" class="on">LIVING</button><button data-t="coll">COLLECTION</button><button data-t="fossil">FOSSILS</button><button data-t="disc">DISCOVERIES</button><button data-t="story">STORY</button><button data-t="organ">ORGANS &amp; PARTS</button></div><button class="btn sm" id="gdClose">' + ICON.close + 'CLOSE</button></div><div class="body" id="gdBody"></div></div>');
     let tab = UI.guideTab || 'hist';
     const render = function () {
       const body = $('gdBody'); body.innerHTML = '';

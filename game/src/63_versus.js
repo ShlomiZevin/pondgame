@@ -35,6 +35,7 @@
     const s = order.join('|');
     if (!order.length) { if (!box.classList.contains('hide')) box.classList.add('hide'); sig = ''; return; }
     box.classList.remove('hide');
+    { const se = document.getElementById('season'); if (se && !se.classList.contains('hide') && window.innerWidth > 720) box.style.top = Math.round(se.getBoundingClientRect().bottom + 16) + 'px'; else box.style.top = ''; }      /* a clear gap under the seasons */
     // the heading folds the card away; under it, one line says what the card is
     if (shut === null) { try { shut = !!localStorage.getItem('primordia.versusShut'); } catch (e) { shut = false; } }
     let html = '<div id="vsHead" title="' + (shut ? 'Open' : 'Fold away') + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer"><span class="ilabel" style="margin:0;color:var(--gold)">' + (shut ? 'DANGERS' : 'DANGERS IN THE POND') + '</span><span style="display:flex;align-items:center;gap:6px">' + (shut ? '<small style="padding:1px 8px;border-radius:999px;border:1px solid rgba(255,126,182,.6);color:#ffd3e2">' + order.length + '</small>' : '') + '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;background:rgba(7,18,31,.55);border:1px solid rgba(207,232,255,.25)">' + (shut ? '▸' : '▾') + '</span></span></div>';
