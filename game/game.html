@@ -1157,7 +1157,12 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       else if (life.diet === 3 && hitL(0.05)) { if (f.en < 2) { f.en++; note('grew an eye, to find the blue food of the deep', true); } else if (!has(f, 4) && room && r() < 0.4) { f.rules.push(newRule(f.n, 4)); note('grew feelers, to find the blue food of the deep', true); } else { f.es += 0.05; note('its eyes grew, for the blue food of the deep', false); } }
       else if (life.diet === 4 && hitL(0.05)) { if (f.mk !== 2) { f.mk = 2; note('grew jaws, for the tough violet food', true); } else if (!has(f, 2) && room) { f.rules.push(newRule(f.n, 2)); note('grew spikes, for the tough violet food', true); } }
       else if (life.diet === 5 && hitL(0.05)) { if (!f.tk) { f.tk = 1 + Math.floor(r() * 2); note('grew a tail, to chase the quick pink food', true); } else if (!has(f, 1) && room) { f.rules.push(newRule(f.n, 1)); note('grew fins, to chase the quick pink food', true); } }
-      if ((f._air || 0) >= 0.5 && hitL(0.22)) { const Lg = legR(); if (!Lg && room) { f.rules.push(newRule(f.n, 0)); note('grew legs, living on the land', true); } else if (has(f, 1) && r() < 0.2) { for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k === 1 && f.rules[i].on < 0) { dropRule(f, i); break; } note('its fins withered on dry land', true); } else if (f.tk && r() < 0.3) { f.tk = 0; note('lost its swimming tail on dry land', true); } else if (f.coat !== 2) { f.coat = 2; note('grew fur, living on the shore', true); } else if (Lg && Lg.t !== 1) { Lg.t = 1; note('its feet grew fingers, living on the shore', true); } }
+      if ((f._air || 0) >= 0.5 && hitL(0.22)) { const Lg = legR();
+        if (!Lg) {      // no legs yet: they come first, in place of tentacles or fins if the body has no room for more
+          if (!room) { let at = -1; for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on < 0 && (q.k === 3 || q.k === 1) && !f.rules.some(function (x) { return x.on === i; })) { at = i; if (q.k === 3) break; } } if (at >= 0) dropRule(f, at); }
+          if (f.rules.length < 6) { const q = newRule(f.n, 0); q.t = r() < 0.7 ? 0 : 3; f.rules.push(q); note('grew legs, living on the land', true); } }
+        else if (f.tk && r() < 0.5) { f.tk = 0; note('lost its swimming tail on dry land', true); }
+        else if (has(f, 1) && r() < 0.2) { for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k === 1 && f.rules[i].on < 0) { dropRule(f, i); break; } note('its fins withered on dry land', true); } else if (f.tk && r() < 0.3) { f.tk = 0; note('lost its swimming tail on dry land', true); } else if (f.coat !== 2) { f.coat = 2; note('grew fur, living on the shore', true); } else if (Lg && Lg.t !== 1) { Lg.t = 1; note('its feet grew fingers, living on the shore', true); } }
       else if (life.shore > 0.3 && life.land < 0.05 && hitL(0.06)) { const Lg = legR(); if (!Lg && room) { f.rules.push(newRule(f.n, 0)); note('grew legs, living by the shore', true); } else if (Lg && Lg.b < f.n - 1) { Lg.b++; note('grew more legs, living by the shore', true); } }
       else if (life.deep > 0.5 && hitL(0.05)) { if (f.glow < 0.6) { f.glow = clamp(f.glow + 0.4, 0, 1); note('began to glow, living in the dark deep', true); } else { f.es += 0.05; note('its eyes grew, living in the dark deep', false); } }
       else if ((f._air || 0) < 0.5 && has(f, 0) && hitL(0.16)) { for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.k === 0 && q.on < 0 && !f.rules.some(function (x) { return x.on === i; })) { q.k = 1; q.t = 0; note('its legs flattened into fins, living in the water', true); break; } } }
@@ -2158,6 +2163,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   // the taste every pond starts with: fitted to the AI's grades of pictures (b: the grade of a body with nothing to see on it)
   F.TASTE0 = { b: 0.2873, w: [0, 0.0049, -0.0083, 0.0033, -0.0273, -0.0226, -0.0825, -0.0151, -0.0389, 0.0131, -0.1379, -0.0141, 0.0624, -0.0415, 0.0307, 0.0259, -0.0108, 0.0604, 0.0325, 0.0211, 0.0569, -0.0014, 0.0695, -0.0342, 0.0021, 0.0547, 0.0282, 0, 0.0411, -0.0144, 0, 0.0459, -0.0337, -0.0617, -0.0081, 0.0229, 0.0106, 0.0234, -0.0046, 0.1216, -0.0289, -0.1043, -0.0193, 0.0673, 0.0252, 0.0303, 0.0212, 0.0287, -0.0097, 0.0386, 0.0068, 0.0427, 0.0899, -0.0541, 0.0169, -0.0288, -0.0187, 0.0047, 0.1863, -0.0773, 0.0375, 0.0359, 0.0165, 0.0006, 0.0031, 0.0184], n: 237, wb: -0.4464, ww: [0, 0.0204, 0.0073, -0.0277, -0.056, -0.0261, -0.0837, -0.0906, -0.0928, 0.0642, -0.0898, -0.0291, 0.0539, -0.0547, 0.0484, -0.017, 0.0095, 0.023, 0.0121, 0.0255, 0.0169, 0.0289, 0.0417, 0.0297, 0.0013, 0.0349, -0.0218, 0, 0.0306, -0.0208, 0, -0.0055, -0.0043, -0.0624, -0.0674, 0.0774, -0.0132, 0.0069, 0.0312, 0.1242, -0.02, -0.1493, -0.0363, 0.0128, 0.0691, -0.0068, -0.0309, -0.0183, -0.0226, -0.0287, -0.0124, -0.0221, 0.0998, -0.0709, -0.0195, -0.0115, -0.0126, -0.0062, 0.1629, -0.0111, 0.0452, -0.0617, 0.0212, 0.0447, 0.035, 0.0091] };      // fitted 2026-10-06 to the AI's marks on 237 random pond creatures (beauty r 0.55 held out; whole is a correction to F.whole, r 0.62)
   while (F.TASTE0.w.length < NAMES.length) { F.TASTE0.w.push(0); F.TASTE0.ww.push(0); }      // the squared measures start at nothing: each pond learns them from its god
+  /** a mark from a raw score: itself up to 0.85, then ever more slowly towards 1, never reaching it and never losing the order of two scores */
+  F.soft = function (s) { return s < 0 ? 0 : s < 0.85 ? s : 0.85 + 0.15 * (1 - Math.exp(-(s - 0.85) / 0.9)); };
   F.newTaste = function () { return { b: F.TASTE0.b, w: F.TASTE0.w.slice(), n: 0, wb: F.TASTE0.wb || 0, ww: F.TASTE0.ww ? F.TASTE0.ww.slice() : F.TASTE0.w.map(function () { return 0; }) }; };
   F.fixTaste = function (t) {
     if (!t || !Array.isArray(t.w) || t.w.length !== NAMES.length || !isFinite(+t.b)) return null;
@@ -2171,11 +2178,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const x = F.looks(f); let s = T.b;
     for (let i = 0; i < x.length; i++) s += T.w[i] * x[i];
     // a soft ceiling, not a wall: two good bodies stay in order instead of both scoring the top mark
-    return s < 0 ? 0 : s < 0.8 ? s : 0.8 + 0.2 * Math.tanh((s - 0.8) / 0.2);
+    return F.soft(s);
   };
   /** the same two guesses from a body's looks already measured (x = F.looks(f); v0 = F.whole(f).v) */
-  F.beautyX = function (x, T) { T = T || F.TASTE0; let s = T.b; for (let i = 0; i < x.length; i++) s += T.w[i] * x[i]; return s < 0 ? 0 : s < 0.8 ? s : 0.8 + 0.2 * Math.tanh((s - 0.8) / 0.2); };
-  F.wholeX = function (x, T, v0) { let s = v0; if (T && T.ww) { s += T.wb; for (let i = 0; i < x.length; i++) s += T.ww[i] * x[i]; } return clamp(s, 0, 1); };
+  F.beautyX = function (x, T) { T = T || F.TASTE0; let s = T.b; for (let i = 0; i < x.length; i++) s += T.w[i] * x[i]; return F.soft(s); };
+  F.wholeX = function (x, T, v0) { let s = v0; if (T && T.ww) { s += T.wb; for (let i = 0; i < x.length; i++) s += T.ww[i] * x[i]; } return F.soft(s); };
   /** the eye graded this body: the taste is corrected a little towards what it said */
   F.learn = function (T, f, grade, rate, x0) {
     const x = x0 || F.looks(f); let s = T.b;
@@ -2221,7 +2228,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (!f.bd) return 0.3;
     let s = v0 === undefined ? F.whole(f).v : v0;
     if (T && T.ww) { const x = x0 || F.looks(f); s += T.wb; for (let i = 0; i < x.length; i++) s += T.ww[i] * x[i]; }
-    return clamp(s, 0, 1);
+    return F.soft(s);
   };
   F.learnWhole = function (T, x, grade, rate, v0) {
     if (!T.ww) return 0;
@@ -3156,7 +3163,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   G.o2At = function (x, y) {
     const W = G.W, e = W.env;
     if (y < G.shoreY(W)) return 1.4;
-    return (e ? e.o2 : 1) * (1.15 - 0.5 * clamp(x / W.ww, 0, 1)) * (env.temp > 0.35 ? 0.85 : 1);
+    return (e ? e.o2 : 1) * (1.1 - 0.25 * clamp(x / W.ww, 0, 1)) * (env.temp > 0.35 ? 0.85 : 1);
   };
   G.envText = function (W) {
     const e = (W || G.W).env; if (!e) return '';
@@ -3199,7 +3206,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       // the shallows grow green algae; the deep gets gold scraps and blue minerals
       // every colour of food grows, each in its own part of the pond and in this pond's own measure; the first cells live on green
       const m = W.env && W.env.mix ? W.env.mix : [1, 1, 1, 1, 1, 1], sh = x < W.ww * 0.55, young = W.gen < 14 ? 3.5 - W.gen * 0.18 : 1;
-      const w = [m[0] * (sh ? 0.5 : 1.3), m[1] * (sh ? 1.0 : 0.3), m[2] * (sh ? 1.7 : 0.5) * young, m[3] * (sh ? 0.2 : 1.2), m[4] * (sh ? 0.3 : 1.0), m[5] * (sh ? 0.9 : 0.5)];
+      const w = [m[0] * (sh ? 0.7 : 1.2), m[1] * (sh ? 1.0 : 0.7), m[2] * (sh ? 1.5 : 1.0) * young, m[3] * (sh ? 0.5 : 1.1), m[4] * (sh ? 0.6 : 1.0), m[5] * (sh ? 0.9 : 0.7)];
       let tot = 0; for (let i = 0; i < 6; i++) tot += w[i];
       let pick = r * tot; tag = 2; for (let i = 0; i < 6; i++) { pick -= w[i]; if (pick <= 0) { tag = i; break; } }
     }
@@ -3530,7 +3537,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
           if (dx * dx + dy * dy < z.r * z.r) sticky += z.p.sticky * 2.2 * z.k * (1 - ph.cnt[8] * 0.08);
         }
       }
-      const sp = ph.speed * (sprint ? 1.7 : 1) * thrust / sticky * (c.colony ? 0.85 : 1) * (c.land ? (0.2 + 0.32 * Math.min(ph.limbs, 4) + 0.15 * (ph.air || 0) + 0.45 * Math.min(1, ph.cnt[1]) * clamp((18 - ph.r) / 8, 0, 1)) * (ph.warm ? 1.3 : 1) : (1 - 0.45 * clamp(((ph.air || 0) - 0.5) / 0.5, 0, 1)) * (1 - 0.14 * Math.min(ph.limbs, 4)))      /* on land legs carry a body, and what were fins are wings that lift a small one; a swimming tail does nothing there; in the water legs only drag */ * (season === 3 && !ph.warm ? 0.68 : 1);      // winter makes the cold-blooded sluggish
+      const sp = ph.speed * (sprint ? 1.7 : 1) * thrust / sticky * (c.colony ? 0.85 : 1) * (c.land ? (0.2 + 0.32 * Math.min(ph.limbs, 4) + 0.15 * (ph.air || 0) + 0.45 * Math.min(1, ph.cnt[1]) * clamp((1.3 * (W.meanR || 12) - ph.r) / (0.6 * (W.meanR || 12)), 0, 1)) * (ph.flag > 0 ? 0.8 : 1) * (ph.warm ? 1.3 : 1) : (1 - 0.45 * clamp(((ph.air || 0) - 0.5) / 0.5, 0, 1)) * (1 - 0.14 * Math.min(ph.limbs, 4)))      /* on land legs carry a body, and what were fins are wings that lift a small one; a swimming tail does nothing there; in the water legs only drag */ * (season === 3 && !ph.warm ? 0.68 : 1);      // winter makes the cold-blooded sluggish
       const tx = Math.cos(c.ang) * sp, ty = Math.sin(c.ang) * sp;
       const k = Math.min(1, 2.6 * dt);
       c.vx += (tx - c.vx) * k; c.vy += (ty - c.vy) * k;
@@ -4000,8 +4007,10 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     // the drive to grow is only as strong as the pond can bear: it eases off when the pond is below its capacity (the big need feeding) and as the average size gets large
     { const popR = W.popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12;
       { const gr = Math.max(1, W.wh / 1400), fedM = cre.length ? cre.reduce(function (s, c) { return s + (c.fed || 0); }, 0) / cre.length : 0, was = W.richS || 1;
-        W.richS = clamp(was * (popR >= 0.8 && fedM >= 0.5 ? 1.008 : fedM < 0.35 ? 0.99 : 1), 1, 5000);
-        W.rich = W.richS * Math.pow(gr, 0.8); W.meanR = mr; W.sizeCap = G.sizeCapOf(W.richS); }
+        W.richS = clamp(was * (popR >= 0.8 && fedM >= 0.5 ? 1.005 : fedM < 0.35 ? 0.99 : 1), 1, 5000);
+        const fit = 1.2 * Math.sqrt(0.03 * W.ww * W.wh / (Math.max(110, cre.length) * 11.34));      // the biggest body there is room for
+        W.sizeCap = Math.min(G.sizeCapOf(W.richS), Math.max(14, fit));
+        W.rich = Math.min(W.richS, Math.pow(Math.max(1, W.sizeCap / 13), 2.05)) * Math.pow(gr, 0.8); W.meanR = mr; }
       // WHEN THE POND IS STUCK, IT GROWS. While beauty and wholeness have stopped rising (W.stall, above) the pond turns to size: bigger bodies are likelier, cheaper
       // to keep and last the winter better. Looks may dip while bodies change scale, and then the pond works on them again at the new size. There is no size at
       // which this stops: only the pond being too thinly peopled holds it back (the big need feeding).
@@ -8877,7 +8886,7 @@ G.addSystem({
 // it, and the food stays what it was, so there is more room, not more mouths. The whole pond still fits the screen.
 (function () {
   'use strict';
-  const MAXG = 5, ROOM = 0.042, PER_GEN = 0.006;      // it grows a little with every generation that passes, whatever else happens, up to five times its first width FOR NOW: measured (scripts/bigpond.js), a pond stays healthy to about four times and starves at nine, because food grows more slowly than the water. The limit can go when food keeps its density where the creatures live.           
+  const MAXG = 14, ROOM = 0.042, PER_GEN = 0.006;      // it grows a little with every generation that passes, whatever else happens, up to five times its first width FOR NOW: measured (scripts/bigpond.js), a pond stays healthy to about four times and starves at nine, because food grows more slowly than the water. The limit can go when food keeps its density where the creatures live.           
   /** how much of the pond is covered by bodies (0..1) */
   G.pondCover = function () { const W = G.W; if (!W || !W.cre.length) return 0; let a = 0; for (let i = 0; i < W.cre.length; i++) { const r = (W.cre[i].ph.r || 8) * 1.9; a += 3.1416 * r * r; } return a / (W.ww * W.wh); };
   /** make the pond g times its first size, moving everything in it apart */
@@ -11833,7 +11842,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const W = G.W;
     W.gen = Math.floor(num(d.gen, 1, 1e6, 1));
     W.room = num(d.room, 0, G.ROOM_MAX || 10, 0);
-    W.richS = num(d.rich, 1, 5000, num(d.gen, 0, 1e6, 0) > 50 ? 3.8 : 1); W.rich = W.richS;      /* (a pond saved before richness was kept: an old one is taken to be rich enough for the bodies it has) */ W.sizeCap = G.sizeCapOf(W.richS);      // before any creature is rebuilt: how big a body may be depends on it
+    W.richS = num(d.rich, 1, 5000, num(d.gen, 0, 1e6, 0) > 50 ? 3.8 : 1); W.rich = W.richS;      /* (a pond saved before richness was kept: an old one is taken to be rich enough for the bodies it has) */ W.sizeCap = Math.min(G.sizeCapOf(W.richS), Math.max(14, 1.2 * Math.sqrt(0.03 * (+d.ww || W.ww) * (+d.wh || W.wh) / (125 * 11.34))));      // before any creature is rebuilt: how big a body may be depends on it
     W.shore = num(d.shore, G.SHORE0, 0.5, G.SHORE0);      // a pond saved when the land began smaller comes back with the bigger land
     W.season = Math.floor(num(d.season, 0, 3, 0));
     W.st = num(d.st, 0, G.PH[W.season] - 0.01, 0);

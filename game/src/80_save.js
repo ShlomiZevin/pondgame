@@ -162,7 +162,7 @@
     const W = G.W;
     W.gen = Math.floor(num(d.gen, 1, 1e6, 1));
     W.room = num(d.room, 0, G.ROOM_MAX || 10, 0);
-    W.richS = num(d.rich, 1, 5000, num(d.gen, 0, 1e6, 0) > 50 ? 3.8 : 1); W.rich = W.richS;      /* (a pond saved before richness was kept: an old one is taken to be rich enough for the bodies it has) */ W.sizeCap = G.sizeCapOf(W.richS);      // before any creature is rebuilt: how big a body may be depends on it
+    W.richS = num(d.rich, 1, 5000, num(d.gen, 0, 1e6, 0) > 50 ? 3.8 : 1); W.rich = W.richS;      /* (a pond saved before richness was kept: an old one is taken to be rich enough for the bodies it has) */ W.sizeCap = Math.min(G.sizeCapOf(W.richS), Math.max(14, 1.2 * Math.sqrt(0.03 * (+d.ww || W.ww) * (+d.wh || W.wh) / (125 * 11.34))));      // before any creature is rebuilt: how big a body may be depends on it
     W.shore = num(d.shore, G.SHORE0, 0.5, G.SHORE0);      // a pond saved when the land began smaller comes back with the bigger land
     W.season = Math.floor(num(d.season, 0, 3, 0));
     W.st = num(d.st, 0, G.PH[W.season] - 0.01, 0);

@@ -167,7 +167,7 @@
   G.o2At = function (x, y) {
     const W = G.W, e = W.env;
     if (y < G.shoreY(W)) return 1.4;
-    return (e ? e.o2 : 1) * (1.15 - 0.5 * clamp(x / W.ww, 0, 1)) * (env.temp > 0.35 ? 0.85 : 1);
+    return (e ? e.o2 : 1) * (1.1 - 0.25 * clamp(x / W.ww, 0, 1)) * (env.temp > 0.35 ? 0.85 : 1);
   };
   G.envText = function (W) {
     const e = (W || G.W).env; if (!e) return '';
@@ -210,7 +210,7 @@
       // the shallows grow green algae; the deep gets gold scraps and blue minerals
       // every colour of food grows, each in its own part of the pond and in this pond's own measure; the first cells live on green
       const m = W.env && W.env.mix ? W.env.mix : [1, 1, 1, 1, 1, 1], sh = x < W.ww * 0.55, young = W.gen < 14 ? 3.5 - W.gen * 0.18 : 1;
-      const w = [m[0] * (sh ? 0.5 : 1.3), m[1] * (sh ? 1.0 : 0.3), m[2] * (sh ? 1.7 : 0.5) * young, m[3] * (sh ? 0.2 : 1.2), m[4] * (sh ? 0.3 : 1.0), m[5] * (sh ? 0.9 : 0.5)];
+      const w = [m[0] * (sh ? 0.7 : 1.2), m[1] * (sh ? 1.0 : 0.7), m[2] * (sh ? 1.5 : 1.0) * young, m[3] * (sh ? 0.5 : 1.1), m[4] * (sh ? 0.6 : 1.0), m[5] * (sh ? 0.9 : 0.7)];
       let tot = 0; for (let i = 0; i < 6; i++) tot += w[i];
       let pick = r * tot; tag = 2; for (let i = 0; i < 6; i++) { pick -= w[i]; if (pick <= 0) { tag = i; break; } }
     }
@@ -541,7 +541,7 @@
           if (dx * dx + dy * dy < z.r * z.r) sticky += z.p.sticky * 2.2 * z.k * (1 - ph.cnt[8] * 0.08);
         }
       }
-      const sp = ph.speed * (sprint ? 1.7 : 1) * thrust / sticky * (c.colony ? 0.85 : 1) * (c.land ? (0.2 + 0.32 * Math.min(ph.limbs, 4) + 0.15 * (ph.air || 0) + 0.45 * Math.min(1, ph.cnt[1]) * clamp((18 - ph.r) / 8, 0, 1)) * (ph.warm ? 1.3 : 1) : (1 - 0.45 * clamp(((ph.air || 0) - 0.5) / 0.5, 0, 1)) * (1 - 0.14 * Math.min(ph.limbs, 4)))      /* on land legs carry a body, and what were fins are wings that lift a small one; a swimming tail does nothing there; in the water legs only drag */ * (season === 3 && !ph.warm ? 0.68 : 1);      // winter makes the cold-blooded sluggish
+      const sp = ph.speed * (sprint ? 1.7 : 1) * thrust / sticky * (c.colony ? 0.85 : 1) * (c.land ? (0.2 + 0.32 * Math.min(ph.limbs, 4) + 0.15 * (ph.air || 0) + 0.45 * Math.min(1, ph.cnt[1]) * clamp((1.3 * (W.meanR || 12) - ph.r) / (0.6 * (W.meanR || 12)), 0, 1)) * (ph.flag > 0 ? 0.8 : 1) * (ph.warm ? 1.3 : 1) : (1 - 0.45 * clamp(((ph.air || 0) - 0.5) / 0.5, 0, 1)) * (1 - 0.14 * Math.min(ph.limbs, 4)))      /* on land legs carry a body, and what were fins are wings that lift a small one; a swimming tail does nothing there; in the water legs only drag */ * (season === 3 && !ph.warm ? 0.68 : 1);      // winter makes the cold-blooded sluggish
       const tx = Math.cos(c.ang) * sp, ty = Math.sin(c.ang) * sp;
       const k = Math.min(1, 2.6 * dt);
       c.vx += (tx - c.vx) * k; c.vy += (ty - c.vy) * k;
@@ -1011,8 +1011,10 @@
     // the drive to grow is only as strong as the pond can bear: it eases off when the pond is below its capacity (the big need feeding) and as the average size gets large
     { const popR = W.popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12;
       { const gr = Math.max(1, W.wh / 1400), fedM = cre.length ? cre.reduce(function (s, c) { return s + (c.fed || 0); }, 0) / cre.length : 0, was = W.richS || 1;
-        W.richS = clamp(was * (popR >= 0.8 && fedM >= 0.5 ? 1.008 : fedM < 0.35 ? 0.99 : 1), 1, 5000);
-        W.rich = W.richS * Math.pow(gr, 0.8); W.meanR = mr; W.sizeCap = G.sizeCapOf(W.richS); }
+        W.richS = clamp(was * (popR >= 0.8 && fedM >= 0.5 ? 1.005 : fedM < 0.35 ? 0.99 : 1), 1, 5000);
+        const fit = 1.2 * Math.sqrt(0.03 * W.ww * W.wh / (Math.max(110, cre.length) * 11.34));      // the biggest body there is room for
+        W.sizeCap = Math.min(G.sizeCapOf(W.richS), Math.max(14, fit));
+        W.rich = Math.min(W.richS, Math.pow(Math.max(1, W.sizeCap / 13), 2.05)) * Math.pow(gr, 0.8); W.meanR = mr; }
       // WHEN THE POND IS STUCK, IT GROWS. While beauty and wholeness have stopped rising (W.stall, above) the pond turns to size: bigger bodies are likelier, cheaper
       // to keep and last the winter better. Looks may dip while bodies change scale, and then the pond works on them again at the new size. There is no size at
       // which this stops: only the pond being too thinly peopled holds it back (the big need feeding).

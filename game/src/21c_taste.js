@@ -58,6 +58,8 @@
   // the taste every pond starts with: fitted to the AI's grades of pictures (b: the grade of a body with nothing to see on it)
   F.TASTE0 = { b: 0.2873, w: [0, 0.0049, -0.0083, 0.0033, -0.0273, -0.0226, -0.0825, -0.0151, -0.0389, 0.0131, -0.1379, -0.0141, 0.0624, -0.0415, 0.0307, 0.0259, -0.0108, 0.0604, 0.0325, 0.0211, 0.0569, -0.0014, 0.0695, -0.0342, 0.0021, 0.0547, 0.0282, 0, 0.0411, -0.0144, 0, 0.0459, -0.0337, -0.0617, -0.0081, 0.0229, 0.0106, 0.0234, -0.0046, 0.1216, -0.0289, -0.1043, -0.0193, 0.0673, 0.0252, 0.0303, 0.0212, 0.0287, -0.0097, 0.0386, 0.0068, 0.0427, 0.0899, -0.0541, 0.0169, -0.0288, -0.0187, 0.0047, 0.1863, -0.0773, 0.0375, 0.0359, 0.0165, 0.0006, 0.0031, 0.0184], n: 237, wb: -0.4464, ww: [0, 0.0204, 0.0073, -0.0277, -0.056, -0.0261, -0.0837, -0.0906, -0.0928, 0.0642, -0.0898, -0.0291, 0.0539, -0.0547, 0.0484, -0.017, 0.0095, 0.023, 0.0121, 0.0255, 0.0169, 0.0289, 0.0417, 0.0297, 0.0013, 0.0349, -0.0218, 0, 0.0306, -0.0208, 0, -0.0055, -0.0043, -0.0624, -0.0674, 0.0774, -0.0132, 0.0069, 0.0312, 0.1242, -0.02, -0.1493, -0.0363, 0.0128, 0.0691, -0.0068, -0.0309, -0.0183, -0.0226, -0.0287, -0.0124, -0.0221, 0.0998, -0.0709, -0.0195, -0.0115, -0.0126, -0.0062, 0.1629, -0.0111, 0.0452, -0.0617, 0.0212, 0.0447, 0.035, 0.0091] };      // fitted 2026-10-06 to the AI's marks on 237 random pond creatures (beauty r 0.55 held out; whole is a correction to F.whole, r 0.62)
   while (F.TASTE0.w.length < NAMES.length) { F.TASTE0.w.push(0); F.TASTE0.ww.push(0); }      // the squared measures start at nothing: each pond learns them from its god
+  /** a mark from a raw score: itself up to 0.85, then ever more slowly towards 1, never reaching it and never losing the order of two scores */
+  F.soft = function (s) { return s < 0 ? 0 : s < 0.85 ? s : 0.85 + 0.15 * (1 - Math.exp(-(s - 0.85) / 0.9)); };
   F.newTaste = function () { return { b: F.TASTE0.b, w: F.TASTE0.w.slice(), n: 0, wb: F.TASTE0.wb || 0, ww: F.TASTE0.ww ? F.TASTE0.ww.slice() : F.TASTE0.w.map(function () { return 0; }) }; };
   F.fixTaste = function (t) {
     if (!t || !Array.isArray(t.w) || t.w.length !== NAMES.length || !isFinite(+t.b)) return null;
@@ -71,11 +73,11 @@
     const x = F.looks(f); let s = T.b;
     for (let i = 0; i < x.length; i++) s += T.w[i] * x[i];
     // a soft ceiling, not a wall: two good bodies stay in order instead of both scoring the top mark
-    return s < 0 ? 0 : s < 0.8 ? s : 0.8 + 0.2 * Math.tanh((s - 0.8) / 0.2);
+    return F.soft(s);
   };
   /** the same two guesses from a body's looks already measured (x = F.looks(f); v0 = F.whole(f).v) */
-  F.beautyX = function (x, T) { T = T || F.TASTE0; let s = T.b; for (let i = 0; i < x.length; i++) s += T.w[i] * x[i]; return s < 0 ? 0 : s < 0.8 ? s : 0.8 + 0.2 * Math.tanh((s - 0.8) / 0.2); };
-  F.wholeX = function (x, T, v0) { let s = v0; if (T && T.ww) { s += T.wb; for (let i = 0; i < x.length; i++) s += T.ww[i] * x[i]; } return clamp(s, 0, 1); };
+  F.beautyX = function (x, T) { T = T || F.TASTE0; let s = T.b; for (let i = 0; i < x.length; i++) s += T.w[i] * x[i]; return F.soft(s); };
+  F.wholeX = function (x, T, v0) { let s = v0; if (T && T.ww) { s += T.wb; for (let i = 0; i < x.length; i++) s += T.ww[i] * x[i]; } return F.soft(s); };
   /** the eye graded this body: the taste is corrected a little towards what it said */
   F.learn = function (T, f, grade, rate, x0) {
     const x = x0 || F.looks(f); let s = T.b;
@@ -121,7 +123,7 @@
     if (!f.bd) return 0.3;
     let s = v0 === undefined ? F.whole(f).v : v0;
     if (T && T.ww) { const x = x0 || F.looks(f); s += T.wb; for (let i = 0; i < x.length; i++) s += T.ww[i] * x[i]; }
-    return clamp(s, 0, 1);
+    return F.soft(s);
   };
   F.learnWhole = function (T, x, grade, rate, v0) {
     if (!T.ww) return 0;

@@ -316,3 +316,12 @@ Land plants were made through `G.spawnFood`, which refuses when the pond's food 
 - **Worn and carried things** have a colour of their own (`tint`, from the AI, else from the thing's name), a shine and a shadow (`drawDesign`); before they were pale cut-outs.
 - **Clutter has weight.** Each part over six takes 5.5% off speed and 4% off turning (down to half): with food rich, upkeep no longer held bodies back.
 - **Live, Haiku 4.5, god and inventions on, 200 generations, $0.08** (`evo-n-g200.jpg`): water 36, near the shore line 63, land 81, land 48% of the map. The two sides are plainly different: water kinds are crab-like with jointed arms and legs in purples and reds; land kinds are broad-hatted, yellow, and nearly all wear the same invented orange cap (fashion spread it). Still open: the land kinds kept fish tails and no legs; the god's marks did not rise (beauty 6.4 then 6.1, whole 5.8 then 5.3); parts 10.4.
+
+### Round 7 (2026-10-08): bodies never outgrow the pond
+
+The owner's pond at about generation 780: bodies 30 times their first size in a pond 5 times its first width, one solid crush in a corner (richness had gone on compounding while the pond had stopped at `MAXG = 5`).
+- **Size is bounded by room.** `W.sizeCap = min(what richness carries, fit)`, with `fit = 1.2 × sqrt(0.03 × pond area / (creatures × 11.34))`: bodies at their biggest cover about 4% of the pond, just where the pond stops widening for crowding, so the two do not chase each other. Bodies now grow with the pond (0.6% of its first width a generation), and `MAXG` is 14. Food's worth follows the real size cap. Richness builds 0.5% a generation.
+- **Late-pond test** (`late.js` in the session notes: a free pond with every body made a giant): 668% of the pond covered, back to 3.5% six generations later, 4.3–4.4% from then on, population 121–187, land 59–95.
+- **The whole pond.** The two ends differ less (every food grows at both, the deep has 77% of the shallows' air where it had 57%), so a pond's life is not shut into one end.
+- **No god:** the pond's own guess no longer reaches a ceiling (`F.soft`): at 10 out of 10 for everyone nothing was being chosen.
+- **Land:** a land line with no legs grows them even when its body is full (in place of tentacles or fins), a swimming tail slows a body on land, and wings lift bodies that are small for their pond (not small in absolute terms).
