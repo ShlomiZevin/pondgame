@@ -140,7 +140,14 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 #zoom .btn { min-width: 40px; min-height: 40px; padding: 0; font-size: 18px; letter-spacing: 0; }
 @media (max-width: 720px) { #zoom { left: auto; bottom: auto; top: 232px; right: 7px; } }
 #inspector { max-height: calc(100vh - 28px); overflow-y: auto; }
-#isub { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+/* the card: every mark in two columns; the reasons, the energy and the history fold away behind one button */
+.imarks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 8px 0 4px; }
+.imarks .mcell { display: grid; grid-template-columns: 58px 1fr 26px; gap: 6px; align-items: center; font-size: 11.5px; }
+.imarks .bar { height: 6px; border-radius: 3px; background: rgba(207,232,255,.14); overflow: hidden; } .imarks .bar i { display: block; height: 100%; border-radius: 3px; background: var(--gold); }
+.imarks b { text-align: right; color: var(--gold); font-size: 11.5px; }
+.iappeal { font-size: 12px; margin: 2px 0 2px; } .iappeal b { color: var(--gold); font-size: 13.5px; } .iappeal i { font-style: normal; opacity: .65; font-size: 10.5px; }
+#inspector:not(.why) #ifit small:not(:first-of-type), #inspector:not(.why) #imut, #inspector:not(.why) .irows { display: none; }
+#isub { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
 #isub.open { display: block; }
 #inspector details { margin-top: 6px; } #inspector summary { cursor: pointer; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--frost); opacity: .75; padding: 4px 0; }
 .igrade { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; align-items: center; font-size: 12px; margin: 6px 0 4px; } .igrade .bar { height: 7px; border-radius: 4px; background: rgba(207,232,255,.14); overflow: hidden; } .igrade .bar i { display: block; height: 100%; border-radius: 4px; background: var(--gold); } .igrade b { color: var(--gold); }
@@ -987,8 +994,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   /** mutate a form in place. m: chance of a nudge per gene; wild: the world's mutation slider; press: what the pond is up against; note(text, big) */
   // ── room to grow ──
   // A young pond keeps its bodies simple: more than about six things on one body counts as clutter, and clutter is shed, snubbed and scored down.
-  // As the pond grows old that limit loosens (W.room, 0 to 6, set once a generation in 30_world.js): bodies may carry more parts, more sets of growths,
-  // and new parts bud more often. So complexity is something a pond grows INTO over hundreds of generations, not something it starts with.
+  // That limit loosens only as it is EARNED (W.room, see G.roomAfterLook in 21c_taste.js): each time the pond's god looks and finds that its bodies read
+  // well, bodies may carry a little more; when they stop reading well it tightens again. Mutation itself is not pushed either way.
   F.room = function () { const W = G.W; return G.ROOM_OFF ? 0 : G.ROOM_FORCE !== undefined ? G.ROOM_FORCE : (W && W.room) || 0; };
   F.mutate = function (f, m, wild, press, note) {
     const r = G.rand, n = G.randn;
@@ -1002,7 +1009,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       else if (f.rules.length) { const q = f.rules[Math.floor(r() * f.rules.length)]; if (q.b > q.a) { q.b = q.a; note(KMANY[q.k] + ' now grow from one place only', true); } }
     } }
     // a change of structure: at most one a birth
-    if (r() < (f.bd ? 0.07 + 0.012 * F.room() : 0.16) * wild) {      /* an old pond grows new parts about twice as often as a young one */
+    if (r() < (f.bd ? 0.07 : 0.16) * wild) {
       const roll = r();
       if (roll < 0.13) { if (f.bd) G.body.bud(f, note); else if (f.n < MAXN) { f.n++; note('body grew to ' + f.n + ' segments', true); } }
       else if (roll < 0.17) { if (f.bd) G.body.drop(f, note); else if (f.n > 1) { f.n--; note('body shrank to ' + f.n + (f.n === 1 ? ' segment' : ' segments'), true); } }
@@ -2116,6 +2123,78 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   };
 })();
 
+// ── The marks: what the god of the pond judges, and how fitness is made of it ──
+// The watcher (the AI that looks at the pond) is its god: from one look it gives each creature a mark for every entry in G.MARKS. A creature's APPEAL is
+// the weighted mean of its marks, and appeal times how well it fed is its fitness: that is the whole of selection. Nothing here reaches into mutation
+// or breeding: nature does its work, the god only says what it likes.
+//   To add a mark: add an entry here (id, label, weight w, and `prior`: the pond's own guess for a creature the god has not seen, from its genes) and
+//   the same id in WATCH_MARKS on the server (lib/ai.js), where the question put to the god is written. The card, the charts, the save and the
+//   fitness all read this list.
+// The first two marks (charm, whole) have their own learned guessers (above); the others start from `prior`, are inherited from the parents, and are
+// pulled towards what the god said of creatures that look alike.
+(function () {
+  'use strict';
+  const clamp = G.clamp;
+  const busyOf = function (g) { return g.f.bd ? G.body.busy(g.f) : g.f.n + g.f.rules.length; };
+  const tidy = function (g) { const b = busyOf(g); return b < 2.5 ? 0.45 : b <= 6 ? 1 : Math.max(0, 1 - (b - 6) * 0.22); };      // the pond's own old sense of clutter: strict, and not loosened by anything
+  G.MARKS = [
+    { id: 'charm', label: 'Beauty', w: 0.28, core: 'charm', note: 'Beauty: how nice to the eye, out of 10.' },
+    { id: 'whole', label: 'Whole', w: 0.24, core: 'whole', note: 'Whole: how complete a creature it is, out of 10.' },
+    { id: 'body', label: 'Body', w: 0.20, note: 'Body: does it have a real body that reads at a glance (one clear form, every part in its place) and not a heap of parts, out of 10.', prior: function (g) { return 0.25 + 0.4 * tidy(g); } },
+    { id: 'balance', label: 'Balance', w: 0.10, note: 'Balance: proportion and poise: do the parts suit one another, out of 10.', prior: function (g) { return 0.4 + 0.25 * tidy(g); } },
+    { id: 'grand', label: 'Grandeur', w: 0.18, note: 'Grandeur: how much creature there is (big, tall, developed, elaborate), counting only what reads well, out of 10. This is what rewards growing.', prior: function (g) { return clamp(0.12 + 0.5 * clamp((g.t[0] - 9) / 40, 0, 1) + 0.25 * clamp((busyOf(g) - 2) / 8, 0, 1) * tidy(g), 0, 1); } },
+  ];
+  G.MARKS_X = G.MARKS.filter(function (m) { return !m.core; });      // the marks beyond the first two
+  let WSUM = 0; G.MARKS.forEach(function (m) { WSUM += m.w; });
+  /** the pond's own guess of the further marks, from the genes alone */
+  G.markPrior = function (g) { const o = {}; for (let i = 0; i < G.MARKS_X.length; i++) o[G.MARKS_X[i].id] = clamp(G.MARKS_X[i].prior(g), 0, 1); return o; };
+  /** one mark of one creature, 0 to 1 */
+  G.markOf = function (c, id) {
+    if (id === 'charm') return c.ph.charm;
+    if (id === 'whole') return c.ph.whole === undefined ? 0.3 : c.ph.whole;
+    if (c.mx && c.mx[id] !== undefined) return c.mx[id];
+    return (c.mx = c.mx || G.markPrior(c.g))[id];
+  };
+  /** a creature's appeal: the weighted mean of all its marks */
+  G.appealRaw = function (c) { let v = 0; for (let i = 0; i < G.MARKS.length; i++) v += G.MARKS[i].w * G.markOf(c, G.MARKS[i].id); return v / WSUM; };
+  /** the same for a remembered look of the god's ({ b, w, m }) */
+  G.appealOfLook = function (q) { let v = 0, ws = 0; for (let i = 0; i < G.MARKS.length; i++) { const m = G.MARKS[i], x = m.id === 'charm' ? q.b : m.id === 'whole' ? q.w : q.m ? q.m[m.id] : undefined; if (x === undefined) continue; v += m.w * x; ws += m.w; } return ws ? v / ws : 0.4; };
+  /** a newborn's further marks: the god's own if it has seen this very body; else its parents', moved by how the child's genes differ from theirs; then
+   *  pulled towards what the god said of creatures that look like it */
+  G.marksBorn = function (c, A, B) {
+    const W = G.W, pr = G.markPrior(c.g), X = G.MARKS_X;
+    const hit = W && W.eyeSeen && c.g.f.bd ? W.eyeSeen[G.form.key(c.g.f)] : null;
+    if (hit && hit.m) { c.mx = {}; for (let i = 0; i < X.length; i++) c.mx[X[i].id] = hit.m[X[i].id] === undefined ? pr[X[i].id] : hit.m[X[i].id]; return; }
+    A = A && A.mx && A.g ? A : null; B = B && B.mx && B.g ? B : A;
+    if (A) { const pa = G.markPrior(A.g), pb = B === A ? pa : G.markPrior(B.g); c.mx = {}; for (let i = 0; i < X.length; i++) { const id = X[i].id; c.mx[id] = clamp((A.mx[id] + B.mx[id]) / 2 + 0.5 * (pr[id] - (pa[id] + pb[id]) / 2), 0, 1); } }
+    else c.mx = pr;
+    if (W && W.eyeBank && W.eyeBank.length && c.g.f.bd) {
+      const fv = c.fv || (c.fv = G.features(c.g)); let sw = 0; const acc = {};
+      for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i]; if (!q.m) continue; const d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; for (let k = 0; k < X.length; k++) { const id = X[k].id; if (q.m[id] !== undefined) acc[id] = (acc[id] || 0) + wt * q.m[id]; } }
+      if (sw > 0.15) { const k = Math.min(0.85, sw / (sw + 0.6)); for (let i = 0; i < X.length; i++) { const id = X[i].id; if (acc[id] !== undefined) c.mx[id] += k * (acc[id] / sw - c.mx[id]); } }
+    }
+  };
+  /** the god has looked at this one: its marks are its own */
+  G.marksSeen = function (c, m) { if (!m) return; c.mx = c.mx || G.markPrior(c.g); for (let i = 0; i < G.MARKS_X.length; i++) { const id = G.MARKS_X[i].id; if (m[id] !== undefined) c.mx[id] = m[id]; } };
+  /** a creature that resembles one the god just looked at moves towards what the god said (wt: how alike, 0 to 1) */
+  G.marksToward = function (x, m, wt) { if (!m) return; x.mx = x.mx || G.markPrior(x.g); for (let i = 0; i < G.MARKS_X.length; i++) { const id = G.MARKS_X[i].id; if (m[id] !== undefined) x.mx[id] += 0.8 * wt * (m[id] - x.mx[id]); } };
+  // ── room to grow is earned ──
+  // How much a body may carry before the pond counts it as clutter (W.room, see F.room) is not given by the calendar: it opens a little each time the
+  // god looks and finds that the pond's bodies read well, and closes again when they stop reading well. So a pond that grows gracefully keeps growing,
+  // with no end set in advance, and one that turns to heaps is drawn back, and may try again. Without a god (no AI) it stays shut: the old limits hold.
+  G.ROOM_MAX = 10;
+  G.roomAfterLook = function (looks) {
+    const W = G.W; if (!W || !looks.length) return;
+    let b = 0, bl = 0, n = 0; for (let i = 0; i < looks.length; i++) { const m = looks[i].m; if (!m || m.body === undefined) continue; b += m.body; bl += m.balance === undefined ? 0.5 : m.balance; n++; }
+    if (!n) return; b /= n; bl /= n;
+    const was = W.room || 0;
+    if (b >= 0.58 && bl >= 0.5) W.room = Math.min(G.ROOM_MAX, was + 0.3);      /* the bodies read well (6 of 10 or so): a little more room */
+    else if (b < 0.46) W.room = Math.max(0, was - 1);                                   /* they have stopped reading well: room is taken back, faster than it was given */
+    W.roomWhy = { body: b, balance: bl, gen: W.gen, d: (W.room || 0) - was };
+    if ((W.room || 0) !== was && G.emit) G.emit('room', W.room, was);
+  };
+})();
+
 </script>
 <script data-part="portrait">
 // ── The character: the same genes, seen as you would meet the animal in the water ──
@@ -2812,6 +2891,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       if (!hit && W.eyeBank && W.eyeBank.length) { const fv = c.fv = G.features(genome); let sw = 0, sb = 0, sh = 0; for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i], d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; sb += wt * q.b; sh += wt * q.w; } if (sw > 0.15) { const k = Math.min(0.85, sw / (sw + 0.6)); c.eb += k * (sb / sw - c.eb); c.ew += k * (sh / sw - c.ew); c.st = Math.min(c.st, 1); } }
       ph.charm = c.eb; ph.whole = c.ew;
     }
+    if (G.marksBorn) G.marksBorn(c, parentA, parentB);      // its further marks (body, balance, grandeur...): see G.MARKS
     return c;
   };
   G.snapOf = function (c, extra) {
@@ -3612,12 +3692,12 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const s = c.sp ? G.speciesById(c.sp) : null;
     // the grade the eye for beauty gave its kind is most of it; its own body's fit to the pond's taste is the rest. What the player kept is loved outright.
     // a grade counts for what it is next to the other grades in this pond: so a generous judge and a strict one select alike
-    let v = 0.42 * c.ph.charm + 0.58 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);
+    let v = G.appealRaw ? G.appealRaw(c) : 0.42 * c.ph.charm + 0.58 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);      // the weighted mean of all the god's marks (G.MARKS)
     // a guess is not a look: where the watcher has really seen creatures, one nobody has looked at is held back towards what the watcher really said of this pond.
     // Selecting the highest guesses every generation would pile up error (the winner's curse); this keeps belief close to the truth.
     const W1 = G.W;
     if (!c.real && W1 && W1.eyeBank && W1.eyeBank.length >= 6) {
-      if (W1._emGen !== W1.gen) { let t = 0; for (let i = 0; i < W1.eyeBank.length; i++) t += (W1.eyeBank[i].b + W1.eyeBank[i].w) / 2; W1._em = t / W1.eyeBank.length; W1._emGen = W1.gen; }
+      if (W1._emGen !== W1.gen) { let t = 0; for (let i = 0; i < W1.eyeBank.length; i++) t += G.appealOfLook ? G.appealOfLook(W1.eyeBank[i]) : (W1.eyeBank[i].b + W1.eyeBank[i].w) / 2; W1._em = t / W1.eyeBank.length; W1._emGen = W1.gen; }
       const k = clamp(0.3 + 0.12 * (c.st === undefined ? 3 : c.st), 0.3, 0.75);
       v = W1._em + (v - W1._em) * (1 - k);
     }
@@ -3666,7 +3746,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     for (let i = 0; i < cre.length; i++) {
       const c = cre[i];
       c.fed = clamp(c.E / c.ph.Emax, 0, 1);
-      c.fit = clamp(c.fed / 0.5, 0, 1) * (0.15 + 0.85 * G.charmOf(c)) * (c.g.f.bd ? Math.max(0.35, 1 - 0.18 * Math.max(0, G.body.busy(c.g.f) - 6 - G.form.room())) : 1);          // fed well enough (half a tank is plenty), times how nice to the eye and how whole it is
+      c.fit = clamp(c.fed / 0.5, 0, 1) * (0.15 + 0.85 * G.charmOf(c));          // fed well enough (half a tank is plenty), times how nice to the eye and how whole it is
       sum += c.fit; genes += c.g.f.n + c.g.f.rules.length + c.g.p.length + c.g.w.length + c.g.h;
       intake += c.intake;
       if (c.fit > best) { best = c.fit; bestC = c; }
@@ -3683,11 +3763,10 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       if (H.length >= 20) { let a = 0, b = 0; for (let i = 0; i < 10; i++) { a += H[H.length - 1 - i]; b += H[H.length - 11 - i]; } const was = W.stall || 0; W.stall = a / 10 < b / 10 + 0.01 ? Math.min(1, was + 0.2) : Math.max(0, was - 0.35);
         if (W.stall >= 0.6 && was < 0.6 && W.gen - (W.stallNote || -99) > 40) { W.stallNote = W.gen; W.discLog.push({ key: 'stall' + W.gen, text: 'The pond has stopped getting nicer, so its creatures turn to growing bigger: size is what there is left to improve.', gen: W.gen }); G.emit('stall'); } } }
     // the drive to grow is only as strong as the pond can bear: it eases off when the pond is below its capacity (the big need feeding) and as the average size gets large
-    { const popR = W.popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12; W.room = 6 * clamp((W.gen - 60) / 360, 0, 1);      /* how much more a body may carry: none before generation 60, all of it from about generation 420 (see F.room) */
-      W.grow = Math.max(W.stall || 0, G.ROOM_OFF ? 0 : 0.5 * W.room / 6) * clamp((popR - 0.6) / 0.3, 0, 1) * (1 - clamp((mr - 26) / 14, 0, 1)); }
+    { const popR = W.popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12; W.grow = (W.stall || 0) * clamp((popR - 0.6) / 0.3, 0, 1) * (1 - clamp((mr - 26) / 14, 0, 1)); }
     // how much there is to a body (its joined parts and all that grows on it, counted as the pond counts clutter) and how big it is: what an old pond grows into
     let bodySum = 0, bodyTop = 0, sizeSum = 0, sizeTop = 0; for (let i = 0; i < cre.length; i++) { const f = cre[i].g.f, b = f.bd ? G.body.busy(f) : f.n + f.rules.length, z = cre[i].g.t[0]; bodySum += b; if (b > bodyTop) bodyTop = b; sizeSum += z; if (z > sizeTop) sizeTop = z; }
-    W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop, body: bodySum / n, bodyTop: bodyTop, size: sizeSum / n, sizeTop: sizeTop });
+    W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop, body: bodySum / n, bodyTop: bodyTop, size: sizeSum / n, sizeTop: sizeTop, mx: (function () { const o = {}, X = G.MARKS_X || []; for (let k = 0; k < X.length; k++) { let t = 0, top = 0; for (let i = 0; i < cre.length; i++) { const v = G.markOf(cre[i], X[k].id); t += v; if (v > top) top = v; } o[X[k].id] = [t / n, top]; } return o; })(), room: W.room || 0 });
     if (W.hist.length > 600) W.hist.shift();
     G.updateSpecies();
     G.scanDiscoveries();
@@ -6179,7 +6258,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   let watching = false;
   const clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
   const c01 = function (v) { v = +v; return isFinite(v) ? G.clamp(v, 0, 1) : NaN; };
-  G.eyeGrade = function (c, g) { c.real = { b: g.b, w: g.w, why: g.why || '', fix: g.fix || '', gen: G.W.gen }; c.eb = g.b; c.ew = g.w; c.st = 0; c.ph.charm = g.b; c.ph.whole = g.w; };
+  G.eyeGrade = function (c, g) { c.real = { b: g.b, w: g.w, m: g.m || null, why: g.why || '', fix: g.fix || '', gen: G.W.gen }; c.eb = g.b; c.ew = g.w; c.st = 0; c.ph.charm = g.b; c.ph.whole = g.w; if (G.marksSeen) G.marksSeen(c, g.m); };
   G.watchPick = function (max) {
     const W = G.W, L = [], seen = W.eyeSeen || {};
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.real || !c.g.f.bd) continue; const hit = seen[G.form.key(c.g.f)]; if (hit) { G.eyeGrade(c, hit); continue; } L.push(c); }
@@ -6210,25 +6289,28 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       watching = false;
       if (G.W !== W || !res || !Array.isArray(res.scores)) return;
       if (!W.eyeSeen || (W.eyeKeys || 0) > 700) { W.eyeSeen = {}; W.eyeKeys = 0; }
-      let n = 0;
+      let n = 0; const looks = [];
       for (let i = 0; i < res.scores.length; i++) {
-        const s = res.scores[i], c = picks[(s.id | 0) - 1], g = { b: c01(s.score), w: c01(s.whole), why: String(s.why || '').replace(/[<>]/g, '').slice(0, 70), fix: (G.form.NUDGES || []).indexOf(s.fix) >= 0 ? s.fix : '' };
+        const s = res.scores[i], c = picks[(s.id | 0) - 1], g = { m: (function () { const o = {}, X = G.MARKS_X || []; for (let k = 0; k < X.length; k++) { const v = c01(s.m && s.m[X[k].id]); if (!isNaN(v)) o[X[k].id] = v; } return o; })(), b: c01(s.score), w: c01(s.whole), why: String(s.why || '').replace(/[<>]/g, '').slice(0, 70), fix: (G.form.NUDGES || []).indexOf(s.fix) >= 0 ? s.fix : '' };
         if (!c || isNaN(g.b) || isNaN(g.w)) continue;
         W.eyeSeen[G.form.key(c.g.f)] = g; W.eyeKeys++; n++;
         if (g.fix) { W.advice = (W.advice || []).filter(function (a) { return W.gen - a.gen <= 40; }); W.advice.push({ fix: g.fix, gen: W.gen, fv: c.fv || (c.fv = G.features(c.g)) }); if (W.advice.length > 60) W.advice.shift(); }
         if (!c.dead) G.eyeGrade(c, g);
+        looks.push(g);
+        if (G.marksToward) for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x === c || x.real || x.dead || !x.g.f.bd) continue; const d = G.fdist(c.fv || (c.fv = G.features(c.g)), x.fv || (x.fv = G.features(x.g))), wt = Math.exp(-d * d); if (wt >= 0.05) G.marksToward(x, g.m, wt); }
         // the look is remembered, and every living creature that resembles this one is moved towards what the watcher said of it
-        { const fv = c.fv || G.features(c.g); (W.eyeBank = W.eyeBank || []).push({ fv: fv, b: g.b, w: g.w, f: c.g.f.bd ? c.g.f : null, x: c.g.f.bd ? G.form.looks(c.g.f) : null, v0: c.g.f.bd ? G.form.whole(c.g.f).v : 0.3 }); if (W.eyeBank.length > 160) W.eyeBank.shift();
+        { const fv = c.fv || G.features(c.g); (W.eyeBank = W.eyeBank || []).push({ fv: fv, m: g.m, b: g.b, w: g.w, f: c.g.f.bd ? c.g.f : null, x: c.g.f.bd ? G.form.looks(c.g.f) : null, v0: c.g.f.bd ? G.form.whole(c.g.f).v : 0.3 }); if (W.eyeBank.length > 160) W.eyeBank.shift();
           for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x === c || x.real || x.dead || !x.g.f.bd || x.eb === undefined) continue; const d = G.fdist(fv, x.fv || (x.fv = G.features(x.g))), wt = Math.exp(-d * d); if (wt < 0.05) continue; x.eb += 0.8 * wt * (g.b - x.eb); x.ew += 0.8 * wt * (g.w - x.ew); x.st = Math.min(x.st || 0, 1); x.ph.charm = x.eb; x.ph.whole = x.ew; } }
         if (W.taste) G.form.learn(W.taste, c.g.f, g.b, 0.03);          // the pond's own guess is corrected by every look
         const sp = c.sp ? G.speciesById(c.sp) : null;
         if (c.sp) (W.spLook = W.spLook || {})[c.sp] = W.gen;
         // the best the watcher has really seen are kept (a hall of fame): they can be bred again if the pond loses what they had
-        if (c.g.f.bd) { const sc = (g.b + g.w) / 2, H = W.hall = W.hall || [], fvh = c.fv || G.features(c.g); let near = -1; for (let h = 0; h < H.length; h++) if (G.fdist(fvh, H[h].fv) < 0.8) { near = h; break; }
+        if (c.g.f.bd) { const sc = G.appealOfLook ? G.appealOfLook(g) : (g.b + g.w) / 2, H = W.hall = W.hall || [], fvh = c.fv || G.features(c.g); let near = -1; for (let h = 0; h < H.length; h++) if (G.fdist(fvh, H[h].fv) < 0.8) { near = h; break; }
           if (near >= 0) { if (sc > H[near].s) H[near] = { g: G.cloneGenome(c.g), fv: fvh, s: sc, gen: W.gen }; } else if (H.length < 8) H.push({ g: G.cloneGenome(c.g), fv: fvh, s: sc, gen: W.gen }); else { let lo = 0; for (let h = 1; h < H.length; h++) if (H[h].s < H[lo].s) lo = h; if (sc > H[lo].s) H[lo] = { g: G.cloneGenome(c.g), fv: fvh, s: sc, gen: W.gen }; } }
         if (sp && (!sp.judge || sp.judge.est || g.b + g.w >= sp.judge.score + (sp.judge.whole || 0) - 0.05 || W.gen - sp.judge.gen > 5)) sp.judge = { score: g.b, whole: g.w, why: g.why, fix: g.fix, gen: W.gen, fv: sp.fv ? sp.fv.slice() : [] };
       }
       W.eyeN = (W.eyeN || 0) + n;
+      if (G.roomAfterLook) G.roomAfterLook(looks);      // room to grow opens while the god finds the pond's bodies read well, and closes when they do not
       // the pond's own guess is taught by everything the watcher has really said: a few passes over its recent marks, newest last,
       // so the guess made for the creatures nobody has looked at keeps up with the watcher's taste
       if (W.taste && W.eyeBank && W.eyeBank.length >= 8) {
@@ -8616,7 +8698,7 @@ G.addSystem({
     const p = el('div', 'glass hide', '', ui); p.id = 'panel';
     p.innerHTML = '<button class="phead" id="panelToggle" aria-label="Evolution panel">EVOLUTION<span id="phSum"></span>' + ICON.chev + '</button>' +
       '<div class="pbody"><div id="era" style="margin-bottom:10px"></div><div class="stats"><div><b id="stGen">1</b><small>Gen</small></div><div><b id="stPop">0</b><small>Alive</small></div><div><b id="stSp">1</b><small>Species</small></div><div><b id="stFit">0.00</b><small>Fitness</small></div></div>' +
-      '<div class="tabs" id="gtabs"><button data-m="look" class="on">BEAUTY</button><button data-m="whole">WHOLE</button><button data-m="fit">FITNESS</button><button data-m="skill">SKILL</button><button data-m="body">BODY</button><button data-m="size">SIZE</button><button data-m="pop">POP</button><button data-m="genes">GENES</button></div>' +
+      '<div class="tabs" id="gtabs"><button data-m="look" class="on">BEAUTY</button><button data-m="whole">WHOLE</button>' + (G.MARKS_X || []).map(function (m) { return '<button data-m="mx_' + m.id + '">' + m.label.toUpperCase() + '</button>'; }).join('') + '<button data-m="fit">FITNESS</button><button data-m="room">ROOM</button><button data-m="body">PARTS</button><button data-m="size">SIZE</button><button data-m="skill">SKILL</button><button data-m="pop">POP</button><button data-m="genes">GENES</button></div>' +
       '<canvas id="graph" width="560" height="184"></canvas><div class="gnote" id="gnote"></div><button class="gnote" id="aiLine" style="min-height:0;color:var(--gold);background:none;border:0;padding:0;font:inherit;font-size:11px;line-height:1.3;text-align:left;cursor:pointer;text-decoration:underline dotted;display:block" title="See what each kind of AI use cost"></button><div class="ilabel">What changed</div><div class="log" id="mutLog"></div></div>';
     refs.panel = p;
     if (window.innerWidth < 720) p.classList.add('min');
@@ -8990,12 +9072,14 @@ G.addSystem({
     whole: { label: 'Whole: how much of a whole, full creature they are, out of 10: from a cell (1), through a ball with a face (3) and a simple critter (5), to a full character with head, body, legs and arms (9). The average; the dashed line is the most whole one alive.', get: function (h) { return (h.whole || 0) * 10; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 },
     look: { label: 'Beauty: how nice to the eye the creatures of this pond are, out of 10 (the average; the dashed line is the nicest one alive). This is what the pond evolves towards.', get: function (h) { return (h.look || 0) * 10; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 },
     fit: { label: 'Fitness = how nice to the eye and how whole a creature is, for those that have eaten well enough (half a tank). Higher scores survive winter and have more children.', get: function (h) { return h.avg; }, fmt: function (v) { return v.toFixed(2); }, min: 0, max: 1 },
-    body: { label: 'Body: how much there is to a body: its joined parts and everything that grows on it (legs, fins, horns, a tail, a coat...). The average; the dashed line is the most complex one alive. A young pond keeps bodies simple; from generation 60 to about 420 it is allowed, step by step, twice as much.', get: function (h) { return h.body || 0; }, top: function (h) { return h.bodyTop || 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
+    room: { label: 'Room to grow: how much more a body may carry than at the start before the pond counts it as clutter. It is earned: it opens a little each time the watcher looks and finds the bodies read well, and closes when they do not. 0 means the first, simple limits.', get: function (h) { return h.room || 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
+    body: { label: 'Parts: a plain COUNT of what is on a body (its joined parts and everything that grows on it). Not a mark: more is not better. The average; the dashed line is the busiest body alive.', get: function (h) { return h.body || 0; }, top: function (h) { return h.bodyTop || 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
     size: { label: 'Size: how big the creatures are (the first cells are about 10; the most a creature can reach is 64). The average; the dashed line is the biggest one alive. An old pond drifts bigger for as long as there is food for it.', get: function (h) { return h.size || 0; }, top: function (h) { return h.sizeTop || 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
     skill: { label: 'Skill: food eaten per creature each generation', get: function (h) { return h.intake; }, fmt: function (v) { return v.toFixed(0); }, min: 0 },
     pop: { label: 'How many creatures were alive at autumn', get: function (h) { return h.pop; }, fmt: function (v) { return v.toFixed(0); }, min: 0 },
     genes: { label: 'Genome size: parts, wires and brain cells per creature', get: function (h) { return h.genes; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
   };
+  (G.MARKS_X || []).forEach(function (m) { METRICS['mx_' + m.id] = { label: m.note + ' The average; the dashed line is the highest alive. Where the watcher has not looked, it is the pond\'s own guess.', get: function (h) { return h.mx && h.mx[m.id] ? h.mx[m.id][0] * 10 : 0; }, top: function (h) { return h.mx && h.mx[m.id] ? h.mx[m.id][1] * 10 : 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 }; });
   function drawGraph(force) {
     const W = G.W, cv = $('graph'); if (!cv || !W) return;
     const m = METRICS[UI.metric || 'look'];
@@ -9135,10 +9219,12 @@ G.addSystem({
       '<div id="ifit" style="font-size:11.5px;line-height:1.4"></div>' +
       '<div class="irows"><div id="iE"></div><div id="iAge"></div><div id="iPar" style="grid-column:span 2"></div><div class="meter"><i id="iEb"></i></div></div>' +
       '<div class="imut" id="imut"></div>' +
+      '<button class="btn sm" id="iwhy" style="width:100%;margin-top:8px">WHY THESE MARKS</button>' +
       '<button class="btn sm" id="igenes" style="width:100%;margin-top:8px" title="See what this creature is made of and watch its brain work">GENES AND BRAIN</button>' +
       '<style>#inspector .ihead{flex-direction:column;align-items:center;text-align:center;position:relative;gap:0}#inspector .ihead canvas{width:150px;height:150px;margin:-14px 0 -10px}#inspector .ihead>div{width:100%}#inspector .ihead b{font-size:15px}#inspector .x{position:absolute;top:-6px;right:-6px;margin:0}#isub{text-align:left;margin-top:5px}#iacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}#iacts .btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:0 4px;font-size:10px;letter-spacing:.06em;white-space:nowrap}#iacts .btn svg{width:14px;height:14px;flex:none;margin:0}#iacts .btn i{font-style:normal;font-size:14px;line-height:1}#iacts #ikeep i{color:var(--gold)}#iacts #ibreed i{color:var(--rose)}#imarvel{margin:8px 0 6px;padding:9px 11px;border-radius:12px;background:rgba(246,211,101,.12);border:1.5px solid rgba(246,211,101,.7);text-align:left}#imarvel .mk{font:800 9.5px system-ui,sans-serif;letter-spacing:.2em;color:#f6d365}#imarvel .mn{display:flex;align-items:center;gap:8px;font:800 16px system-ui,sans-serif;color:#fff;margin:2px 0 3px}#imarvel .mn img{width:30px;height:30px;flex:none}#imarvel .mw{font:600 12.5px/1.4 system-ui,sans-serif;color:#fff}#imarvel ul{margin:6px 0 0;padding:0;list-style:none}#imarvel li{font:600 11.5px/1.35 system-ui,sans-serif;color:#ffe9a8;padding:3px 0 3px 16px;position:relative}#imarvel li:before{content:"\\25C6";position:absolute;left:0;font-size:9px;top:5px}#imarvel .my{font-size:10.5px;opacity:.75;margin-top:5px;font-style:italic}</style>' +
       '<div id="iacts"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond."><i>★</i>KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection."><i>♥</i>BREED</button><button class="btn sm" id="itree" title="Its family tree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide" title="Its kind, in the Book of Life">' + ICON.book + 'KIND</button></div>';
     $('iclose').onclick = function () { G.select(null); };
+    $('iwhy').onclick = function () { G.sfx('click'); const on = i.classList.toggle('why'); this.textContent = on ? 'HIDE THE DETAILS' : 'WHY THESE MARKS'; };
     $('igenes').onclick = function () { G.sfx('click'); if (G.openGenes) G.openGenes(); };
     $('isub').onclick = function () { this.classList.toggle('open'); };
     $('itree').onclick = function () { G.sfx('click'); G.openTree(); };
@@ -9213,7 +9299,9 @@ G.addSystem({
         const be = c.ph.charm, wh0 = c.g.f.bd ? G.form.whole(c.g.f) : { v: 0.5, has: [], lacks: [] }, wh = { v: c.ph.whole === undefined ? wh0.v : c.ph.whole, has: wh0.has, lacks: wh0.lacks }, bw = c.g.f.bd ? G.form.beautyWhy(c.g.f, G.W.taste) : { up: [], down: [] };
         const row = function (name, v, col) { return '<span>' + name + '</span><span class="bar"><i style="width:' + Math.round(Math.max(0, Math.min(1, v)) * 100) + '%' + (col ? ';background:' + col : '') + '"></i></span><b>' + (v * 10).toFixed(1) + '</b>'; };
         const nice = function (L) { return L.map(function (k) { return k.replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase(); }).join(', '); };
-        $('ifit').innerHTML = '<div class="igrade">' + row('Beauty', be) + row('Whole', wh.v) + row('Fed', Math.max(0, f), 'var(--algae)') + '</div>' +
+        const cell = function (name, v, col, tip) { return '<span class="mcell" title="' + escapeHtml(tip || '') + '"><span>' + name + '</span><span class="bar"><i style="width:' + Math.round(Math.max(0, Math.min(1, v)) * 100) + '%' + (col ? ';background:' + col : '') + '"></i></span><b>' + (v * 10).toFixed(1) + '</b></span>'; };
+        $('ifit').innerHTML = '<div class="imarks">' + (G.MARKS || []).map(function (m) { return cell(m.label, G.markOf(c, m.id), '', m.note); }).join('') + cell('Fed', Math.max(0, f), 'var(--algae)', 'How full it is: a creature must have fed to breed.') + '</div>' +
+          '<div class="iappeal">Appeal <b>' + (G.charmOf(c) * 10).toFixed(1) + '</b> <i>' + (sp && sp.loved ? 'you kept one of its kind, so it is loved above its marks' : 'all its marks together: this, with being fed, is its fitness') + '</i></div>' +
           '<small>' + (c.real ? '<b style="color:var(--gold)">The watcher looked at it:</b> <i>' + escapeHtml(c.real.why || 'no comment') + '</i>' : G.W.eyeN ? 'Not looked at yet: these marks are its parents\' marks, adjusted for how it differs.' : 'No watcher here: these marks are the pond\'s own guess.') + '</small>' +
           '<small>' + (c.doomed ? '<span style="color:var(--rose)">Its score is too low: it fades this winter.</span> ' : c.snub ? '<span style="color:var(--rose)">Among the plainest: nobody chose it as a mate this spring.</span> ' : kids ? 'It could have <b>' + kids + '</b> ' + (kids === 1 ? 'child' : 'children') + ' in spring. ' : '') +
           (bw.up.length ? 'Nice: ' + nice(bw.up) + '. ' : '') + (bw.down.length ? 'Holds it back: ' + nice(bw.down) + '. ' : '') + '</small>' +
@@ -10931,9 +11019,9 @@ G.addSystem({
     const W = G.W;
     if (!W || W.title) return null;
     const out = {
-      v: 1, at: Date.now(), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
+      v: 1, at: Date.now(), room: +(W.room || 0).toFixed(1), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
       set: W.set, disc: W.disc, nextSp: W.nextSp, ai: G.ai && G.ai.model ? G.ai.model : '', drawn: G.ai && G.ai.drawn ? 1 : 0, spend: G.ai ? G.ai.life : {},
-      hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species, +(h.look || 0).toFixed(3), +(h.lookTop || 0).toFixed(2), +(h.whole || 0).toFixed(3), +(h.wholeTop || 0).toFixed(2), +(h.body || 0).toFixed(1), +(h.bodyTop || 0).toFixed(1), +(h.size || 0).toFixed(1), +(h.sizeTop || 0).toFixed(1)]; }),
+      hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species, +(h.look || 0).toFixed(3), +(h.lookTop || 0).toFixed(2), +(h.whole || 0).toFixed(3), +(h.wholeTop || 0).toFixed(2), +(h.body || 0).toFixed(1), +(h.bodyTop || 0).toFixed(1), +(h.size || 0).toFixed(1), +(h.sizeTop || 0).toFixed(1), (G.MARKS_X || []).map(function (m) { const q = h.mx && h.mx[m.id]; return q ? [+q[0].toFixed(3), +q[1].toFixed(2)] : 0; }), +(h.room || 0).toFixed(1)]; }),
       discLog: W.discLog.slice(-40),
       hints: Object.keys(G.hints),
       cre: [], species: [], fossils: [],
@@ -10957,7 +11045,7 @@ G.addSystem({
     const maxC = Math.min(sorted.length, 220);
     for (let i = 0; i < maxC; i++) {
       const c = sorted[i];
-      out.cre.push([G.packGenome(c.g), Math.round(c.x), Math.round(c.y), Math.round(c.E), c.age, c.sp, c.born, c.eb === undefined ? -1 : +c.eb.toFixed(2), c.ew === undefined ? -1 : +c.ew.toFixed(2), c.real ? 1 : 0, c.real ? c.real.why : '']);
+      out.cre.push([G.packGenome(c.g), Math.round(c.x), Math.round(c.y), Math.round(c.E), c.age, c.sp, c.born, c.eb === undefined ? -1 : +c.eb.toFixed(2), c.ew === undefined ? -1 : +c.ew.toFixed(2), c.real ? 1 : 0, c.real ? c.real.why : '', (G.MARKS_X || []).map(function (m) { return c.mx && c.mx[m.id] !== undefined ? +c.mx[m.id].toFixed(2) : -1; })]);
     }
     // children already on their way (spring's births come a few at a time) are saved as born, so a save in spring does not lose them
     (W.births || []).slice(0, 60).forEach(function (b) { const c = b && b.c; if (!c || !c.g || out.cre.length >= 240) return; out.cre.push([G.packGenome(c.g), Math.round(b.x), Math.round(b.y), Math.round(c.E), c.age || 0, c.sp || 0, c.born === undefined ? W.gen : c.born, -1, -1, 0, '']); });
@@ -11082,6 +11170,7 @@ G.addSystem({
     G.newWorld({ seed: num(d.seed, 1, 4e9, 1) });
     const W = G.W;
     W.gen = Math.floor(num(d.gen, 1, 1e6, 1));
+    W.room = num(d.room, 0, G.ROOM_MAX || 10, 0);
     W.season = Math.floor(num(d.season, 0, 3, 0));
     W.st = num(d.st, 0, G.PH[W.season] - 0.01, 0);
     W.t = num(d.t, 0, 1e7, 0);
@@ -11119,7 +11208,7 @@ G.addSystem({
     if (typeof d.ai === 'string' && d.ai && G.ai && (!G.ai.models.length || G.ai.labelOf(d.ai))) G.ai.model = d.ai.slice(0, 60);
     if (d.disc && typeof d.disc === 'object') { for (const k in d.disc) if (typeof k === 'string' && k.length < 20) W.disc[k] = num(d.disc[k], 0, 1e6, 0); }
     if (Array.isArray(d.discLog)) W.discLog = d.discLog.filter(function (e) { return e && typeof e.text === 'string'; }).slice(-40).map(function (e) { return { key: String(e.key).slice(0, 20), text: String(e.text).slice(0, 420), gen: num(e.gen, 0, 1e6, 0) }; });
-    if (Array.isArray(d.hist)) d.hist.forEach(function (h) { if (Array.isArray(h) && h.length >= 7) W.hist.push({ gen: num(h[0], 0, 1e6, 0), avg: num(h[1], 0, 1, 0), best: num(h[2], 0, 1, 0), pop: num(h[3], 0, 1e4, 0), genes: num(h[4], 0, 1e3, 0), intake: num(h[5], 0, 1e5, 0), species: num(h[6], 0, 1e3, 0), look: num(h[7], 0, 1, 0), lookTop: num(h[8], 0, 1, 0), whole: num(h[9], 0, 1, 0), wholeTop: num(h[10], 0, 1, 0), body: num(h[11], 0, 99, 0), bodyTop: num(h[12], 0, 99, 0), size: num(h[13], 0, 99, 0), sizeTop: num(h[14], 0, 99, 0) }); });
+    if (Array.isArray(d.hist)) d.hist.forEach(function (h) { if (Array.isArray(h) && h.length >= 7) W.hist.push({ gen: num(h[0], 0, 1e6, 0), avg: num(h[1], 0, 1, 0), best: num(h[2], 0, 1, 0), pop: num(h[3], 0, 1e4, 0), genes: num(h[4], 0, 1e3, 0), intake: num(h[5], 0, 1e5, 0), species: num(h[6], 0, 1e3, 0), look: num(h[7], 0, 1, 0), lookTop: num(h[8], 0, 1, 0), whole: num(h[9], 0, 1, 0), wholeTop: num(h[10], 0, 1, 0), body: num(h[11], 0, 99, 0), bodyTop: num(h[12], 0, 99, 0), size: num(h[13], 0, 99, 0), sizeTop: num(h[14], 0, 99, 0), room: num(h[16], 0, 99, 0), mx: (function () { const o = {}; if (Array.isArray(h[15]) && G.MARKS_X) G.MARKS_X.forEach(function (m, k) { const q = h[15][k]; if (Array.isArray(q)) o[m.id] = [num(q[0], 0, 1, 0), num(q[1], 0, 1, 0)]; }); return o; })() }); });
     if (Array.isArray(d.hints)) d.hints.forEach(function (k) { if (typeof k === 'string') G.hints[k.slice(0, 20)] = 1; });
     if (Array.isArray(d.species)) d.species.forEach(function (s) {
       if (!Array.isArray(s) || s.length < 10) return;
@@ -11174,6 +11263,7 @@ G.addSystem({
       c.x = num(r[1], 5, W.ww - 5, W.ww / 2); c.y = num(r[2], 5, W.wh - 5, W.wh / 2); c.px = c.x; c.py = c.y;
       c.E = num(r[3], 1, c.ph.Emax, c.ph.Emax * 0.5); c.age = Math.floor(num(r[4], 0, 20, 0)); c.sp = Math.floor(num(r[5], 0, 1e6, 0)); c.born = Math.floor(num(r[6], 0, 1e6, 1));
       if (r[7] >= 0 && r[8] >= 0) { c.eb = num(r[7], 0, 1, 0.3); c.ew = num(r[8], 0, 1, 0.3); c.st = r[9] ? 0 : 2; if (r[9]) c.real = { b: c.eb, w: c.ew, why: String(r[10] || '').replace(/[<>]/g, '').slice(0, 70), gen: c.born }; c.ph.charm = c.eb; c.ph.whole = c.ew; W.eyeN = (W.eyeN || 0) + (r[9] ? 1 : 0); }
+      if (Array.isArray(r[11]) && G.MARKS_X) { c.mx = c.mx || G.markPrior(c.g); G.MARKS_X.forEach(function (m, k) { if (r[11][k] >= 0) c.mx[m.id] = num(r[11][k], 0, 1, c.mx[m.id]); }); }
       c.snap = G.snapOf(c);
       W.cre.push(c);
     });

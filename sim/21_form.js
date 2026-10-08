@@ -103,8 +103,8 @@
   /** mutate a form in place. m: chance of a nudge per gene; wild: the world's mutation slider; press: what the pond is up against; note(text, big) */
   // ── room to grow ──
   // A young pond keeps its bodies simple: more than about six things on one body counts as clutter, and clutter is shed, snubbed and scored down.
-  // As the pond grows old that limit loosens (W.room, 0 to 6, set once a generation in 30_world.js): bodies may carry more parts, more sets of growths,
-  // and new parts bud more often. So complexity is something a pond grows INTO over hundreds of generations, not something it starts with.
+  // That limit loosens only as it is EARNED (W.room, see G.roomAfterLook in 21c_taste.js): each time the pond's god looks and finds that its bodies read
+  // well, bodies may carry a little more; when they stop reading well it tightens again. Mutation itself is not pushed either way.
   F.room = function () { const W = G.W; return G.ROOM_OFF ? 0 : G.ROOM_FORCE !== undefined ? G.ROOM_FORCE : (W && W.room) || 0; };
   F.mutate = function (f, m, wild, press, note) {
     const r = G.rand, n = G.randn;
@@ -118,7 +118,7 @@
       else if (f.rules.length) { const q = f.rules[Math.floor(r() * f.rules.length)]; if (q.b > q.a) { q.b = q.a; note(KMANY[q.k] + ' now grow from one place only', true); } }
     } }
     // a change of structure: at most one a birth
-    if (r() < (f.bd ? 0.07 + 0.012 * F.room() : 0.16) * wild) {      /* an old pond grows new parts about twice as often as a young one */
+    if (r() < (f.bd ? 0.07 : 0.16) * wild) {
       const roll = r();
       if (roll < 0.13) { if (f.bd) G.body.bud(f, note); else if (f.n < MAXN) { f.n++; note('body grew to ' + f.n + ' segments', true); } }
       else if (roll < 0.17) { if (f.bd) G.body.drop(f, note); else if (f.n > 1) { f.n--; note('body shrank to ' + f.n + (f.n === 1 ? ' segment' : ' segments'), true); } }

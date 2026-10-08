@@ -140,7 +140,14 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 #zoom .btn { min-width: 40px; min-height: 40px; padding: 0; font-size: 18px; letter-spacing: 0; }
 @media (max-width: 720px) { #zoom { left: auto; bottom: auto; top: 232px; right: 7px; } }
 #inspector { max-height: calc(100vh - 28px); overflow-y: auto; }
-#isub { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+/* the card: every mark in two columns; the reasons, the energy and the history fold away behind one button */
+.imarks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 8px 0 4px; }
+.imarks .mcell { display: grid; grid-template-columns: 58px 1fr 26px; gap: 6px; align-items: center; font-size: 11.5px; }
+.imarks .bar { height: 6px; border-radius: 3px; background: rgba(207,232,255,.14); overflow: hidden; } .imarks .bar i { display: block; height: 100%; border-radius: 3px; background: var(--gold); }
+.imarks b { text-align: right; color: var(--gold); font-size: 11.5px; }
+.iappeal { font-size: 12px; margin: 2px 0 2px; } .iappeal b { color: var(--gold); font-size: 13.5px; } .iappeal i { font-style: normal; opacity: .65; font-size: 10.5px; }
+#inspector:not(.why) #ifit small:not(:first-of-type), #inspector:not(.why) #imut, #inspector:not(.why) .irows { display: none; }
+#isub { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
 #isub.open { display: block; }
 #inspector details { margin-top: 6px; } #inspector summary { cursor: pointer; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--frost); opacity: .75; padding: 4px 0; }
 .igrade { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; align-items: center; font-size: 12px; margin: 6px 0 4px; } .igrade .bar { height: 7px; border-radius: 4px; background: rgba(207,232,255,.14); overflow: hidden; } .igrade .bar i { display: block; height: 100%; border-radius: 4px; background: var(--gold); } .igrade b { color: var(--gold); }

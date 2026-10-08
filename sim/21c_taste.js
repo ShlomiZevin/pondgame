@@ -113,3 +113,75 @@
     return { up: L.filter(function (q) { return q[1] > 0; }).slice(0, 3).map(function (q) { return q[0]; }), down: L.filter(function (q) { return q[1] < 0; }).slice(-3).reverse().map(function (q) { return q[0]; }) };
   };
 })();
+
+// ── The marks: what the god of the pond judges, and how fitness is made of it ──
+// The watcher (the AI that looks at the pond) is its god: from one look it gives each creature a mark for every entry in G.MARKS. A creature's APPEAL is
+// the weighted mean of its marks, and appeal times how well it fed is its fitness: that is the whole of selection. Nothing here reaches into mutation
+// or breeding: nature does its work, the god only says what it likes.
+//   To add a mark: add an entry here (id, label, weight w, and `prior`: the pond's own guess for a creature the god has not seen, from its genes) and
+//   the same id in WATCH_MARKS on the server (lib/ai.js), where the question put to the god is written. The card, the charts, the save and the
+//   fitness all read this list.
+// The first two marks (charm, whole) have their own learned guessers (above); the others start from `prior`, are inherited from the parents, and are
+// pulled towards what the god said of creatures that look alike.
+(function () {
+  'use strict';
+  const clamp = G.clamp;
+  const busyOf = function (g) { return g.f.bd ? G.body.busy(g.f) : g.f.n + g.f.rules.length; };
+  const tidy = function (g) { const b = busyOf(g); return b < 2.5 ? 0.45 : b <= 6 ? 1 : Math.max(0, 1 - (b - 6) * 0.22); };      // the pond's own old sense of clutter: strict, and not loosened by anything
+  G.MARKS = [
+    { id: 'charm', label: 'Beauty', w: 0.28, core: 'charm', note: 'Beauty: how nice to the eye, out of 10.' },
+    { id: 'whole', label: 'Whole', w: 0.24, core: 'whole', note: 'Whole: how complete a creature it is, out of 10.' },
+    { id: 'body', label: 'Body', w: 0.20, note: 'Body: does it have a real body that reads at a glance (one clear form, every part in its place) and not a heap of parts, out of 10.', prior: function (g) { return 0.25 + 0.4 * tidy(g); } },
+    { id: 'balance', label: 'Balance', w: 0.10, note: 'Balance: proportion and poise: do the parts suit one another, out of 10.', prior: function (g) { return 0.4 + 0.25 * tidy(g); } },
+    { id: 'grand', label: 'Grandeur', w: 0.18, note: 'Grandeur: how much creature there is (big, tall, developed, elaborate), counting only what reads well, out of 10. This is what rewards growing.', prior: function (g) { return clamp(0.12 + 0.5 * clamp((g.t[0] - 9) / 40, 0, 1) + 0.25 * clamp((busyOf(g) - 2) / 8, 0, 1) * tidy(g), 0, 1); } },
+  ];
+  G.MARKS_X = G.MARKS.filter(function (m) { return !m.core; });      // the marks beyond the first two
+  let WSUM = 0; G.MARKS.forEach(function (m) { WSUM += m.w; });
+  /** the pond's own guess of the further marks, from the genes alone */
+  G.markPrior = function (g) { const o = {}; for (let i = 0; i < G.MARKS_X.length; i++) o[G.MARKS_X[i].id] = clamp(G.MARKS_X[i].prior(g), 0, 1); return o; };
+  /** one mark of one creature, 0 to 1 */
+  G.markOf = function (c, id) {
+    if (id === 'charm') return c.ph.charm;
+    if (id === 'whole') return c.ph.whole === undefined ? 0.3 : c.ph.whole;
+    if (c.mx && c.mx[id] !== undefined) return c.mx[id];
+    return (c.mx = c.mx || G.markPrior(c.g))[id];
+  };
+  /** a creature's appeal: the weighted mean of all its marks */
+  G.appealRaw = function (c) { let v = 0; for (let i = 0; i < G.MARKS.length; i++) v += G.MARKS[i].w * G.markOf(c, G.MARKS[i].id); return v / WSUM; };
+  /** the same for a remembered look of the god's ({ b, w, m }) */
+  G.appealOfLook = function (q) { let v = 0, ws = 0; for (let i = 0; i < G.MARKS.length; i++) { const m = G.MARKS[i], x = m.id === 'charm' ? q.b : m.id === 'whole' ? q.w : q.m ? q.m[m.id] : undefined; if (x === undefined) continue; v += m.w * x; ws += m.w; } return ws ? v / ws : 0.4; };
+  /** a newborn's further marks: the god's own if it has seen this very body; else its parents', moved by how the child's genes differ from theirs; then
+   *  pulled towards what the god said of creatures that look like it */
+  G.marksBorn = function (c, A, B) {
+    const W = G.W, pr = G.markPrior(c.g), X = G.MARKS_X;
+    const hit = W && W.eyeSeen && c.g.f.bd ? W.eyeSeen[G.form.key(c.g.f)] : null;
+    if (hit && hit.m) { c.mx = {}; for (let i = 0; i < X.length; i++) c.mx[X[i].id] = hit.m[X[i].id] === undefined ? pr[X[i].id] : hit.m[X[i].id]; return; }
+    A = A && A.mx && A.g ? A : null; B = B && B.mx && B.g ? B : A;
+    if (A) { const pa = G.markPrior(A.g), pb = B === A ? pa : G.markPrior(B.g); c.mx = {}; for (let i = 0; i < X.length; i++) { const id = X[i].id; c.mx[id] = clamp((A.mx[id] + B.mx[id]) / 2 + 0.5 * (pr[id] - (pa[id] + pb[id]) / 2), 0, 1); } }
+    else c.mx = pr;
+    if (W && W.eyeBank && W.eyeBank.length && c.g.f.bd) {
+      const fv = c.fv || (c.fv = G.features(c.g)); let sw = 0; const acc = {};
+      for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i]; if (!q.m) continue; const d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; for (let k = 0; k < X.length; k++) { const id = X[k].id; if (q.m[id] !== undefined) acc[id] = (acc[id] || 0) + wt * q.m[id]; } }
+      if (sw > 0.15) { const k = Math.min(0.85, sw / (sw + 0.6)); for (let i = 0; i < X.length; i++) { const id = X[i].id; if (acc[id] !== undefined) c.mx[id] += k * (acc[id] / sw - c.mx[id]); } }
+    }
+  };
+  /** the god has looked at this one: its marks are its own */
+  G.marksSeen = function (c, m) { if (!m) return; c.mx = c.mx || G.markPrior(c.g); for (let i = 0; i < G.MARKS_X.length; i++) { const id = G.MARKS_X[i].id; if (m[id] !== undefined) c.mx[id] = m[id]; } };
+  /** a creature that resembles one the god just looked at moves towards what the god said (wt: how alike, 0 to 1) */
+  G.marksToward = function (x, m, wt) { if (!m) return; x.mx = x.mx || G.markPrior(x.g); for (let i = 0; i < G.MARKS_X.length; i++) { const id = G.MARKS_X[i].id; if (m[id] !== undefined) x.mx[id] += 0.8 * wt * (m[id] - x.mx[id]); } };
+  // ── room to grow is earned ──
+  // How much a body may carry before the pond counts it as clutter (W.room, see F.room) is not given by the calendar: it opens a little each time the
+  // god looks and finds that the pond's bodies read well, and closes again when they stop reading well. So a pond that grows gracefully keeps growing,
+  // with no end set in advance, and one that turns to heaps is drawn back, and may try again. Without a god (no AI) it stays shut: the old limits hold.
+  G.ROOM_MAX = 10;
+  G.roomAfterLook = function (looks) {
+    const W = G.W; if (!W || !looks.length) return;
+    let b = 0, bl = 0, n = 0; for (let i = 0; i < looks.length; i++) { const m = looks[i].m; if (!m || m.body === undefined) continue; b += m.body; bl += m.balance === undefined ? 0.5 : m.balance; n++; }
+    if (!n) return; b /= n; bl /= n;
+    const was = W.room || 0;
+    if (b >= 0.58 && bl >= 0.5) W.room = Math.min(G.ROOM_MAX, was + 0.3);      /* the bodies read well (6 of 10 or so): a little more room */
+    else if (b < 0.46) W.room = Math.max(0, was - 1);                                   /* they have stopped reading well: room is taken back, faster than it was given */
+    W.roomWhy = { body: b, balance: bl, gen: W.gen, d: (W.room || 0) - was };
+    if ((W.room || 0) !== was && G.emit) G.emit('room', W.room, was);
+  };
+})();

@@ -102,7 +102,7 @@
   let watching = false;
   const clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
   const c01 = function (v) { v = +v; return isFinite(v) ? G.clamp(v, 0, 1) : NaN; };
-  G.eyeGrade = function (c, g) { c.real = { b: g.b, w: g.w, why: g.why || '', fix: g.fix || '', gen: G.W.gen }; c.eb = g.b; c.ew = g.w; c.st = 0; c.ph.charm = g.b; c.ph.whole = g.w; };
+  G.eyeGrade = function (c, g) { c.real = { b: g.b, w: g.w, m: g.m || null, why: g.why || '', fix: g.fix || '', gen: G.W.gen }; c.eb = g.b; c.ew = g.w; c.st = 0; c.ph.charm = g.b; c.ph.whole = g.w; if (G.marksSeen) G.marksSeen(c, g.m); };
   G.watchPick = function (max) {
     const W = G.W, L = [], seen = W.eyeSeen || {};
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.real || !c.g.f.bd) continue; const hit = seen[G.form.key(c.g.f)]; if (hit) { G.eyeGrade(c, hit); continue; } L.push(c); }
@@ -133,25 +133,28 @@
       watching = false;
       if (G.W !== W || !res || !Array.isArray(res.scores)) return;
       if (!W.eyeSeen || (W.eyeKeys || 0) > 700) { W.eyeSeen = {}; W.eyeKeys = 0; }
-      let n = 0;
+      let n = 0; const looks = [];
       for (let i = 0; i < res.scores.length; i++) {
-        const s = res.scores[i], c = picks[(s.id | 0) - 1], g = { b: c01(s.score), w: c01(s.whole), why: String(s.why || '').replace(/[<>]/g, '').slice(0, 70), fix: (G.form.NUDGES || []).indexOf(s.fix) >= 0 ? s.fix : '' };
+        const s = res.scores[i], c = picks[(s.id | 0) - 1], g = { m: (function () { const o = {}, X = G.MARKS_X || []; for (let k = 0; k < X.length; k++) { const v = c01(s.m && s.m[X[k].id]); if (!isNaN(v)) o[X[k].id] = v; } return o; })(), b: c01(s.score), w: c01(s.whole), why: String(s.why || '').replace(/[<>]/g, '').slice(0, 70), fix: (G.form.NUDGES || []).indexOf(s.fix) >= 0 ? s.fix : '' };
         if (!c || isNaN(g.b) || isNaN(g.w)) continue;
         W.eyeSeen[G.form.key(c.g.f)] = g; W.eyeKeys++; n++;
         if (g.fix) { W.advice = (W.advice || []).filter(function (a) { return W.gen - a.gen <= 40; }); W.advice.push({ fix: g.fix, gen: W.gen, fv: c.fv || (c.fv = G.features(c.g)) }); if (W.advice.length > 60) W.advice.shift(); }
         if (!c.dead) G.eyeGrade(c, g);
+        looks.push(g);
+        if (G.marksToward) for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x === c || x.real || x.dead || !x.g.f.bd) continue; const d = G.fdist(c.fv || (c.fv = G.features(c.g)), x.fv || (x.fv = G.features(x.g))), wt = Math.exp(-d * d); if (wt >= 0.05) G.marksToward(x, g.m, wt); }
         // the look is remembered, and every living creature that resembles this one is moved towards what the watcher said of it
-        { const fv = c.fv || G.features(c.g); (W.eyeBank = W.eyeBank || []).push({ fv: fv, b: g.b, w: g.w, f: c.g.f.bd ? c.g.f : null, x: c.g.f.bd ? G.form.looks(c.g.f) : null, v0: c.g.f.bd ? G.form.whole(c.g.f).v : 0.3 }); if (W.eyeBank.length > 160) W.eyeBank.shift();
+        { const fv = c.fv || G.features(c.g); (W.eyeBank = W.eyeBank || []).push({ fv: fv, m: g.m, b: g.b, w: g.w, f: c.g.f.bd ? c.g.f : null, x: c.g.f.bd ? G.form.looks(c.g.f) : null, v0: c.g.f.bd ? G.form.whole(c.g.f).v : 0.3 }); if (W.eyeBank.length > 160) W.eyeBank.shift();
           for (let k = 0; k < W.cre.length; k++) { const x = W.cre[k]; if (x === c || x.real || x.dead || !x.g.f.bd || x.eb === undefined) continue; const d = G.fdist(fv, x.fv || (x.fv = G.features(x.g))), wt = Math.exp(-d * d); if (wt < 0.05) continue; x.eb += 0.8 * wt * (g.b - x.eb); x.ew += 0.8 * wt * (g.w - x.ew); x.st = Math.min(x.st || 0, 1); x.ph.charm = x.eb; x.ph.whole = x.ew; } }
         if (W.taste) G.form.learn(W.taste, c.g.f, g.b, 0.03);          // the pond's own guess is corrected by every look
         const sp = c.sp ? G.speciesById(c.sp) : null;
         if (c.sp) (W.spLook = W.spLook || {})[c.sp] = W.gen;
         // the best the watcher has really seen are kept (a hall of fame): they can be bred again if the pond loses what they had
-        if (c.g.f.bd) { const sc = (g.b + g.w) / 2, H = W.hall = W.hall || [], fvh = c.fv || G.features(c.g); let near = -1; for (let h = 0; h < H.length; h++) if (G.fdist(fvh, H[h].fv) < 0.8) { near = h; break; }
+        if (c.g.f.bd) { const sc = G.appealOfLook ? G.appealOfLook(g) : (g.b + g.w) / 2, H = W.hall = W.hall || [], fvh = c.fv || G.features(c.g); let near = -1; for (let h = 0; h < H.length; h++) if (G.fdist(fvh, H[h].fv) < 0.8) { near = h; break; }
           if (near >= 0) { if (sc > H[near].s) H[near] = { g: G.cloneGenome(c.g), fv: fvh, s: sc, gen: W.gen }; } else if (H.length < 8) H.push({ g: G.cloneGenome(c.g), fv: fvh, s: sc, gen: W.gen }); else { let lo = 0; for (let h = 1; h < H.length; h++) if (H[h].s < H[lo].s) lo = h; if (sc > H[lo].s) H[lo] = { g: G.cloneGenome(c.g), fv: fvh, s: sc, gen: W.gen }; } }
         if (sp && (!sp.judge || sp.judge.est || g.b + g.w >= sp.judge.score + (sp.judge.whole || 0) - 0.05 || W.gen - sp.judge.gen > 5)) sp.judge = { score: g.b, whole: g.w, why: g.why, fix: g.fix, gen: W.gen, fv: sp.fv ? sp.fv.slice() : [] };
       }
       W.eyeN = (W.eyeN || 0) + n;
+      if (G.roomAfterLook) G.roomAfterLook(looks);      // room to grow opens while the god finds the pond's bodies read well, and closes when they do not
       // the pond's own guess is taught by everything the watcher has really said: a few passes over its recent marks, newest last,
       // so the guess made for the creatures nobody has looked at keeps up with the watcher's taste
       if (W.taste && W.eyeBank && W.eyeBank.length >= 8) {

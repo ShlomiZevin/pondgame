@@ -130,6 +130,7 @@
       if (!hit && W.eyeBank && W.eyeBank.length) { const fv = c.fv = G.features(genome); let sw = 0, sb = 0, sh = 0; for (let i = 0; i < W.eyeBank.length; i++) { const q = W.eyeBank[i], d = G.fdist(fv, q.fv), wt = Math.exp(-d * d); if (wt < 0.03) continue; sw += wt; sb += wt * q.b; sh += wt * q.w; } if (sw > 0.15) { const k = Math.min(0.85, sw / (sw + 0.6)); c.eb += k * (sb / sw - c.eb); c.ew += k * (sh / sw - c.ew); c.st = Math.min(c.st, 1); } }
       ph.charm = c.eb; ph.whole = c.ew;
     }
+    if (G.marksBorn) G.marksBorn(c, parentA, parentB);      // its further marks (body, balance, grandeur...): see G.MARKS
     return c;
   };
   G.snapOf = function (c, extra) {
@@ -930,12 +931,12 @@
     const s = c.sp ? G.speciesById(c.sp) : null;
     // the grade the eye for beauty gave its kind is most of it; its own body's fit to the pond's taste is the rest. What the player kept is loved outright.
     // a grade counts for what it is next to the other grades in this pond: so a generous judge and a strict one select alike
-    let v = 0.42 * c.ph.charm + 0.58 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);
+    let v = G.appealRaw ? G.appealRaw(c) : 0.42 * c.ph.charm + 0.58 * (c.ph.whole === undefined ? 0.3 : c.ph.whole);      // the weighted mean of all the god's marks (G.MARKS)
     // a guess is not a look: where the watcher has really seen creatures, one nobody has looked at is held back towards what the watcher really said of this pond.
     // Selecting the highest guesses every generation would pile up error (the winner's curse); this keeps belief close to the truth.
     const W1 = G.W;
     if (!c.real && W1 && W1.eyeBank && W1.eyeBank.length >= 6) {
-      if (W1._emGen !== W1.gen) { let t = 0; for (let i = 0; i < W1.eyeBank.length; i++) t += (W1.eyeBank[i].b + W1.eyeBank[i].w) / 2; W1._em = t / W1.eyeBank.length; W1._emGen = W1.gen; }
+      if (W1._emGen !== W1.gen) { let t = 0; for (let i = 0; i < W1.eyeBank.length; i++) t += G.appealOfLook ? G.appealOfLook(W1.eyeBank[i]) : (W1.eyeBank[i].b + W1.eyeBank[i].w) / 2; W1._em = t / W1.eyeBank.length; W1._emGen = W1.gen; }
       const k = clamp(0.3 + 0.12 * (c.st === undefined ? 3 : c.st), 0.3, 0.75);
       v = W1._em + (v - W1._em) * (1 - k);
     }
@@ -984,7 +985,7 @@
     for (let i = 0; i < cre.length; i++) {
       const c = cre[i];
       c.fed = clamp(c.E / c.ph.Emax, 0, 1);
-      c.fit = clamp(c.fed / 0.5, 0, 1) * (0.15 + 0.85 * G.charmOf(c)) * (c.g.f.bd ? Math.max(0.35, 1 - 0.18 * Math.max(0, G.body.busy(c.g.f) - 6 - G.form.room())) : 1);          // fed well enough (half a tank is plenty), times how nice to the eye and how whole it is
+      c.fit = clamp(c.fed / 0.5, 0, 1) * (0.15 + 0.85 * G.charmOf(c));          // fed well enough (half a tank is plenty), times how nice to the eye and how whole it is
       sum += c.fit; genes += c.g.f.n + c.g.f.rules.length + c.g.p.length + c.g.w.length + c.g.h;
       intake += c.intake;
       if (c.fit > best) { best = c.fit; bestC = c; }
@@ -1001,11 +1002,10 @@
       if (H.length >= 20) { let a = 0, b = 0; for (let i = 0; i < 10; i++) { a += H[H.length - 1 - i]; b += H[H.length - 11 - i]; } const was = W.stall || 0; W.stall = a / 10 < b / 10 + 0.01 ? Math.min(1, was + 0.2) : Math.max(0, was - 0.35);
         if (W.stall >= 0.6 && was < 0.6 && W.gen - (W.stallNote || -99) > 40) { W.stallNote = W.gen; W.discLog.push({ key: 'stall' + W.gen, text: 'The pond has stopped getting nicer, so its creatures turn to growing bigger: size is what there is left to improve.', gen: W.gen }); G.emit('stall'); } } }
     // the drive to grow is only as strong as the pond can bear: it eases off when the pond is below its capacity (the big need feeding) and as the average size gets large
-    { const popR = W.popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12; W.room = 6 * clamp((W.gen - 60) / 360, 0, 1);      /* how much more a body may carry: none before generation 60, all of it from about generation 420 (see F.room) */
-      W.grow = Math.max(W.stall || 0, G.ROOM_OFF ? 0 : 0.5 * W.room / 6) * clamp((popR - 0.6) / 0.3, 0, 1) * (1 - clamp((mr - 26) / 14, 0, 1)); }
+    { const popR = W.popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12; W.grow = (W.stall || 0) * clamp((popR - 0.6) / 0.3, 0, 1) * (1 - clamp((mr - 26) / 14, 0, 1)); }
     // how much there is to a body (its joined parts and all that grows on it, counted as the pond counts clutter) and how big it is: what an old pond grows into
     let bodySum = 0, bodyTop = 0, sizeSum = 0, sizeTop = 0; for (let i = 0; i < cre.length; i++) { const f = cre[i].g.f, b = f.bd ? G.body.busy(f) : f.n + f.rules.length, z = cre[i].g.t[0]; bodySum += b; if (b > bodyTop) bodyTop = b; sizeSum += z; if (z > sizeTop) sizeTop = z; }
-    W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop, body: bodySum / n, bodyTop: bodyTop, size: sizeSum / n, sizeTop: sizeTop });
+    W.hist.push({ gen: W.gen, avg: sum / n, best: best, pop: cre.length, genes: genes / n, intake: intake / n, species: 0, look: looksSum / n, lookTop: looksTop, whole: wholeSum / n, wholeTop: wholeTop, body: bodySum / n, bodyTop: bodyTop, size: sizeSum / n, sizeTop: sizeTop, mx: (function () { const o = {}, X = G.MARKS_X || []; for (let k = 0; k < X.length; k++) { let t = 0, top = 0; for (let i = 0; i < cre.length; i++) { const v = G.markOf(cre[i], X[k].id); t += v; if (v > top) top = v; } o[X[k].id] = [t / n, top]; } return o; })(), room: W.room || 0 });
     if (W.hist.length > 600) W.hist.shift();
     G.updateSpecies();
     G.scanDiscoveries();
