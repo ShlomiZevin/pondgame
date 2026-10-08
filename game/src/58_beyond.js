@@ -61,7 +61,7 @@
   function farPond(i, j, cs, cx, cy) {
     if (!i && !j) return null;
     if (hash(i, j, 1) > 0.5) return null;
-    return { i: i, j: j, x: cx + (i + (hash(i, j, 2) - 0.5) * 0.5) * cs, y: cy + (j + (hash(i, j, 3) - 0.5) * 0.5) * cs, r: cs * (0.07 + 0.05 * hash(i, j, 4)), hue: (150 + hash(i, j, 5) * 170) % 360, name: nameOf(i, j), kinds: 2 + ((hash(i, j, 6) * 3) | 0), rings: hash(i, j, 7) < 0.45, moons: (hash(i, j, 8) * 3) | 0 };
+    return { i: i, j: j, x: cx + (i + (hash(i, j, 2) - 0.5) * 0.5) * cs, y: cy + (j + (hash(i, j, 3) - 0.5) * 0.5) * cs, r: unit() * 0.3 * (0.85 + 0.55 * hash(i, j, 4)), hue: (150 + hash(i, j, 5) * 170) % 360, name: nameOf(i, j), kinds: 2 + ((hash(i, j, 6) * 3) | 0), rings: hash(i, j, 7) < 0.45, moons: (hash(i, j, 8) * 3) | 0 };
   }
   function visiblePonds() {
     const v = G.view, cs = cellSize(), cx = v.ww / 2, cy = v.wh / 2, x0 = -v.ox / v.scale, y0 = -v.oy / v.scale, x1 = x0 + v.w / v.scale, y1 = y0 + v.h / v.scale, out = [];
@@ -97,19 +97,30 @@
   let EDGE = null;
   function edgeMask(w, h, mg, R, fadeIn) {
     const key = Math.round(w / h * 200) + ':' + Math.round(mg / h * 200); if (EDGE && EDGE.key === key) return EDGE.cv;
-    EDGE = { key: key, cv: buildMask(w, h, mg, R, fadeIn, 720) }; return EDGE.cv;
+    EDGE = { key: key, cv: buildMask(w, h, mg, R, fadeIn, 1500) }; return EDGE.cv;
   }
+  // The dust picture, as brightness 0..1 (read once it has loaded; until then a plain soft noise stands in)
+  let DUST = null;
+  if (G.DUST_IMG) { const im = new Image(); im.onload = function () { try { const S = 448, cv = document.createElement('canvas'); cv.width = cv.height = S; const x = cv.getContext('2d'); x.drawImage(im, 0, 0, S, S); const d = x.getImageData(0, 0, S, S).data, a = new Float32Array(S * S); for (let i = 0; i < S * S; i++) a[i] = d[i * 4] / 255; DUST = { n: S, a: a }; EDGE = null; FMASK = null; for (const q in BODY) delete BODY[q]; } catch (e) { console.error(e); } }; im.src = G.DUST_IMG; }
+  /** how much dust there is at a place (u, v in tiles of the picture): it repeats mirrored, so there is no seam */
+  function dust(u, v) {
+    if (!DUST) return 0.5 + 0.25 * Math.sin(u * 5.1 + Math.sin(v * 3.7) * 1.3) * Math.cos(v * 4.3 + Math.sin(u * 2.9));
+    const N = DUST.n, A = DUST.a; u = Math.abs(u % 2); if (u > 1) u = 2 - u; v = Math.abs(v % 2); if (v > 1) v = 2 - v;
+    const x = u * (N - 1), y = v * (N - 1), x0 = x | 0, y0 = y | 0, x1 = Math.min(N - 1, x0 + 1), y1 = Math.min(N - 1, y0 + 1), fx = x - x0, fy = y - y0;
+    return (A[y0 * N + x0] * (1 - fx) + A[y0 * N + x1] * fx) * (1 - fy) + (A[y1 * N + x0] * (1 - fx) + A[y1 * N + x1] * fx) * fy;
+  }
+  /** the picture of a pond's ending: space-coloured, clear where the pond is. The pond does not stop at its edge: beyond it the water goes on as thin
+   *  veils that follow the dust (far where the dust is thick, hardly at all where it is thin), and past the veils a faint haze of it and single motes. */
   function buildMask(w, h, mg, R, fadeIn, TW) {
     const k = TW / (w + 2 * mg), TH = Math.max(8, Math.round((h + 2 * mg) * k)), cv = document.createElement('canvas'); cv.width = TW; cv.height = TH;
-    const x = cv.getContext('2d'), im = x.createImageData(TW, TH), D = im.data, hw = w / 2, hh = h / 2;
+    const x = cv.getContext('2d'), im = x.createImageData(TW, TH), D = im.data, hw = w / 2, hh = h / 2, S1 = Math.min(w, h) * 1.15, S2 = S1 * 0.41, out = mg * 0.62;
     for (let py = 0; py < TH; py++) for (let px = 0; px < TW; px++) {
       const wx = px / k - mg - hw, wy = py / k - mg - hh, qx = Math.abs(wx) - (hw - R), qy = Math.abs(wy) - (hh - R);
       const d = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - R;      // how far outside the pond's edge this point is (inside: below zero)
-      const p = sm(-fadeIn, mg * 0.3, d), g = rnd(), o = (py * TW + px) * 4;
-      let a = clamp(p + (g - 0.5) * 1.5 * Math.sin(3.1416 * p), 0, 1), r = SP[0], gg = SP[1], b = SP[2];
-      if (p > 0.03 && p < 0.97) { if (g < p * p) a = 1; else if (g > 0.5 + p * 0.5) a = Math.min(a, 0.25); }      // grains: whole specks of dark among the water, whole specks of water among the dark
-      if (d > 0) { const far = clamp(1 - d / (mg * 0.95), 0, 1); if (rnd() < 0.05 * far * far) { const l = 0.5 + rnd() * 0.5; r = 30 * l; gg = 120 * l + 30; b = 130 * l + 30; a = 1; } }      // the last atoms of it, loose in space
-      D[o] = r; D[o + 1] = gg; D[o + 2] = b; D[o + 3] = Math.round(a * 255);
+      const n1 = dust(wx / S1 + 0.31, wy / S1 + 0.17), n2 = dust(wx / S2 + 0.77, wy / S2 + 0.53), o = (py * TW + px) * 4;
+      const a = sm(-fadeIn, out, d + (0.42 - 0.75 * n1 - 0.25 * n2) * out * 1.25);                    // the veils: thick dust carries the water further out
+      const far = clamp(1 - d / (mg * 0.97), 0, 1), haze = d > -fadeIn ? clamp((n2 - 0.3) * 1.15, 0, 1) * far * far * 0.5 + clamp((n1 - 0.72) * 3.2, 0, 1) * far * 0.75 : 0;      // a haze of it, and motes
+      D[o] = SP[0] + (62 - SP[0]) * haze; D[o + 1] = SP[1] + (150 - SP[1]) * haze; D[o + 2] = SP[2] + (158 - SP[2]) * haze; D[o + 3] = Math.round(a * 255);
     }
     x.putImageData(im, 0, 0);
     return cv;
@@ -126,7 +137,7 @@
   function nebula(hb) { if (NEB[hb]) return NEB[hb]; const S = 160, cv = document.createElement('canvas'); cv.width = cv.height = S; const x = cv.getContext('2d'), hue = 190 + hb * 28, g = x.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2); g.addColorStop(0, 'hsla(' + hue + ',70%,45%,0.17)'); g.addColorStop(0.5, 'hsla(' + (hue + 30) + ',70%,35%,0.07)'); g.addColorStop(1, 'hsla(' + hue + ',70%,30%,0)'); x.fillStyle = g; x.fillRect(0, 0, S, S); return (NEB[hb] = cv); }
   /** a far pond, painted once. It is a pond like ours, seen from too far to make out who lives in it: the same shape, a shore along the top, water below,
    *  soft lights where its life is, and the same ending, its rim breaking up into grains that drift off into space. */
-  const BODY = {}, FW = 400, FH = 240, FM = 120;      // the pond in its picture: wide, tall, and the margin round it
+  const BODY = {}, FW = 320, FH = 192, FM = 150;      // the pond in its picture: wide, tall, and the margin round it
   let FMASK = null;
   function bodyOf(p) {
     const key = p.i + ',' + p.j; if (BODY[key]) return BODY[key];
@@ -135,21 +146,19 @@
     x.save(); x.translate(SW / 2, SH / 2); x.scale(1, SH / SW); const halo = x.createRadialGradient(0, 0, FW * 0.25, 0, 0, SW / 2); halo.addColorStop(0, col(0, 85, 58, 0.3)); halo.addColorStop(0.55, col(25, 85, 50, 0.1)); halo.addColorStop(1, col(0, 85, 50, 0)); x.fillStyle = halo; x.fillRect(-SW / 2, -SW / 2, SW, SW); x.restore();
     // the pond itself, on a sheet of its own so that its rim can be eaten away
     const pc = document.createElement('canvas'); pc.width = SW; pc.height = SH; const d = pc.getContext('2d'), shore = FH * (0.2 + 0.1 * hash(p.i, p.j, 210));
-    d.save(); d.beginPath(); d.rect(FM, FM, FW, FH); d.clip();
-    const wg = d.createLinearGradient(0, FM, 0, FM + FH); wg.addColorStop(0, col(0, 55, 34, 1)); wg.addColorStop(0.5, col(8, 60, 24, 1)); wg.addColorStop(1, col(18, 65, 12, 1)); d.fillStyle = wg; d.fillRect(FM, FM, FW, FH);
+    d.save();      /* the water and the shore are painted right across the sheet: the ending below decides how far they are seen */
+    const wg = d.createLinearGradient(0, FM, 0, FM + FH); wg.addColorStop(0, col(0, 55, 34, 1)); wg.addColorStop(0.5, col(8, 60, 24, 1)); wg.addColorStop(1, col(18, 65, 12, 1)); d.fillStyle = wg; d.fillRect(0, 0, SW, SH);
     try { d.filter = 'blur(4.5px)'; } catch (e) { /* no blur here: the lights are simply sharper */ }
     // what lives in it, too far to make out: soft lights of many colours
     for (let k = 0; k < 46; k++) { const lx = FM + hash(p.i + k, p.j, 211) * FW, ly = FM + shore + hash(p.i, p.j + k, 212) * (FH - shore), big = hash(p.i - k, p.j, 213) < 0.2; d.fillStyle = 'hsla(' + ((h + 60 + k * 53) % 360) + ',90%,' + (big ? 70 : 76) + '%,' + (big ? 0.55 : 0.85) + ')'; d.beginPath(); d.arc(lx, ly, big ? 9 : 3 + 2.4 * hash(k, p.i, 214), 0, TAU); d.fill(); }
     // the shore along the top, with its uneven waterline
-    d.fillStyle = col(-115 + 30 * hash(p.i, p.j, 215), 38, 58, 1); d.beginPath(); d.moveTo(FM, FM); d.lineTo(FM + FW, FM); d.lineTo(FM + FW, FM + shore);
-    for (let q = 24; q >= 0; q--) d.lineTo(FM + FW * q / 24, FM + shore + Math.sin(q * 1.3 + p.i) * 3.2 + Math.sin(q * 0.5 + p.j) * 2.8); d.closePath(); d.fill();
+    d.fillStyle = col(-115 + 30 * hash(p.i, p.j, 215), 38, 58, 1); d.beginPath(); d.moveTo(0, 0); d.lineTo(SW, 0); d.lineTo(SW, FM + shore);
+    for (let q = 24; q >= 0; q--) d.lineTo(SW * q / 24, FM + shore + Math.sin(q * 1.3 + p.i) * 3.2 + Math.sin(q * 0.5 + p.j) * 2.8); d.closePath(); d.fill();
     for (let k = 0; k < 16; k++) { d.fillStyle = 'hsla(' + ((h + 100 + k * 71) % 360) + ',75%,68%,0.8)'; d.beginPath(); d.arc(FM + hash(k, p.j, 216) * FW, FM + hash(p.i, k, 217) * shore * 0.9, 2.8, 0, TAU); d.fill(); }
     d.filter = 'none'; d.restore();
-    if (!FMASK) FMASK = buildMask(FW, FH, FM, FH * 0.2, FH * 0.16, SW);
+    if (!FMASK) FMASK = buildMask(FW, FH, FM, FH * 0.14, FH * 0.02, SW);
     d.globalCompositeOperation = 'destination-out'; d.drawImage(FMASK, 0, 0, SW, SH); d.globalCompositeOperation = 'source-over';      // the water itself is eaten away at the rim, so its glow and the stars show through
     x.drawImage(pc, 0, 0);
-    // and its last grains, loose in space
-    for (let k = 0; k < 150; k++) { const a = hash(p.i * 7 + k, p.j, 201) * TAU, u = hash(p.i, p.j * 5 + k, 202), ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / (FW / 2), Math.abs(sa) / (FH / 2)), kk = k0 * 0.92 + FM * 0.85 * u * u; x.fillStyle = col(20 * (k % 3), 80, 68, 0.8 * (1 - u)); x.fillRect(SW / 2 + ca * kk, SH / 2 + sa * kk, 2.6, 2.6); }
     if (Object.keys(BODY).length > 24) for (const q in BODY) { delete BODY[q]; break; }      /* only the ponds lately in view are kept: far space costs no memory */
     return (BODY[key] = cv);
   }
@@ -162,11 +171,11 @@
     if (pr > 9) {
       // a few of its lights wander, and grains of it drift slowly off into space
       const n = Math.min(9, Math.floor(pr / 4)); for (let q = 0; q < n; q++) { const a = hash(p.i, p.j, 40 + q) * TAU + t * (0.09 + 0.12 * hash(p.i, p.j, 60 + q)) * (q % 2 ? 1 : -1), d = 0.15 + 0.6 * hash(p.i, p.j, 80 + q); ctx.fillStyle = 'hsla(' + (h + 70 + q * 47) % 360 + ',95%,80%,0.55)'; ctx.beginPath(); ctx.arc(px + Math.cos(a) * hw2 * 0.8 * d, py + hh2 * 0.22 + Math.sin(a) * hh2 * 0.6 * d, Math.max(1, pr * 0.045), 0, TAU); ctx.fill(); }
-      for (let q = 0; q < 18; q++) { const a = hash(p.i, p.j, 140 + q) * TAU, u = (t * (0.015 + 0.02 * hash(p.i, p.j, 160 + q)) + hash(p.i, p.j, 180 + q)) % 1, ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / hw2, Math.abs(sa) / hh2), kk = k0 * 0.95 + FM * k * 0.9 * u, sz = Math.max(1, pr * 0.03) * (1.2 - u * 0.6); ctx.fillStyle = col(15, 85, 72, 0.75 * (1 - u)); ctx.fillRect(px + ca * kk - sz / 2, py + sa * kk - sz / 2, sz, sz); }
+      for (let q = 0; q < 40; q++) { const a = hash(p.i, p.j, 140 + q) * TAU, u = (t * (0.006 + 0.01 * hash(p.i, p.j, 160 + q)) + hash(p.i, p.j, 180 + q)) % 1, ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / hw2, Math.abs(sa) / hh2), kk = k0 * 1.02 + FM * k * 0.9 * u; ctx.fillStyle = col(15, 80, 76, 0.5 * Math.sin(3.1416 * Math.min(1, u * 1.15))); ctx.beginPath(); ctx.arc(px + ca * kk, py + sa * kk, 0.7 + 0.8 * hash(p.i, q, 190), 0, TAU); ctx.fill(); }
     }
     if (pr > 16) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const fs = Math.round(clamp(pr * 0.24, 12, 18)); ctx.font = '800 ' + fs + 'px system-ui, sans-serif';
-      const tw = ctx.measureText(p.name).width + 26, ty = py + hh2 + FM * k * 0.55 + 14; ctx.fillStyle = 'rgba(9,20,33,0.85)'; G.roundRect(ctx, px - tw / 2, ty - fs * 0.85, tw, fs * 1.7, fs * 0.85); ctx.fill(); ctx.strokeStyle = col(20, 90, 75, 0.7); ctx.lineWidth = 1.2; ctx.stroke();
+      const tw = ctx.measureText(p.name).width + 26, ty = py + hh2 + FM * k * 0.5 + 14; ctx.fillStyle = 'rgba(9,20,33,0.85)'; G.roundRect(ctx, px - tw / 2, ty - fs * 0.85, tw, fs * 1.7, fs * 0.85); ctx.fill(); ctx.strokeStyle = col(20, 90, 75, 0.7); ctx.lineWidth = 1.2; ctx.stroke();
       ctx.fillStyle = '#fff'; ctx.fillText(p.name, px, ty + 0.5);
       ctx.font = '700 10px system-ui, sans-serif'; ctx.fillStyle = col(20, 80, 80, 0.9); ctx.fillText(p.kinds + (p.kinds === 1 ? ' KIND LIVES HERE' : ' KINDS LIVE HERE'), px, ty + fs * 1.5);
     }
@@ -174,12 +183,14 @@
 
   function draw() {
     const W = G.W, ctx = G.ctx; if (!W || W.title || !ctx || G.mode !== 'play') { if (home) home.classList.add('hide'); return; }
-    const v = G.view, s = v.scale * v.dpr, t = G.rt || 0, ww = W.ww, wh = W.wh, m = Math.min(ww, wh), R = m * 0.2, IN = m * 0.16, MG = m * 0.3;
+    const v = G.view, s = v.scale * v.dpr, t = G.rt || 0, ww = W.ww, wh = W.wh, m = Math.min(ww, wh), R = m * 0.14, IN = m * 0.02, MG = m * 0.5;      /* the pond is whole right up to its edge; it thins out over the half-pond of space beyond */
     const x0 = -v.ox / v.scale, y0 = -v.oy / v.scale, x1 = x0 + v.w / v.scale, y1 = y0 + v.h / v.scale;
     hud(x0, y0, x1, y1);
     { const wx = document.getElementById('wxfx'); if (wx) { const q = function (n) { return Math.round(Math.max(0, n) / 6) * 6; }, l = q(v.ox), tp = q(v.oy), r = q(v.w - (ww * v.scale + v.ox)), bt = q(v.h - (wh * v.scale + v.oy)), cp = (l || tp || r || bt) ? 'inset(' + tp + 'px ' + r + 'px ' + bt + 'px ' + l + 'px round ' + Math.round(R * v.scale) + 'px)' : ''; if (wx._cp !== cp) { wx._cp = cp; wx.style.clipPath = cp; } } }      // the pond's weather (snow, bubbles, embers) falls in the pond, not in space
     if (x0 > IN && y0 > IN && x1 < ww - IN && y1 < wh - IN) return;      // looking at the middle of the pond: nothing of the outside is in view
     ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr);
+    // the shore goes on past the pond's edge like the water does (the pond's own renderer stops it at the edge), so the land thins out into the dark the same way
+    if (G.shoreY) { const sy = G.shoreY(W); if (sy > 4) { const g = ctx.createLinearGradient(0, 0, 0, sy + 30); g.addColorStop(0, 'rgba(70,96,58,0.96)'); g.addColorStop(0.72, 'rgba(120,128,78,0.9)'); g.addColorStop(0.9, 'rgba(196,180,120,0.7)'); g.addColorStop(1, 'rgba(196,180,120,0)'); ctx.fillStyle = g; ctx.fillRect(-MG, 0, MG + 1, sy + 30); ctx.fillRect(ww - 1, 0, MG + 1, sy + 30); ctx.fillStyle = 'rgba(70,96,58,0.96)'; ctx.fillRect(-MG, -MG, ww + 2 * MG, MG + 1); } }
     // 1. the pond's ending, laid over its edges; and plain dark beyond that picture
     ctx.imageSmoothingEnabled = true; ctx.drawImage(edgeMask(ww, wh, MG, R, IN), -MG, -MG, ww + 2 * MG, wh + 2 * MG);
     ctx.fillStyle = 'rgb(' + SPACE + ')';
@@ -190,12 +201,13 @@
       if (y1 > wh + MG - ov) ctx.fillRect(x0 - 9, wh + MG - ov, x1 - x0 + 18, y1 - wh - MG + ov + 9); }
     // 2. everything of space is drawn outside the pond (a little way in over its fading rim, so stars show through where the water has thinned)
     ctx.beginPath(); ctx.rect(x0 - 20, y0 - 20, x1 - x0 + 40, y1 - y0 + 40);
-    { const q = IN * 0.45, rr = Math.max(1, R - q); ctx.moveTo(q + rr, q); ctx.lineTo(ww - q - rr, q); ctx.quadraticCurveTo(ww - q, q, ww - q, q + rr); ctx.lineTo(ww - q, wh - q - rr); ctx.quadraticCurveTo(ww - q, wh - q, ww - q - rr, wh - q); ctx.lineTo(q + rr, wh - q); ctx.quadraticCurveTo(q, wh - q, q, wh - q - rr); ctx.lineTo(q, q + rr); ctx.quadraticCurveTo(q, q, q + rr, q); ctx.closePath(); }
+    { const q = -MG * 0.2, rr = R + MG * 0.2;      /* stars and the rest begin a little way out, where the veils are thin */ ctx.moveTo(q + rr, q); ctx.lineTo(ww - q - rr, q); ctx.quadraticCurveTo(ww - q, q, ww - q, q + rr); ctx.lineTo(ww - q, wh - q - rr); ctx.quadraticCurveTo(ww - q, wh - q, ww - q - rr, wh - q); ctx.lineTo(q + rr, wh - q); ctx.quadraticCurveTo(q, wh - q, q, wh - q - rr); ctx.lineTo(q, q + rr); ctx.quadraticCurveTo(q, q, q + rr, q); ctx.closePath(); }
     ctx.clip('evenodd');
     // grains of our own water, drifting slowly off into space; brighter for a moment when the pond has just grown
-    { const hw = ww / 2, hh = wh / 2; for (let i = 0; i < 110; i++) { const a = hash(i, 9, 301) * TAU, u = (t * (0.012 + 0.016 * hash(i, 9, 302)) + hash(i, 9, 303)) % 1, ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / hw, Math.abs(sa) / hh), kk = k0 * 0.96 + MG * (u * 1.05 - 0.12), sz = m * 0.0045 * (1.3 - u) * (0.6 + hash(i, 9, 304));
-        ctx.fillStyle = 'rgba(' + (i % 4 ? '95,205,200' : '200,240,235') + ',' + (0.8 * (1 - u) * (0.6 + 0.4 * pulse) + 0.25 * pulse * (1 - u)) + ')'; ctx.fillRect(hw + ca * kk - sz / 2, hh + sa * kk - sz / 2, sz, sz); } pulse = Math.max(0, pulse - 0.006); }
+    { const hw = ww / 2, hh = wh / 2, px1 = 1 / v.scale; for (let i = 0; i < 260; i++) { const a = hash(i, 9, 301) * TAU, u = (t * (0.006 + 0.01 * hash(i, 9, 302)) + hash(i, 9, 303)) % 1, ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / hw, Math.abs(sa) / hh), kk = k0 * 1.02 + MG * 0.95 * u, sz = px1 * (0.9 + 1.3 * hash(i, 9, 304)) * (1.15 - 0.5 * u);
+        ctx.fillStyle = 'rgba(' + (i % 5 ? '110,205,205' : '215,245,240') + ',' + (0.55 * Math.sin(3.1416 * Math.min(1, u * 1.15)) * (0.7 + 0.5 * pulse)) + ')'; ctx.beginPath(); ctx.arc(hw + ca * kk, hh + sa * kk, sz, 0, TAU); ctx.fill(); } pulse = Math.max(0, pulse - 0.006); }
     ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
+    // drifting clouds of colour    ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
     // drifting clouds of colour, far off
     { const cs = cellSize() * 1.6, cx = ww / 2, cy = wh / 2, i0 = Math.floor((x0 - cx) / cs - 0.7), i1 = Math.ceil((x1 - cx) / cs + 0.7), j0 = Math.floor((y0 - cy) / cs - 0.7), j1 = Math.ceil((y1 - cy) / cs + 0.7);
       if ((i1 - i0) * (j1 - j0) < 300) { ctx.globalCompositeOperation = 'lighter';
@@ -239,7 +251,7 @@
         ctx.fillStyle = 'rgba(240,252,255,' + fade + ')'; ctx.beginPath(); ctx.arc(hx, hy, 4.5, 0, TAU); ctx.fill(); } }
     ctx.restore();
     // seen from afar, our own is named
-    if (G.cam.z < 0.45) { ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); const px = ww / 2 * v.scale + v.ox, py = (wh + MG * 0.75) * v.scale + v.oy + 14; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (G.cam.z < 0.45) { ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); const px = ww / 2 * v.scale + v.ox, py = (wh + MG * 0.55) * v.scale + v.oy + 14; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = '800 14px system-ui, sans-serif'; ctx.fillStyle = '#f6d365'; ctx.fillText('YOUR POND', px, py); ctx.font = '600 11px system-ui, sans-serif'; ctx.fillStyle = 'rgba(207,232,255,0.85)'; ctx.fillText('generation ' + W.gen + ' · ' + W.cre.length + ' alive', px, py + 17); ctx.restore(); }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
