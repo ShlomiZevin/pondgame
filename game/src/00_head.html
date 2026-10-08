@@ -74,6 +74,8 @@ small { color: rgba(207,232,255,.7); }
 .stats small { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
 .tabs { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
 #gtabs button { flex: 1 1 30%; min-width: 0; }
+/* a dozen charts: on a small or short screen their buttons go four to a row and shrink, so none falls off the panel */
+@media (max-width: 820px), (max-height: 520px) { #gtabs { gap: 3px; } #gtabs button { flex: 1 1 22%; min-height: 24px; font-size: 8px; letter-spacing: .04em; padding: 0 2px; } }
 .tabs button { flex: 1; min-height: 32px; border-radius: 999px; border: 1px solid rgba(207,232,255,.18); background: rgba(7,18,31,.4); color: rgba(207,232,255,.75); font: 700 9.5px system-ui, sans-serif; letter-spacing: .1em; cursor: pointer; }
 .tabs button.on { border-color: var(--algae); color: #fff; box-shadow: 0 0 12px rgba(51,214,166,.35); }
 #graph { width: 100%; height: 92px; display: block; border-radius: 10px; background: rgba(7,18,31,.4); }
