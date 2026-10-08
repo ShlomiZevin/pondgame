@@ -5,7 +5,7 @@
 // it, and the food stays what it was, so there is more room, not more mouths. The whole pond still fits the screen.
 (function () {
   'use strict';
-  const MAXG = 12, ROOM = 0.07, PER_GEN = 0.006;      // it may grow to twelve times its first width; and it grows a little with every generation that passes, whatever else happens           // bodies may cover about a fourteenth of the water
+  const MAXG = 5, ROOM = 0.07, PER_GEN = 0.006;      // it grows a little with every generation that passes, whatever else happens, up to five times its first width FOR NOW: measured (scripts/bigpond.js), a pond stays healthy to about four times and starves at nine, because food grows more slowly than the water. The limit can go when food keeps its density where the creatures live.           // bodies may cover about a fourteenth of the water
   /** how much of the pond is covered by bodies (0..1) */
   G.pondCover = function () { const W = G.W; if (!W || !W.cre.length) return 0; let a = 0; for (let i = 0; i < W.cre.length; i++) { const r = (W.cre[i].ph.r || 8) * 1.9; a += 3.1416 * r * r; } return a / (W.ww * W.wh); };
   /** make the pond g times its first size, moving everything in it apart */
