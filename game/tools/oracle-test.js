@@ -32,13 +32,15 @@ function truth(f) {
   const w = 0.05 + 0.4 * wh + 0.15 * (stand ? 1 : 0) + 0.1 * (limbs >= 2 ? 1 : 0) + 0.1 * hd + 0.15 * limbRead + 0.05 * pose;
   // what would help most
   const miss = [['eyes_bigger', f.es < 0.55 ? 0.6 - f.es : 0], ['bigger_head', head < 0.45 ? 0.45 - head : 0], ['simpler', spikes * 0.2 + Math.max(0, busy - 5) * 0.1 + wings * 0.1], ['smile', f.sm < 0.5 ? 0.3 : 0], ['legs', limbs === 0 ? 0.35 : 0], ['arms', limbs === 1 ? 0.3 : 0], ['eyes_lower', f.ey > 0.1 ? 0.2 : 0], ['rounder', bm.lobed ? 0.3 : 0]].sort((a, c) => c[1] - a[1])[0];
-  return { b: clamp(b, 0, 1), w: clamp(w, 0, 1), fix: miss[1] > 0.05 ? miss[0] : '' };
+  return { b: clamp(b, 0, 1), w: clamp(w, 0, 1), fix: miss[1] > 0.05 ? miss[0] : '', busy: busy, size: f._sz || 0 };
 }
 const rnd = (() => { let s = 12345; return () => (s = (s * 1664525 + 1013904223) % 4294967296) / 4294967296; })();
 G.sheet = (forms) => { G._sheet = forms; return 'x'; };
 G.mode = 'play'; G.catching = false;
 G.ai.provider = 'server'; G.ai.available = () => true; G.ai.hasFuel = () => true; G.ai.allow = () => true;
-G.ai.ask = (task, input) => { const forms = G._sheet || []; return Promise.resolve({ scores: forms.map((f, i) => { const t = truth(f); return { id: i + 1, score: clamp(t.b * 0.72 + (rnd() - 0.5) * 0.16, 0, 1), whole: clamp(t.w * 0.6 + (rnd() - 0.5) * 0.16, 0, 1), why: 'x', fix: t.fix }; }) }); };
+G.ai.ask = (task, input) => { const forms = G._sheet || []; return Promise.resolve({ scores: forms.map((f, i) => { const t = truth(f); return { id: i + 1, score: clamp(t.b * 0.72 + (rnd() - 0.5) * 0.16, 0, 1), whole: clamp(t.w * 0.6 + (rnd() - 0.5) * 0.16, 0, 1), why: 'x', fix: t.fix, m: process.env.NOMARKS ? undefined : { body: clamp(0.64 - 0.02 * Math.max(0, t.busy - 9) + (rnd() - 0.5) * 0.14, 0, 1), balance: clamp(0.66 + (rnd() - 0.5) * 0.14, 0, 1), grand: clamp(0.25 + 0.035 * t.busy + (rnd() - 0.5) * 0.1, 0, 1) } }; }) }); };
+if (process.env.ROOM_RULE) G.ROOM_RULE = process.env.ROOM_RULE;
+if (process.env.ROOM_OFF) G.ROOM_OFF = true;
 (async () => {
   for (const seed of seeds) {
     G.newWorld({ seed }); G.founderPond();
@@ -55,7 +57,7 @@ G.ai.ask = (task, input) => { const forms = G._sheet || []; return Promise.resol
           const cre = G.W.cre, n = cre.length || 1; let tb = 0, tw = 0, bb = 0, bel = 0, belw = 0, es = 0, hdv = 0, sz = 0, sp = 0; const kc = {}, hb = [0, 0, 0, 0, 0, 0]; for (const c of cre) { const k = G.shapeOf(c.g) + '|' + G.hueOf(c.g); kc[k] = (kc[k] || 0) + 1; hb[G.hueOf(c.g)]++; } let sq2 = 0; for (const k in kc) sq2 += (kc[k] / n) * (kc[k] / n); const effK = 1 / sq2, hues = hb.filter((v) => v / n >= 0.08).length;
           for (const c of cre) { const t = truth(c.g.f); tb += t.b; tw += t.w; bb = Math.max(bb, t.b); bel += c.ph.charm; belw += c.ph.whole; es += c.g.f.es; sz += c.ph.r; }
           if (last > gens / 2) { acc.b += tb / n; acc.w += tw / n; acc.d += effK; acc.n++; }
-          line.push('g' + String(last).padEnd(4) + ' TRUE beauty ' + (tb / n * 10).toFixed(1) + ' (best ' + (bb * 10).toFixed(1) + ') whole ' + (tw / n * 10).toFixed(1) + ' | believed ' + (bel / n * 10).toFixed(1) + '/' + (belw / n * 10).toFixed(1) + ' | eyes ' + (es / n).toFixed(2) + ' size ' + (sz / n).toFixed(1) + ' (grow ' + (G.W.grow || 0).toFixed(1) + ')' + ' DIVERSITY ' + effK.toFixed(1) + ' looks, ' + hues + ' colours; kinds ' + G.W.species.filter((q) => !q.extinct).length + ' pop ' + cre.length);
+          line.push('g' + String(last).padEnd(4) + ' TRUE beauty ' + (tb / n * 10).toFixed(1) + ' (best ' + (bb * 10).toFixed(1) + ') whole ' + (tw / n * 10).toFixed(1) + ' | believed ' + (bel / n * 10).toFixed(1) + '/' + (belw / n * 10).toFixed(1) + ' | eyes ' + (es / n).toFixed(2) + ' size ' + (sz / n).toFixed(1) + ' (grow ' + (G.W.grow || 0).toFixed(1) + ')' + ' ROOM ' + (G.W.room || 0).toFixed(1) + ' parts ' + (cre.reduce((a, c) => a + G.body.busy(c.g.f), 0) / n).toFixed(1) + ' DIVERSITY ' + effK.toFixed(1) + ' looks, ' + hues + ' colours; kinds ' + G.W.species.filter((q) => !q.extinct).length + ' pop ' + cre.length);
         }
       }
     }

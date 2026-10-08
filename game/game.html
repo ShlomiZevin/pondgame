@@ -2138,14 +2138,13 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   const busyOf = function (g) { return g.f.bd ? G.body.busy(g.f) : g.f.n + g.f.rules.length; };
   const tidy = function (g) { const b = busyOf(g); return b < 2.5 ? 0.45 : b <= 6 ? 1 : Math.max(0, 1 - (b - 6) * 0.22); };      // the pond's own old sense of clutter: strict, and not loosened by anything
   G.MARKS = [
-    { id: 'charm', label: 'Beauty', w: 0.28, core: 'charm', note: 'Beauty: how nice to the eye, out of 10.' },
-    { id: 'whole', label: 'Whole', w: 0.24, core: 'whole', note: 'Whole: how complete a creature it is, out of 10.' },
-    { id: 'body', label: 'Body', w: 0.20, note: 'Body: does it have a real body that reads at a glance (one clear form, every part in its place) and not a heap of parts, out of 10.', prior: function (g) { return 0.25 + 0.4 * tidy(g); } },
-    { id: 'balance', label: 'Balance', w: 0.10, note: 'Balance: proportion and poise: do the parts suit one another, out of 10.', prior: function (g) { return 0.4 + 0.25 * tidy(g); } },
-    { id: 'grand', label: 'Grandeur', w: 0.18, note: 'Grandeur: how much creature there is (big, tall, developed, elaborate), counting only what reads well, out of 10. This is what rewards growing.', prior: function (g) { return clamp(0.12 + 0.5 * clamp((g.t[0] - 9) / 40, 0, 1) + 0.25 * clamp((busyOf(g) - 2) / 8, 0, 1) * tidy(g), 0, 1); } },
+    { id: 'charm', label: 'Beauty', w: 0.45, core: 'charm', note: 'Beauty: how nice to the eye, out of 10.' },
+    { id: 'whole', label: 'Whole', w: 0.55, core: 'whole', note: 'Whole: how complete a creature it is, out of 10.' },
+    { id: 'body', label: 'Body', w: 0.10, extra: 1, note: 'Body: does it have a real body that reads at a glance (one clear form, every part in its place) and not a heap of parts, out of 10.', prior: function (g) { return 0.25 + 0.4 * tidy(g); } },
+    { id: 'balance', label: 'Balance', w: 0.05, extra: 1, note: 'Balance: proportion and poise: do the parts suit one another, out of 10.', prior: function (g) { return 0.4 + 0.25 * tidy(g); } },
+    { id: 'grand', label: 'Grandeur', w: 0.10, extra: 1, note: 'Grandeur: how much creature there is (big, tall, developed, elaborate), counting only what reads well, out of 10. This is what rewards growing.', prior: function (g) { return clamp(0.12 + 0.5 * clamp((g.t[0] - 9) / 40, 0, 1) + 0.25 * clamp((busyOf(g) - 2) / 8, 0, 1) * tidy(g), 0, 1); } },
   ];
   G.MARKS_X = G.MARKS.filter(function (m) { return !m.core; });      // the marks beyond the first two
-  let WSUM = 0; G.MARKS.forEach(function (m) { WSUM += m.w; });
   /** the pond's own guess of the further marks, from the genes alone */
   G.markPrior = function (g) { const o = {}; for (let i = 0; i < G.MARKS_X.length; i++) o[G.MARKS_X[i].id] = clamp(G.MARKS_X[i].prior(g), 0, 1); return o; };
   /** one mark of one creature, 0 to 1 */
@@ -2155,10 +2154,20 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (c.mx && c.mx[id] !== undefined) return c.mx[id];
     return (c.mx = c.mx || G.markPrior(c.g))[id];
   };
-  /** a creature's appeal: the weighted mean of all its marks */
-  G.appealRaw = function (c) { let v = 0; for (let i = 0; i < G.MARKS.length; i++) v += G.MARKS[i].w * G.markOf(c, G.MARKS[i].id); return v / WSUM; };
+  // APPEAL. Beauty and whole ARE the creature: their weighted mean is its core, as it was when the pond grew its nicest creatures. The further marks
+  // (those with `extra`) cannot make up for a lack of them: each can only ADD to the core, by its weight times how far the mark is above the middle,
+  // and only in proportion to the core itself. So an ugly creature gains next to nothing by being big or elaborate, a lovely one gains by being big
+  // and well built as well, and between two equally lovely creatures the grander, better-built one wins. Nature is never asked to trade beauty away.
+  const mix = function (get) {
+    let core = 0, cw = 0, add = 0;
+    for (let i = 0; i < G.MARKS.length; i++) { const m = G.MARKS[i], x = get(m.id); if (x === undefined) continue; if (m.extra) add += m.w * (x - 0.5) * 2; else { core += m.w * x; cw += m.w; } }
+    core = cw ? core / cw : 0.4;
+    return clamp(core * (1 + (G.MARKS_EXTRA_OFF ? 0 : add)), 0, 1);
+  };
+  /** a creature's appeal, 0 to 1 */
+  G.appealRaw = function (c) { return mix(function (id) { return G.markOf(c, id); }); };
   /** the same for a remembered look of the god's ({ b, w, m }) */
-  G.appealOfLook = function (q) { let v = 0, ws = 0; for (let i = 0; i < G.MARKS.length; i++) { const m = G.MARKS[i], x = m.id === 'charm' ? q.b : m.id === 'whole' ? q.w : q.m ? q.m[m.id] : undefined; if (x === undefined) continue; v += m.w * x; ws += m.w; } return ws ? v / ws : 0.4; };
+  G.appealOfLook = function (q) { return mix(function (id) { return id === 'charm' ? q.b : id === 'whole' ? q.w : q.m ? q.m[id] : undefined; }); };
   /** a newborn's further marks: the god's own if it has seen this very body; else its parents', moved by how the child's genes differ from theirs; then
    *  pulled towards what the god said of creatures that look like it */
   G.marksBorn = function (c, A, B) {
@@ -2182,15 +2191,28 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   // How much a body may carry before the pond counts it as clutter (W.room, see F.room) is not given by the calendar: it opens a little each time the
   // god looks and finds that the pond's bodies read well, and closes again when they stop reading well. So a pond that grows gracefully keeps growing,
   // with no end set in advance, and one that turns to heaps is drawn back, and may try again. Without a god (no AI) it stays shut: the old limits hold.
-  G.ROOM_MAX = 10;
+  G.ROOM_MAX = 4;
+  // Growth is a climb with a way back. The pond remembers how nice (beauty and whole together) its creatures have been at their best. While the god
+  // finds them as nice as that best, and their bodies clear, a little more room is given. As soon as they are clearly less nice than their best, room is
+  // taken back, faster than it was given: the growth that made them worse is undone, and the pond may try another way. So room only stays open for
+  // growth that keeps the creatures lovely.
   G.roomAfterLook = function (looks) {
     const W = G.W; if (!W || !looks.length) return;
-    let b = 0, bl = 0, n = 0; for (let i = 0; i < looks.length; i++) { const m = looks[i].m; if (!m || m.body === undefined) continue; b += m.body; bl += m.balance === undefined ? 0.5 : m.balance; n++; }
+    let b = 0, bl = 0, n = 0;
+    for (let i = 0; i < looks.length; i++) { const m = looks[i].m; if (!m || m.body === undefined) continue; b += m.body; bl += m.balance === undefined ? 0.5 : m.balance; n++; }
     if (!n) return; b /= n; bl /= n;
+    // how nice the WHOLE pond is (not only the favourites the god was shown): beauty and whole of everything alive, as the pond believes them after this look
+    let core = 0, cn = 0; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !c.g.f.bd) continue; core += 0.45 * c.ph.charm + 0.55 * (c.ph.whole === undefined ? 0.3 : c.ph.whole); cn++; }
+    if (!cn) return; core /= cn;
     const was = W.room || 0;
-    if (b >= 0.58 && bl >= 0.5) W.room = Math.min(G.ROOM_MAX, was + 0.3);      /* the bodies read well (6 of 10 or so): a little more room */
-    else if (b < 0.46) W.room = Math.max(0, was - 1);                                   /* they have stopped reading well: room is taken back, faster than it was given */
-    W.roomWhy = { body: b, balance: bl, gen: W.gen, d: (W.room || 0) - was };
+    W.nice = W.nice === undefined ? core : W.nice + 0.35 * (core - W.nice);
+    W.niceBest = Math.max(W.nice, (W.niceBest === undefined ? W.nice : W.niceBest) - 0.0005);
+    const drop = W.niceBest - W.nice;
+    if (G.ROOM_RULE === 'old') { if (b >= 0.58 && bl >= 0.5) W.room = Math.min(10, was + 0.3); else if (b < 0.46) W.room = Math.max(0, was - 1); }
+    else if (drop > 0.02 || b < 0.5) W.room = Math.max(0, was - 0.6);                                                  // less nice than at its best, or bodies no longer clear: room is taken back
+    else if (drop < 0.006 && b >= 0.6 && bl >= 0.5 && (W.looksN || 0) >= 8) W.room = Math.min(G.ROOM_MAX, was + 0.15);      // as nice as it has ever been, and clear bodies: a little more room
+    W.looksN = (W.looksN || 0) + 1;
+    W.roomWhy = { body: b, balance: bl, nice: W.nice, best: W.niceBest, gen: W.gen, d: (W.room || 0) - was };
     if ((W.room || 0) !== was && G.emit) G.emit('room', W.room, was);
   };
 })();
