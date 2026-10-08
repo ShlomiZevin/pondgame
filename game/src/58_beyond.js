@@ -60,7 +60,9 @@
   /** the far pond of one cell of space, or null (the cell is empty, or it is ours) */
   function farPond(i, j, cs, cx, cy) {
     if (!i && !j) return null;
-    if (hash(i, j, 1) > 0.5) return null;
+    const roll = hash(i, j, 1);
+    if (roll > 0.64) return null;
+    if (roll > 0.5) return { free: true, i: i, j: j, x: cx + (i + (hash(i, j, 2) - 0.5) * 0.5) * cs, y: cy + (j + (hash(i, j, 3) - 0.5) * 0.5) * cs, r: unit() * 0.3, hue: 48, name: 'An empty place', kinds: 0 };      // nobody's yet: a place where a pond could be put
     return { i: i, j: j, x: cx + (i + (hash(i, j, 2) - 0.5) * 0.5) * cs, y: cy + (j + (hash(i, j, 3) - 0.5) * 0.5) * cs, r: unit() * 0.3 * (0.85 + 0.55 * hash(i, j, 4)), hue: (150 + hash(i, j, 5) * 170) % 360, name: nameOf(i, j), kinds: 2 + ((hash(i, j, 6) * 3) | 0), rings: hash(i, j, 7) < 0.45, moons: (hash(i, j, 8) * 3) | 0 };
   }
   function visiblePonds() {
@@ -169,7 +171,16 @@
     return (BODY[key] = cv);
   }
 
+  /** an empty place: the outline of a pond that is not there yet, breathing slowly, with a plus in it */
+  function freeDraw(ctx, p, px, py, pr, t) {
+    const w = pr * 3.34, h = pr * 2, rr = Math.min(w, h) * 0.2, pulse2 = 0.55 + 0.45 * Math.sin(t * 1.4 + p.i * 2 + p.j);
+    const g = ctx.createRadialGradient(px, py, 0, px, py, w * 0.7); g.addColorStop(0, 'rgba(246,211,101,' + 0.1 * pulse2 + ')'); g.addColorStop(1, 'rgba(246,211,101,0)'); ctx.fillStyle = g; ctx.fillRect(px - w, py - w, w * 2, w * 2);
+    ctx.strokeStyle = 'rgba(246,211,101,' + (0.4 + 0.4 * pulse2) + ')'; ctx.lineWidth = Math.max(1, pr * 0.03); ctx.setLineDash([Math.max(3, pr * 0.14), Math.max(3, pr * 0.12)]); ctx.lineDashOffset = -t * 5; G.roundRect(ctx, px - w / 2, py - h / 2, w, h, rr); ctx.stroke(); ctx.setLineDash([]);
+    if (pr > 7) { const a = pr * 0.3; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(1.5, pr * 0.06); ctx.beginPath(); ctx.moveTo(px - a, py); ctx.lineTo(px + a, py); ctx.moveTo(px, py - a); ctx.lineTo(px, py + a); ctx.stroke(); }
+    if (pr > 16) { ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '800 ' + Math.round(clamp(pr * 0.2, 11, 15)) + 'px system-ui, sans-serif'; ctx.fillStyle = 'rgba(246,211,101,0.95)'; ctx.fillText('EMPTY PLACE', px, py + h / 2 + 18); ctx.font = '600 10.5px system-ui, sans-serif'; ctx.fillStyle = 'rgba(207,232,255,0.75)'; ctx.fillText('a pond could be put here', px, py + h / 2 + 34); }
+  }
   function farPondDraw(ctx, p, px, py, pr, t) {
+    if (p.free) { freeDraw(ctx, p, px, py, pr, t); return; }
     const h = p.hue, col = function (dh, s, l, a) { return 'hsla(' + ((h + dh + 360) % 360) + ',' + s + '%,' + l + '%,' + a + ')'; };
     // p.r is half the pond's height; the picture carries the pond and its margin
     const k = pr * 2 / FH, w = (FW + 2 * FM) * k, hh = (FH + 2 * FM) * k, hw2 = FW * k / 2, hh2 = FH * k / 2;
@@ -192,6 +203,14 @@
     const v = G.view, s = v.scale * v.dpr, t = G.rt || 0, ww = W.ww, wh = W.wh, m = Math.min(ww, wh), R = m * 0.2, IN = m * 0.15, MG = m * 0.34;      /* the mist takes the outer sixth or so of the pond, and thins away over a third of a pond beyond it */
     const x0 = -v.ox / v.scale, y0 = -v.oy / v.scale, x1 = x0 + v.w / v.scale, y1 = y0 + v.h / v.scale;
     hud(x0, y0, x1, y1);
+    { const seen = x1 > 0 && x0 < ww && y1 > 0 && y0 < wh;
+      if (!asleep) { snap = null; skip = false; }
+      else if (!skip) {      /* it has just fallen still (this frame was still drawn in full): keep its picture if all of it is on the screen, and stop drawing it */
+        const sx = v.ox * v.dpr, sy = v.oy * v.dpr, sw = ww * v.scale * v.dpr, sh = wh * v.scale * v.dpr, cv = G.canvas || ctx.canvas;
+        if (!seen) { snap = null; skip = true; }
+        else if (sx >= 0 && sy >= 0 && sx + sw <= cv.width && sy + sh <= cv.height && sw >= 2 && sh >= 2) { try { const c2 = document.createElement('canvas'); c2.width = Math.max(2, Math.round(sw)); c2.height = Math.max(2, Math.round(sh)); c2.getContext('2d').drawImage(cv, sx, sy, sw, sh, 0, 0, c2.width, c2.height); snap = c2; skip = true; } catch (e) { console.error(e); } }
+      }
+      if (skip) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = 'rgb(' + SPACE + ')'; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); if (snap && seen) { ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); ctx.imageSmoothingEnabled = true; ctx.drawImage(snap, 0, 0, ww, wh); } } }
     { const wx = document.getElementById('wxfx'); if (wx) { const q = function (n) { return Math.round(n / 8) * 8; }, cx = q(ww / 2 * v.scale + v.ox), cy = q(wh / 2 * v.scale + v.oy), rx = q(ww * v.scale * 0.56), ry = q(wh * v.scale * 0.6), all = v.ox <= 0 && v.oy <= 0 && ww * v.scale + v.ox >= v.w && wh * v.scale + v.oy >= v.h, mk = all ? '' : 'radial-gradient(ellipse ' + rx + 'px ' + ry + 'px at ' + cx + 'px ' + cy + 'px, #000 55%, transparent 96%)'; if (wx._mk !== mk) { wx._mk = mk; wx.style.clipPath = ''; wx.style.maskImage = mk; wx.style.webkitMaskImage = mk; } } }      // the pond's weather (snow, bubbles, embers) is the pond's: it thins out towards the edge, softly, and does not fall in space
     if (x0 > IN && y0 > IN && x1 < ww - IN && y1 < wh - IN) return;      // looking at the middle of the pond: nothing of the outside is in view
     ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr);
@@ -242,7 +261,7 @@
     { const byCell = {}; for (let k = 0; k < P.length; k++) byCell[P[k].i + ',' + P[k].j] = P[k]; byCell['0,0'] = { i: 0, j: 0, x: ww / 2, y: wh / 2, r: wh * 0.5 };
       ctx.lineCap = 'round'; ctx.setLineDash([2, 9]); ctx.lineDashOffset = -t * 6; ctx.lineWidth = 1.3;
       for (const key in byCell) { const a = byCell[key]; for (let d = 0; d < 4; d++) { const b = byCell[(a.i + [1, 0, 1, 1][d]) + ',' + (a.j + [0, 1, 1, -1][d])]; if (!b) continue; const ax = a.x * v.scale + v.ox, ay = a.y * v.scale + v.oy, bx = b.x * v.scale + v.ox, by = b.y * v.scale + v.oy, len = Math.hypot(bx - ax, by - ay); if (len < 60) continue; const ux = (bx - ax) / len, uy = (by - ay) / len, ra = a.r * v.scale * 2.3 + 8, rb = b.r * v.scale * 2.3 + 8; if (len < ra + rb + 10) continue;
-        const mine = (!a.i && !a.j) || (!b.i && !b.j); ctx.strokeStyle = mine ? 'rgba(246,211,101,0.42)' : 'rgba(150,190,235,0.2)'; ctx.beginPath(); ctx.moveTo(ax + ux * ra, ay + uy * ra); ctx.lineTo(bx - ux * rb, by - uy * rb); ctx.stroke(); } }
+        if (a.free || b.free) continue; const mine = (!a.i && !a.j) || (!b.i && !b.j); ctx.strokeStyle = mine ? 'rgba(246,211,101,0.42)' : 'rgba(150,190,235,0.2)'; ctx.beginPath(); ctx.moveTo(ax + ux * ra, ay + uy * ra); ctx.lineTo(bx - ux * rb, by - uy * rb); ctx.stroke(); } }
       ctx.setLineDash([]); }
     for (let k = 0; k < P.length; k++) { const p = P[k], px = p.x * v.scale + v.ox, py = p.y * v.scale + v.oy, pr = p.r * v.scale;
       if (px + pr * 4 < 0 || py + pr * 4 < 0 || px - pr * 4 > v.w || py - pr * 5 > v.h) continue;
@@ -271,7 +290,11 @@
   // ── while you are out in space your pond waits ──
   // Once it is out of sight, or only a speck on the screen, nobody is watching it, so it stands still, as it does when you leave the game: nothing is
   // born, nothing dies, nothing is spent. It goes on from where it was the moment it is back in view.
-  let asleep = false;
+  let asleep = false, snap = null, skip = false;
+  // Drawing the pond is the dearest thing in a frame (every creature, every speck of food). Once it stands still there is no need to draw it again and again:
+  // the moment it falls still a picture of it is kept, and while you are out in space that picture is shown in its place (or nothing at all, when the pond
+  // is out of sight). So wandering far costs only what space itself costs, however much lives in the pond.
+  { const rs = (G.systems || []).filter(function (q) { return q.name === 'render'; })[0]; if (rs && rs.draw) { const d0 = rs.draw; rs.draw = function (dt) { if (skip && G.mode === 'play' && G.W && !G.W.title) return; return d0.call(rs, dt); }; } }
   { const blocked0 = G.isBlocked; G.isBlocked = function () { return asleep || blocked0(); }; }
   G.pondAsleep = function () { return asleep; };
 
@@ -312,9 +335,10 @@
     ui(); if (G.sfx) G.sfx('click');
     G.flyTo(hit.x, hit.y + hit.r * 0.7, clamp(v.h * 0.17 / (hit.r * v.base), ZMIN, 1.2), 1.0);
     shown = hit.name;
+    if (hit.free) { card.innerHTML = '<div class="k">An empty place</div><b>Nobody lives here yet</b>This is what a free place in space looks like. Someone with no pond yet will be able to choose a place like this one and start their pond here, next to whoever is already nearby. For now it is only shown: placing a pond is not open yet.<div class="r"><button class="btn sm" id="farHome">BACK TO MY POND</button><button class="btn sm" id="farClose">CLOSE</button></div>'; card.classList.remove('hide'); return; }
     const K = kindsOf(hit); let pics = ''; for (let k = 0; k < K.length; k++) { try { pics += '<img alt="" src="' + K[k].toDataURL('image/png') + '">'; } catch (e) { /* no picture */ } }
     card.innerHTML = '<div class="k">A far pond</div><b>' + G.escapeHtml(hit.name) + '</b>' + (pics ? '<div class="ks">' + pics + '</div>' : '') + K.length + (K.length === 1 ? ' kind lives' : ' kinds live') + ' here. One day this will be somebody else\'s living pond, and you will be able to go in, look around and meet them. For now it is only a place on the map: visiting is not open yet.<div class="r"><button class="btn sm" id="farHome">BACK TO MY POND</button><button class="btn sm" id="farClose">CLOSE</button></div>';
     card.classList.remove('hide');
   });
-  G.on('new-pond', function () { fly = null; asleep = false; hideCard(); for (const q in KIND) delete KIND[q]; });
+  G.on('new-pond', function () { fly = null; asleep = false; snap = null; skip = false; hideCard(); for (const q in KIND) delete KIND[q]; });
 })();
