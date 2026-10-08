@@ -292,3 +292,7 @@ From the owner's screenshots of a late pond: life bunched in one corner and alon
 - **The land breeds as its food allows.** Land births are capped at `12 + 0.45 × land food` (`startSpring`). Land starvation deaths fell from about 16 to 2 a generation; 16–57 land creatures throughout, fed 0.66–0.85.
 - **Pace of growth.** Richness builds 0.8% a thriving generation: mean size 18, 32, 42, 55, 63 at generations 40, 120, 200, 280, 320.
 - **Clicking a big creature.** The pick radius follows the drawn body (`60_ui.js`), not the circle it is reckoned as.
+
+### Round 5c (2026-10-08): why the land stood bare
+
+Land plants were made through `G.spawnFood`, which refuses when the pond's food is at its limit, and the water's food always fills that limit. So after the first plants were eaten almost none grew again (the owner: "gen 211, no food outside"), and land creatures fed in the shallows. Land plants now have their own allowance (`ownRoom`; the water's limit counts food without the land's): `max(170, 0.24 × food cap) × (shore/0.16)^0.7` standing, growing at rate 1.0. Free pond, 260 generations: 440–900 plants standing, 59–95 land creatures fed 0.87–0.93, 2–9 land starvation deaths a generation (it was 16–28). Autumn population is about 185 against 150 before (the land's life comes on top of the water's).

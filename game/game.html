@@ -3158,8 +3158,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     return t;
   };
 
-  G.spawnFood = function (W, x, y, tag, any) {
-    if (W.food.length >= foodCap(W)) return null;
+  G.spawnFood = function (W, x, y, tag, any, ownRoom) {
+    if (!ownRoom && W.food.length - (W.landFood || 0) >= foodCap(W)) return null;      // (the water's food is counted without the land's)
     if (x === null || x === undefined) {
       // light-dependent: try a few places and keep a bright one
       let bx = 0, by = 0, bl = -1;
@@ -3236,11 +3236,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       if (f && W.gen > 12 && G.rand() < 0.3) { f.big = 1; f.v = 60; f.tag = 3; }
     }
     // plants grow on the shore, untouched until something can breathe air
-    W.landAcc = (W.landAcc || 0) + K.foodRate * (W.ww * W.wh / 1.6e6) * 0.85 * (W.landRich || 1) * Math.pow((W.shore || G.SHORE0) / 0.16, 0.7) * dt;      // land plants do not care about the pond's seasons much
+    W.landAcc = (W.landAcc || 0) + K.foodRate * (W.ww * W.wh / 1.6e6) * 1.0 * Math.pow((W.shore || G.SHORE0) / 0.16, 0.7) * dt;      // land plants do not care about the pond's seasons much
     while (W.landAcc >= 1) {
       W.landAcc -= 1;
       // the land grows plants of several colours (so whatever the pond's first life eats, something up there is food for it), and more of them as the land widens
-      if ((W.landFood || 0) < Math.max(150, 0.26 * foodCap(W)) * (W.landRich || 1) * Math.pow((W.shore || G.SHORE0) / 0.16, 0.7)) {      /* the land keeps its share of the world's food as the world widens */ const f = G.spawnFood(W, G.rand() * W.ww, 14 + G.rand() * (G.shoreY(W) - 28), (function () { const rc = W.cre.length && G.rand() < 0.7 ? W.cre[(G.rand() * W.cre.length) | 0] : null; return rc && rc.ph && rc.ph.fav >= 0 ? rc.ph.fav : [1, 5, 2, 0][(G.rand() * 4) | 0]; })());      /* plants grow thickest by the water: the first step out of it is a short one */ if (f) { f.land = 1; f.v = 34 + G.rand() * 14 + 34 * (1 - f.y / G.shoreY(W));      /* the further from the water, the richer: fewer mouths have ever reached it */ W.landFood = (W.landFood || 0) + 1; } }
+      if ((W.landFood || 0) < Math.max(170, 0.24 * foodCap(W)) * Math.pow((W.shore || G.SHORE0) / 0.16, 0.7)) {      /* the land keeps its share of the world's food as the world widens */ const f = G.spawnFood(W, G.rand() * W.ww, 14 + G.rand() * (G.shoreY(W) - 28), (function () { const rc = W.cre.length && G.rand() < 0.7 ? W.cre[(G.rand() * W.cre.length) | 0] : null; return rc && rc.ph && rc.ph.fav >= 0 ? rc.ph.fav : [1, 5, 2, 0][(G.rand() * 4) | 0]; })(), false, true);      /* plants grow thickest by the water: the first step out of it is a short one */ if (f) { f.land = 1; f.v = 34 + G.rand() * 14 + 34 * (1 - f.y / G.shoreY(W));      /* the further from the water, the richer: fewer mouths have ever reached it */ W.landFood = (W.landFood || 0) + 1; } }
     }
   }
 
