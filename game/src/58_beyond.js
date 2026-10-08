@@ -22,7 +22,8 @@
     // (the renderer's own shore runs from 50 before the pond to 50 past it, down to a waterline that waves: this takes up exactly where that leaves off, with the same wave)
     const wave = function (x) { return sy + 9 * Math.sin(x * 0.011 + G.rt * 0.5) + 6 * Math.sin(x * 0.031); };
     ctx.fillStyle = g;
-    ctx.beginPath(); ctx.moveTo(-MG, -52); ctx.lineTo(-48.5, -52); ctx.lineTo(-48.5, wave(-48.5)); for (let x = -50; x >= -MG - 40; x -= 40) ctx.lineTo(x, wave(x)); ctx.lineTo(-MG, -52); ctx.closePath(); ctx.fill();
+    { const xl = ww + 50 - 40 * Math.floor((ww + 100) / 40);      /* the renderer's shore does not end square on the left: its last step of the waterline stops short of -50 and the outline slants back up. This side is cut to fit that slant exactly, so no sliver of water shows between them */
+      ctx.beginPath(); ctx.moveTo(-MG, -52); ctx.lineTo(-49.2, -52); ctx.lineTo(xl + 0.8, wave(xl)); for (let x = xl - 40; x >= -MG - 40; x -= 40) ctx.lineTo(x, wave(x)); ctx.lineTo(-MG, -52); } ctx.closePath(); ctx.fill();
     ctx.beginPath(); ctx.moveTo(ww + MG, -52); ctx.lineTo(ww + 48.5, -52); ctx.lineTo(ww + 48.5, wave(ww + 48.5)); for (let x = ww + 50; x <= ww + MG + 40; x += 40) ctx.lineTo(x, wave(x)); ctx.lineTo(ww + MG, -52); ctx.closePath(); ctx.fill();
     ctx.fillStyle = 'rgba(70,96,58,0.96)'; ctx.fillRect(-MG - 40, -MG, ww + 2 * MG + 80, MG - 48.5);
     ctx.restore();
@@ -130,7 +131,7 @@
    *  veils that follow the dust (far where the dust is thick, hardly at all where it is thin), and past the veils a faint haze of it and single motes. */
   function buildMask(w, h, mg, R, fadeIn, TW) {
     const k = TW / (w + 2 * mg), TH = Math.max(8, Math.round((h + 2 * mg) * k)), cv = document.createElement('canvas'); cv.width = TW; cv.height = TH;
-    const x = cv.getContext('2d'), im = x.createImageData(TW, TH), D = im.data, hw = w / 2, hh = h / 2, S1 = Math.min(w, h) * 1.15, S2 = S1 * 0.41, out = mg * 0.62;
+    const x = cv.getContext('2d'), im = x.createImageData(TW, TH), D = im.data, hw = w / 2, hh = h / 2, S1 = Math.min(w, h) * 1.15, S2 = S1 * 0.41, out = mg * 0.44;      /* how far the veils may reach */
     for (let py = 0; py < TH; py++) for (let px = 0; px < TW; px++) {
       const wx = px / k - mg - hw, wy = py / k - mg - hh, qx = Math.abs(wx) - (hw - R), qy = Math.abs(wy) - (hh - R);
       const d = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - R;      // how far outside the pond's edge this point is (inside: below zero)
