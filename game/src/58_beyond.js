@@ -274,7 +274,13 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
   // the camera's flight is stepped BEFORE the pond is drawn, so the pond and the space round it are always drawn from the same place
-  G.addSystem({ name: 'beyond', update: function (dt) { flyStep(Math.min(0.1, dt || 0.016)); }, draw: function () { draw(); } });      // and space is painted last, after the pond's own renderer
+  // When the pond grows, the picture does not shrink to keep all of it on the screen: what you were looking at stays the size it was, and the pond's
+  // edges move outward, past the screen if need be. So growing is SEEN: there is more pond than there was, and you zoom out (or press the 'all of it'
+  // button) to take it in.
+  let grew = 0;
+  function keepScale() { const v = G.view, g = v.grow || 1; if (!free()) { grew = 0; return; } if (!grew) { grew = g; return; } if (g !== grew) { if (!fly) { G.cam.z *= g / grew; G.applyCam(); } grew = g; } }
+  G.on('new-pond', function () { grew = 0; });
+  G.addSystem({ name: 'beyond', update: function (dt) { keepScale(); flyStep(Math.min(0.1, dt || 0.016)); }, draw: function () { draw(); } });      // and space is painted last, after the pond's own renderer
 
   // ── while you are out in space your pond waits ──
   // Once it is out of sight, or only a speck on the screen, nobody is watching it, so it stands still, as it does when you leave the game: nothing is
