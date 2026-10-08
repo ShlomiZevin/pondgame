@@ -9,17 +9,24 @@ const path = require('path');
   await page.waitForTimeout(2500);
   const fr = page.frames().find((f) => f !== page.mainFrame());
   await fr.locator('#tBegin').click(); await page.waitForTimeout(1200);
-  await fr.evaluate(() => G.setSpeed(64)); await page.waitForTimeout(12000); await fr.evaluate(() => G.setSpeed(1));
+  await fr.evaluate(() => G.setSpeed(64)); await page.waitForTimeout(25000); await fr.evaluate(() => G.setSpeed(1));
   const shot = (n) => page.screenshot({ path: path.join(__dirname, 'space-' + n + '.png') });
-  await fr.evaluate(() => { G.cam.z = 0.6; G.applyCam(); }); await page.waitForTimeout(700); await shot('1-edge');
-  await fr.evaluate(() => { G.cam.z = 0.16; G.applyCam(); }); await page.waitForTimeout(700); await shot('2-out');
-  await fr.evaluate(() => { G.cam.z = 0.045; G.applyCam(); }); await page.waitForTimeout(700); await shot('3-far');
-  // click the nearest far pond, then go home with the button
-  const hit = await fr.evaluate(() => { const v = G.view, W = G.W; let best = null; for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) { const sx = v.w / 2 + i * 60, sy = v.h / 2 + j * 60; } return null; });
-  const p = await fr.evaluate(() => { const v = G.view; const cs = Math.max(v.ww, v.wh) * 4.2; return { z: G.cam.z }; });
-  await fr.evaluate(() => { G.cam.z = 0.16; G.cam.x = G.view.ww * 3; G.applyCam(); }); await page.waitForTimeout(600);
-  console.log('home button shown when away: ' + await fr.evaluate(() => !document.getElementById('gohome').classList.contains('hide')) + ' · ' + (await fr.locator('#gohome').innerText()).replace(/\n+/g, ' '));
-  await shot('4-away');
+  const btn = () => fr.evaluate(() => !document.getElementById('gohome').classList.contains('hide'));
+  await fr.evaluate(() => { G.select(null); G.cam.z = 0.6; G.applyCam(); }); await page.waitForTimeout(700); await shot('1-edge');
+  console.log('home button, pond filling half the screen: ' + await btn());
+  await fr.evaluate(() => { G.cam.z = 2.5; G.cam.x = G.view.ww * 0.1; G.cam.y = G.view.wh * 0.2; G.applyCam(); }); await page.waitForTimeout(500);
+  console.log('home button, zoomed in on a corner of my pond: ' + await btn());
+  await fr.evaluate(() => { G.cam.z = 0.09; G.cam.x = G.view.ww / 2; G.cam.y = G.view.wh / 2; G.applyCam(); }); await page.waitForTimeout(700); await shot('2-out');
+  // where the far ponds are, before and after the pond grows
+  const where = () => fr.evaluate(() => { const v = G.view, cs = Math.max(v.ww, v.wh) / (v.grow || 1) * 8; return { pond: Math.round(v.ww) + 'x' + Math.round(v.wh), cell: Math.round(cs), centre: Math.round(v.ww / 2) + ',' + Math.round(v.wh / 2) }; });
+  const a = await where(); await fr.evaluate(() => G.pondGrowTo((G.view.grow || 1) * 1.5)); await page.waitForTimeout(400); const b = await where();
+  console.log('before growing ' + JSON.stringify(a) + ' · after ' + JSON.stringify(b) + ' · spacing of far ponds unchanged: ' + (a.cell === b.cell));
+  // fly to a far pond by clicking it
+  const tgt = await fr.evaluate(() => { const v = G.view; G.cam.z = 0.09; G.cam.x = v.ww / 2; G.cam.y = v.wh / 2; G.applyCam(); const cs = Math.max(v.ww, v.wh) / (v.grow || 1) * 8; for (let r = 1; r < 4; r++) for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) { const sx = v.w / 2 + i * cs * v.scale, sy = v.h / 2 + j * cs * v.scale; } return null; });
+  await fr.evaluate(() => { let n = 0; G.on('pond-click', () => n++); const v = G.view, W = G.W; const step = 30; for (let sx = 0; sx < v.w && !document.getElementById('farcard').offsetHeight; sx += step) for (let sy = 0; sy < v.h; sy += step) { const wx = (sx - v.ox) / v.scale, wy = (sy - v.oy) / v.scale; if (wx > 0 && wx < W.ww && wy > 0 && wy < W.wh) continue; G.emit('pond-click', { x: wx, y: wy }); if (!document.getElementById('farcard').classList.contains('hide')) return; } });
+  await page.waitForTimeout(1700); await shot('3-farpond');
+  console.log('far pond card: ' + (await fr.locator('#farcard').innerText()).replace(/\n+/g, ' | ').slice(0, 200));
+  console.log('home button at a far pond: ' + await btn() + ' · ' + (await fr.locator('#gohome').innerText()).replace(/\n+/g, ' '));
   await fr.locator('#gohome').click(); await page.waitForTimeout(1600);
   console.log('after BACK TO MY POND: ' + JSON.stringify(await fr.evaluate(() => ({ z: +G.cam.z.toFixed(2), atHome: Math.abs(G.cam.x - G.view.ww / 2) < 2, button: !document.getElementById('gohome').classList.contains('hide') }))));
   console.log(errs.slice(0, 6).join('\n') || 'no errors');
