@@ -184,3 +184,31 @@ Live runs (Sonnet, ~$0.15–0.18 each, blind Sonnet judge) vary a lot from run t
 ### Round 2g: when the pond stops improving, it grows
 
 If the mean appeal of the pond has not gone up over the last ten generations (`W.apHist`), a stall builds (`W.stall`, 0 to 1, rising 0.2 a generation, falling 0.35 as soon as it improves) and the pond turns to growing bigger: size is what there is left to improve. The drive (`W.grow`) is the stall scaled down to nothing when the pond is below 60–90% of its capacity (the big need feeding) and as the average size goes from 26 to 40. While it is on: size mutations lean upward (+0.6), a birth sometimes grows 8% in one step, size costs 20% less to keep, and in winter the bigger last longer (`sel`). A matching brake keeps ponds alive: when numbers fall below 62% of capacity size leans down, and below 50% a birth sometimes shrinks 10% (`W.popR`). The size ceiling is `26 + 9·(parts − 1)` and drifts up a little each mutation. As a last safety net, if fewer than 14 creatures are left a few small survivors turn up in a sheltered corner (`W.arkGen`). Without the brake and the net the first version drove ponds to sizes of 40–45 and some to extinction around generation 100–270. Now, over six seeds and 300 generations with the stand-in watcher, no pond goes extinct and the average size at generation 300 is 24–43 (about 33) against 22–28 before; true beauty stays 7.5–9.3 and whole 6.4–7.8. The player is told in the pond's log when the turn to growing begins.
+
+## Round 4 (2026-10-08): the god's marks, and what growth did to beauty
+
+Hand-over note for whoever works on the algorithm next.
+
+**What exists now**
+- The watcher returns, from the same look, five marks per creature: beauty, whole, body, balance, grandeur. The list is `G.MARKS` in `game/src/21c_taste.js` and `WATCH_MARKS` in `lib/ai.js`; a new mark is one entry in each.
+- Appeal (`G.appealRaw`): core = 0.45 beauty + 0.55 whole, as before. Marks flagged `extra` (body, balance, grandeur) only add to the core, by weight x (mark - 0.5) x 2, multiplied by the core. Fitness = fed x (0.15 + 0.85 x appeal). The old clutter factor on fitness is gone.
+- Further marks for unseen creatures: `G.marksBorn` (parents' marks, moved by the genes' own prior, pulled to the god's marks on look-alikes).
+- Room to grow (`W.room`, read by `F.room()`): loosens the clutter limits (shedding in `F.mutate`, the breeding block, `clean`/`tidy` in the two guessers, sets of growths, number of body masses). Set only in `G.roomAfterLook`: +0.15 when the whole pond is as nice as its best and the god's body mark is 6 or more; -0.6 when niceness drops 0.02 below its best or body falls under 5. Ceiling `G.ROOM_MAX = 4`. Without AI it stays 0.
+
+**What was measured** (`tools/oracle-test.js 300 11,23,57`, stand-in watcher, free; second-half mean of TRUE beauty / whole, three ponds)
+- commit 730f03f (before any growth work): 8.7 / 6.5
+- b556abf (favourite food, learning in one life): 8.8 / 6.9, so those did no harm
+- 3d66e72 (limits loosened by generation number): about 6.1 beauty
+- 754b412 (five marks averaged, room opened by body mark alone): 4.7 / 7.0, room at its maximum by generation 140
+- a229dcd (this state): 7.4 to 8.0 / 6.2 to 6.4. Run-to-run spread is about +-0.7, so the gap to 8.7 is not established.
+
+**Caveats, read before trusting those numbers**
+- The stand-in's hidden beauty penalises busy bodies by construction (`tidy`, and -0.05 per part over 6), so in that test more parts is always worse. It cannot tell graceful complexity from clutter. The real watcher and the owner's eyes agreed that today's big bodies were ugly, but the test would say so of any big body.
+- The stand-in's extra marks were written to be as lenient about "body" as the real watcher was seen to be (about 6 for anything), and its grandeur rises with the count of parts.
+- The real watcher was only run for 7 looks (2.5 cents) to confirm the marks come back; no long real-AI run has been done on this state.
+
+**Open**
+- The owner wants open-ended growth into big, complex, lovely creatures. With the present body genes, "more" mostly arrives as more lumps and more sets of growths, which reads as clutter. Growth that reads well probably has to come from size, height, limb length and proportion, or from a body gene that adds structure rather than parts.
+- The owner reports that evolution stalls at some point (beauty and whole flat by generation 300) and suspects ranking, mixing or mutation. Not investigated. Suggested: measure the selection differential (parents vs pond) and how much of it reaches the children.
+- Owner's notes, not built: creatures that go onto the ground should evolve differently; legs should matter only to those that need them.
+- Owner's rule: do not steer mutation or breeding; work only through the marks and the fitness function. No loosening by generation number.
