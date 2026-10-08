@@ -940,7 +940,7 @@
       const k = clamp(0.3 + 0.12 * (c.st === undefined ? 3 : c.st), 0.3, 0.75);
       v = W1._em + (v - W1._em) * (1 - k);
     }
-    return s && s.loved ? Math.max(v, 0.92) : v;
+    return v;      // a kind the pond's wish or the player kept is remembered (s.loved) but breeds on its marks like any other: a fixed mark would stop it improving
   };
 
   function findMate(p, surv) {

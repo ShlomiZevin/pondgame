@@ -162,9 +162,9 @@
       if (c.sayCool <= 0 && W.lastSay !== undefined && W.t - W.lastSay < 1.6) c.sayCool = 0.6 + G.rand();      // one voice at a time: the others wait a moment
       if (c.sayCool <= 0) {
         c.sayCool = 9 + G.rand() * 12; W.lastSay = W.t;
-        const w = ph.mv.words, inp = c.inp;
+        const w = ph.mv.words;
         let word = w[(G.rand() * w.length) | 0];
-        if (inp && Math.max(inp[5], inp[6]) > 0.45 && G.rand() < 0.5) word = 'Run!'; else if (inp && Math.max(inp[1], inp[2]) > 0.5 && G.rand() < 0.25) word = 'Food!';
+        /* it says only its own lines, the ones invented for it (some of them may be lines the shared voice repository already holds): nothing is scripted */
         c.say = { w: word, t: 3 };
         G.emit('say', c, word);
       }
