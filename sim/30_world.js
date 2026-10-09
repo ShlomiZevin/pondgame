@@ -472,7 +472,7 @@
         }
         for (let zi = 0; zi < W.zones.length; zi++) {
           const z = W.zones[zi], zp = z.p;
-          if (zp.eats < 0.2 && zp.poison < 0.3 && zp.acid < 0.3 && zp.deadly < 0.2) continue;
+          if (zp.eats < 0.2 && zp.poison < 0.3 && zp.acid < 0.3 && zp.deadly < 0.2 && !(z.foe && z.act)) continue;      /* (a thing that acts against them is a danger too: see 54c_acts.js) */
           const dx = z.x - c.x, dy = z.y - c.y, d = Math.sqrt(dx * dx + dy * dy) - z.r * 0.6;
           if (d < range && d * d < bt) { bt = Math.max(1, d * d); btx = dx; bty = dy; }
         }
@@ -517,23 +517,23 @@
           if (z.hvStep !== W.step) { z.hvPrev = z.hvStep === W.step - 1 ? z.hvNow : 0; z.hvNow = 0; z.hvStep = W.step; }
           const room = G.HAVEN_ROOM || 3, guest = c.guestOf === z.id && c.guestStep >= W.step - 2, free = Math.max(z.hvPrev, z.hvNow) < room;
           /* the fence is a fence for marvels too: in and out only through the gate (at the bottom, between the two tall posts), and in only with a place */
-          const R = z.r * 0.9, wasIn = c.hvIn === z.id;
+          const R = z.r * 0.9, hs = Math.max(1, R / 85), wasIn = c.hvIn === z.id;
           { let ga = Math.abs(Math.atan2(-hy, -hx) - 1.5708); if (ga > 3.1416) ga = 6.2832 - ga;
             const open = ga < 0.3 && (wasIn || guest || free);
             if (!open) {
               const ux = -hx / hd, uy = -hy / hd, vn = c.vx * ux + c.vy * uy;      /* (ux, uy) points from the middle of the garden out to the marvel */
-              if (wasIn && hd > R - 4) { c.x = z.x + ux * (R - 4); c.y = z.y + uy * (R - 4); if (vn > 0) { c.vx -= vn * ux; c.vy -= vn * uy; } }
-              else if (!wasIn && hd < R + 4) { c.x = z.x + ux * (R + 4); c.y = z.y + uy * (R + 4); if (vn < 0) { c.vx -= vn * ux; c.vy -= vn * uy; } }
+              if (wasIn && hd > R - 4 * hs) { c.x = z.x + ux * (R - 4 * hs); c.y = z.y + uy * (R - 4 * hs); if (vn > 0) { c.vx -= vn * ux; c.vy -= vn * uy; } }
+              else if (!wasIn && hd < R + 4 * hs) { c.x = z.x + ux * (R + 4 * hs); c.y = z.y + uy * (R + 4 * hs); if (vn < 0) { c.vx -= vn * ux; c.vy -= vn * uy; } }
               hx = z.x - c.x; hy = z.y - c.y; hd = Math.sqrt(hx * hx + hy * hy) + 0.01;
             }
             c.hvIn = hd < R ? z.id : (wasIn ? 0 : c.hvIn); }
-          if (hd < R) { if (guest || free) { z.hvNow++; c.guestOf = z.id; c.guestStep = W.step; c.havenGen = W.gen; if (!(c.graceLeft >= 3)) c.graceLeft = 3; c.E = Math.min(ph.Emax, c.E + 1.6 * dt); c.vx *= 1 - 0.6 * dt; c.vy *= 1 - 0.6 * dt; if (hd > R * 0.6) { c.vx += hx / hd * 20 * dt; c.vy += hy / hd * 20 * dt; } } }
+          if (hd < R) { if (guest || free) { z.hvNow++; c.guestOf = z.id; c.guestStep = W.step; c.havenGen = W.gen; if (!(c.graceLeft >= 3)) c.graceLeft = 3; c.E = Math.min(ph.Emax, c.E + 1.6 * dt); c.vx *= 1 - 0.6 * dt; c.vy *= 1 - 0.6 * dt; if (hd > R * 0.6) { c.vx += hx / hd * 20 * hs * dt; c.vy += hy / hd * 20 * hs * dt; } } }
           else if (free) {      /* on its way to a garden with room: it makes for the gate, and the journey itself is safe (it does not starve or fall on the road) */
-            let gx = z.x - c.x, gy = z.y + R + 16 - c.y; const gd = Math.sqrt(gx * gx + gy * gy) + 0.01;
-            if (gd < 22 || (c.y > z.y + R * 0.8 && Math.abs(c.x - z.x) < R * 0.28)) { gx = hx; gy = hy; }      /* at the gate: straight in */
-            else if (c.y < z.y + R * 0.5 && Math.abs(c.x - z.x) < R + 20) { gx = (c.x < z.x ? -1 : 1) * (R + 30) + z.x - c.x; gy = z.y + R * 0.7 - c.y; }      /* behind or beside it: go round the outside first */
+            let gx = z.x - c.x, gy = z.y + R + 16 * hs - c.y; const gd = Math.sqrt(gx * gx + gy * gy) + 0.01;
+            if (gd < 22 * hs || (c.y > z.y + R * 0.8 && Math.abs(c.x - z.x) < R * 0.28)) { gx = hx; gy = hy; }      /* at the gate: straight in */
+            else if (c.y < z.y + R * 0.5 && Math.abs(c.x - z.x) < R + 20 * hs) { gx = (c.x < z.x ? -1 : 1) * (R + 30 * hs) + z.x - c.x; gy = z.y + R * 0.7 - c.y; }      /* behind or beside it: go round the outside first */
             const gl = Math.sqrt(gx * gx + gy * gy) + 0.01;
-            c.vx += gx / gl * 70 * dt; c.vy += gy / gl * 70 * dt; c.havenGen = W.gen; if (!(c.graceLeft >= 2)) c.graceLeft = 2; if (c.E < ph.Emax * 0.3) c.E = ph.Emax * 0.3;
+            c.vx += gx / gl * 70 * hs * dt; c.vy += gy / gl * 70 * hs * dt; c.havenGen = W.gen; if (!(c.graceLeft >= 2)) c.graceLeft = 2; if (c.E < ph.Emax * 0.3) c.E = ph.Emax * 0.3;
           }
         }
         if (z.p.sticky) {

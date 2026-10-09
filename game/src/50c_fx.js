@@ -28,6 +28,21 @@
   });
   G.on('eat', function (c, o) { if (!on() || G.speed > 4) return; add({ k: 'nom', a: c, x: o.x, y: o.y, hue: G.TAGHUE ? G.TAGHUE[o.tag] : 120, T: 0.32, big: !!o.big }); });
   G.on('ill', function (c) { if (!on()) return; add({ k: 'ill', a: c, T: 1.2, txt: words() ? 'yuck!' : '' }); });
+  // things that act (54c_acts.js): a swing where a blow lands, a ring where a blast or a healing goes out; what is shot is drawn as it flies (below)
+  G.on('act', function (z, q, o, R) { if (!on()) return; if (q.do === 'strike' && o) add({ k: 'swing', z: z, o: o, T: 0.45, hue: q.hue, txt: words() ? (q.with || 'strikes') : '' }); else if (q.do === 'blast') add({ k: 'ringout', x: z.x, y: z.y, R: R, T: 0.7, col: 'hsla(' + q.hue + ',95%,65%,' }); else if (q.do === 'heal') add({ k: 'ringout', x: z.x, y: z.y, R: R, T: 0.9, col: 'hsla(130,85%,70%,' }); });
+  G.on('act-hit', function (z, o) { if (!on() || !o) return; add({ k: 'spark', x: o.x, y: o.ph ? o.y - o.ph.r : o.y, r: o.ph ? o.ph.r : 14, T: 0.35 }); });
+  const SHOT = { arrow: function (ctx, L) { ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(-L, 0); ctx.lineTo(L * 0.4, 0); ctx.stroke(); ctx.beginPath(); ctx.moveTo(L * 0.9, 0); ctx.lineTo(L * 0.2, -L * 0.3); ctx.lineTo(L * 0.2, L * 0.3); ctx.closePath(); ctx.fill(); },
+    bullet: function (ctx, L) { ctx.beginPath(); ctx.ellipse(0, 0, L * 0.55, L * 0.26, 0, 0, TAU); ctx.fill(); }, rock: function (ctx, L) { ctx.beginPath(); ctx.arc(0, 0, L * 0.5, 0, TAU); ctx.fill(); ctx.stroke(); },
+    beam: function (ctx, L) { ctx.lineWidth = L * 0.35; ctx.beginPath(); ctx.moveTo(-L * 2.2, 0); ctx.lineTo(L, 0); ctx.stroke(); }, web: function (ctx, L) { ctx.lineWidth = 1.4; for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(k * 1.57 + 0.6) * L, Math.sin(k * 1.57 + 0.6) * L); ctx.stroke(); } ctx.beginPath(); ctx.arc(0, 0, L * 0.6, 0, TAU); ctx.stroke(); },
+    bubble: function (ctx, L) { ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(0, 0, L * 0.6, 0, TAU); ctx.stroke(); } };
+  function shots(ctx) {
+    const S = G.W.shots; if (!S || !S.length || G.speed > 16) return;
+    for (let i = 0; i < S.length; i++) { const s = S[i], q = s.q, L = 9, glow = q.shot === 'fire' || q.shot === 'spark' || q.shot === 'ice' || q.shot === 'bolt';
+      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.a);
+      if (glow) { const g = ctx.createLinearGradient(-L * 3, 0, L, 0), h = q.shot === 'ice' ? 195 : q.shot === 'fire' ? 22 : q.hue; g.addColorStop(0, 'hsla(' + h + ',100%,60%,0)'); g.addColorStop(1, 'hsla(' + h + ',100%,70%,0.95)'); ctx.strokeStyle = g; ctx.lineCap = 'round'; ctx.lineWidth = L * 0.7; ctx.beginPath(); ctx.moveTo(-L * 3, 0); ctx.lineTo(L * 0.6, 0); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(L * 0.6, 0, L * 0.3, 0, TAU); ctx.fill(); }
+      else { ctx.fillStyle = 'hsl(' + q.hue + ',70%,78%)'; ctx.strokeStyle = q.shot === 'web' || q.shot === 'bubble' || q.shot === 'beam' ? 'hsla(' + q.hue + ',85%,82%,0.95)' : INK; ctx.lineWidth = 1.4; ctx.lineCap = 'round'; (SHOT[q.shot] || SHOT.bullet)(ctx, L); }
+      ctx.restore(); }
+  }
   G.on('new-pond', function () { FX.length = 0; });
 
   function label(ctx, x, y, txt, col, a, inv) {
@@ -51,14 +66,24 @@
   }
 
   G.drawFx = function (ctx) {
-    if (!FX.length || !G.W) return;
+    if (!G.W || (!FX.length && !(G.W.shots && G.W.shots.length))) return;
     const v = G.view, s = v.scale * v.dpr, now = G.rt || 0, inv = 1 / Math.max(0.7, v.scale);
     ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    try { shots(ctx); } catch (er) { console.error(er); }
     for (let i = FX.length - 1; i >= 0; i--) {
       const e = FX[i], u = (now - e.t0) / e.T;
       if (u >= 1 || u < 0) { FX.splice(i, 1); continue; }
       const fade = u < 0.7 ? 1 : (1 - u) / 0.3;
-      if (e.k === 'hit') {
+      if (e.k === 'swing') {
+        const z = e.z, o = e.o; if (!z || !o) continue; const a0 = Math.atan2((o.ph ? o.y - o.ph.r : o.y) - z.y, o.x - z.x), rr = Math.hypot(o.x - z.x, o.y - z.y) * 0.85 + 14;
+        ctx.globalAlpha = fade; ctx.strokeStyle = INK; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(z.x, z.y, rr, a0 - 0.9 + u * 1.2, a0 - 0.2 + u * 1.2); ctx.stroke();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.stroke(); ctx.globalAlpha = 1;
+        label(ctx, z.x, z.y - (z.r || 40) * 0.9 - 26 * inv, e.txt, RED, fade, inv);
+      } else if (e.k === 'ringout') {
+        ctx.strokeStyle = e.col + (0.8 * (1 - u)) + ')'; ctx.lineWidth = 6 * (1 - u) + 2; ctx.beginPath(); ctx.arc(e.x, e.y, e.R * (0.15 + 0.85 * u), 0, TAU); ctx.stroke(); ctx.fillStyle = e.col + (0.12 * (1 - u)) + ')'; ctx.fill();
+      } else if (e.k === 'spark') {
+        burst(ctx, e.x, e.y, e.r * (0.5 + 0.8 * u), '#fff3c4', fade * (1 - u * 0.6));
+      } else if (e.k === 'hit') {
         const a = e.a, b = e.b; if (!a || !b) continue;
         const ax = px(a), ay = py(a) - a.ph.r * 0.9, bx = px(b), by = py(b) - b.ph.r * 0.9, dx = bx - ax, dy = by - ay, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
         const reach = Math.min(1, u / 0.22), sx = ax + ux * a.ph.r * 0.8, sy = ay + uy * a.ph.r * 0.8, ex = sx + (bx - ux * b.ph.r * 0.7 - sx) * reach, ey = sy + (by - uy * b.ph.r * 0.7 - sy) * reach, wd = Math.max(2.5, a.ph.r * 0.28);

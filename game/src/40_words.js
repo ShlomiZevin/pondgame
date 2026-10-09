@@ -128,6 +128,7 @@
       weak: typeof t.weak === 'string' ? G.weakIndex(t.weak) : (t.weak >= 0 && t.weak <= 4 ? t.weak | 0 : -1),
       alive: clamp(+t.alive || 0, 0, 1),
       look: G.cleanLook ? G.cleanLook(t.look) : null,
+      act: G.cleanActs ? (G.cleanActs(t) || (t.source !== 'ai' && G.actsFromWord ? G.actsFromWord(t.name) : null)) : null,      // what it DOES of its own (54c_acts.js)
     };
   }
   G.clampThing = clampThing;

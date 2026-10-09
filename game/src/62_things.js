@@ -64,11 +64,12 @@
     }
     if (z.p.poison + z.p.acid + z.p.eats + (z.p.deadly || 0) > 0.25) { const a = G.adaptedTo(z); facts.push('The pond has adapted to it: <b>' + Math.round(a * 100) + '%</b>' + (a > 0.45 ? ' (they have learned to live with it).' : a > 0.2 ? ' (they are learning).' : ' (so far it still hurts).')); }
     if (z.haven) { const n = Math.min(G.HAVEN_ROOM || 3, Math.max(z.hvPrev || 0, z.hvNow || 0)); facts.length = 0; facts.push('<b>' + n + ' of ' + (G.HAVEN_ROOM || 3) + '</b> places are taken. Only marvels can enter, and only through the gate at the bottom.', 'Inside, a marvel is fed, kept from harm and does not die of old age. A child born here is a marvel one time in four.', 'It stands for about <b>' + Math.round(z.life) + '</b> more seconds of pond time; then you can add another.'); }
+    if (z.act && G.actWords) { const aw = G.actWords(z); for (let i = aw.length - 1; i >= 0; i--) facts.unshift(aw[i]); if (z.deaths) facts.push('It has struck down <b>' + z.deaths + '</b> creatures.'); }
     if (!facts.length) facts.push('Nothing has happened to it yet.');
     const ev = (z.ev || []).map(function (e) { return '<div><small>g' + e.g + '</small> ' + esc(e.t) + '</div>'; }).join('');
     const lifeTxt = living ? 'Health' : 'Time left';
     card.innerHTML = '<div class="ihead">' + picture(z) + '<div><b>' + esc(z.word) + (living && z.genN > 1 ? ' <small>· generation ' + z.genN + '</small>' : '') + '</b><small>' + esc(z.note || '') + '</small>' + (by ? '<small style="color:var(--gold)">imagined by ' + esc(by) + '</small>' : '') + '</div><button class="x" id="zclose" aria-label="Close">' + G.ICON.close + '</button></div>' +
-      '<div class="ilabel">What it does</div>' + (bars || (z.haven ? '<small>Shelters the marvels of the pond.</small>' : '<small>Very little.</small>')) +
+      '<div class="ilabel">What it does</div>' + (bars || (z.haven ? '<small>Shelters the marvels of the pond.</small>' : z.act ? '' : '<small>Very little.</small>')) +
       '<div class="ilabel">' + lifeTxt + '</div><div class="meter"><i id="zlife"></i></div>' +
       '<div class="ilabel">Its story</div><div class="log" style="height:auto;max-height:96px" id="zev">' + ev + '</div>' +
       '<div id="zfacts" style="font-size:11.5px;line-height:1.45;margin-top:6px">' + facts.join(' ') + '</div>';
@@ -104,6 +105,11 @@
   G.thingStatus = function (z) {
     const p = z.p, w = G.WEAK[z.weak].text, pct = function (v) { return Math.round(100 * G.clamp(v, 0, 1)) + '%'; };
     if (p.vault > 0.2) { const broken = 1 - z.life / (z.life0 || 420); return { t: 'locks food inside · ' + pct(broken) + ' broken' + (z.atk ? ' · ' + z.atk + ' breaking in' : ' · only ' + w + ' get through'), tone: 'bad', bar: 1 - broken }; }
+    if (z.act) {      // a thing that acts: what it is doing, and how it is faring
+      const V = { strike: 'strikes', shoot: 'shoots', blast: 'blasts', heal: 'heals', shield: 'shields', spawn: 'breeds' }, does = z.act.acts.map(function (q) { return V[q.do]; }).filter(function (x, i, L) { return L.indexOf(x) === i; }).join(' and ');
+      const side = z.act.side === 'friend' ? 'on their side' : z.act.side === 'wild' ? 'against all' : '';
+      return { t: (z.act.way === 'hunts' ? 'hunts · ' : z.act.way === 'guards' ? 'guards · ' : '') + does + (side ? ' · ' + side : '') + (z.deaths ? ' · ' + z.deaths + ' struck down' : '') + (z.foe ? (z.atk ? ' · ' + z.atk + ' fighting back' : ' · weak to ' + w) : ''), tone: z.act.side === 'friend' ? 'good' : z.atk ? 'fight' : 'bad', bar: z.alive > 0.25 ? G.clamp(z.health, 0, 1) : G.clamp(z.life / (z.life0 || 120), 0, 1) };
+    }
     if (G.isBad(z)) {
       const does = p.deadly > 0.05 ? 'kills at a touch' : p.eats > 0.05 ? 'eats creatures' : p.poison > 0.05 ? 'poisons' : 'burns', taken = (z.deaths || 0) + (p.eats > 0.05 ? (z.ate || 0) : 0);
       return { t: does + (taken ? ' · ' + taken + ' taken' : '') + (z.hurtN ? ' · hurting ' + z.hurtN : '') + (z.atk ? ' · ' + z.atk + ' fighting back' : ' · weak to ' + w), tone: z.atk ? 'fight' : 'bad', bar: z.alive > 0.25 ? G.clamp(z.health, 0, 1) : G.clamp(z.life / (z.life0 || 120), 0, 1) };

@@ -3468,7 +3468,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         }
         for (let zi = 0; zi < W.zones.length; zi++) {
           const z = W.zones[zi], zp = z.p;
-          if (zp.eats < 0.2 && zp.poison < 0.3 && zp.acid < 0.3 && zp.deadly < 0.2) continue;
+          if (zp.eats < 0.2 && zp.poison < 0.3 && zp.acid < 0.3 && zp.deadly < 0.2 && !(z.foe && z.act)) continue;      /* (a thing that acts against them is a danger too: see 54c_acts.js) */
           const dx = z.x - c.x, dy = z.y - c.y, d = Math.sqrt(dx * dx + dy * dy) - z.r * 0.6;
           if (d < range && d * d < bt) { bt = Math.max(1, d * d); btx = dx; bty = dy; }
         }
@@ -3513,23 +3513,23 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
           if (z.hvStep !== W.step) { z.hvPrev = z.hvStep === W.step - 1 ? z.hvNow : 0; z.hvNow = 0; z.hvStep = W.step; }
           const room = G.HAVEN_ROOM || 3, guest = c.guestOf === z.id && c.guestStep >= W.step - 2, free = Math.max(z.hvPrev, z.hvNow) < room;
           /* the fence is a fence for marvels too: in and out only through the gate (at the bottom, between the two tall posts), and in only with a place */
-          const R = z.r * 0.9, wasIn = c.hvIn === z.id;
+          const R = z.r * 0.9, hs = Math.max(1, R / 85), wasIn = c.hvIn === z.id;
           { let ga = Math.abs(Math.atan2(-hy, -hx) - 1.5708); if (ga > 3.1416) ga = 6.2832 - ga;
             const open = ga < 0.3 && (wasIn || guest || free);
             if (!open) {
               const ux = -hx / hd, uy = -hy / hd, vn = c.vx * ux + c.vy * uy;      /* (ux, uy) points from the middle of the garden out to the marvel */
-              if (wasIn && hd > R - 4) { c.x = z.x + ux * (R - 4); c.y = z.y + uy * (R - 4); if (vn > 0) { c.vx -= vn * ux; c.vy -= vn * uy; } }
-              else if (!wasIn && hd < R + 4) { c.x = z.x + ux * (R + 4); c.y = z.y + uy * (R + 4); if (vn < 0) { c.vx -= vn * ux; c.vy -= vn * uy; } }
+              if (wasIn && hd > R - 4 * hs) { c.x = z.x + ux * (R - 4 * hs); c.y = z.y + uy * (R - 4 * hs); if (vn > 0) { c.vx -= vn * ux; c.vy -= vn * uy; } }
+              else if (!wasIn && hd < R + 4 * hs) { c.x = z.x + ux * (R + 4 * hs); c.y = z.y + uy * (R + 4 * hs); if (vn < 0) { c.vx -= vn * ux; c.vy -= vn * uy; } }
               hx = z.x - c.x; hy = z.y - c.y; hd = Math.sqrt(hx * hx + hy * hy) + 0.01;
             }
             c.hvIn = hd < R ? z.id : (wasIn ? 0 : c.hvIn); }
-          if (hd < R) { if (guest || free) { z.hvNow++; c.guestOf = z.id; c.guestStep = W.step; c.havenGen = W.gen; if (!(c.graceLeft >= 3)) c.graceLeft = 3; c.E = Math.min(ph.Emax, c.E + 1.6 * dt); c.vx *= 1 - 0.6 * dt; c.vy *= 1 - 0.6 * dt; if (hd > R * 0.6) { c.vx += hx / hd * 20 * dt; c.vy += hy / hd * 20 * dt; } } }
+          if (hd < R) { if (guest || free) { z.hvNow++; c.guestOf = z.id; c.guestStep = W.step; c.havenGen = W.gen; if (!(c.graceLeft >= 3)) c.graceLeft = 3; c.E = Math.min(ph.Emax, c.E + 1.6 * dt); c.vx *= 1 - 0.6 * dt; c.vy *= 1 - 0.6 * dt; if (hd > R * 0.6) { c.vx += hx / hd * 20 * hs * dt; c.vy += hy / hd * 20 * hs * dt; } } }
           else if (free) {      /* on its way to a garden with room: it makes for the gate, and the journey itself is safe (it does not starve or fall on the road) */
-            let gx = z.x - c.x, gy = z.y + R + 16 - c.y; const gd = Math.sqrt(gx * gx + gy * gy) + 0.01;
-            if (gd < 22 || (c.y > z.y + R * 0.8 && Math.abs(c.x - z.x) < R * 0.28)) { gx = hx; gy = hy; }      /* at the gate: straight in */
-            else if (c.y < z.y + R * 0.5 && Math.abs(c.x - z.x) < R + 20) { gx = (c.x < z.x ? -1 : 1) * (R + 30) + z.x - c.x; gy = z.y + R * 0.7 - c.y; }      /* behind or beside it: go round the outside first */
+            let gx = z.x - c.x, gy = z.y + R + 16 * hs - c.y; const gd = Math.sqrt(gx * gx + gy * gy) + 0.01;
+            if (gd < 22 * hs || (c.y > z.y + R * 0.8 && Math.abs(c.x - z.x) < R * 0.28)) { gx = hx; gy = hy; }      /* at the gate: straight in */
+            else if (c.y < z.y + R * 0.5 && Math.abs(c.x - z.x) < R + 20 * hs) { gx = (c.x < z.x ? -1 : 1) * (R + 30 * hs) + z.x - c.x; gy = z.y + R * 0.7 - c.y; }      /* behind or beside it: go round the outside first */
             const gl = Math.sqrt(gx * gx + gy * gy) + 0.01;
-            c.vx += gx / gl * 70 * dt; c.vy += gy / gl * 70 * dt; c.havenGen = W.gen; if (!(c.graceLeft >= 2)) c.graceLeft = 2; if (c.E < ph.Emax * 0.3) c.E = ph.Emax * 0.3;
+            c.vx += gx / gl * 70 * hs * dt; c.vy += gy / gl * 70 * hs * dt; c.havenGen = W.gen; if (!(c.graceLeft >= 2)) c.graceLeft = 2; if (c.E < ph.Emax * 0.3) c.E = ph.Emax * 0.3;
           }
         }
         if (z.p.sticky) {
@@ -4541,6 +4541,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       weak: typeof t.weak === 'string' ? G.weakIndex(t.weak) : (t.weak >= 0 && t.weak <= 4 ? t.weak | 0 : -1),
       alive: clamp(+t.alive || 0, 0, 1),
       look: G.cleanLook ? G.cleanLook(t.look) : null,
+      act: G.cleanActs ? (G.cleanActs(t) || (t.source !== 'ai' && G.actsFromWord ? G.actsFromWord(t.name) : null)) : null,      // what it DOES of its own (54c_acts.js)
     };
   }
   G.clampThing = clampThing;
@@ -7194,23 +7195,25 @@ function drawOrb(ctx, z, x, y, r, k, label, ghost, plain) {
 // The marvels' garden: a ring of small golden pickets with a rail, a gap for a gate between two taller posts with a star each, and a soft light
 // on the water inside. Drawn in the pond's own style (dark outline, flat colour), small enough that the marvels in it are what is seen.
 function drawHaven(ctx, z, t) {
-  const R = z.r * 0.9, a = Math.min(1, 0.35 + z.k), N = Math.max(14, Math.round(R / 6.5)), gate = 1.5708, gw = 0.34;
+  // The garden grows with the pond's creatures (see z.r in 30_world.js), and its fence grows with it: s is how many times its first size it is. Without
+  // that, a garden grown tenfold was a hair-thin ring of specks and no longer read as a fence at all.
+  const R = z.r * 0.9, s = Math.max(1, R / 85), a = Math.min(1, 0.35 + z.k), N = Math.max(14, Math.round(R / (6.5 * s))), gate = 1.5708, gw = 0.34;
   ctx.save(); ctx.globalAlpha = a;
   const g = ctx.createRadialGradient(z.x, z.y, R * 0.1, z.x, z.y, R); g.addColorStop(0, 'rgba(246,211,101,0.16)'); g.addColorStop(1, 'rgba(246,211,101,0.03)');
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(z.x, z.y, R, 0, 6.2832); ctx.fill();
   // the rail, open at the gate
-  ctx.lineCap = 'round'; ctx.strokeStyle = '#1a2433'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(z.x, z.y - 5, R, gate + gw, gate - gw + 6.2832); ctx.stroke();
-  ctx.strokeStyle = '#e9c46a'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.arc(z.x, z.y - 5, R, gate + gw, gate - gw + 6.2832); ctx.stroke();
+  ctx.lineCap = 'round'; ctx.strokeStyle = '#1a2433'; ctx.lineWidth = 5 * s; ctx.beginPath(); ctx.arc(z.x, z.y - 5 * s, R, gate + gw, gate - gw + 6.2832); ctx.stroke();
+  ctx.strokeStyle = '#e9c46a'; ctx.lineWidth = 2.4 * s; ctx.beginPath(); ctx.arc(z.x, z.y - 5 * s, R, gate + gw, gate - gw + 6.2832); ctx.stroke();
   const post = function (px, py, h, w, star, i) {
-    ctx.fillStyle = '#f6d365'; ctx.strokeStyle = '#1a2433'; ctx.lineWidth = 1.8;
+    h *= s; w *= s;
+    ctx.fillStyle = '#f6d365'; ctx.strokeStyle = '#1a2433'; ctx.lineWidth = 1.8 * s;
     ctx.beginPath(); ctx.moveTo(px - w, py); ctx.lineTo(px - w, py - h + w); ctx.lineTo(px, py - h - w * 0.4); ctx.lineTo(px + w, py - h + w); ctx.lineTo(px + w, py); ctx.closePath(); ctx.fill(); ctx.stroke();
     if (star) {
-      const sy = py - h - 8 + Math.sin(t * 2 + i) * 1.5, s = 5.5; ctx.fillStyle = '#fff3c4'; ctx.beginPath();
-      for (let k = 0; k < 10; k++) { const an = -1.5708 + k * 0.62832, rr = k % 2 ? s * 0.45 : s; ctx.lineTo(px + Math.cos(an) * rr, sy + Math.sin(an) * rr); }
+      const sy = py - h - (8 + Math.sin(t * 2 + i) * 1.5) * s, sz = 5.5 * s; ctx.fillStyle = '#fff3c4'; ctx.beginPath();
+      for (let k = 0; k < 10; k++) { const an = -1.5708 + k * 0.62832, rr = k % 2 ? sz * 0.45 : sz; ctx.lineTo(px + Math.cos(an) * rr, sy + Math.sin(an) * rr); }
       ctx.closePath(); ctx.fill(); ctx.stroke();
     }
   };
-  // pickets, the far side first so the near ones overlap them
   const P = [];
   for (let i = 0; i < N; i++) { const an = i / N * 6.2832; let d = Math.abs(an - gate); if (d > 3.1416) d = 6.2832 - d; if (d < gw) continue; P.push([z.x + Math.cos(an) * R, z.y + Math.sin(an) * R, 11, 2.6, false, i]); }
   P.push([z.x + Math.cos(gate - gw) * R, z.y + Math.sin(gate - gw) * R, 19, 3.6, true, 1], [z.x + Math.cos(gate + gw) * R, z.y + Math.sin(gate + gw) * R, 19, 3.6, true, 2]);
@@ -7218,7 +7221,7 @@ function drawHaven(ctx, z, t) {
   for (let i = 0; i < P.length; i++) post.apply(null, P[i]);
   // a few slow sparkles inside
   ctx.fillStyle = 'rgba(255,243,196,0.8)';
-  for (let i = 0; i < 5; i++) { const an = i * 1.9 + t * 0.15, rr = R * (0.25 + 0.5 * ((i * 37) % 10) / 10), tw = 0.5 + 0.5 * Math.sin(t * 2.4 + i * 2); ctx.globalAlpha = a * tw; ctx.beginPath(); ctx.arc(z.x + Math.cos(an) * rr, z.y + Math.sin(an) * rr, 1.6, 0, 6.2832); ctx.fill(); }
+  for (let i = 0; i < 5; i++) { const an = i * 1.9 + t * 0.15, rr = R * (0.25 + 0.5 * ((i * 37) % 10) / 10), tw = 0.5 + 0.5 * Math.sin(t * 2.4 + i * 2); ctx.globalAlpha = a * tw; ctx.beginPath(); ctx.arc(z.x + Math.cos(an) * rr, z.y + Math.sin(an) * rr, 1.6 * s, 0, 6.2832); ctx.fill(); }
   ctx.restore();
 }
 function thingImage(o) {
@@ -7903,6 +7906,21 @@ G.addSystem({
   });
   G.on('eat', function (c, o) { if (!on() || G.speed > 4) return; add({ k: 'nom', a: c, x: o.x, y: o.y, hue: G.TAGHUE ? G.TAGHUE[o.tag] : 120, T: 0.32, big: !!o.big }); });
   G.on('ill', function (c) { if (!on()) return; add({ k: 'ill', a: c, T: 1.2, txt: words() ? 'yuck!' : '' }); });
+  // things that act (54c_acts.js): a swing where a blow lands, a ring where a blast or a healing goes out; what is shot is drawn as it flies (below)
+  G.on('act', function (z, q, o, R) { if (!on()) return; if (q.do === 'strike' && o) add({ k: 'swing', z: z, o: o, T: 0.45, hue: q.hue, txt: words() ? (q.with || 'strikes') : '' }); else if (q.do === 'blast') add({ k: 'ringout', x: z.x, y: z.y, R: R, T: 0.7, col: 'hsla(' + q.hue + ',95%,65%,' }); else if (q.do === 'heal') add({ k: 'ringout', x: z.x, y: z.y, R: R, T: 0.9, col: 'hsla(130,85%,70%,' }); });
+  G.on('act-hit', function (z, o) { if (!on() || !o) return; add({ k: 'spark', x: o.x, y: o.ph ? o.y - o.ph.r : o.y, r: o.ph ? o.ph.r : 14, T: 0.35 }); });
+  const SHOT = { arrow: function (ctx, L) { ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(-L, 0); ctx.lineTo(L * 0.4, 0); ctx.stroke(); ctx.beginPath(); ctx.moveTo(L * 0.9, 0); ctx.lineTo(L * 0.2, -L * 0.3); ctx.lineTo(L * 0.2, L * 0.3); ctx.closePath(); ctx.fill(); },
+    bullet: function (ctx, L) { ctx.beginPath(); ctx.ellipse(0, 0, L * 0.55, L * 0.26, 0, 0, TAU); ctx.fill(); }, rock: function (ctx, L) { ctx.beginPath(); ctx.arc(0, 0, L * 0.5, 0, TAU); ctx.fill(); ctx.stroke(); },
+    beam: function (ctx, L) { ctx.lineWidth = L * 0.35; ctx.beginPath(); ctx.moveTo(-L * 2.2, 0); ctx.lineTo(L, 0); ctx.stroke(); }, web: function (ctx, L) { ctx.lineWidth = 1.4; for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(k * 1.57 + 0.6) * L, Math.sin(k * 1.57 + 0.6) * L); ctx.stroke(); } ctx.beginPath(); ctx.arc(0, 0, L * 0.6, 0, TAU); ctx.stroke(); },
+    bubble: function (ctx, L) { ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(0, 0, L * 0.6, 0, TAU); ctx.stroke(); } };
+  function shots(ctx) {
+    const S = G.W.shots; if (!S || !S.length || G.speed > 16) return;
+    for (let i = 0; i < S.length; i++) { const s = S[i], q = s.q, L = 9, glow = q.shot === 'fire' || q.shot === 'spark' || q.shot === 'ice' || q.shot === 'bolt';
+      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.a);
+      if (glow) { const g = ctx.createLinearGradient(-L * 3, 0, L, 0), h = q.shot === 'ice' ? 195 : q.shot === 'fire' ? 22 : q.hue; g.addColorStop(0, 'hsla(' + h + ',100%,60%,0)'); g.addColorStop(1, 'hsla(' + h + ',100%,70%,0.95)'); ctx.strokeStyle = g; ctx.lineCap = 'round'; ctx.lineWidth = L * 0.7; ctx.beginPath(); ctx.moveTo(-L * 3, 0); ctx.lineTo(L * 0.6, 0); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(L * 0.6, 0, L * 0.3, 0, TAU); ctx.fill(); }
+      else { ctx.fillStyle = 'hsl(' + q.hue + ',70%,78%)'; ctx.strokeStyle = q.shot === 'web' || q.shot === 'bubble' || q.shot === 'beam' ? 'hsla(' + q.hue + ',85%,82%,0.95)' : INK; ctx.lineWidth = 1.4; ctx.lineCap = 'round'; (SHOT[q.shot] || SHOT.bullet)(ctx, L); }
+      ctx.restore(); }
+  }
   G.on('new-pond', function () { FX.length = 0; });
 
   function label(ctx, x, y, txt, col, a, inv) {
@@ -7926,14 +7944,24 @@ G.addSystem({
   }
 
   G.drawFx = function (ctx) {
-    if (!FX.length || !G.W) return;
+    if (!G.W || (!FX.length && !(G.W.shots && G.W.shots.length))) return;
     const v = G.view, s = v.scale * v.dpr, now = G.rt || 0, inv = 1 / Math.max(0.7, v.scale);
     ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    try { shots(ctx); } catch (er) { console.error(er); }
     for (let i = FX.length - 1; i >= 0; i--) {
       const e = FX[i], u = (now - e.t0) / e.T;
       if (u >= 1 || u < 0) { FX.splice(i, 1); continue; }
       const fade = u < 0.7 ? 1 : (1 - u) / 0.3;
-      if (e.k === 'hit') {
+      if (e.k === 'swing') {
+        const z = e.z, o = e.o; if (!z || !o) continue; const a0 = Math.atan2((o.ph ? o.y - o.ph.r : o.y) - z.y, o.x - z.x), rr = Math.hypot(o.x - z.x, o.y - z.y) * 0.85 + 14;
+        ctx.globalAlpha = fade; ctx.strokeStyle = INK; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(z.x, z.y, rr, a0 - 0.9 + u * 1.2, a0 - 0.2 + u * 1.2); ctx.stroke();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.stroke(); ctx.globalAlpha = 1;
+        label(ctx, z.x, z.y - (z.r || 40) * 0.9 - 26 * inv, e.txt, RED, fade, inv);
+      } else if (e.k === 'ringout') {
+        ctx.strokeStyle = e.col + (0.8 * (1 - u)) + ')'; ctx.lineWidth = 6 * (1 - u) + 2; ctx.beginPath(); ctx.arc(e.x, e.y, e.R * (0.15 + 0.85 * u), 0, TAU); ctx.stroke(); ctx.fillStyle = e.col + (0.12 * (1 - u)) + ')'; ctx.fill();
+      } else if (e.k === 'spark') {
+        burst(ctx, e.x, e.y, e.r * (0.5 + 0.8 * u), '#fff3c4', fade * (1 - u * 0.6));
+      } else if (e.k === 'hit') {
         const a = e.a, b = e.b; if (!a || !b) continue;
         const ax = px(a), ay = py(a) - a.ph.r * 0.9, bx = px(b), by = py(b) - b.ph.r * 0.9, dx = bx - ax, dy = by - ay, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
         const reach = Math.min(1, u / 0.22), sx = ax + ux * a.ph.r * 0.8, sy = ay + uy * a.ph.r * 0.8, ex = sx + (bx - ux * b.ph.r * 0.7 - sx) * reach, ey = sy + (by - uy * b.ph.r * 0.7 - sy) * reach, wd = Math.max(2.5, a.ph.r * 0.28);
@@ -8647,6 +8675,138 @@ G.addSystem({
     if (W.discLog) W.discLog.push({ key: 'deed' + d.id + '_' + W.gen, text: d.say + ' ' + t, gen: W.gen });
   });
   G.on('new-pond', function () { asking = false; });
+})();
+
+</script>
+<script data-part="54c_acts">
+// ── Things that act ──
+// What the player adds to the pond is not only a patch of something that poisons or feeds: a knight should swing his sword, a cannon should fire, a
+// dragon should hunt, a healer should mend. Nothing of the kind is written here by name. There is one small set of ABILITIES the pond knows how to play
+// out, and whatever is typed is given (by the AI that imagines it) a WAY of carrying itself, a SIDE, and up to three abilities with their strength,
+// pace and reach:
+//     way    hunts (goes after its targets) · guards (keeps to its place and goes for whatever comes near) · wanders · stays
+//     side   foe (against the pond's creatures) · friend (against whatever harms them: fierce creatures, and things that are foes) · wild (against all)
+//     do     strike (hits what is next to it) · shoot (sends something flying at a target) · blast (hits everything round it)
+//            heal (mends those near it) · shield (those near it take less harm) · spawn (makes smaller ones of itself)
+// The same abilities will serve what the creatures build, and ships. The pond answers an acting thing as it answers any danger: its creatures flee it,
+// learn from being hit, evolve what wears it down (its weakness) and gang up on it; and acting things go for each other.
+// It works beside the simulation: after every step it moves and plays out the acting things. (Offline, with no AI to imagine a thing, a few plain
+// words are read for what they obviously do: only a fallback.)
+(function () {
+  'use strict';
+  const clamp = G.clamp, TAU = 6.2832;
+  const WAYS = ['hunts', 'guards', 'wanders', 'stays'], SIDES = ['foe', 'friend', 'wild'], DOS = ['strike', 'shoot', 'blast', 'heal', 'shield', 'spawn'];
+  const SHOTS = ['bolt', 'arrow', 'bullet', 'fire', 'ice', 'spark', 'rock', 'web', 'beam', 'bubble'];
+  G.ACT_DOS = DOS;
+  const num = function (v, a, b, d) { v = +v; return isFinite(v) ? clamp(v, a, b) : d; };
+
+  /** what a thing does, checked and clamped, from whatever described it ({ way, side, acts: [...] }), or null when it does nothing of its own */
+  G.cleanActs = function (t) {
+    const src = t && (t.act && typeof t.act === 'object' ? t.act : t); if (!src || !Array.isArray(src.acts)) return null;
+    const acts = [];
+    for (let i = 0; i < src.acts.length && acts.length < 3; i++) {
+      const q = src.acts[i] || {}; if (DOS.indexOf(q.do) < 0) continue;
+      acts.push({ do: q.do, power: num(q.power, 0.05, 1, 0.5), every: num(q.every, 0.4, 12, q.do === 'spawn' ? 9 : 2), reach: num(q.reach, 0.05, 1, 0.4), with: String(q.with || '').replace(/[<>"]/g, '').slice(0, 24), shot: SHOTS.indexOf(q.shot) >= 0 ? q.shot : 'bolt', hue: num(q.hue, 0, 360, 40) });
+    }
+    if (!acts.length) return null;
+    return { way: WAYS.indexOf(src.way) >= 0 ? src.way : 'guards', side: SIDES.indexOf(src.side) >= 0 ? src.side : 'foe', acts: acts };
+  };
+  /** with no AI to ask, the plainest words are read for what they do (a fallback only) */
+  const WORDS = [
+    [/\b(knight|warrior|samurai|soldier|guard|gladiator|viking|paladin|swordsman|ninja)\b/, { way: 'guards', side: 'foe', acts: [{ do: 'strike', power: 0.75, every: 1.3, reach: 0.3, with: 'a sword' }] }],
+    [/\b(gun|cannon|turret|archer|sniper|tank|laser|robot|bow|crossbow|catapult|soldier with a gun|gunner|shooter)\b/, { way: 'guards', side: 'foe', acts: [{ do: 'shoot', power: 0.6, every: 1.1, reach: 0.8, with: 'shots', shot: 'bullet' }] }],
+    [/\b(dragon)\b/, { way: 'hunts', side: 'wild', acts: [{ do: 'shoot', power: 0.7, every: 2.2, reach: 0.6, with: 'fire', shot: 'fire', hue: 20 }, { do: 'strike', power: 0.6, every: 1.6, reach: 0.3, with: 'its claws' }] }],
+    [/\b(wolf|shark|tiger|lion|bear|monster|beast|hunter|predator|zombie|spider|crocodile|snake|eagle|hawk)\b/, { way: 'hunts', side: 'foe', acts: [{ do: 'strike', power: 0.65, every: 1.4, reach: 0.3, with: 'its teeth' }] }],
+    [/\b(bomb|dynamite|mine|grenade|volcano|geyser|earthquake)\b/, { way: 'stays', side: 'wild', acts: [{ do: 'blast', power: 0.8, every: 5, reach: 0.7, with: 'a blast', hue: 25 }] }],
+    [/\b(healer|doctor|nurse|angel|fairy|medic|shaman|unicorn|hospital)\b/, { way: 'wanders', side: 'friend', acts: [{ do: 'heal', power: 0.7, every: 1.6, reach: 0.6, with: 'its light', hue: 130 }] }],
+    [/\b(guardian|protector|bodyguard|sheriff|police|hero|shepherd)\b/, { way: 'guards', side: 'friend', acts: [{ do: 'strike', power: 0.7, every: 1.3, reach: 0.35, with: 'its staff' }, { do: 'shield', power: 0.6, every: 1.5, reach: 0.6, with: 'its watch', hue: 200 }] }],
+    [/\b(wizard|witch|mage|sorcerer|sorceress)\b/, { way: 'wanders', side: 'wild', acts: [{ do: 'shoot', power: 0.6, every: 1.8, reach: 0.7, with: 'spells', shot: 'spark', hue: 280 }] }],
+    [/\b(queen|hive|nest|egg|mother|factory|swarm)\b/, { way: 'stays', side: 'foe', acts: [{ do: 'spawn', power: 0.5, every: 10, reach: 0.4, with: 'its young' }, { do: 'strike', power: 0.4, every: 1.6, reach: 0.25, with: 'its sting' }] }],
+  ];
+  G.actsFromWord = function (word) { const low = String(word || '').toLowerCase(); for (let i = 0; i < WORDS.length; i++) if (WORDS[i][0].test(low)) return G.cleanActs(JSON.parse(JSON.stringify(WORDS[i][1]))); return null; };
+  const VERB = { strike: 'strikes', shoot: 'shoots', blast: 'blasts everything round it', heal: 'heals those near it', shield: 'shields those near it', spawn: 'makes more of itself' };
+  /** what it does, in plain words, for its card */
+  G.actWords = function (z) {
+    const a = z && z.act; if (!a) return [];
+    const who = a.side === 'friend' ? 'On the creatures\' side: it goes for whatever attacks them.' : a.side === 'wild' ? 'On nobody\'s side: it goes for creatures and for other things alike.' : 'Against the creatures of the pond.';
+    const how = a.way === 'hunts' ? 'It hunts: it goes after them.' : a.way === 'guards' ? 'It guards its place and goes for whatever comes near.' : a.way === 'wanders' ? 'It wanders.' : 'It stays where it is.';
+    const L = a.acts.map(function (q) { return 'It <b>' + VERB[q.do] + '</b>' + (q.with && (q.do === 'strike' || q.do === 'shoot' || q.do === 'blast') ? ' with ' + G.escapeHtml(q.with) : '') + ' (' + (q.power > 0.66 ? 'hard' : q.power > 0.33 ? 'firmly' : 'lightly') + ', every ' + q.every.toFixed(1) + ' s' + (z.actN && z.actN[q.do] ? '; ' + z.actN[q.do] + ' times so far' : '') + ').'; });
+    return [who + ' ' + how].concat(L);
+  };
+
+  // a thing dropped in the pond keeps what it does; and one that is against the creatures counts as a danger, which is what makes the pond answer it
+  { const add0 = G.addZone; G.addZone = function (x, y, info) { const z = add0(x, y, info); const a = z && info ? (G.cleanActs(info) || null) : null; if (z && a && !z.haven && !(z.p.vault > 0.2)) { z.act = a; z.hx = z.x; z.hy = z.y; z.actT = a.acts.map(function (q, i) { return 0.8 + i * 0.5; }); z.actN = {}; z.p.moves = 0; z.foe = a.side !== 'friend'; } return z; }; }
+  { const bad0 = G.isBad; G.isBad = function (z) { return bad0(z) || !!(z && z.foe && z.act); }; }
+
+  const dist = function (a, b) { return Math.hypot(a.x - b.x, a.y - b.y); };
+  /** whom this thing goes for: the nearest it may attack within `far` */
+  function target(z, far) {
+    const W = G.W, a = z.act; let best = null, bd = far;
+    if (a.side !== 'friend' || true) for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue; if (a.side === 'friend' && !((c.ph.aggro || 0) > 0.38 || c.cool > 0.6)) continue; const d = dist(c, z) - c.ph.r; if (d < bd) { bd = d; best = c; } }
+    if (a.side !== 'foe') for (let i = 0; i < W.zones.length; i++) { const o = W.zones[i]; if (o === z || o.haven) continue; if (a.side === 'friend' ? !G.isBad(o) : !o.act) continue; const d = dist(o, z) - o.r * 0.5; if (d < bd) { bd = d; best = o; } }
+    return best;
+  }
+  /** harm done to a creature or to another thing */
+  function hurt(z, o, dmg, why) {
+    const W = G.W;
+    if (o.ph) {      // a creature
+      if (o.dead) return;
+      const ward = o.wardT > 0 ? 0.45 : 1;
+      o.E -= dmg * ward * (1 - Math.min(0.85, (o.ph.defense || 0)) * 0.75); o.flash = 1; o.startle = Math.max(o.startle || 0, 1.2);
+      const dx = o.x - z.x, dy = o.y - z.y, d = Math.hypot(dx, dy) + 0.01; o.vx += dx / d * 60; o.vy += dy / d * 60;
+      if (G.learn) G.learn(o, -0.7);                       // it learns what was near when it was hit
+      z.hurt = (z.hurt || 0) + dmg;
+      if (o.E <= 0) { z.deaths = (z.deaths || 0) + 1; W.stats.killed = (W.stats.killed || 0) + 1; if (G.zoneEvent && z.deaths === 1) G.zoneEvent(z, 'It struck down its first creature'); G.killCreature(o, 'fought', null); }
+    } else {         // another thing
+      if (o.alive > 0.25) o.health = Math.max(0, (o.health || 0) - dmg * 0.012); else o.life -= dmg * 0.5;
+      o.struck = 1; o.bite = 1;
+    }
+    G.emit('act-hit', z, o, why);
+  }
+  function act(z, q, i, dt) {
+    const W = G.W, m = Math.min(W.ww, W.wh);
+    z.actT[i] -= dt; if (z.actT[i] > 0) return;
+    const count = function () { z.actN[q.do] = (z.actN[q.do] || 0) + 1; z.actT[i] = q.every * (0.85 + 0.3 * G.rand()); };
+    if (q.do === 'strike') { const R = z.r * 0.55 + 40 + 90 * q.reach, o = target(z, R); if (!o) { z.actT[i] = 0.25; return; } count(); z.bite = 1; z.aim = Math.atan2(o.y - z.y, o.x - z.x); hurt(z, o, 10 + 26 * q.power, q); G.emit('act', z, q, o); }
+    else if (q.do === 'shoot') { const R = 160 + 620 * q.reach, o = target(z, R); if (!o) { z.actT[i] = 0.3; return; } count(); z.aim = Math.atan2(o.y - z.y, o.x - z.x); (W.shots = W.shots || []).push({ x: z.x, y: z.y - z.r * 0.3, o: o, z: z, q: q, t: 0, a: z.aim }); if (W.shots.length > 60) W.shots.shift(); G.emit('act', z, q, o); }
+    else if (q.do === 'blast') { const R = 90 + 360 * q.reach; let any = false; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (c.dead || (z.act.side === 'friend' && !((c.ph.aggro || 0) > 0.38))) continue; const d = dist(c, z); if (d < R) { any = true; break; } } if (!any && z.act.side !== 'wild') { z.actT[i] = 0.5; return; } count();
+      for (let k = W.cre.length - 1; k >= 0; k--) { const c = W.cre[k]; if (c.dead || (z.act.side === 'friend' && !((c.ph.aggro || 0) > 0.38))) continue; const d = dist(c, z); if (d < R) hurt(z, c, (10 + 30 * q.power) * (1 - 0.6 * d / R), q); }
+      if (z.act.side !== 'foe') for (let k = 0; k < W.zones.length; k++) { const o = W.zones[k]; if (o !== z && o.act && dist(o, z) < R) hurt(z, o, 10 + 30 * q.power, q); }
+      G.emit('act', z, q, null, R); }
+    else if (q.do === 'heal') { const R = 80 + 300 * q.reach; let n = 0; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (c.dead || c.E >= c.ph.Emax * 0.98 || dist(c, z) > R) continue; c.E = Math.min(c.ph.Emax, c.E + (4 + 12 * q.power) + 0.03 * c.ph.Emax); c.mend = 1; n++; } if (!n) { z.actT[i] = 0.5; return; } count(); z.fedN = (z.fedN || 0) + n; G.emit('act', z, q, null, R); }
+    else if (q.do === 'shield') { const R = 80 + 300 * q.reach; let n = 0; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (!c.dead && dist(c, z) < R) { c.wardT = q.every + 0.4; n++; } } z.wardR = R; if (n) count(); else z.actT[i] = 0.6; }
+    else if (q.do === 'spawn') { if ((z.kids || 0) >= 2 || W.zones.length >= 11 || z.small) { z.actT[i] = 4; return; } count(); z.kids = (z.kids || 0) + 1; const an = G.rand() * TAU, d = z.r + 60;
+      const kid = G.addZone(clamp(z.x + Math.cos(an) * d, 60, W.ww - 60), clamp(z.y + Math.sin(an) * d, 60, W.wh - 60), { name: z.word, props: { poison: z.p.poison, acid: z.p.acid, eats: z.p.eats * 0.5, deadly: 0, nutrition: z.p.nut }, hue: z.hue, radius: Math.max(40, z.r0 * 0.6), life: 70, look: z.look || null, weak: z.weak, note: 'One of the young of ' + z.word + '.', from: z.word, source: 'ai',
+        act: { way: 'hunts', side: z.act.side, acts: z.act.acts.filter(function (x) { return x.do !== 'spawn'; }).map(function (x) { return { do: x.do, power: x.power * 0.55, every: x.every * 1.2, reach: x.reach * 0.8, with: x.with, shot: x.shot, hue: x.hue }; }) } });
+      if (kid) { kid.small = true; kid._fig = z._fig; kid._figSvg = z._figSvg; kid._figAsked = true; } G.emit('act', z, q, kid); }
+    void m;
+  }
+  function stepActs(dt) {
+    const W = G.W;
+    for (let k = 0; k < W.zones.length; k++) {
+      const z = W.zones[k], a = z.act; if (!a) continue;
+      // how it carries itself
+      const sp = 26 + 30 * (z.small ? 1.3 : 1), far = a.way === 'hunts' ? 900 : a.way === 'guards' ? 150 + z.r0 * 2.2 : 0;
+      const o = far ? target(z, far) : null; let tx = z.x, ty = z.y, go = 0;
+      const near = function (q) { return q.do === 'strike' ? z.r * 0.4 + 30 : q.do === 'shoot' ? 140 + 400 * q.reach : 60; };
+      if (o) { const want = Math.min.apply(null, a.acts.filter(function (q) { return q.do === 'strike' || q.do === 'shoot' || q.do === 'blast'; }).map(near).concat([400])), d = dist(o, z); if (d > want) { tx = o.x; ty = o.y; go = 1; } if (a.way === 'guards' && Math.hypot(z.x - z.hx, z.y - z.hy) > 200 + z.r0 * 2.5) { tx = z.hx; ty = z.hy; go = 1; } }
+      else if (a.way === 'guards') { if (Math.hypot(z.x - z.hx, z.y - z.hy) > 30) { tx = z.hx; ty = z.hy; go = 0.6; } }
+      else if (a.way === 'wanders' || a.way === 'hunts') { z.ma = (z.ma || 0) + (G.rand() - 0.5) * 1.2 * dt; tx = z.x + Math.cos(z.ma) * 100; ty = z.y + Math.sin(z.ma) * 100; go = 0.45; }
+      if (go) { const dx = tx - z.x, dy = ty - z.y, d = Math.hypot(dx, dy) + 0.01; z.x = clamp(z.x + dx / d * sp * go * dt, 50, W.ww - 50); z.y = clamp(z.y + dy / d * sp * go * dt, 50, W.wh - 50); if (z.x <= 50 || z.x >= W.ww - 50 || z.y <= 50 || z.y >= W.wh - 50) z.ma = (z.ma || 0) + 2; z.face = dx < 0 ? -1 : 1; }
+      for (let i = 0; i < a.acts.length; i++) act(z, a.acts[i], i, dt);
+    }
+    // what was shot flies, follows its target a little, and lands or is lost
+    const S = W.shots; if (S && S.length) for (let i = S.length - 1; i >= 0; i--) {
+      const s = S[i], o = s.o; s.t += dt;
+      if (s.t > 2.6 || !o || o.dead || (!o.ph && W.zones.indexOf(o) < 0)) { S.splice(i, 1); continue; }
+      const dx = o.x - s.x, dy = (o.ph ? o.y - o.ph.r : o.y) - s.y, d = Math.hypot(dx, dy) + 0.01, want = Math.atan2(dy, dx); let da = want - s.a; while (da > Math.PI) da -= TAU; while (da < -Math.PI) da += TAU;
+      s.a += da * Math.min(1, 5 * dt); const v = 430; s.x += Math.cos(s.a) * v * dt; s.y += Math.sin(s.a) * v * dt;
+      if (d < (o.ph ? o.ph.r + 10 : o.r * 0.5 + 10)) { hurt(s.z, o, 8 + 20 * s.q.power, s.q); S.splice(i, 1); }
+    }
+    for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.wardT > 0) c.wardT -= dt; }
+  }
+  { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (W && !W.title && W.zones && W.zones.length) { let any = W.shots && W.shots.length; for (let i = 0; i < W.zones.length && !any; i++) if (W.zones[i].act) any = true; if (any) stepActs(dt); } }; }
+  if (G.on) G.on('new-pond', function () { if (G.W) G.W.shots = []; });
 })();
 
 </script>
@@ -10299,11 +10459,12 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     }
     if (z.p.poison + z.p.acid + z.p.eats + (z.p.deadly || 0) > 0.25) { const a = G.adaptedTo(z); facts.push('The pond has adapted to it: <b>' + Math.round(a * 100) + '%</b>' + (a > 0.45 ? ' (they have learned to live with it).' : a > 0.2 ? ' (they are learning).' : ' (so far it still hurts).')); }
     if (z.haven) { const n = Math.min(G.HAVEN_ROOM || 3, Math.max(z.hvPrev || 0, z.hvNow || 0)); facts.length = 0; facts.push('<b>' + n + ' of ' + (G.HAVEN_ROOM || 3) + '</b> places are taken. Only marvels can enter, and only through the gate at the bottom.', 'Inside, a marvel is fed, kept from harm and does not die of old age. A child born here is a marvel one time in four.', 'It stands for about <b>' + Math.round(z.life) + '</b> more seconds of pond time; then you can add another.'); }
+    if (z.act && G.actWords) { const aw = G.actWords(z); for (let i = aw.length - 1; i >= 0; i--) facts.unshift(aw[i]); if (z.deaths) facts.push('It has struck down <b>' + z.deaths + '</b> creatures.'); }
     if (!facts.length) facts.push('Nothing has happened to it yet.');
     const ev = (z.ev || []).map(function (e) { return '<div><small>g' + e.g + '</small> ' + esc(e.t) + '</div>'; }).join('');
     const lifeTxt = living ? 'Health' : 'Time left';
     card.innerHTML = '<div class="ihead">' + picture(z) + '<div><b>' + esc(z.word) + (living && z.genN > 1 ? ' <small>· generation ' + z.genN + '</small>' : '') + '</b><small>' + esc(z.note || '') + '</small>' + (by ? '<small style="color:var(--gold)">imagined by ' + esc(by) + '</small>' : '') + '</div><button class="x" id="zclose" aria-label="Close">' + G.ICON.close + '</button></div>' +
-      '<div class="ilabel">What it does</div>' + (bars || (z.haven ? '<small>Shelters the marvels of the pond.</small>' : '<small>Very little.</small>')) +
+      '<div class="ilabel">What it does</div>' + (bars || (z.haven ? '<small>Shelters the marvels of the pond.</small>' : z.act ? '' : '<small>Very little.</small>')) +
       '<div class="ilabel">' + lifeTxt + '</div><div class="meter"><i id="zlife"></i></div>' +
       '<div class="ilabel">Its story</div><div class="log" style="height:auto;max-height:96px" id="zev">' + ev + '</div>' +
       '<div id="zfacts" style="font-size:11.5px;line-height:1.45;margin-top:6px">' + facts.join(' ') + '</div>';
@@ -10339,6 +10500,11 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   G.thingStatus = function (z) {
     const p = z.p, w = G.WEAK[z.weak].text, pct = function (v) { return Math.round(100 * G.clamp(v, 0, 1)) + '%'; };
     if (p.vault > 0.2) { const broken = 1 - z.life / (z.life0 || 420); return { t: 'locks food inside · ' + pct(broken) + ' broken' + (z.atk ? ' · ' + z.atk + ' breaking in' : ' · only ' + w + ' get through'), tone: 'bad', bar: 1 - broken }; }
+    if (z.act) {      // a thing that acts: what it is doing, and how it is faring
+      const V = { strike: 'strikes', shoot: 'shoots', blast: 'blasts', heal: 'heals', shield: 'shields', spawn: 'breeds' }, does = z.act.acts.map(function (q) { return V[q.do]; }).filter(function (x, i, L) { return L.indexOf(x) === i; }).join(' and ');
+      const side = z.act.side === 'friend' ? 'on their side' : z.act.side === 'wild' ? 'against all' : '';
+      return { t: (z.act.way === 'hunts' ? 'hunts · ' : z.act.way === 'guards' ? 'guards · ' : '') + does + (side ? ' · ' + side : '') + (z.deaths ? ' · ' + z.deaths + ' struck down' : '') + (z.foe ? (z.atk ? ' · ' + z.atk + ' fighting back' : ' · weak to ' + w) : ''), tone: z.act.side === 'friend' ? 'good' : z.atk ? 'fight' : 'bad', bar: z.alive > 0.25 ? G.clamp(z.health, 0, 1) : G.clamp(z.life / (z.life0 || 120), 0, 1) };
+    }
     if (G.isBad(z)) {
       const does = p.deadly > 0.05 ? 'kills at a touch' : p.eats > 0.05 ? 'eats creatures' : p.poison > 0.05 ? 'poisons' : 'burns', taken = (z.deaths || 0) + (p.eats > 0.05 ? (z.ate || 0) : 0);
       return { t: does + (taken ? ' · ' + taken + ' taken' : '') + (z.hurtN ? ' · hurting ' + z.hurtN : '') + (z.atk ? ' · ' + z.atk + ' fighting back' : ' · weak to ' + w), tone: z.atk ? 'fight' : 'bad', bar: z.alive > 0.25 ? G.clamp(z.health, 0, 1) : G.clamp(z.life / (z.life0 || 120), 0, 1) };
@@ -11707,7 +11873,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       history: (W.history || []).slice(-90), evShelf: (W.evShelf || []).slice(-10).map(function (e) { const c = JSON.parse(JSON.stringify(e)); if (c.thing) c.thing.svg = ''; return c; }),
       shelf: (W.shelf || []).slice(-12).map(function (t) { return Object.assign({}, t, { svg: t.svg && t.svg.length < 1500 ? t.svg : '' }); }),
       zones: W.zones.map(function (z) {
-        return { hv: z.haven ? 1 : 0, x: Math.round(z.x), y: Math.round(z.y), w: z.word, p: z.p, tag: z.tag, r0: Math.round(z.r0), life: Math.round(z.life), life0: Math.round(z.life0 || 120), age: Math.round(z.age), hue: Math.round(z.hue), shape: z.shape, note: z.note, svg: z.svg && z.svg.length < 1500 ? z.svg : '', look: z.look || null, model: z.model, alive: +(z.alive || 0).toFixed(2), health: +(z.health || 0).toFixed(2), genN: z.genN, kids: z.kids, made: z.made, fed: z.fed, hurt: Math.round(z.hurt), deaths: z.deaths, vis: Math.round(z.vis), sig: z.sig, weak: z.weak, hit: +(z.hit || 0).toFixed(2), ate: z.ate || 0, ev: (z.ev || []).slice(-8), born: z.born };
+        return { hv: z.haven ? 1 : 0, act: z.act || undefined, x: Math.round(z.x), y: Math.round(z.y), w: z.word, p: z.p, tag: z.tag, r0: Math.round(z.r0), life: Math.round(z.life), life0: Math.round(z.life0 || 120), age: Math.round(z.age), hue: Math.round(z.hue), shape: z.shape, note: z.note, svg: z.svg && z.svg.length < 1500 ? z.svg : '', look: z.look || null, model: z.model, alive: +(z.alive || 0).toFixed(2), health: +(z.health || 0).toFixed(2), genN: z.genN, kids: z.kids, made: z.made, fed: z.fed, hurt: Math.round(z.hurt), deaths: z.deaths, vis: Math.round(z.vis), sig: z.sig, weak: z.weak, hit: +(z.hit || 0).toFixed(2), ate: z.ate || 0, ev: (z.ev || []).slice(-8), born: z.born };
       }),
     };
     // the most successful creatures, up to a budget
@@ -11725,14 +11891,14 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const sp = W.species.filter(function (s) { return s.rep; }).sort(function (a, b) { return (b.extinct ? 0 : 1) - (a.extinct ? 0 : 1) || b.peak - a.peak; }).slice(0, 26);
     sp.forEach(function (s) { out.species.push([s.id, s.name, s.born, s.parent, s.extinct ? s.diedGen || 1 : 0, s.peak, s.kills || 0, Math.round(s.hue), G.packGenome(s.rep), s.hist.slice(-40), s.judge && !s.extinct ? { score: +s.judge.score.toFixed(2), why: s.judge.why, gen: s.judge.gen, fix: s.judge.fix || '', loved: s.loved ? 1 : 0 } : s.loved ? { loved: 1 } : null]); });
     W.fossils.slice(-12).forEach(function (f) { if (f.g) out.fossils.push([f.id, f.name, f.born, f.died, f.peak, G.packGenome(f.g)]); });
-    // keep it under the server's limit (400 kB). It used to be 100 kB, and a long game's collection, marvels and charts filled that: the living creatures were
+    // keep it under the server's limit (1.2 MB; the route that receives it in server.js takes 1.3 MB). It used to be 100 kB, and a long game's collection, marvels and charts filled that: the living creatures were
     // then the first thing cut, so a pond came back with a couple of dozen of them. Creatures are the last thing to go now, and there is room for all of them.
     let s = JSON.stringify(out);
-    if (s.length > 360000) { out.zones.forEach(function (z) { z.svg = ''; }); s = JSON.stringify(out); }
-    if (s.length > 360000) { out.history = out.history.slice(-30); s = JSON.stringify(out); }
-    for (let i = out.species.length - 1; i >= 0 && s.length > 360000; i--) { if (out.species[i][10]) { out.species[i][10] = null; s = JSON.stringify(out); } }
-    if (s.length > 360000 && out.discLog && out.discLog.length > 20) { out.discLog = out.discLog.slice(-20); s = JSON.stringify(out); }
-    while (s.length > 360000 && (all.length > 10 || out.species.length > 8 || out.fossils.length > 4)) {
+    if (s.length > 1000000) { out.zones.forEach(function (z) { z.svg = ''; }); s = JSON.stringify(out); }
+    if (s.length > 1000000) { out.history = out.history.slice(-30); s = JSON.stringify(out); }
+    for (let i = out.species.length - 1; i >= 0 && s.length > 1000000; i--) { if (out.species[i][10]) { out.species[i][10] = null; s = JSON.stringify(out); } }
+    if (s.length > 1000000 && out.discLog && out.discLog.length > 20) { out.discLog = out.discLog.slice(-20); s = JSON.stringify(out); }
+    while (s.length > 1000000 && (all.length > 10 || out.species.length > 8 || out.fossils.length > 4)) {
       if (out.fossils.length > 4) out.fossils.length = Math.max(4, out.fossils.length - 4);
       else if (out.species.length > 16) out.species.length = 16;
       else if (out.species.length > 12) out.species.length = Math.max(12, out.species.length - 4);
@@ -11919,7 +12085,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       if (!q || typeof q !== 'object' || !q.p || typeof q.p !== 'object') return;
       const pr = q.p;
       const z = G.addZone(num(q.x, 0, W.ww, W.ww / 2), num(q.y, 0, W.wh, W.wh / 2), {
-        name: String(q.w || 'thing').slice(0, 28), haven: !!q.hv, look: G.cleanLook ? G.cleanLook(q.look) : null,
+        name: String(q.w || 'thing').slice(0, 28), haven: !!q.hv, act: q.act && G.cleanActs ? G.cleanActs(q) : null, look: G.cleanLook ? G.cleanLook(q.look) : null,
         props: { nutrition: num(pr.nut, 0, 1, 0), poison: num(pr.poison, 0, 1, 0), heat: num(pr.heat, -1, 1, 0), light: num(pr.light, -1, 1, 0), sticky: num(pr.sticky, 0, 1, 0), acid: num(pr.acid, 0, 1, 0), hard: num(pr.hard, 0, 1, 0), spread: num(pr.spread, 0, 1, 0), eats: num(pr.eats, 0, 1, 0), moves: num(pr.moves, 0, 1, 0), pull: num(pr.pull, -1, 1, 0), vault: num(pr.vault, 0, 0.7, 0), deadly: num(pr.deadly, 0, 1, 0) },
         tag: Math.floor(num(q.tag, 0, 5, 2)), radius: num(q.r0, 40, 150, 80), life: num(q.life, 1, 400, 60), hue: num(q.hue, 0, 360, 200), shape: Math.floor(num(q.shape, 0, 4, 0)),
         note: String(q.note || '').slice(0, 160), svg: typeof q.svg === 'string' ? G.safeSvg(q.svg) : '', model: String(q.model || '').slice(0, 60),

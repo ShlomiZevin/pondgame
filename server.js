@@ -254,7 +254,7 @@ function createApp(opts = {}) {
       return send(res, 200, r || { save: null, report: null });
     }
     if (route === 'PUT /api/pond') {
-      const body = await readJson(req, 120000);
+      const body = await readJson(req, 1300000);      // a whole pond, every creature in it (lib/pond.js holds the real limit)
       const r = await ponds.put(who, body.save);
       return send(res, r.status || 200, r);
     }

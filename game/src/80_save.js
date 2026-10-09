@@ -27,7 +27,7 @@
       history: (W.history || []).slice(-90), evShelf: (W.evShelf || []).slice(-10).map(function (e) { const c = JSON.parse(JSON.stringify(e)); if (c.thing) c.thing.svg = ''; return c; }),
       shelf: (W.shelf || []).slice(-12).map(function (t) { return Object.assign({}, t, { svg: t.svg && t.svg.length < 1500 ? t.svg : '' }); }),
       zones: W.zones.map(function (z) {
-        return { hv: z.haven ? 1 : 0, x: Math.round(z.x), y: Math.round(z.y), w: z.word, p: z.p, tag: z.tag, r0: Math.round(z.r0), life: Math.round(z.life), life0: Math.round(z.life0 || 120), age: Math.round(z.age), hue: Math.round(z.hue), shape: z.shape, note: z.note, svg: z.svg && z.svg.length < 1500 ? z.svg : '', look: z.look || null, model: z.model, alive: +(z.alive || 0).toFixed(2), health: +(z.health || 0).toFixed(2), genN: z.genN, kids: z.kids, made: z.made, fed: z.fed, hurt: Math.round(z.hurt), deaths: z.deaths, vis: Math.round(z.vis), sig: z.sig, weak: z.weak, hit: +(z.hit || 0).toFixed(2), ate: z.ate || 0, ev: (z.ev || []).slice(-8), born: z.born };
+        return { hv: z.haven ? 1 : 0, act: z.act || undefined, x: Math.round(z.x), y: Math.round(z.y), w: z.word, p: z.p, tag: z.tag, r0: Math.round(z.r0), life: Math.round(z.life), life0: Math.round(z.life0 || 120), age: Math.round(z.age), hue: Math.round(z.hue), shape: z.shape, note: z.note, svg: z.svg && z.svg.length < 1500 ? z.svg : '', look: z.look || null, model: z.model, alive: +(z.alive || 0).toFixed(2), health: +(z.health || 0).toFixed(2), genN: z.genN, kids: z.kids, made: z.made, fed: z.fed, hurt: Math.round(z.hurt), deaths: z.deaths, vis: Math.round(z.vis), sig: z.sig, weak: z.weak, hit: +(z.hit || 0).toFixed(2), ate: z.ate || 0, ev: (z.ev || []).slice(-8), born: z.born };
       }),
     };
     // the most successful creatures, up to a budget
@@ -45,14 +45,14 @@
     const sp = W.species.filter(function (s) { return s.rep; }).sort(function (a, b) { return (b.extinct ? 0 : 1) - (a.extinct ? 0 : 1) || b.peak - a.peak; }).slice(0, 26);
     sp.forEach(function (s) { out.species.push([s.id, s.name, s.born, s.parent, s.extinct ? s.diedGen || 1 : 0, s.peak, s.kills || 0, Math.round(s.hue), G.packGenome(s.rep), s.hist.slice(-40), s.judge && !s.extinct ? { score: +s.judge.score.toFixed(2), why: s.judge.why, gen: s.judge.gen, fix: s.judge.fix || '', loved: s.loved ? 1 : 0 } : s.loved ? { loved: 1 } : null]); });
     W.fossils.slice(-12).forEach(function (f) { if (f.g) out.fossils.push([f.id, f.name, f.born, f.died, f.peak, G.packGenome(f.g)]); });
-    // keep it under the server's limit (400 kB). It used to be 100 kB, and a long game's collection, marvels and charts filled that: the living creatures were
+    // keep it under the server's limit (1.2 MB; the route that receives it in server.js takes 1.3 MB). It used to be 100 kB, and a long game's collection, marvels and charts filled that: the living creatures were
     // then the first thing cut, so a pond came back with a couple of dozen of them. Creatures are the last thing to go now, and there is room for all of them.
     let s = JSON.stringify(out);
-    if (s.length > 360000) { out.zones.forEach(function (z) { z.svg = ''; }); s = JSON.stringify(out); }
-    if (s.length > 360000) { out.history = out.history.slice(-30); s = JSON.stringify(out); }
-    for (let i = out.species.length - 1; i >= 0 && s.length > 360000; i--) { if (out.species[i][10]) { out.species[i][10] = null; s = JSON.stringify(out); } }
-    if (s.length > 360000 && out.discLog && out.discLog.length > 20) { out.discLog = out.discLog.slice(-20); s = JSON.stringify(out); }
-    while (s.length > 360000 && (all.length > 10 || out.species.length > 8 || out.fossils.length > 4)) {
+    if (s.length > 1000000) { out.zones.forEach(function (z) { z.svg = ''; }); s = JSON.stringify(out); }
+    if (s.length > 1000000) { out.history = out.history.slice(-30); s = JSON.stringify(out); }
+    for (let i = out.species.length - 1; i >= 0 && s.length > 1000000; i--) { if (out.species[i][10]) { out.species[i][10] = null; s = JSON.stringify(out); } }
+    if (s.length > 1000000 && out.discLog && out.discLog.length > 20) { out.discLog = out.discLog.slice(-20); s = JSON.stringify(out); }
+    while (s.length > 1000000 && (all.length > 10 || out.species.length > 8 || out.fossils.length > 4)) {
       if (out.fossils.length > 4) out.fossils.length = Math.max(4, out.fossils.length - 4);
       else if (out.species.length > 16) out.species.length = 16;
       else if (out.species.length > 12) out.species.length = Math.max(12, out.species.length - 4);
@@ -239,7 +239,7 @@
       if (!q || typeof q !== 'object' || !q.p || typeof q.p !== 'object') return;
       const pr = q.p;
       const z = G.addZone(num(q.x, 0, W.ww, W.ww / 2), num(q.y, 0, W.wh, W.wh / 2), {
-        name: String(q.w || 'thing').slice(0, 28), haven: !!q.hv, look: G.cleanLook ? G.cleanLook(q.look) : null,
+        name: String(q.w || 'thing').slice(0, 28), haven: !!q.hv, act: q.act && G.cleanActs ? G.cleanActs(q) : null, look: G.cleanLook ? G.cleanLook(q.look) : null,
         props: { nutrition: num(pr.nut, 0, 1, 0), poison: num(pr.poison, 0, 1, 0), heat: num(pr.heat, -1, 1, 0), light: num(pr.light, -1, 1, 0), sticky: num(pr.sticky, 0, 1, 0), acid: num(pr.acid, 0, 1, 0), hard: num(pr.hard, 0, 1, 0), spread: num(pr.spread, 0, 1, 0), eats: num(pr.eats, 0, 1, 0), moves: num(pr.moves, 0, 1, 0), pull: num(pr.pull, -1, 1, 0), vault: num(pr.vault, 0, 0.7, 0), deadly: num(pr.deadly, 0, 1, 0) },
         tag: Math.floor(num(q.tag, 0, 5, 2)), radius: num(q.r0, 40, 150, 80), life: num(q.life, 1, 400, 60), hue: num(q.hue, 0, 360, 200), shape: Math.floor(num(q.shape, 0, 4, 0)),
         note: String(q.note || '').slice(0, 160), svg: typeof q.svg === 'string' ? G.safeSvg(q.svg) : '', model: String(q.model || '').slice(0, 60),

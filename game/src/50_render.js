@@ -362,23 +362,25 @@ function drawOrb(ctx, z, x, y, r, k, label, ghost, plain) {
 // The marvels' garden: a ring of small golden pickets with a rail, a gap for a gate between two taller posts with a star each, and a soft light
 // on the water inside. Drawn in the pond's own style (dark outline, flat colour), small enough that the marvels in it are what is seen.
 function drawHaven(ctx, z, t) {
-  const R = z.r * 0.9, a = Math.min(1, 0.35 + z.k), N = Math.max(14, Math.round(R / 6.5)), gate = 1.5708, gw = 0.34;
+  // The garden grows with the pond's creatures (see z.r in 30_world.js), and its fence grows with it: s is how many times its first size it is. Without
+  // that, a garden grown tenfold was a hair-thin ring of specks and no longer read as a fence at all.
+  const R = z.r * 0.9, s = Math.max(1, R / 85), a = Math.min(1, 0.35 + z.k), N = Math.max(14, Math.round(R / (6.5 * s))), gate = 1.5708, gw = 0.34;
   ctx.save(); ctx.globalAlpha = a;
   const g = ctx.createRadialGradient(z.x, z.y, R * 0.1, z.x, z.y, R); g.addColorStop(0, 'rgba(246,211,101,0.16)'); g.addColorStop(1, 'rgba(246,211,101,0.03)');
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(z.x, z.y, R, 0, 6.2832); ctx.fill();
   // the rail, open at the gate
-  ctx.lineCap = 'round'; ctx.strokeStyle = '#1a2433'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(z.x, z.y - 5, R, gate + gw, gate - gw + 6.2832); ctx.stroke();
-  ctx.strokeStyle = '#e9c46a'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.arc(z.x, z.y - 5, R, gate + gw, gate - gw + 6.2832); ctx.stroke();
+  ctx.lineCap = 'round'; ctx.strokeStyle = '#1a2433'; ctx.lineWidth = 5 * s; ctx.beginPath(); ctx.arc(z.x, z.y - 5 * s, R, gate + gw, gate - gw + 6.2832); ctx.stroke();
+  ctx.strokeStyle = '#e9c46a'; ctx.lineWidth = 2.4 * s; ctx.beginPath(); ctx.arc(z.x, z.y - 5 * s, R, gate + gw, gate - gw + 6.2832); ctx.stroke();
   const post = function (px, py, h, w, star, i) {
-    ctx.fillStyle = '#f6d365'; ctx.strokeStyle = '#1a2433'; ctx.lineWidth = 1.8;
+    h *= s; w *= s;
+    ctx.fillStyle = '#f6d365'; ctx.strokeStyle = '#1a2433'; ctx.lineWidth = 1.8 * s;
     ctx.beginPath(); ctx.moveTo(px - w, py); ctx.lineTo(px - w, py - h + w); ctx.lineTo(px, py - h - w * 0.4); ctx.lineTo(px + w, py - h + w); ctx.lineTo(px + w, py); ctx.closePath(); ctx.fill(); ctx.stroke();
     if (star) {
-      const sy = py - h - 8 + Math.sin(t * 2 + i) * 1.5, s = 5.5; ctx.fillStyle = '#fff3c4'; ctx.beginPath();
-      for (let k = 0; k < 10; k++) { const an = -1.5708 + k * 0.62832, rr = k % 2 ? s * 0.45 : s; ctx.lineTo(px + Math.cos(an) * rr, sy + Math.sin(an) * rr); }
+      const sy = py - h - (8 + Math.sin(t * 2 + i) * 1.5) * s, sz = 5.5 * s; ctx.fillStyle = '#fff3c4'; ctx.beginPath();
+      for (let k = 0; k < 10; k++) { const an = -1.5708 + k * 0.62832, rr = k % 2 ? sz * 0.45 : sz; ctx.lineTo(px + Math.cos(an) * rr, sy + Math.sin(an) * rr); }
       ctx.closePath(); ctx.fill(); ctx.stroke();
     }
   };
-  // pickets, the far side first so the near ones overlap them
   const P = [];
   for (let i = 0; i < N; i++) { const an = i / N * 6.2832; let d = Math.abs(an - gate); if (d > 3.1416) d = 6.2832 - d; if (d < gw) continue; P.push([z.x + Math.cos(an) * R, z.y + Math.sin(an) * R, 11, 2.6, false, i]); }
   P.push([z.x + Math.cos(gate - gw) * R, z.y + Math.sin(gate - gw) * R, 19, 3.6, true, 1], [z.x + Math.cos(gate + gw) * R, z.y + Math.sin(gate + gw) * R, 19, 3.6, true, 2]);
@@ -386,7 +388,7 @@ function drawHaven(ctx, z, t) {
   for (let i = 0; i < P.length; i++) post.apply(null, P[i]);
   // a few slow sparkles inside
   ctx.fillStyle = 'rgba(255,243,196,0.8)';
-  for (let i = 0; i < 5; i++) { const an = i * 1.9 + t * 0.15, rr = R * (0.25 + 0.5 * ((i * 37) % 10) / 10), tw = 0.5 + 0.5 * Math.sin(t * 2.4 + i * 2); ctx.globalAlpha = a * tw; ctx.beginPath(); ctx.arc(z.x + Math.cos(an) * rr, z.y + Math.sin(an) * rr, 1.6, 0, 6.2832); ctx.fill(); }
+  for (let i = 0; i < 5; i++) { const an = i * 1.9 + t * 0.15, rr = R * (0.25 + 0.5 * ((i * 37) % 10) / 10), tw = 0.5 + 0.5 * Math.sin(t * 2.4 + i * 2); ctx.globalAlpha = a * tw; ctx.beginPath(); ctx.arc(z.x + Math.cos(an) * rr, z.y + Math.sin(an) * rr, 1.6 * s, 0, 6.2832); ctx.fill(); }
   ctx.restore();
 }
 function thingImage(o) {
