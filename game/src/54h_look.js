@@ -107,21 +107,22 @@
   // (everything about it that does not move: the picture is made again whenever a piece is set, coloured or lost)
   const baseOf = function (o) { return [o.x, o.y + (o.bp ? o.bp.S * 0.45 : 30)]; };
   const draw0 = G.drawBlueprint; let made = 0, frame = 0;
+  const KEPT = new WeakMap();      // the kept picture of each building, by its plan (kept beside the plan, not in it: a plan is copied and saved, a picture is not)
   if (draw0) G.drawBlueprint = function (ctx, o, building) {
     const bp = o.bp; if (!bp || building || !bp.P || !bp.P.length) return draw0(ctx, o, building);
     const P = bp.P, t = G.W ? G.W.t : 0; let sig = '' + Math.round(bp.hue || 0), moving = false;
     for (let i = 0; i < P.length; i++) { const p = P[i]; sig += p.st + (p.um === undefined ? '' : 'm' + p.um); if (p.st > 0 && p.t0 !== undefined && t - p.t0 >= 0 && t - p.t0 < 0.45) moving = true; }
     if (moving) return draw0(ctx, o, building);
-    let cv = bp._cv;
-    if (!cv || bp._sig !== sig) {
-      if (G.rt !== frame) { frame = G.rt; made = 0; } if (made >= 2 && cv) sig = bp._sig; else {      /* (two new pictures a frame at most: a pond coming back from a save fills in over a few frames) */
+    let K = KEPT.get(bp), cv = K ? K.cv : null;
+    if (!cv || K.sig !== sig) {
+      if (G.rt !== frame) { frame = G.rt; made = 0; } if (made >= 2 && cv) sig = K.sig; else {      /* (two new pictures a frame at most: a pond coming back from a save fills in over a few frames) */
         made++; let hw = 30, top = 20; for (let i = 0; i < P.length; i++) { const p = P[i]; hw = Math.max(hw, Math.abs(p.x) + p.w * 0.72); top = Math.max(top, -p.y + p.h * 1.12 + (p.s === 'lamp' ? p.w : 0)); }
         const pad = 10, Wc = hw * 2 + pad * 2, Hc = top + pad * 2 + 6, k = Math.min(2, Math.sqrt(900000 / (Wc * Hc)));
-        cv = bp._cv && bp._cv.width === Math.ceil(Wc * k) && bp._cv.height === Math.ceil(Hc * k) ? bp._cv : document.createElement('canvas'); cv.width = Math.ceil(Wc * k); cv.height = Math.ceil(Hc * k);
+        cv = cv && cv.width === Math.ceil(Wc * k) && cv.height === Math.ceil(Hc * k) ? cv : document.createElement('canvas'); cv.width = Math.ceil(Wc * k); cv.height = Math.ceil(Hc * k);
         const c2 = cv.getContext('2d'); c2.setTransform(k, 0, 0, k, (hw + pad) * k, (top + pad) * k);
         for (let i = 0; i < P.length; i++) if (P[i].st > 0 && !LIVE[P[i].s]) { try { G.pieceDraw(c2, P[i], bp.hue, t); } catch (e) { console.error(e); } }
-        bp._cv = cv; bp._sig = sig; bp._box = [hw + pad, top + pad, Wc, Hc]; } }
-    const b = baseOf(o), S = bp.S, box = bp._box;
+        K = { cv: cv, sig: sig, box: [hw + pad, top + pad, Wc, Hc] }; KEPT.set(bp, K); } }
+    const b = baseOf(o), S = bp.S, box = K.box;
     ctx.save(); ctx.translate(b[0], b[1]);
     { const hw = bp.hw || 60, ring = bp.type === 'wall' && !bp.designed; ctx.fillStyle = 'rgba(8,16,26,0.28)'; ctx.beginPath(); ctx.ellipse(0, S * 0.1, ring ? S * 1.25 : hw * 1.12, ring ? S * 0.74 : Math.max(10, hw * 0.2), 0, 0, TAU); ctx.fill(); }
     ctx.imageSmoothingEnabled = true; ctx.drawImage(cv, -box[0], -box[1], box[2], box[3]);

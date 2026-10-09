@@ -3,6 +3,7 @@
 // red when something dangerous has appeared. It opens one panel, which stays open for as long as you like while the pond goes on:
 //     NOW       what is happening this minute, most pressing first      PLANS    the plan under way, what they have built, plans past
 //     MARVELS   every marvel alive                                      PEOPLE   each kind's society, strangers, your outposts in far ponds
+//     SPACE     the spaceport and the spaceship (always shown once they exist), the mission under way, your outposts in far ponds
 //     DANGERS   what harms the pond, and how far life has got in beating it
 // Other parts of the game put their own rows in it (G.hub.add): voyages (59_voyage.js), society (54g_society.js), dangers (63_versus.js).
 // Click any row and the camera goes to it.
@@ -13,7 +14,7 @@
   const H = G.hub = { parts: [], acts: {},
     /** a part of the game says what it has for the panel: fn(W) -> { sig, now:[html], people:[html], dangers:[html], news:[keys], alarm:[keys] } */
     add: function (fn) { H.parts.push(fn); }, act: function (name, fn) { H.acts[name] = fn; },
-    open: function (t) { shut = false; if (t) tab = t; sig = ''; draw(); }, close: function () { shut = true; sig = ''; draw(); }, poke: function () { sig = ''; },
+    open: function (t) { shut = false; if (t) tab = t; sig = ''; draw(); }, close: function () { shut = true; sig = ''; draw(); }, poke: function () { sig = ''; }, tab: function () { return shut ? '' : tab; },
     /** one row, in the panel's own look: { icon, title, tag, bad, sub, extra, act, arg, live } */
     row: function (o) { return '<div class="rrow' + (o.live ? ' live' : '') + (o.act ? '' : ' idle') + '"' + (o.act ? ' data-act="' + o.act + '" data-arg="' + esc(o.arg === undefined ? '' : o.arg) + '"' : '') + '><span class="ric">' + (o.icon || '\u2022') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(o.title) + '</b>' + (o.tag ? '<span class="rtag' + (o.bad ? ' no' : '') + '">' + esc(o.tag) + '</span>' : '') + '</span>' + (o.sub ? '<div class="rsub">' + o.sub + '</div>' : '') + (o.extra || '') + '</span></div>'; } };
   const esc = function (s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
@@ -60,7 +61,7 @@
       '#rarebox .rrow.idle{cursor:default}#rarebox .rrow.idle:hover{background:rgba(7,18,31,.38);border-color:rgba(207,232,255,.12)}#rarebox .rrow.idle .ric{opacity:.75}#rarebox .rrow.ask .ric{border-color:rgba(246,211,101,.7);color:#f6d365;animation:rpulse 1.2s ease-in-out infinite}#rarebox .rtag.wait{background:rgba(207,232,255,.1);border-color:rgba(207,232,255,.35);color:#dcecff}@keyframes rpulse{50%{opacity:.45}}' +
       '#rarebox .rnone{font-size:12px;color:#b9cde2;margin:8px 2px 0;line-height:1.45}' +
       '#rarebox{scrollbar-color:rgba(207,232,255,.35) transparent}#rarebox::-webkit-scrollbar{width:6px}#rarebox::-webkit-scrollbar-track{background:transparent}#rarebox::-webkit-scrollbar-thumb{background:rgba(207,232,255,.3);border-radius:3px}' +
-      '#rarebox .tabs2{display:flex;gap:4px;margin:8px 0 2px}#rarebox .tabs2 span{flex:1;text-align:center;padding:6px 2px;border-radius:10px;cursor:pointer;white-space:nowrap;font:700 10.5px system-ui,sans-serif;color:#b9cde2;background:rgba(7,18,31,.4);border:1px solid rgba(207,232,255,.14)}#rarebox .tabs2 span.on{color:#14202e;background:#f6d365;border-color:#f6d365}#rarebox .tabs2 span i{font-style:normal;opacity:.75;margin-left:3px}#rarebox .tabs2 span.bad:not(.on){border-color:#ff5d7a;color:#ffd3dc}#rarebox .tabs2 span.new:not(.on){border-color:#f6d365;color:#ffe9a8}' +
+      '#rarebox .tabs2{display:flex;gap:4px;margin:8px 0 2px}#rarebox .tabs2 span{flex:1;text-align:center;padding:6px 1px;border-radius:10px;cursor:pointer;white-space:nowrap;font:700 10px system-ui,sans-serif;color:#b9cde2;background:rgba(7,18,31,.4);border:1px solid rgba(207,232,255,.14)}#rarebox .tabs2 span.on{color:#14202e;background:#f6d365;border-color:#f6d365}#rarebox .tabs2 span i{font-style:normal;opacity:.75;margin-left:3px}#rarebox .tabs2 span.bad:not(.on){border-color:#ff5d7a;color:#ffd3dc}#rarebox .tabs2 span.new:not(.on){border-color:#f6d365;color:#ffe9a8}' +
       '#rarebox .rmore{margin-top:8px;padding-top:8px;border-top:1px solid rgba(207,232,255,.16);font-size:12px;color:#dcecff}#rarebox .rmore img{display:block;width:120px;height:120px;margin:0 auto 6px}#rarebox .rmore ul{margin:4px 0 0;padding:0;list-style:none}#rarebox .rmore li{padding:2px 0 2px 14px;position:relative;color:#ffe9a8;font-weight:600}#rarebox .rmore li:before{content:"\\25C6";position:absolute;left:0;font-size:8px;top:6px}' +
       '#rarebox.flash{animation:rareflash 1.4s ease-out 2}@keyframes rareflash{0%{box-shadow:0 0 0 0 rgba(246,211,101,.9)}100%{box-shadow:0 0 0 22px rgba(246,211,101,0)}}' +
       '@media (max-width:720px){#rarebox{top:auto;bottom:150px;left:7px;transform:none;max-height:30vh}}@media (max-height:560px){#rarebox{display:none}}';
@@ -96,7 +97,7 @@
     if (btn && btn.parentNode) return btn; const tb = document.getElementById('toolbar'); if (!tb) return null;
     btn = document.createElement('button'); btn.id = 'tb-now'; btn.className = 'btn'; btn.setAttribute('aria-label', 'now'); btn.title = 'What is happening in the pond now: plans, marvels, ships, strangers, dangers';
     btn.innerHTML = ((G.ICON && G.ICON.wave) || '') + '<span class="lab">NOW</span><b class="tbadge"></b>'; tb.insertBefore(btn, tb.firstChild);
-    btn.onclick = function () { if (G.mode !== 'play') return; if (G.sfx) G.sfx('click'); shut = !shut; sig = ''; draw(); };
+    btn.onclick = function () { if (G.mode !== 'play') return; if (G.sfx) G.sfx('click'); if (shut || tab === 'space') { shut = false; tab = 'now'; if (G.closePop) G.closePop(); } else shut = true; sig = ''; draw(); };      /* (NOW opens on what is happening; one panel of the menu at a time) */
     return btn;
   }
   function badge(n, bad) { const b = button(); if (!b) return; const e = b.lastChild, t = n ? String(n) : (bad ? '!' : ''); if (e.textContent !== t) e.textContent = t; e.classList.toggle('bad', !!bad); b.classList.toggle('on', !shut); b.classList.toggle('pulse', !!(n || bad) && shut); }
@@ -119,13 +120,13 @@
     box.classList.remove('hide'); box.classList.remove('shut');
     // it stands above the bottom menu, beside the zoom buttons, and may be as tall as the room up to the season card
     { const tb = document.getElementById('toolbar'), se = document.getElementById('season'), top = se && !se.classList.contains('hide') ? se.getBoundingClientRect().bottom + 10 : 14, bot = tb ? tb.getBoundingClientRect().top - 10 : window.innerHeight - 90;
-      if (window.innerWidth > 720) { box.style.top = 'auto'; box.style.bottom = Math.round(window.innerHeight - bot) + 'px'; box.style.left = '78px'; box.style.transform = 'none'; box.style.maxHeight = Math.max(170, Math.round(bot - top)) + 'px'; } else { box.style.top = ''; box.style.bottom = ''; box.style.left = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
+      if (window.innerWidth > 720) { box.style.top = 'auto'; box.style.bottom = Math.round(window.innerHeight - bot) + 'px'; box.style.left = '78px'; box.style.transform = 'none'; const hgt = Math.max(280, Math.min(640, Math.round(bot - top))); box.style.height = hgt + 'px'; box.style.maxHeight = hgt + 'px'; } else { box.style.height = '';      /* (always the same height: what is in it scrolls, the panel itself does not jump about) */ box.style.top = ''; box.style.bottom = ''; box.style.left = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
     box.style.zIndex = '9';
     const ps = parts.map(function (p) { return p.sig || ''; }).join('~');
     if (s2 + tab + open + bo + ps === sig) return; sig = s2 + tab + open + bo + ps;
     const dang = cat('dangers'), ppl = cat('people');
     let fresh = false, h = '<div class="rk" title="Close"><span>In the pond now</span><span class="rc"><u>\u2715</u></span></div>';
-    { const T = [['now', 'Now', ''], ['plans', 'Plans', (d ? 1 : 0) + Wk.length || ''], ['marvels', 'Marvels', order.length || ''], ['people', 'People', ''], ['dangers', 'Dangers', dang.length || '']];
+    { const T = [['now', 'Now', ''], ['plans', 'Plans', (d ? 1 : 0) + Wk.length || ''], ['marvels', 'Marvels', order.length || ''], ['people', 'People', ''], ['space', 'Space', cat('spaceN').length || ''], ['dangers', 'Dangers', dang.length || '']];
       h += '<div class="tabs2">' + T.map(function (q) { return '<span data-tab="' + q[0] + '" class="' + (tab === q[0] ? 'on' : '') + (q[0] === 'dangers' && dang.length ? ' bad' : '') + '">' + q[1] + (q[2] ? '<i>' + q[2] + '</i>' : '') + '</span>'; }).join('') + '</div>'; }
     const Mv = tab === 'marvels', Nw = tab === 'now';
     const P = tab === 'plans';
@@ -155,6 +156,7 @@
       h += '<div class="rrow old" data-go="p' + i + '"><span class="ric">' + (p.how === 'done' ? '✓' : '✕') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(p.title) + '</b><span class="rtag' + (p.how === 'done' ? '' : ' no') + '">' + (p.how === 'done' ? 'done' : 'gave up') + ' · gen ' + p.gen + '</span></span><div class="rsub">' + chip(p.kind, p.hue) + ' ' + (p.what ? names('set out to ' + p.what.replace(/\.$/, '') + '.') : names(p.say)) + '</div></span></div>'; }
     if (G.ai.over && G.ai.provider === 'server') { if (P && G.ai.over('deed') && d) h += '<div class="rnone" style="color:#ff9db0">New plans are OFF: their budget for this pond is used up.</div>'; if (Mv && G.ai.over('marvel')) h += '<div class="rnone" style="color:#ff9db0">New marvels are OFF: their budget for this pond is used up.</div>'; }
     if (Nw) { const N = cat('now'); h += N.join(''); if (!N.length && !d && !order.length && !cat('alarmRows').length) h += '<div class="rnone">The pond is quiet just now: no plan under way, no marvel alive, nothing dangerous in it. What matters will show here as it happens.</div>'; }
+    if (tab === 'space') h += cat('space').join('') || '<div class="rnone">Nothing of space yet.</div>';
     if (tab === 'people') h += ppl.join('') || '<div class="rnone">No kind is settled enough yet to say what its people are like.</div>';
     if (tab === 'dangers') h += dang.length ? '<div class="rnone" style="margin-bottom:2px">Harmful things you or events put in the pond, and how far the creatures have got in beating each one.</div>' + dang.join('') : '<div class="rnone">Nothing harmful is in the pond just now.</div>';
     if (Mv && !order.length) h += '<div class="rnone">No marvel alive just now. Once in many generations a creature is born with a rare gift. It shows here, and a click takes you to it.</div>';
@@ -165,7 +167,7 @@
   H.act('marvel', function (id) { const W = G.W, L = W.cre.filter(function (c) { return !c.dead && c.g.mv === +id; }).sort(function (a, b) { return G.charmOf(b) - G.charmOf(a); }); if (L[0]) { if (G.select) G.select(L[0]); G.focusOn(L[0].x, L[0].y, 2.4); } });
   H.act('cre', function (id) { const c = G.W.cre.filter(function (q) { return q.id === +id && !q.dead; })[0]; if (c) { if (G.select) G.select(c); G.focusOn(c.x, c.y, 1.8); } });
   // NOW is one of the menu's buttons: the old way of asking for it goes there too
-  setTimeout(function () { if (!G.act) return; const a0 = G.act; G.act = function (name) { if (name === 'now') { if (G.mode !== 'play') return; shut = !shut; sig = ''; draw(); return; } return a0(name); }; }, 0);
+  setTimeout(function () { if (!G.act) return; const a0 = G.act; G.act = function (name) { if (name === 'now') { if (G.mode !== 'play') return; shut = !shut; sig = ''; draw(); return; } if (!shut && name !== 'speed') { shut = true; sig = ''; draw(); } return a0(name); };      /* (opening anything else in the menu puts this away) */ }, 0);
   G.on('new-pond', function () { seen = {}; sig = ''; });
   G.on('marvel-icon', function () { sig = ''; });
 })();

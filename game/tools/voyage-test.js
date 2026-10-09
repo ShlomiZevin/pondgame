@@ -46,11 +46,12 @@ check(again.name === ponds[0].name && again.hue === ponds[0].hue && F.moodOf(aga
 
 // ── 3. the crossing ──
 const home = { seed: G.W.seed, gen: G.W.gen, n: G.saveCre(G.collectWorld()).length,      /* (those alive, and the children already on their way this spring: they are saved as born) */ works: (G.W.works || []).length }, p = ponds[0], key = F.key(p);
-const lead = G.leaderOf(ship.sp), builders = G.W.cre.filter((c) => !c.dead && c.builtShip === ship.name);      // who goes is theirs to decide: their leader, then those who built it
+const lead = G.leaderOf(ship.sp), builders = G.W.cre.filter((c) => !c.dead && c.builtShip === ship.name);
+{ const c0 = F.crewFor(ship), outsider = G.W.cre.filter((c) => !c.dead && !c.deedId && c0.indexOf(c) < 0)[0]; outsider.crewPick = 1; c0[c0.length - 1].crewPick = -1; const c1 = F.crewFor(ship); check(c1[0] === outsider && c1.indexOf(c0[c0.length - 1]) < 0 && c1.length >= 2, '3. the crew can be changed: one you put in goes first, one you take out stays behind'); outsider.crewPick = 0; c0[c0.length - 1].crewPick = 0; }      // who goes is theirs to decide: their leader, then those who built it
 const crew = F.crewFor(ship), crewS = crew.map((c) => c.g.s.slice());
 const kept0 = (G.collection || []).length;
 const out = F.sail(p, crew, ship);
-check(!!out && out.length === crew.length && crew.length >= 2 && (!lead || crew[0] === lead) && builders.slice(0, 1).every((b) => crew.indexOf(b) >= 0), '3. the crossing: ' + crew.length + ' went aboard by their own choice: ' + crew.map((c) => '#' + c.id + ' (' + c.crewWhy + ')').join(', '));
+check(!!out && out.length === crew.length && crew.length >= 2 && (!lead || lead.deedId || crew[0] === lead) && builders.slice(0, 1).every((b) => crew.indexOf(b) >= 0), '3. the crossing: ' + crew.length + ' went aboard by their own choice: ' + crew.map((c) => '#' + c.id + ' (' + c.crewWhy + ')').join(', '));
 let W2 = G.W; const natives = W2.cre.filter((c) => !c.line);
 console.log('far:  ' + p.name + ', generation ' + W2.gen + ', ' + natives.length + ' of its own alive in ' + W2.species.filter((s) => !s.extinct && s.n > 0).length + ' kinds; ' + (out || []).length + ' of ours set down');
 check(W2.seed !== home.seed && natives.length >= 25 && !!F.visiting && F.visiting.key === key, '3. ... the far pond is another pond, alive with its own (' + natives.length + ')');
@@ -64,6 +65,7 @@ check(!W2.extinct && W2.cre.length >= 20, '4. among them: the far pond lives on 
 check(met.length >= (out || []).length, '4. ... and said what it made of each of the crew: ' + JSON.stringify(met.reduce((o, m) => { o[m.end] = (o[m.end] || 0) + 1; return o; }, {})));
 met.slice(0, 2).forEach((m) => console.log('      ' + m.text));
 
+{ const stepped = (out || []).filter((c) => !c.inShip).length; check(stepped === (out || []).filter((c) => !c.dead).length, '4. ... they stepped out of the ship one by one (' + stepped + ' of ' + (out || []).length + ' are out and about)'); }
 // ── 5. saved while away ──
 { const d = G.collectSave(), fb = d && d.far && d.far.book && d.far.book[key];
   check(!!d && d.seed === home.seed && d.gen === home.gen && G.saveCre(d).length === home.n - crew.length, '5. saved while away: what is saved is the pond at home, without the crew (' + (d ? G.saveCre(d).length : 0) + ' of ' + home.n + ')');
@@ -77,11 +79,12 @@ met.slice(0, 2).forEach((m) => console.log('      ' + m.text));
 // ── 6. home ──
 W2 = G.W;      // (the far pond was put away and brought back: it is the same pond, held anew)
 const theirs = W2.cre.filter((c) => !c.line && !c.dead).sort((a, b) => b.g.s[0] - a.g.s[0])[0]; theirs.aboard = true; const theirS = theirs.g.s.slice();
-const stay = W2.cre.filter((c) => !c.dead && c.line).length, farGen = W2.gen, farN = W2.cre.length;
-const r = F.home(theirs);
+const stay = W2.cre.filter((c) => !c.dead && c.line).length - Math.min(1, W2.cre.filter((c) => c.crew && !c.dead).length), farGen = W2.gen, farN = W2.cre.length - Math.min(1, W2.cre.filter((c) => c.crew && !c.dead).length);
+const backC = W2.cre.filter((c) => c.crew && !c.dead).slice(0, 1); const r = F.home(theirs, backC);
 const H = G.W;
 check(!!r && H.seed === home.seed && !F.visiting && !F.origin, '6. home: the pond at home is your own (generation ' + H.gen + ')');
 check(H.cre.length >= 20 && !!r.brought && r.brought.line && r.brought.stranger !== undefined && r.brought.g.s.every((v, t) => Math.abs(v - theirS[t]) < 0.006), '6. ... ' + H.cre.length + ' alive: those who did not sail, and one of THEIRS who came back with the ship, a stranger here');
+check((r.crew || []).length === backC.length && (r.crew || []).every((c) => c.stranger === undefined && c.beenTo), '6. ... ' + backC.length + ' of the crew came home with it, as one of this pond (not a stranger)');
 check(F.book[key].mine === stay && !!F.book[key].blob && (H.works || []).filter((w) => w.bp && w.bp.type === 'ship').length === 1, '6. ... ' + stay + ' of ours stayed there (the outpost), and the ship is home');
 
 // ── 7. again ──

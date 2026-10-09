@@ -415,6 +415,7 @@
     m.addEventListener('pointerdown', function (e) { if (e.target === m) G.closeMenu(); });
     UI.menuEl = m;
     buildSoundControls($('mnBody'), true);
+    { const nb = el('button', 'btn', (ICON.drop || '') + 'START A NEW POND', $('mnBody')); nb.style.cssText = 'width:100%;margin-top:14px'; nb.title = 'Leave this pond and begin another (you are asked first)'; nb.onclick = function () { G.sfx('click'); G.closeMenu(); G.confirmNew(); }; }
     $('mnClose').onclick = function () { G.closeMenu(); };
   };
   G.closeMenu = function () {

@@ -3199,6 +3199,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     return t;
   };
 
+  /** how near the left and right edges of the pond anything that lives may come (the mist begins at a tenth of the pond's lesser side) */
+  G.sideEdge = function (W) { return Math.min(W.ww, W.wh) * 0.058; };
   G.spawnFood = function (W, x, y, tag, any, ownRoom) {
     if (!ownRoom && W.food.length - (W.landFood || 0) >= foodCap(W)) return null;      // (the water's food is counted without the land's)
     if (x === null || x === undefined) {
@@ -3210,6 +3212,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       }
       x = bx; y = by;
     }
+    { const e = G.sideEdge(W) + 6; x = Math.max(e, Math.min(W.ww - e, x)); }      // (food does not grow in the dark at the sides, where nobody can come for it)
     if (tag === null || tag === undefined) {
       const r = G.rand();
       // the shallows grow green algae; the deep gets gold scraps and blue minerals
@@ -3575,10 +3578,11 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         }
       }
       c.x += c.vx * dt; c.y += c.vy * dt;
-      if (c.x < ph.r) { c.x = ph.r; c.vx = Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; }
-      else if (c.x > ww - ph.r) { c.x = ww - ph.r; c.vx = -Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; }
+      // at its two sides the pond fades into mist and then the dark: a creature may go a little way into the mist and no further (it is lost to sight beyond)
+      { const side = G.sideEdge(W) + ph.r; if (c.x < side) { c.x = side; c.vx = Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; }
+        else if (c.x > ww - side) { c.x = ww - side; c.vx = -Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; } }
       // a creature of the water stops at the shore; a creature of the land only paddles in the shallows; one at home in both goes where it likes
-      const crew = c.deedId && W.deed && W.deed.id === c.deedId && (W.deed.voyage || (W.deed.result && (W.deed.result.port || W.deed.result.ship)));      // (those building a spaceport or its ship, and the crew of a mission, walk to the port wherever it is: up the beach, or down to the water's edge)
+      const crew = c.goTo || c.inShip || (c.deedId && W.deed && W.deed.id === c.deedId && (W.deed.voyage || (W.deed.result && (W.deed.result.port || W.deed.result.ship))));      // (those building a spaceport or its ship, and the crew of a mission, walk to the port wherever it is: up the beach, or down to the water's edge)
       const top = (crew ? 0 : landTop) + ph.r, bot = crew ? wh - ph.r : botLim;
       if (c.y < top) { c.y = top; c.vy = Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
       else if (c.y > bot) { c.y = bot; c.vy = -Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
@@ -8901,6 +8905,7 @@ G.addSystem({
   // ── materials in the pond ──
   function scatter(W, k) {
     const sy = G.shoreY ? G.shoreY(W) : W.wh * 0.2; let x = 30 + G.rand() * (W.ww - 60), y;
+    { const e = (G.sideEdge ? G.sideEdge(W) : 30) + 16; x = e + G.rand() * (W.ww - 2 * e); }      // (not in the dark at the sides)
     if (k === 0) y = W.wh - 26 - G.rand() * G.rand() * (W.wh - sy) * 0.5;                    // stone: sunk to the floor, thinning upward
     else if (k === 1) y = G.rand() < 0.7 ? 18 + G.rand() * Math.max(10, sy - 30) : sy + G.rand() * 40;      // reed: on the land, some at the waterline
     else return;                                                                           // shell: only where something died
@@ -8991,11 +8996,14 @@ G.addSystem({
     let x = d.x, y = d.y; const own = function (w) { return w.bp.type !== 'ship' && w.bp.type !== 'port'; }, mine = Wk.filter(function (w) { return w.sp === d.sp && own(w); });      /* (a port and its ship stand at the border: nothing is lined up on them) */
     if (mine.length) { x = mine[mine.length - 1].x; y = mine[0].y; d.beside = mine[0].name; }
     else { let nb = null, nd = 460; Wk.forEach(function (w) { const dd = Math.hypot(w.x - x, w.y - y); if (dd < nd && own(w) && (w.y < sy) === onLand) { nd = dd; nb = w; } }); if (nb) y = nb.y; }
-    const free = function (px) { for (let i = 0; i < Wk.length; i++) { const w = Wk[i], gap = (w.bp.hw || halfW(w.bp)) + hw + 26; if (Math.abs(w.x - px) < gap && Math.abs(w.y - y) < 150) return false; } return px > hw + 40 && px < W.ww - hw - 40; };
-    const step = hw * 0.8 + 40, y0 = y, x0 = x, lo = onLand ? 70 : sy + 110, hi = onLand ? Math.max(80, sy - 40) : W.wh - 90; let ok = false;
+    const edge = Math.max(40, G.sideEdge ? G.sideEdge(W) + 10 : 40);
+    const free = function (px) { for (let i = 0; i < Wk.length; i++) { const w = Wk[i], gap = (w.bp.hw || halfW(w.bp)) + hw + 26; if (Math.abs(w.x - px) < gap && Math.abs(w.y - y) < 150) return false; } return px > hw + edge && px < W.ww - hw - edge; };
+    // Under water or on land, never across the two: what is built under water has its TOP well below the waterline, what is built on land has its FOOT well above it.
+    const S45 = bp.S * 0.45, tall = Math.max(40, (bp.top === undefined ? (halfW(bp), bp.top) : bp.top) || 60), CLEAR = 46;
+    const step = hw * 0.8 + 40, y0 = y, x0 = x, lo = onLand ? 60 + tall - S45 : sy + CLEAR + tall - S45, hi = onLand ? Math.max(lo, sy - CLEAR - S45) : W.wh - 90; let ok = false;
     for (let row = 0; row < 7 && !ok; row++) { y = y0 + (row % 2 ? 1 : -1) * Math.ceil(row / 2) * 190; if (row && (y < lo || y > hi)) continue; y = clamp(y, lo, hi); x = x0; ok = free(x); for (let k = 1; k < 40 && !ok; k++) { const px = x0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * step; if (free(px)) { x = px; ok = true; } } }      /* when a row is full, a new one is begun behind it: a second street */
     if (!ok) { d.noRoom = true; y = y0; x = x0; }
-    d.x = clamp(x, hw + 40, W.ww - hw - 40); d.y = clamp(y, lo, hi);
+    d.x = clamp(x, hw + edge, W.ww - hw - edge); d.y = clamp(y, lo, Math.max(lo, hi));
   }
   // ── the shape is theirs to decide ──
   const SHAPE = { block: 'rect', column: 'rect', slab: 'rect', boulder: 'rect', dome: 'dome', cone: 'tri', ball: 'circ', arch: 'door', beam: 'beam', wing: 'wing', lamp: 'lamp', flag: 'flag',
@@ -9023,6 +9031,7 @@ G.addSystem({
     const near = (W.works || []).filter(function (w) { return w.bp && !w.fall && Math.hypot(w.x - d.x, w.y - d.y) < 900; }).slice(-5).map(function (w) { return { name: w.name, by: w.by, what: w.bp.about || w.looks || '' }; });
     const wet = base.wet !== false, where = r.ship || r.port ? '' : wet ? ' WHERE IT STANDS: UNDER WATER, on the floor of the pond. Build it as underwater things are built: shell, coral and stone; rounded domes and bubbles, arches, fronds and fins that sway in the current; low, wide and anchored to the floor. Nothing that belongs in dry air: no thatch, no chimney, no flag on a pole.' : ' WHERE IT STANDS: ON DRY LAND, in the open air above the water. Build it as land things are built: reed, wood and stone; walls and posts under a pitched or pointed roof that sheds rain, steps, a smoke-hole, a flag. Taller and lighter than what is built under water; no bubbles, no fronds.';
     const info = { builders: d.kind, body: f && G.form.kind ? G.form.kind(f).full + (G.form.facts ? ': ' + G.form.facts(f).slice(0, 6).join('; ') : '') : '', name: r.name || '', looks: r.looks || '', why: d.why || '', what: d.what || '', purpose: r.port ? 'a SPACEPORT, on dry land at the very edge of the pond: the place their spaceship will be built on and lift off from. The rest is yours to design, but it must have: a wide, low, flat launch PAD lying on the ground (one "slab" about 2 wide and 0.15 high, at x 0, y 0), whose MIDDLE IS LEFT CLEAR (nothing taller than a marking between x -0.65 and x 0.65: the ship will stand there); and whatever else you give it (towers, gantries, masts, lamps, fuel tanks, flags) standing at its SIDES, outside that middle. Open to the sky: no roof over the pad' : r.ship ? 'a SPACESHIP, to fly a few of them through outer space to another pond: a rocket, a saucer or a pod of their own making. It stands in the clear middle of their launch pad, centred on x 0, its foot (legs, fins or engines) flat on the ground at y 0, no wider than 1.1 in all, nose up, ready to lift off: a body they can sit in with round windows, a nose or a dome on top, fins or wings at its sides, engines at the bottom, a light at its tip. It must read at a glance as a spacecraft (NOT a sailing ship: no mast, no sail, no hull on water; and not a house)' : house ? 'a small house for one family of them to sleep in and raise their young: every house of this kind will be built to this same design, side by side, so keep it simple and their own' : r.solid ? 'it shuts others out: only they may pass' : r.feed > 0.05 ? 'it feeds them' : r.pull > 0.1 ? 'it draws them together' : r.hurt > 0.05 ? 'it harms what comes near' : 'a place of their own', where: d.y < (G.shoreY ? G.shoreY(W) : 0) ? 'on the land' : 'under water, on the pond floor', pieces: [Math.round(maxN * 0.55), maxN], near: near, model: G.ai.model || undefined }; info.where = where.replace(/^ WHERE IT STANDS: /, '');
+    { const c0 = base.craft | 0; if (c0 >= 1 && !house && !r.ship && !r.port) info.purpose = String(info.purpose || '') + ' THEIR CRAFT: this is building number ' + (c0 + 1) + ' of their kind. ' + (c0 >= 5 ? 'They are master builders now: make it their finest yet, richly finished, with confident proportions and fine detail (windows, crests, lamps, steps), and unlike their earlier ones.' : c0 >= 2 ? 'They have learned from the earlier ones: this one is more accomplished, better proportioned and more finely finished.' : 'It should show a little more skill than their first.'); }
     d.design = null;
     G.host.call('ai.build', info, 60000).then(function (res) { G.ai.tally('deed', res && res.source, res && res.usd); if (G.W !== W || W.deed !== d || d.bp) return; const P = res && res.build ? G.designFrom(res.build, base.S, maxN) : null; if (!P) { d.design = false; return; } if (house) { (W.houseStyle = W.houseStyle || {})[styleKey(d.sp, base.wet)] = { about: String(res.build.about || '').slice(0, 120), pieces: res.build.pieces.slice(0, 14) }; } base.P = P; base.designed = true; fit(base, W); settle(base, true); base.about = String(res.build.about || '').replace(/[<>]/g, '').slice(0, 120); d.design = base; }, function () { if (W.deed === d) d.design = false; });
   }
@@ -9033,7 +9042,8 @@ G.addSystem({
     const W = G.W, r = d.result || {}, m = Math.min(W.ww, W.wh), sp = G.speciesById(d.sp), f = sp && sp.rep ? sp.rep.f : null;
     let spiky = 0; if (f) { (f.rules || []).forEach(function (q) { if (q.k === 2 || q.k === 7) spiky = 1; }); if (f.crest > 0.25) spiky = 1; }
     let h = 0, n = 0; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].sp === d.sp) { h += W.cre[i].g.h; n++; }
-    const o = { wet: !(r.port || r.ship) && d.y > (G.shoreY ? G.shoreY(W) : 0), seed: (G.hash ? G.hash(String(d.title) + d.id) : d.id * 7919) >>> 0, type: r.port ? 'port' : r.ship ? 'ship' : r.house ? 'house' : r.solid ? 'wall' : r.feed > 0.05 ? 'huts' : r.pull > 0.15 ? 'spire' : 'hall', S: r.port ? clamp((r.size || 0.085) * m, 84, 124) : r.ship ? clamp((r.size || 0.06) * m, 52, 84) : r.house ? clamp((r.size || 0.04) * m, 36, 58) : clamp((r.size || 0.08) * m, 55, 118), hue: d.hue || 50, spiky: spiky, brain: clamp((n ? h / n : 0) / 7, 0, 1) };
+    const craft = G.craftOf(d.sp);      // how many buildings their kind (and the kinds it came from) has raised: practice shows
+    const o = { wet: !(r.port || r.ship) && d.y > (G.shoreY ? G.shoreY(W) : 0), seed: (G.hash ? G.hash(String(d.title) + d.id) : d.id * 7919) >>> 0, type: r.port ? 'port' : r.ship ? 'ship' : r.house ? 'house' : r.solid ? 'wall' : r.feed > 0.05 ? 'huts' : r.pull > 0.15 ? 'spire' : 'hall', S: r.port ? clamp((r.size || 0.085) * m, 84, 124) : r.ship ? clamp((r.size || 0.06) * m, 52, 84) : r.house ? clamp((r.size || 0.04) * m, 36, 58) : clamp((r.size || 0.08) * m, 55, 118), hue: d.hue || 50, spiky: spiky, brain: clamp((n ? h / n : 0) / 7 + 0.09 * craft, 0, 1), craft: craft };
     o.P = plan(o); fit(o, W); settle(o, true); return o;      // (the fallback shape: used when the kind's own design cannot be had)
   }
   G.blueprintPack = function (bp) { return bp.designed ? { about: bp.about || '', P: bp.P.map(function (p) { return [p.s, Math.round(p.x), Math.round(p.y), Math.round(p.w), Math.round(p.h), p.m, p.c[0], p.c[1], p.c[2], p.rr || 0]; }) } : null; };
@@ -9134,6 +9144,11 @@ G.addSystem({
     const Wk = W.works; if (!Wk || !Wk.length) return;
     // a ship stays made fast to its port: wherever the port is (the pond grows, and everything in it moves apart), the ship stands in the middle of its pad
     { let port = null, ship = null; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.bp || w.fall) continue; if (w.bp.type === 'port') port = w; else if (w.bp.type === 'ship' && !w.visitor) ship = w; } if (port && ship && !ship.lifting) { const dk = G.dockOf(port); ship.x = dk.x; ship.y = dk.y - ship.bp.S * 0.45; } }
+    // The land widens with the generations. What was built under water must stay under it: when the waterline comes down on the highest of them, the whole
+    // underwater town settles deeper together (so its rows and the room between its buildings stay as they were), never left half in the air.
+    W.sinkT = (W.sinkT || 0) - dt; if (W.sinkT <= 0) { W.sinkT = 3; const sy = G.shoreY ? G.shoreY(W) : 0, wetOf = function (w) { return w.bp && w.bp.type !== 'port' && w.bp.type !== 'ship' && w.bp.wet !== false && !w.visitor; }; let need = 0, low = 0;
+      for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!wetOf(w)) continue; need = Math.max(need, sy + 40 - (w.y + w.bp.S * 0.45 - (w.bp.top || 60))); low = Math.max(low, w.y + w.bp.S * 0.45); }
+      if (need > 0) { const sh = Math.min(need, 12, Math.max(0, W.wh - 60 - low)); if (sh > 0) for (let i = 0; i < Wk.length; i++) if (wetOf(Wk[i])) Wk[i].y += sh; } }
     for (let i = Wk.length - 1; i >= 0; i--) {
       const w = Wk[i]; if (!w.bp) continue;
       w.until = W.t + 9999;      // it does not run out by the clock
@@ -9150,7 +9165,8 @@ G.addSystem({
         if (heir) { w.sp = heir.id; w.keptBy = heir.name; kin = heir.n; } }
       w.lone = kin < 3 ? (w.lone || 0) + 1 : 0;      /* (kinds are sorted afresh each autumn: a short gap in the count is not the end of them) */
       if (w.fall || (w.lone > 24 && w.lone % 3 === 0)) { let top = -1; for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { top = k; break; } if (top >= 0) { P[top].st = 0; G.emit('build-fall', w, P[top]); if (!w.fall && !w.ruin) { w.ruin = true; G.emit('work-ruin', w); } } }
-      else if (!(w.dmg > 0 && W.gen === w.hitGen)) { for (let k = 0; k < P.length; k++) if (P[k].st < 2) { P[k].st++; P[k].t0 = W.t; break; } }      // its keepers mend and colour it
+      else if (!(w.dmg > 0 && W.gen === w.hitGen)) { let busy = false; for (let k = 0; k < P.length; k++) if (P[k].st < 2) { P[k].st++; P[k].t0 = W.t; busy = true; break; }      // its keepers mend and colour it
+        if (!busy && kin >= 5 && W.gen - (w.grewGen === undefined ? w.gen : w.grewGen) >= 7 + 3 * (w.grown || 0) && G.craftOf(w.sp) >= 2) { w.grewGen = W.gen; const what = G.improveWork(w); if (what && G.mode === 'play' && G.log) { const sp = G.speciesById(w.sp); G.log('sel', w.name + ' is added to', 'The ' + (sp ? sp.name : 'keepers') + ' are adding ' + what + ' to it: they have grown better at building.'); G.emit('work-grown', w, what); } } }      // and, practised builders, they add to it now and then
       const n = count(w.bp);
       if (n[0] === 0) { Wk.splice(i, 1); G.emit('work-gone', w, w.fall ? 'struck down' : w.hitBy ? 'attacked' : 'abandoned'); continue; }
       const F = W.fields || []; for (let k = 0; k < F.length; k++) if (F[k].id === w.field || (!w.field && F[k].name === w.name)) { w.field = F[k].id; F[k].hidden = true; if (n[0] >= n[2] * 0.6 && !w.fall) F[k].life = Math.max(F[k].life, 30); else F[k].life = Math.min(F[k].life, 6); }      // it does what it was built for while most of it stands
@@ -9178,6 +9194,28 @@ G.addSystem({
   }
   { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (!W || W.title) return; matsStep(W, dt); const d = W.deed; if (d && d.result && d.steps[d.i] && d.steps[d.i].do === 'build') buildStep(W, d, dt); worksStep(W, dt); if (W.works && W.works.length) homeStep(W, dt); }; }
 
+  /** how practised a kind is at building: the buildings it has finished, and those of the kinds it came from */
+  G.craftOf = function (spId) { const W = G.W, C = (W && W.craft) || {}; let id = spId, n = 0; for (let k = 0; k < 6 && id; k++) { n += C[id] || 0; const s = G.speciesById ? G.speciesById(id) : null; id = s ? s.parent : 0; } return Math.min(9, n); };
+  if (G.on) G.on('deed-end', function (d, how, made) { const W = G.W; if (W && made && d.bp && how === 'done' && d.sp) { (W.craft = W.craft || {})[d.sp] = (W.craft[d.sp] || 0) + 1; } });
+  /** Those who keep a building add to it, now and then: a window in a bare wall, a light or a flag on top, weed or steps at its foot. The new piece is set and
+   *  coloured by them like any other (it starts unbuilt and is mended in). Returns what was added, in words, or ''. */
+  G.improveWork = function (w) {
+    const bp = w && w.bp; if (!bp || bp.type === 'ship' || bp.type === 'port' || (bp.type === 'wall' && !bp.designed) || bp.P.length >= 34 || count(bp)[0] < count(bp)[2]) return '';
+    const Pc = bp.P, S = bp.S, r = G.rand, has = function (s) { let n = 0; for (let i = 0; i < Pc.length; i++) if (Pc[i].s === s) n++; return n; };
+    let wall = null, topP = null, topY = 0; for (let i = 0; i < Pc.length; i++) { const p = Pc[i], t = -p.y + p.h; if ((p.s === 'rect' || p.s === 'vase') && p.w > S * 0.42 && p.h > S * 0.3 && (!wall || p.w * p.h > wall.w * wall.h)) wall = p; if (t > topY && p.s !== 'flag' && p.s !== 'lamp' && p.s !== 'frond') { topY = t; topP = p; } }
+    let add = null, what = '';
+    const roomFor = function (x, y, ww, hh) { for (let i = 0; i < Pc.length; i++) { const p = Pc[i]; if ((p.s === 'window' || p.s === 'door' || p.s === 'circ' || p.s === 'scallop') && Math.abs(p.x - x) < (p.w + ww) / 2 + 2 && Math.abs((p.y - p.h / 2) - (y - hh / 2)) < (p.h + hh) / 2 + 2) return false; } return true; };
+    if (wall && has('window') < 4) { const d = Math.min(wall.w * 0.22, wall.h * 0.5, S * 0.26), y = wall.y - wall.h * 0.28; for (const u of [0.26, -0.26, 0, 0.4, -0.4]) { const x = wall.x + u * wall.w; if (roomFor(x, y, d, d * 1.3)) { add = { s: 'window', x: x, y: y, w: d, h: d * 1.3, m: 2, c: [14, 34, 82], st: 0 }; what = 'a window'; break; } } }
+    if (!add && topP && !has('lamp')) { add = { s: 'lamp', x: topP.x, y: -topY - S * 0.07, w: S * 0.14, h: S * 0.14, m: 2, c: [50, 95, 72], st: 0 }; what = 'a light on top'; }
+    if (!add && bp.wet !== false && has('frond') < 4) { const hw = halfW(bp), sd = has('frond') % 2 ? 1 : -1; add = { s: 'frond', x: sd * (hw + S * 0.12), y: 0, w: S * 0.2, h: S * (0.7 + 0.5 * r()), m: 1, c: [95, 52, 46], st: 0 }; what = 'weed at its side'; }
+    if (!add && bp.wet === false && !has('stairs')) { const door = Pc.filter(function (p) { return p.s === 'door'; })[0]; if (door) { add = { s: 'stairs', x: door.x - door.w * 0.9 - S * 0.02, y: 0, w: door.w * 0.9, h: Math.min(door.h * 0.3, S * 0.14), m: 0, c: [0, 14, 44], st: 0 }; what = 'steps at its door'; } }
+    if (!add && topP && !has('flag')) { add = { s: 'flag', x: topP.x + (has('lamp') ? S * 0.12 : 0), y: -topY, w: S * 0.2, h: S * 0.3, m: 1, c: [0, 85, 60], st: 0 }; what = 'a flag'; }
+    if (!add && topP && has('drop') < 2 && topP.w > S * 0.3) { const sd = has('drop') ? 1 : -1; add = { s: 'drop', x: topP.x + sd * topP.w * 0.3, y: topP.y - topP.h * 0.2, w: S * 0.12, h: S * 0.16, m: 2, c: [14, 34, 82], st: 0 }; what = 'a finial'; }
+    if (!add) return '';
+    { const W = G.W, nh = Math.max(halfW(bp), Math.abs(add.x) + add.w / 2), Wk = (W && W.works) || []; for (let i = 0; i < Wk.length; i++) { const o = Wk[i]; if (o === w || !o.bp || Math.abs(o.y - w.y) > 150) continue; if (Math.abs(o.x - w.x) - (nh + (o.bp.hw || halfW(o.bp))) < 18) { if (nh > halfW(bp) + 1) return ''; } } }      /* (it may not grow sideways into the one beside it) */
+    Pc.push(add); bp.designed = true; settle(bp, true); w.grown = (w.grown || 0) + 1;      // (kept with its own pieces from now on: it is no longer the plain shape)
+    return what;
+  };
   // ── a port and its ship: the shape is theirs, the fit is plain sense ──
   // A spaceport and a spaceship are designed like everything else they build (by the kind's own mind when the AI is there, a plain shape when it is not).
   // Whatever the design, three things are then made sure of, as a floating piece is let down onto what it rests on:
@@ -9226,8 +9264,9 @@ G.addSystem({
       const type = wantPort ? 'port' : wantShip ? 'ship' : houses < wantH && (mine.length >= may || houses < mine.length * 2) ? 'house' : !mine.length ? (hungry ? 'huts' : 'hall') : threatened && !has('wall') ? 'wall' : hungry && !has('huts') ? 'huts' : !has('spire') ? 'spire' : !has('huts') ? 'huts' : !has('hall') ? 'hall' : 'wall', nw = String(s.name).split(' '), first = nw.length >= 3 ? nw[nw.length - 2] : nw[0];      /* first a place of their own; then what they are short of */
       const name = first + ' ' + { wall: 'Ring', huts: 'Huts', hall: 'Hall', spire: 'Tower', house: 'House', ship: 'Starship', port: 'Spaceport' }[type] + (type === 'house' && houses ? ' ' + (houses + 1) : ''), why = type === 'port' ? 'they have seen the lights of other ponds, far off in space' : type === 'ship' ? 'their spaceport stands ready' : type === 'house' ? 'there are more of them than there are roofs' : type === 'wall' ? (armed ? 'something armed is loose in the pond' : 'fierce strangers are all about them') : type === 'huts' ? 'they are going hungry' : mine.length ? 'their place has room for more' : 'they have no place of their own';
       G.deedStart({ kind: s.name, title: name, say: '', what: 'build ' + (type === 'port' ? 'a spaceport on the shore, to build a spaceship on' : type === 'ship' ? 'a spaceship on their spaceport, to fly to another pond' : type === 'house' ? 'a house for a family, beside the others' : type === 'wall' ? 'a ring of posts to live inside' : type === 'huts' ? 'huts round a store of food' : type === 'hall' ? 'a hall to gather in' : 'a tower to be seen from afar'), why: why, share: 0.6, own: true,
-        steps: [{ do: 'gather', secs: 5, cry: '' }, { do: 'build', secs: 34, cry: '' }], place: (function () { const L = G.leaderOf ? G.leaderOf(s.id) : null; if (type === 'port') return { x: x / n < W.ww / 2 ? 0.13 : 0.87, y: ((G.shoreY ? G.shoreY(W) : W.wh * 0.25) - 46) / W.wh };      /* on the land, at the border of the pond, just above the waterline: in plain sight, and within reach of those in the shallows */ if (type === 'ship') return { x: G.dockOf(port).x / W.ww, y: port.y / W.wh }; return L ? { x: clamp(L.x / W.ww, 0.12, 0.88), y: clamp(L.y / W.wh, 0.3, 0.85) } : { x: clamp(x / n / W.ww, 0.12, 0.88), y: clamp(y / n / W.wh, 0.3, 0.85) }; })(),      /* where their leader is, if they have one; else in the midst of them */
-        result: { name: name, looks: 'made of what lay about the pond', stuff: 'rock', shape: 'circle', size: type === 'house' ? 0.04 : type === 'ship' ? 0.06 : type === 'port' ? 0.085 : 0.075, ship: type === 'ship', port: type === 'port', at: type === 'ship' ? { x: G.dockOf(port).x, y: G.dockOf(port).y } : type === 'port' ? (function () { const sy = G.shoreY ? G.shoreY(W) : W.wh * 0.25, busy = function (px) { return (W.works || []).some(function (w) { return w.bp && Math.abs(w.x - px) < 330 && w.y < sy + 60; }); }, L = W.ww * 0.13, R = W.ww * 0.87, first = x / n < W.ww / 2 ? L : R, other = first === L ? R : L; return { x: busy(first) && !busy(other) ? other : first, y: sy - 10 }; })() : undefined,      /* a port stands on the land at the border of the pond, its foot just above the waterline, on whichever side is free; a ship stands on its port */ house: type === 'house', solid: type === 'wall', feed: type === 'huts' ? 0.25 : 0, slow: 0, hurt: 0, pull: type === 'spire' ? 0.22 : type === 'hall' ? 0.08 : 0, life: 240 } });
+        steps: [{ do: 'gather', secs: 5, cry: '' }, { do: 'build', secs: 34, cry: '' }], place: (function () { const L = G.leaderOf ? G.leaderOf(s.id) : null; if (type === 'port') return { x: x / n < W.ww / 2 ? 0.13 : 0.87, y: ((G.shoreY ? G.shoreY(W) : W.wh * 0.25) - 46) / W.wh };      /* on the land, at the border of the pond, just above the waterline: in plain sight, and within reach of those in the shallows */ if (type === 'ship') return { x: G.dockOf(port).x / W.ww, y: port.y / W.wh }; const sy0 = G.shoreY ? G.shoreY(W) : W.wh * 0.25, px = clamp((L ? L.x : x / n) / W.ww, 0.12, 0.88), py = (L ? L.y : y / n); if (py <= sy0) return { x: px, y: clamp(py / W.wh, 0.05, 0.85) };      /* a kind of the land builds on the land, where it lives */
+          const u = (s.id * 0.6180339887) % 1; return { x: px, y: (sy0 + (W.wh - 90 - sy0) * (0.12 + 0.8 * u)) / W.wh }; })(),      /* a kind of the water builds at a depth of its own, anywhere from just under the shore down to the floor: the pond is built on all over, not only along its shore (its later buildings stand beside its first) */      /* where their leader is, if they have one; else in the midst of them */
+        result: { name: name, looks: 'made of what lay about the pond', stuff: 'rock', shape: 'circle', size: type === 'house' ? 0.04 : type === 'ship' ? 0.06 : type === 'port' ? 0.085 : 0.075, ship: type === 'ship', port: type === 'port', at: type === 'ship' ? { x: G.dockOf(port).x, y: G.dockOf(port).y } : type === 'port' ? (function () { const sy = G.shoreY ? G.shoreY(W) : W.wh * 0.25, busy = function (px) { return (W.works || []).some(function (w) { return w.bp && Math.abs(w.x - px) < 330 && w.y < sy + 60; }); }, L = W.ww * 0.13, R = W.ww * 0.87, first = x / n < W.ww / 2 ? L : R, other = first === L ? R : L; return { x: busy(first) && !busy(other) ? other : first, y: sy - 44 }; })() : undefined,      /* a port stands on the land at the border of the pond, its foot just above the waterline, on whichever side is free; a ship stands on its port */ house: type === 'house', solid: type === 'wall', feed: type === 'huts' ? 0.25 : 0, slow: 0, hurt: 0, pull: type === 'spire' ? 0.22 : type === 'hall' ? 0.08 : 0, life: 240 } });
       return; }
   });
   // ── seen ──
@@ -9346,33 +9385,44 @@ G.addSystem({
 <script data-part="54f_judge">
 // ── Good and bad: how the player teaches ──
 // The player never commands. They say GOOD or BAD of something a creature DID, and that goes into its brain as the strongest reward or punishment it knows.
-// Three things make that usable:
+// Four things make that usable:
 //   · MOMENTS. The pond points out things worth a word as they happen ("a Wobmop struck back at the Knight", "a Vorra set a piece of the Hall", "a Darter
-//     attacked a Glider"), each with GOOD and BAD beside it. What the creature's brain was doing AT THAT MOMENT is kept with the moment, so the word, when it
-//     comes a few seconds later, lands on the right wires. (On a creature's card the same two buttons judge what it is doing right now, and say what that is.)
+//     attacked a Glider"), each with SEE, GOOD and BAD beside it. What the creature's brain was doing AT THAT MOMENT is kept with the moment, so the word,
+//     when it comes a few seconds later, lands on the right wires. (On a creature's card the same two buttons judge what it is doing right now.)
+//   · IT IS SEEN IN THE POND. When a moment appears, an arrow in the pond runs from the one who did it to what it was done to, with a word on it; SEE takes
+//     you there. When you speak, GOOD or BAD rises in big letters over the one you spoke to, and a line says to whom, for what, and who else heard.
 //   · IT IS HEARD. Others of its kind who were near hear it too, more faintly. And what is learned is passed on (54e_teach.js): the young pick it up, children
 //     are born with half of it. So a word to one creature can become a habit of a kind, or fade if it never pays.
-//   · IT IS SHOWN. A heart or a cross rises from whoever heard; and WHAT YOU HAVE TAUGHT keeps count: for each sort of deed, how often you called it good or
-//     bad, and how common it was when you first spoke and is now. The player can see whether the pond is listening. It may not be: a brain weighs your word
-//     against hunger, fear and habit, and that is the point.
+//   · IT IS COUNTED. WHAT YOU HAVE TAUGHT keeps, for each sort of behaviour, how often you called it good and bad, what you said lately, and (for the deeds
+//     the pond can count) how common it was when you first spoke and is now. It may not take: a brain weighs your word against hunger, fear and habit.
 (function () {
   'use strict';
-  const KINDS = { strike: 'striking back at what harms them', build: 'building', help: 'going to help build', attack: 'attacking other kinds', hunt: 'eating other creatures' };
+  const KINDS = { attack: 'attacking other kinds', hunt: 'hunting and eating other creatures', strike: 'striking back at what harms them', build: 'building', help: 'going to help build', feed: 'feeding', flee: 'fleeing from danger', family: 'keeping with their family', rest: 'resting and drifting about' };
+  const COUNTED = { attack: 1, hunt: 1, strike: 1, build: 1, help: 1 };      // deeds the pond itself counts, so "then and now" can be shown
+  G.JUDGE_KINDS = KINDS;
   const near = function (c, R, fn) { const W = G.W; for (let i = 0; i < W.cre.length; i++) { const o = W.cre[i]; if (o !== c && !o.dead && o.sp === c.sp && Math.hypot(o.x - c.x, o.y - c.y) < R) fn(o); } };
   function teach(c, good, el, k) { if (!c || c.dead || !G.learn || !c.lw) return; const own = c.el; if (el && el.length === c.lw.length) c.el = el; G.learn(c, (good ? 1 : -1) * k); G.learn(c, (good ? 1 : -1) * k); c.el = own; c.godV = (good ? 1 : -1) * Math.min(1, k); }
   /** the player's word on a creature: `m` is the moment it is about (with the brain's state then), or nothing for "what it is doing right now" */
   G.judge = function (c, good, m) {
     const W = G.W; if (!W || !c || c.dead) return;
-    teach(c, good, m && m.el, 1); c.judged = (c.judged || 0) + (good ? 1 : -1); c.flash = 1; if (good) c.mend = 1; else c.startle = Math.max(c.startle || 0, 0.8);
+    teach(c, good, m && m.el, 1); c.judged = (c.judged || 0) + (good ? 1 : -1); if (good) c.goodN = (c.goodN || 0) + 1; else c.badN = (c.badN || 0) + 1; c.flash = 1; if (good) c.mend = 1; else c.startle = Math.max(c.startle || 0, 0.8);
     G.emit('judged-by-god', c, good, false);
     let heard = 0; near(c, 260, function (o) { teach(o, good, null, 0.45); heard++; G.emit('judged-by-god', o, good, true); });
-    const key = m ? m.key : G.doingKey(c);
+    const key = m ? m.key : G.doingKey(c), what = m ? m.words : (G.doingWords ? G.doingWords(c) : '');
     if (key && KINDS[key]) { const T = W.taught = W.taught || {}, r = T[key] = T[key] || { good: 0, bad: 0, rate0: rateOf(key), gen0: W.gen }; if (good) r.good++; else r.bad++; }
+    const sp = G.speciesById ? G.speciesById(c.sp) : null, said = { gen: W.gen, good: !!good, key: key || '', what: what, who: (sp ? sp.name : 'Creature') + ' #' + c.id, heard: heard };
+    (W.said = W.said || []).push(said); if (W.said.length > 12) W.said.shift();
+    G.emit('you-said', c, good, said);
     if (G.markDirty) G.markDirty();
     return heard;
   };
-  /** what a creature is doing right now, as one of the sorts of deed (or '' for none of them), and in words */
-  G.doingKey = function (c) { return c.haul >= 0 || (c.bj && c.deedId) ? 'build' : c.strikeT > 0.4 ? 'strike' : c.cool > 0.9 ? 'attack' : ''; };
+  /** what a creature is doing right now, as one of the sorts of behaviour, and in words */
+  G.doingKey = function (c) {
+    if (c.haul >= 0 || (c.bj && c.deedId)) return 'build'; if (c.strikeT > 0.4) return 'strike'; if (c.cool > 0.9) return 'attack'; if (c.asleep) return 'rest'; if (c.eatFlash > 0.4) return 'feed';
+    const i = c.inp, o = c.out; if (!i || !o) return 'rest';
+    if (Math.max(Math.abs(i[5]), Math.abs(i[6])) > 0.35 && o[2] > 0.6) return 'flee'; if (Math.max(Math.abs(i[3]), Math.abs(i[4])) > 0.35 && o[0] > 0.5) return 'hunt'; if (Math.max(Math.abs(i[1]), Math.abs(i[2])) > 0.35 && o[0] > 0.4) return 'feed';
+    if (o[4] > 0.5 && (i[10] || 0) > 0.3) return 'family'; return 'rest';
+  };
   G.doingWords = function (c) {
     if (!c || c.dead) return '';
     if (c.asleep) return 'sleeping';
@@ -9384,39 +9434,46 @@ G.addSystem({
     if (o && o[4] > 0.5 && (i[10] || 0) > 0.3) return 'keeping with its family'; return o && o[0] > 0.5 ? 'swimming about' : 'drifting';
   };
 
-  // ── how common each sort of deed is: counted every generation, per hundred creatures ──
+  // ── how common each counted deed is: counted every generation, per hundred creatures ──
   const did = {}; function rateOf(key) { const W = G.W; return W && W.didRate && W.didRate[key] !== undefined ? W.didRate[key] : 0; }
-  G.on('scored', function () { const W = G.W; if (!W) return; const n = Math.max(1, W.cre.length), R = W.didRate = W.didRate || {}; for (const k in KINDS) { R[k] = +(100 * (did[k] || 0) / n).toFixed(1); did[k] = 0; } });
-  G.on('new-pond', function () { for (const k in did) did[k] = 0; M.length = 0; });
+  G.on('scored', function () { const W = G.W; if (!W) return; const n = Math.max(1, W.cre.length), R = W.didRate = W.didRate || {}; for (const k in COUNTED) { R[k] = +(100 * (did[k] || 0) / n).toFixed(1); did[k] = 0; } });
+  G.on('new-pond', function () { for (const k in did) did[k] = 0; M.length = 0; MK.length = 0; });
 
   // ── moments ──
-  const M = []; const lastOf = {}; let seq = 0;
-  /** something worth a word has just been done by this creature */
-  G.didIt = function (c, key, words) {
+  const M = [], MK = []; const lastOf = {}; let seq = 0;
+  /** something worth a word has just been done by this creature (`to`: what it was done to: a creature, a thing, a building, or a place { x, y }) */
+  G.didIt = function (c, key, words, to) {
     did[key] = (did[key] || 0) + 1;
     if (typeof document === 'undefined' || G.mode !== 'play' || !c || c.dead || G.speed > 4 || (G.pondAsleep && G.pondAsleep())) return;
     const now = performance.now(); if (now - (lastOf[key] || 0) < 9000 || M.length >= 2) return; lastOf[key] = now;
-    const sp = G.speciesById(c.sp); M.push({ id: ++seq, c: c, key: key, words: words, who: sp ? sp.name : 'A creature', el: c.el ? Float32Array.from(c.el) : null, t0: now });
+    const sp = G.speciesById(c.sp), tx = to ? to.x : c.x, ty = to ? to.y : c.y, verb = { attack: 'attacks', hunt: 'ate', build: 'sets a piece', strike: 'strikes back', help: 'goes to help' }[key] || '';
+    const m = { id: ++seq, c: c, key: key, words: words, who: sp ? sp.name : 'A creature', el: c.el ? Float32Array.from(c.el) : null, t0: now, to: to && !to.dead ? to : null, tx: tx, ty: ty, verb: verb };
+    M.push(m); mark(m, 3.4);      // it is shown in the pond as it happens
     draw();
   };
+  /** an arrow in the pond from the one who did it to what it was done to, with a word on it, for a few seconds */
+  function mark(m, secs) { for (let i = MK.length - 1; i >= 0; i--) if (MK[i].m === m) MK.splice(i, 1); MK.push({ m: m, t0: performance.now(), T: secs * 1000 }); if (MK.length > 6) MK.shift(); }
   if (G.on) {
-    G.on('fight', function (a, b) { if (a && b && a.sp !== b.sp) { const s = G.speciesById(b.sp); G.didIt(a, 'attack', 'attacked a ' + (s ? s.name : 'stranger')); } });
-    G.on('death', function (c, cause, by) { if (cause === 'eaten' && by && !by.dead) { const s = G.speciesById(c.sp); G.didIt(by, 'hunt', 'ate a ' + (s ? s.name : 'creature')); } });
-    G.on('build-piece', function (d, pc, c) { if (c && pc.st === 1) G.didIt(c, 'build', 'set a piece of the ' + (d.result ? d.result.name : 'building')); });
-    G.on('struck-back', function (c, z) { G.didIt(c, 'strike', 'struck back at ' + z.word); });
-    G.on('joined-build', function (c, d) { G.didIt(c, 'help', 'went to help build the ' + (d.result ? d.result.name : 'building')); });
+    G.on('fight', function (a, b) { if (a && b && a.sp !== b.sp) { const s = G.speciesById(b.sp); G.didIt(a, 'attack', 'attacked a ' + (s ? s.name : 'stranger'), b); } });
+    G.on('death', function (c, cause, by) { if (cause === 'eaten' && by && !by.dead) { const s = G.speciesById(c.sp); G.didIt(by, 'hunt', 'ate a ' + (s ? s.name : 'creature'), { x: c.x, y: c.y }); } });
+    G.on('build-piece', function (d, pc, c) { if (c && pc.st === 1) G.didIt(c, 'build', 'set a piece of the ' + (d.result ? d.result.name : 'building'), { x: d.x, y: d.y }); });
+    G.on('struck-back', function (c, z) { G.didIt(c, 'strike', 'struck back at ' + z.word, z); });
+    G.on('joined-build', function (c, d) { G.didIt(c, 'help', 'went to help build the ' + (d.result ? d.result.name : 'building'), { x: d.x, y: d.y }); });
   }
   if (typeof document === 'undefined') return;
   const esc = function (s) { return G.escapeHtml ? G.escapeHtml(String(s)) : String(s); };
-  let box = null, win = null;
+  let box = null, win = null, said = null, saidT = 0;
   function ui() {
     if (box) return;
     const st = document.createElement('style');
-    st.textContent = '#moments{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);z-index:6;display:flex;flex-direction:column;gap:6px;width:min(560px,calc(100vw - 28px));pointer-events:none}' +
-      '#moments .mo{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;border-radius:999px;font:500 12.5px/1.3 system-ui,sans-serif;color:#eaf4ff;animation:moin .3s ease-out}@keyframes moin{from{opacity:0;transform:translateY(8px)}}' +
+    st.textContent = '#moments{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);z-index:6;display:flex;flex-direction:column;gap:6px;width:min(620px,calc(100vw - 28px));pointer-events:none}' +
+      '#moments .mo{pointer-events:auto;display:flex;align-items:center;gap:8px;padding:8px 10px 8px 14px;border-radius:999px;font:500 12.5px/1.3 system-ui,sans-serif;color:#eaf4ff;animation:moin .3s ease-out}@keyframes moin{from{opacity:0;transform:translateY(8px)}}' +
       '#moments .mo .tx{flex:1;min-width:0;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#moments .mo .tx b{color:#fff}#moments .mo .tx:hover{color:#f6d365}' +
       '#moments .mo button{flex:none;height:30px;padding:0 13px;border-radius:999px;cursor:pointer;font:800 10.5px system-ui,sans-serif;letter-spacing:.1em;background:rgba(7,18,31,.55)}#moments .mo .g{border:1px solid rgba(51,214,166,.75);color:#dffbf1}#moments .mo .b{border:1px solid rgba(255,126,182,.75);color:#ffd3e2}#moments .mo .g:hover{background:rgba(51,214,166,.25)}#moments .mo .b:hover{background:rgba(255,126,182,.25)}' +
-      '#moments .mo .q{border:1px solid rgba(207,232,255,.3);color:#cfe8ff;padding:0 10px}#moments .mo.done{opacity:.0;transition:opacity .5s}';
+      '#moments .mo .s{border:1px solid rgba(246,211,101,.7);color:#ffe9a8}#moments .mo .s:hover{background:rgba(246,211,101,.22)}#moments .mo .q{border:1px solid rgba(207,232,255,.3);color:#cfe8ff;padding:0 10px}' +
+      '#saidbar{position:fixed;left:50%;transform:translateX(-50%);z-index:7;max-width:min(640px,calc(100vw - 28px));padding:9px 18px;border-radius:16px;font:500 13px/1.4 system-ui,sans-serif;color:#eaf4ff;text-align:center;cursor:pointer;animation:moin .25s ease-out}#saidbar.g{border:1.5px solid rgba(51,214,166,.9)}#saidbar.b{border:1.5px solid rgba(255,126,182,.9)}#saidbar b{color:#fff}#saidbar .big{font:800 14px system-ui,sans-serif;letter-spacing:.12em;margin-right:8px}#saidbar.g .big{color:#5fe6b8}#saidbar.b .big{color:#ff9ec6}#saidbar small{display:block;font-size:11.5px;color:#b9cde2;margin-top:2px}' +
+      '#gbwin .trow{display:grid;grid-template-columns:minmax(0,1fr) 62px 62px;gap:4px 10px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(207,232,255,.1)}#gbwin .trow b{font:700 13.5px system-ui,sans-serif;color:#fff}#gbwin .trow .n{font:800 15px system-ui,sans-serif;text-align:center;padding:3px 0;border-radius:10px}#gbwin .trow .n.g{color:#5fe6b8;background:rgba(51,214,166,.12)}#gbwin .trow .n.b{color:#ff9ec6;background:rgba(255,126,182,.12)}#gbwin .trow .n.z{opacity:.35}#gbwin .trow small{grid-column:1 / -1;font:500 12px/1.45 system-ui,sans-serif;color:#b9cde2}' +
+      '#gbwin .thead{display:grid;grid-template-columns:minmax(0,1fr) 62px 62px;gap:10px;font:800 10px system-ui,sans-serif;letter-spacing:.14em;color:#8fb2d6;text-align:center;padding-bottom:2px}#gbwin .thead span:first-child{text-align:left}#gbwin .tlog{font:500 12.5px/1.5 system-ui,sans-serif;color:#dcecff;margin:0;padding:0;list-style:none}#gbwin .tlog li{padding:3px 0}#gbwin .tlog i{font-style:normal;font-weight:800}';
     document.head.appendChild(st);
     box = document.createElement('div'); box.id = 'moments'; (document.getElementById('ui') || document.body).appendChild(box);
     box.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
@@ -9424,35 +9481,90 @@ G.addSystem({
       let n = e.target; while (n && n !== box && !n.dataset.act) n = n.parentNode; if (!n || n === box) return;
       const id = +n.parentNode.dataset.id, m = M.filter(function (q) { return q.id === id; })[0], act = n.dataset.act; if (!m && act !== 'q') return;
       if (act === 'q') { G.openTaught(); return; }
-      if (act === 'see') { if (!m.c.dead) { G.select(m.c); G.R.ping = { c: m.c, t: 0 }; G.focusOn(m.c.x, m.c.y, 2.2); } return; }
+      if (act === 'see') { see(m); return; }
       if (G.sfx) G.sfx('click'); G.judge(m.c, act === 'g', m); M.splice(M.indexOf(m), 1); draw();
     });
+    said = document.createElement('div'); said.id = 'saidbar'; said.className = 'glass hide'; said.title = 'Open what you have taught'; (document.getElementById('ui') || document.body).appendChild(said);
+    said.addEventListener('pointerdown', function (e) { e.stopPropagation(); }); said.addEventListener('click', function () { G.openTaught(); });
+  }
+  /** go and look at a moment: the view goes to where it happened, the one who did it is picked, and the arrow shows again, longer */
+  function see(m) {
+    if (!m || m.c.dead) return; if (G.sfx) G.sfx('click');
+    const tx = m.to && !m.to.dead && m.to.x !== undefined ? m.to.x : m.tx, ty = m.to && !m.to.dead && m.to.y !== undefined ? m.to.y : m.ty, d = Math.hypot(tx - m.c.x, ty - m.c.y);
+    G.select(m.c); G.R.ping = { c: m.c, t: 0 }; if (G.cam) G.cam.z = G.clamp(520 / Math.max(180, d * 2.2), 1.2, 2.4); G.focusOn((m.c.x + tx) / 2, (m.c.y + ty) / 2, 1.2); mark(m, 7);
+    m.t0 = performance.now();      // (looking at it keeps it a while longer)
   }
   let sig = '';
   function draw() {
     ui(); const now = performance.now();
     for (let i = M.length - 1; i >= 0; i--) if (now - M[i].t0 > 9000 || M[i].c.dead) M.splice(i, 1);
     const hide = G.mode !== 'play' || (G.ui && G.ui.modal) || (G.pondAsleep && G.pondAsleep());
-    const s = hide ? '' : M.map(function (m) { return m.id; }).join(','); if (s === sig) return; sig = s;
-    const al = document.getElementById('mvalert'), up = al && !al.classList.contains('hide'); box.style.bottom = up ? Math.round(window.innerHeight - al.getBoundingClientRect().top + 10) + 'px' : '150px';
-    box.innerHTML = hide ? '' : M.map(function (m) { return '<div class="mo glass" data-id="' + m.id + '"><span class="tx" data-act="see" title="Show me">A <b>' + esc(m.who) + '</b> ' + esc(m.words) + '</span><button class="g" data-act="g" title="Good: it, and those of its kind who saw, will do more of this">♥ GOOD</button><button class="b" data-act="b" title="Bad: they will do less of this">✕ BAD</button><button class="q" data-act="q" title="What you have taught this pond">?</button></div>'; }).join('');
+    const al = document.getElementById('mvalert'), up = al && !al.classList.contains('hide'), base = up ? Math.round(window.innerHeight - al.getBoundingClientRect().top + 10) : 150;
+    if (said && !said.classList.contains('hide')) { if (now - saidT > 5200 || hide) said.classList.add('hide'); else said.style.bottom = (base + box.offsetHeight + (box.offsetHeight ? 8 : 0)) + 'px'; }
+    const hb0 = document.getElementById('rarebox'), s = hide ? '' : M.map(function (m) { return m.id; }).join(',') + (hb0 && !hb0.classList.contains('hide') ? 'h' : ''); if (s === sig) return; sig = s;
+    box.style.bottom = base + 'px';
+    { const hb = document.getElementById('rarebox'), open = hb && !hb.classList.contains('hide') && window.innerWidth > 900, w = Math.min(620, window.innerWidth - 28), x = open ? Math.max(window.innerWidth / 2, hb.getBoundingClientRect().right + 12 + w / 2) : 0; box.style.left = x ? Math.round(x) + 'px' : ''; if (said) said.style.left = x ? Math.round(x) + 'px' : ''; }      /* (beside the NOW panel when that is open, never under it) */
+    box.innerHTML = hide ? '' : M.map(function (m) { return '<div class="mo glass" data-id="' + m.id + '"><span class="tx" data-act="see" title="Go and see it">A <b>' + esc(m.who) + '</b> ' + esc(m.words) + '</span><button class="s" data-act="see" title="Go and see it in the pond">SEE</button><button class="g" data-act="g" title="Good: it, and those of its kind who saw, will do more of this">♥ GOOD</button><button class="b" data-act="b" title="Bad: they will do less of this">✕ BAD</button><button class="q" data-act="q" title="What you have taught this pond">?</button></div>'; }).join('');
   }
-  setInterval(function () { try { draw(); } catch (e) { console.error(e); } }, 700);
+  setInterval(function () { try { draw(); } catch (e) { console.error(e); } }, 600);
+
+  // ── your word, said back to you: to whom, for what, who else heard, and the count so far ──
+  const JW = [];      // GOOD and BAD rising over those spoken to
+  G.on('you-said', function (c, good, s) {
+    if (G.mode !== 'play') return; ui(); const W = G.W, r = s.key && W.taught ? W.taught[s.key] : null;
+    said.className = 'glass ' + (good ? 'g' : 'b');
+    said.innerHTML = '<span class="big">' + (good ? '♥ GOOD' : '✕ BAD') + '</span>to <b>' + esc(s.who) + '</b>' + (s.what ? ' for <b>' + esc(s.what) + '</b>' : '') + '<small>' + (s.heard ? s.heard + ' of its kind nearby heard it too. ' : 'Nobody else of its kind was near enough to hear. ') + (r ? cap(KINDS[s.key]) + ', so far: <b style="color:#5fe6b8">♥ ' + r.good + '</b> · <b style="color:#ff9ec6">✕ ' + r.bad + '</b>' : '') + '</small>';
+    saidT = performance.now(); sig = 'x'; draw();
+    JW.push({ c: c, good: good, t0: performance.now(), big: true }); if (JW.length > 30) JW.shift();
+  });
+  G.on('judged-by-god', function (c, good, soft) { if (soft && G.mode === 'play') JW.push({ c: c, good: good, t0: performance.now(), big: false }); });
+  const cap = function (s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); };
+
+  // ── drawn in the pond: the arrow of a moment, and GOOD / BAD over those who were spoken to ──
+  G.addSystem({ name: 'judge-marks', draw: function () {
+    const ctx = G.ctx, v = G.view; if (!ctx || G.mode !== 'play' || (!MK.length && !JW.length) || (G.pondAsleep && G.pondAsleep())) return;
+    const now = performance.now(), sx = function (x) { return x * v.scale + v.ox; }, sy = function (y) { return y * v.scale + v.oy; };
+    ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let i = MK.length - 1; i >= 0; i--) { const k = MK[i], m = k.m, u = (now - k.t0) / k.T; if (u >= 1 || m.c.dead) { MK.splice(i, 1); continue; }
+      const a = Math.min(1, (1 - u) * 3) * Math.min(1, u * 8), c = m.c, cx = c.rx === undefined ? c.x : c.rx, cy = c.ry === undefined ? c.y : c.ry, T = m.to && !m.to.dead && m.to.x !== undefined ? m.to : null, tx = T ? (T.rx === undefined ? T.x : T.rx) : m.tx, ty = T ? (T.ry === undefined ? T.y : T.ry) : m.ty;
+      const ax = sx(cx), ay = sy(cy), bx = sx(tx), by = sy(ty), r1 = (c.ph.r * 2.1 + 6) * v.scale, r2 = ((T && T.ph ? T.ph.r * 2.1 : 26) + 6) * v.scale, L = Math.hypot(bx - ax, by - ay), bad = m.key === 'attack' || m.key === 'hunt', col = bad ? '255,110,140' : '246,211,101';
+      // the one who did it, and what it was done to
+      ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(' + col + ',' + 0.95 * a + ')'; ctx.setLineDash([6, 6]); ctx.lineDashOffset = -now / 40; ctx.beginPath(); ctx.arc(ax, ay, r1, 0, 6.2832); ctx.stroke(); ctx.setLineDash([]);
+      if (L > r1 + 8) { ctx.strokeStyle = 'rgba(' + col + ',' + 0.8 * a + ')'; ctx.beginPath(); ctx.arc(bx, by, r2 * (1 + 0.12 * Math.sin(now / 160)), 0, 6.2832); ctx.stroke();
+        const ux = (bx - ax) / L, uy = (by - ay) / L, x0 = ax + ux * r1, y0 = ay + uy * r1, x1 = bx - ux * (r2 + 2), y1 = by - uy * (r2 + 2);
+        if (L > r1 + r2 + 14) { ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(' + col + ',' + 0.9 * a + ')'; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.fillStyle = 'rgba(' + col + ',' + a + ')'; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * 12 - uy * 6, y1 - uy * 12 + ux * 6); ctx.lineTo(x1 - ux * 12 + uy * 6, y1 - uy * 12 - ux * 6); ctx.closePath(); ctx.fill(); } }
+      // the word for it, by the one who did it
+      if (m.verb) { ctx.font = '800 12px system-ui, sans-serif'; const tw = ctx.measureText(m.verb).width + 16, lx = ax, ly = ay - r1 - 15; ctx.fillStyle = 'rgba(9,18,30,' + 0.88 * a + ')'; G.roundRect(ctx, lx - tw / 2, ly - 10, tw, 20, 10); ctx.fill(); ctx.strokeStyle = 'rgba(' + col + ',' + 0.9 * a + ')'; ctx.lineWidth = 1.3; ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,' + a + ')'; ctx.fillText(m.verb, lx, ly + 0.5); } }
+    for (let i = JW.length - 1; i >= 0; i--) { const j = JW[i], T = j.big ? 2400 : 1500, u = (now - j.t0) / T; if (u >= 1 || j.c.dead) { JW.splice(i, 1); continue; }
+      const c = j.c, x = sx(c.rx === undefined ? c.x : c.rx), y = sy((c.ry === undefined ? c.y : c.ry) - c.ph.r * 2.4) - 10 - u * (j.big ? 34 : 18), a = Math.min(1, (1 - u) * 2.5), col = j.good ? '95,230,184' : '255,150,190';
+      if (j.big) { const R = (c.ph.r * 2.2 + 8 + u * 26) * v.scale; ctx.lineWidth = 3.5 * (1 - u) + 1; ctx.strokeStyle = 'rgba(' + col + ',' + 0.9 * a + ')'; ctx.beginPath(); ctx.arc(sx(c.rx === undefined ? c.x : c.rx), sy(c.ry === undefined ? c.y : c.ry), R, 0, 6.2832); ctx.stroke();
+        const txt = j.good ? '♥ GOOD' : '✕ BAD', pop = 1 + 0.3 * Math.max(0, 1 - u * 6); ctx.font = '800 ' + Math.round(22 * pop) + 'px system-ui, sans-serif'; ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(9,18,30,' + 0.85 * a + ')'; ctx.strokeText(txt, x, y); ctx.fillStyle = 'rgba(' + col + ',' + a + ')'; ctx.fillText(txt, x, y); }
+      else { ctx.font = '800 14px system-ui, sans-serif'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(9,18,30,' + 0.8 * a + ')'; ctx.strokeText(j.good ? '♥' : '✕', x, y); ctx.fillStyle = 'rgba(' + col + ',' + a + ')'; ctx.fillText(j.good ? '♥' : '✕', x, y); } }
+    ctx.restore();
+  } });
 
   // ── what you have taught ──
+  function taughtHtml() {
+    const W = G.W, T = W.taught || {}, keys = Object.keys(KINDS), spoken = keys.filter(function (k) { return T[k]; }), silent = keys.filter(function (k) { return !T[k]; }), log = (W.said || []).slice().reverse();
+    const row = function (k) { const r = T[k], now = rateOf(k); let note = '';
+      if (COUNTED[k]) { const d = now - r.rate0, lean = r.good - r.bad; note = 'When you first spoke of it (generation ' + r.gen0 + ') it happened <b>' + r.rate0 + '</b> times a generation for every hundred creatures; now <b>' + now + '</b>.' + (lean === 0 ? ' You have said as much good of it as bad.' : (lean > 0) === (d > 0) && Math.abs(d) >= 0.5 ? ' <span style="color:#5fe6b8">They seem to be listening.</span>' : W.gen - r.gen0 < 4 ? ' It is early to say whether they are listening.' : ' <span style="color:#ff9ec6">So far they are not taking it up: other things weigh more with them.</span>'); }
+      else note = 'First spoken of in generation ' + r.gen0 + '. (The pond does not count how often this happens, so only your own words are shown.)';
+      return '<div class="trow"><b>' + esc(cap(KINDS[k])) + '</b><span class="n g' + (r.good ? '' : ' z') + '">♥ ' + r.good + '</span><span class="n b' + (r.bad ? '' : ' z') + '">✕ ' + r.bad + '</span><small>' + note + '</small></div>'; };
+    return '<div class="gtop"><div><b>What you have taught</b><small>You do not command the pond. You say <span style="color:#5fe6b8;font-weight:800">GOOD</span> or <span style="color:#ff9ec6;font-weight:800">BAD</span> of what a creature did. It learns from it, and so, more faintly, do those of its kind who were near; the young pick it up and children are born with half of it. Whether it takes hold is up to them.</small></div><button class="btn sm" id="twclose">' + ((G.ICON && G.ICON.close) || '') + 'CLOSE</button></div>' +
+      '<h3>YOUR WORDS, BY BEHAVIOUR</h3>' + (spoken.length ? '<div class="thead"><span>BEHAVIOUR</span><span>GOOD</span><span>BAD</span></div>' + spoken.map(row).join('') : '<p class="gnote" style="font-size:13px">You have said nothing yet. Press GOOD or BAD on one of the little notes that appear above the menu when something happens, or on any creature\'s card.</p>') +
+      (silent.length && spoken.length ? '<p class="gnote">Not spoken of yet: ' + esc(silent.map(function (k) { return KINDS[k]; }).join(', ')) + '.</p>' : '') +
+      (log.length ? '<h3>WHAT YOU SAID LATELY</h3><ul class="tlog">' + log.slice(0, 7).map(function (s) { return '<li><i style="color:' + (s.good ? '#5fe6b8' : '#ff9ec6') + '">' + (s.good ? '♥ GOOD' : '✕ BAD') + '</i> to ' + esc(s.who) + (s.what ? ' for ' + esc(s.what) : '') + ' <span style="opacity:.6">· generation ' + s.gen + (s.heard ? ' · ' + s.heard + ' more heard' : '') + '</span></li>'; }).join('') + '</ul>' : '') +
+      '<p class="gnote">Where to say it: on the notes above the menu (they come when the pond runs at 1× or 4×; SEE takes you to what happened), or on a creature\'s card, where GOOD and BAD are about what it is doing at that moment.</p>';
+  }
   G.openTaught = function () {
     if (win) { win.remove(); win = null; return; }
-    const W = G.W; if (!W) return; const T = W.taught || {}, keys = Object.keys(KINDS);
+    if (!G.W) return; ui();
     win = document.createElement('div'); win.id = 'gbwin'; win.className = 'about'; (document.getElementById('ui') || document.body).appendChild(win);
     win.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
-    const row = function (k) { const r = T[k], now = rateOf(k); if (!r) return '<div class="arow"><b style="grid-column:1 / -1">' + esc(KINDS[k].charAt(0).toUpperCase() + KINDS[k].slice(1)) + '</b><small>You have said nothing of it yet. Now: ' + now + ' times a generation for every hundred creatures.</small></div>';
-      const d = now - r.rate0, lean = r.good - r.bad, heard = lean === 0 ? '' : (lean > 0) === (d > 0) && Math.abs(d) >= 0.5 ? ' <span style="color:#33d6a6">They seem to be listening.</span>' : W.gen - r.gen0 < 4 ? ' It is early to say.' : ' <span style="color:#ff9ec6">So far they are not taking it up: other things weigh more with them.</span>';
-      return '<div class="arow"><b style="grid-column:1 / -1">' + esc(KINDS[k].charAt(0).toUpperCase() + KINDS[k].slice(1)) + '</b><small>You called it good <b style="color:#33d6a6">' + r.good + '</b> ' + (r.good === 1 ? 'time' : 'times') + ' and bad <b style="color:#ff9ec6">' + r.bad + '</b>. When you first spoke (generation ' + r.gen0 + ') it happened ' + r.rate0 + ' times a generation for every hundred creatures; now ' + now + '.' + heard + '</small></div>'; };
-    win.innerHTML = '<div class="gtop"><div><b>What you have taught</b><small>You do not command the pond. You say GOOD or BAD of what a creature did; it, and those of its kind who saw, learn from it, the young pick it up from them, and children are born with half of it. Whether it takes hold is up to them.</small></div><button class="btn sm" id="twclose">' + ((G.ICON && G.ICON.close) || '') + 'CLOSE</button></div><h3>BY SORT OF DEED</h3>' + keys.map(row).join('') +
-      '<p class="gnote">Where to say it: on the little notes that appear above the toolbar when something happens (slow the pond to 1× or 4× to get them), or on any creature\'s card, where GOOD and BAD are about what it is doing at that moment.</p>';
-    document.getElementById('twclose').onclick = function () { win.remove(); win = null; };
+    const fill = function () { if (!win) return; const h = taughtHtml(); if (win._h !== h) { win._h = h; win.innerHTML = h; document.getElementById('twclose').onclick = function () { win.remove(); win = null; }; } };
+    fill(); const t = setInterval(function () { if (!win) { clearInterval(t); return; } try { fill(); } catch (e) { console.error(e); } }, 900);
   };
-  G.on('new-pond', function () { if (win) { win.remove(); win = null; } });
+  G.on('new-pond', function () { if (win) { win.remove(); win = null; } if (said) said.classList.add('hide'); JW.length = 0; });
 })();
 
 </script>
@@ -9616,7 +9728,7 @@ G.addSystem({
   /** whom it follows or who follows it, what it has given and danced, and what its people are like */
   G.societyText = function (c) { const L = c.leader && !c.leader.dead ? c.leader : null, so = c.sp ? G.societyOf(c.sp) : null;
     return ((c.fol || 0) >= 3 ? c.fol + ' follow it. ' : L ? 'It follows #' + L.id + (L.sp !== c.sp ? ', one of another kind' : '') + (c.swayed ? ' (talked into it by #' + c.swayed + ')' : '') + '. ' : 'It follows nobody. ') + (c.gave ? 'It has shared its food ' + c.gave + (c.gave === 1 ? ' time. ' : ' times. ') : '') + (c.danced ? 'It has danced ' + c.danced + (c.danced === 1 ? ' time. ' : ' times. ') : '') + (so ? 'Its people: ' + so.text : ''); };
-  if (G.lifeText) { const t0 = G.lifeText; G.lifeText = function (c) { return t0(c) + ' Character: ' + G.characterOf(c) + '.' + (c.stranger !== undefined ? (c.fromPond === 0 ? ' You set it down here yourself.' : ' It came here from another pond.') + ({ led: ' They follow it.', few: ' A few follow it.', looked: ' They looked at it and went back to their own.', shunned: ' They kept away from it.', left: ' Its following has left it.' }[c.met] || '') : c.line ? ' It is descended from one who came here from another pond.' : ''); }; }
+  if (G.lifeText) { const t0 = G.lifeText; G.lifeText = function (c) { return t0(c) + ' Character: ' + G.characterOf(c) + '.' + (c.beenTo ? ' It flew to ' + c.beenTo + ' and came home.' : '') + (c.stranger !== undefined ? (c.fromPond === 0 ? ' You set it down here yourself.' : ' It came here from another pond.') + ({ led: ' They follow it.', few: ' A few follow it.', looked: ' They looked at it and went back to their own.', shunned: ' They kept away from it.', left: ' Its following has left it.' }[c.met] || '') : c.line ? ' It is descended from one who came here from another pond.' : ''); }; }
   // The stranger's own strip, above the moments: who came, how many are looking and following right now, and then what the pond made of it. It stays on
   // screen for a while after the verdict (banners are often busy with other news), and a click on it goes to the stranger.
   if (typeof document !== 'undefined') setInterval(function () {
@@ -9644,7 +9756,7 @@ G.addSystem({
       if (line) { out.sig += 'ln' + line; out.people.push(G.hub.row({ icon: '\u2691', title: (G.far && G.far.visiting ? 'Born here of your people' : 'Born of strangers') + ': ' + line, sub: 'Descended from those who came from another pond. They carry their character on.' })); }
       W.species.filter(function (s) { return !s.extinct && s.n >= 3; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 7).forEach(function (s) { const so = G.societyOf(s.id); if (!so) return; const top = so.top;
         out.sig += s.id + ':' + so.heads + ':' + (top ? top.id + '.' + top.fol : '') + '|';
-        out.people.push(G.hub.row({ icon: so.heads ? '\u2691' : '\u2022', title: 'The ' + s.name, tag: so.n + ' alive', sub: so.text, act: top ? 'cre' : 'kind', arg: top ? top.id : s.id }));
+        const cr = G.craftOf ? G.craftOf(s.id) : 0; out.sig += 'c' + cr; out.people.push(G.hub.row({ icon: so.heads ? '\u2691' : '\u2022', title: 'The ' + s.name, tag: so.n + ' alive', sub: so.text + (cr ? ' <span style="color:#f6d365">Builders: ' + cr + (cr === 1 ? ' building raised' : ' buildings raised') + (cr >= 5 ? ' (masters of it)' : cr >= 2 ? ' (practised)' : '') + '.</span>' : ''), act: top ? 'cre' : 'kind', arg: top ? top.id : s.id }));
         if (top && top.fol >= 5) out.news.push('L' + s.id + ':' + top.id); });
       return out;
     });
@@ -9771,21 +9883,22 @@ G.addSystem({
   // (everything about it that does not move: the picture is made again whenever a piece is set, coloured or lost)
   const baseOf = function (o) { return [o.x, o.y + (o.bp ? o.bp.S * 0.45 : 30)]; };
   const draw0 = G.drawBlueprint; let made = 0, frame = 0;
+  const KEPT = new WeakMap();      // the kept picture of each building, by its plan (kept beside the plan, not in it: a plan is copied and saved, a picture is not)
   if (draw0) G.drawBlueprint = function (ctx, o, building) {
     const bp = o.bp; if (!bp || building || !bp.P || !bp.P.length) return draw0(ctx, o, building);
     const P = bp.P, t = G.W ? G.W.t : 0; let sig = '' + Math.round(bp.hue || 0), moving = false;
     for (let i = 0; i < P.length; i++) { const p = P[i]; sig += p.st + (p.um === undefined ? '' : 'm' + p.um); if (p.st > 0 && p.t0 !== undefined && t - p.t0 >= 0 && t - p.t0 < 0.45) moving = true; }
     if (moving) return draw0(ctx, o, building);
-    let cv = bp._cv;
-    if (!cv || bp._sig !== sig) {
-      if (G.rt !== frame) { frame = G.rt; made = 0; } if (made >= 2 && cv) sig = bp._sig; else {      /* (two new pictures a frame at most: a pond coming back from a save fills in over a few frames) */
+    let K = KEPT.get(bp), cv = K ? K.cv : null;
+    if (!cv || K.sig !== sig) {
+      if (G.rt !== frame) { frame = G.rt; made = 0; } if (made >= 2 && cv) sig = K.sig; else {      /* (two new pictures a frame at most: a pond coming back from a save fills in over a few frames) */
         made++; let hw = 30, top = 20; for (let i = 0; i < P.length; i++) { const p = P[i]; hw = Math.max(hw, Math.abs(p.x) + p.w * 0.72); top = Math.max(top, -p.y + p.h * 1.12 + (p.s === 'lamp' ? p.w : 0)); }
         const pad = 10, Wc = hw * 2 + pad * 2, Hc = top + pad * 2 + 6, k = Math.min(2, Math.sqrt(900000 / (Wc * Hc)));
-        cv = bp._cv && bp._cv.width === Math.ceil(Wc * k) && bp._cv.height === Math.ceil(Hc * k) ? bp._cv : document.createElement('canvas'); cv.width = Math.ceil(Wc * k); cv.height = Math.ceil(Hc * k);
+        cv = cv && cv.width === Math.ceil(Wc * k) && cv.height === Math.ceil(Hc * k) ? cv : document.createElement('canvas'); cv.width = Math.ceil(Wc * k); cv.height = Math.ceil(Hc * k);
         const c2 = cv.getContext('2d'); c2.setTransform(k, 0, 0, k, (hw + pad) * k, (top + pad) * k);
         for (let i = 0; i < P.length; i++) if (P[i].st > 0 && !LIVE[P[i].s]) { try { G.pieceDraw(c2, P[i], bp.hue, t); } catch (e) { console.error(e); } }
-        bp._cv = cv; bp._sig = sig; bp._box = [hw + pad, top + pad, Wc, Hc]; } }
-    const b = baseOf(o), S = bp.S, box = bp._box;
+        K = { cv: cv, sig: sig, box: [hw + pad, top + pad, Wc, Hc] }; KEPT.set(bp, K); } }
+    const b = baseOf(o), S = bp.S, box = K.box;
     ctx.save(); ctx.translate(b[0], b[1]);
     { const hw = bp.hw || 60, ring = bp.type === 'wall' && !bp.designed; ctx.fillStyle = 'rgba(8,16,26,0.28)'; ctx.beginPath(); ctx.ellipse(0, S * 0.1, ring ? S * 1.25 : hw * 1.12, ring ? S * 0.74 : Math.max(10, hw * 0.2), 0, 0, TAU); ctx.fill(); }
     ctx.imageSmoothingEnabled = true; ctx.drawImage(cv, -box[0], -box[1], box[2], box[3]);
@@ -9887,6 +10000,7 @@ G.addSystem({
 // red when something dangerous has appeared. It opens one panel, which stays open for as long as you like while the pond goes on:
 //     NOW       what is happening this minute, most pressing first      PLANS    the plan under way, what they have built, plans past
 //     MARVELS   every marvel alive                                      PEOPLE   each kind's society, strangers, your outposts in far ponds
+//     SPACE     the spaceport and the spaceship (always shown once they exist), the mission under way, your outposts in far ponds
 //     DANGERS   what harms the pond, and how far life has got in beating it
 // Other parts of the game put their own rows in it (G.hub.add): voyages (59_voyage.js), society (54g_society.js), dangers (63_versus.js).
 // Click any row and the camera goes to it.
@@ -9897,7 +10011,7 @@ G.addSystem({
   const H = G.hub = { parts: [], acts: {},
     /** a part of the game says what it has for the panel: fn(W) -> { sig, now:[html], people:[html], dangers:[html], news:[keys], alarm:[keys] } */
     add: function (fn) { H.parts.push(fn); }, act: function (name, fn) { H.acts[name] = fn; },
-    open: function (t) { shut = false; if (t) tab = t; sig = ''; draw(); }, close: function () { shut = true; sig = ''; draw(); }, poke: function () { sig = ''; },
+    open: function (t) { shut = false; if (t) tab = t; sig = ''; draw(); }, close: function () { shut = true; sig = ''; draw(); }, poke: function () { sig = ''; }, tab: function () { return shut ? '' : tab; },
     /** one row, in the panel's own look: { icon, title, tag, bad, sub, extra, act, arg, live } */
     row: function (o) { return '<div class="rrow' + (o.live ? ' live' : '') + (o.act ? '' : ' idle') + '"' + (o.act ? ' data-act="' + o.act + '" data-arg="' + esc(o.arg === undefined ? '' : o.arg) + '"' : '') + '><span class="ric">' + (o.icon || '\u2022') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(o.title) + '</b>' + (o.tag ? '<span class="rtag' + (o.bad ? ' no' : '') + '">' + esc(o.tag) + '</span>' : '') + '</span>' + (o.sub ? '<div class="rsub">' + o.sub + '</div>' : '') + (o.extra || '') + '</span></div>'; } };
   const esc = function (s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
@@ -9944,7 +10058,7 @@ G.addSystem({
       '#rarebox .rrow.idle{cursor:default}#rarebox .rrow.idle:hover{background:rgba(7,18,31,.38);border-color:rgba(207,232,255,.12)}#rarebox .rrow.idle .ric{opacity:.75}#rarebox .rrow.ask .ric{border-color:rgba(246,211,101,.7);color:#f6d365;animation:rpulse 1.2s ease-in-out infinite}#rarebox .rtag.wait{background:rgba(207,232,255,.1);border-color:rgba(207,232,255,.35);color:#dcecff}@keyframes rpulse{50%{opacity:.45}}' +
       '#rarebox .rnone{font-size:12px;color:#b9cde2;margin:8px 2px 0;line-height:1.45}' +
       '#rarebox{scrollbar-color:rgba(207,232,255,.35) transparent}#rarebox::-webkit-scrollbar{width:6px}#rarebox::-webkit-scrollbar-track{background:transparent}#rarebox::-webkit-scrollbar-thumb{background:rgba(207,232,255,.3);border-radius:3px}' +
-      '#rarebox .tabs2{display:flex;gap:4px;margin:8px 0 2px}#rarebox .tabs2 span{flex:1;text-align:center;padding:6px 2px;border-radius:10px;cursor:pointer;white-space:nowrap;font:700 10.5px system-ui,sans-serif;color:#b9cde2;background:rgba(7,18,31,.4);border:1px solid rgba(207,232,255,.14)}#rarebox .tabs2 span.on{color:#14202e;background:#f6d365;border-color:#f6d365}#rarebox .tabs2 span i{font-style:normal;opacity:.75;margin-left:3px}#rarebox .tabs2 span.bad:not(.on){border-color:#ff5d7a;color:#ffd3dc}#rarebox .tabs2 span.new:not(.on){border-color:#f6d365;color:#ffe9a8}' +
+      '#rarebox .tabs2{display:flex;gap:4px;margin:8px 0 2px}#rarebox .tabs2 span{flex:1;text-align:center;padding:6px 1px;border-radius:10px;cursor:pointer;white-space:nowrap;font:700 10px system-ui,sans-serif;color:#b9cde2;background:rgba(7,18,31,.4);border:1px solid rgba(207,232,255,.14)}#rarebox .tabs2 span.on{color:#14202e;background:#f6d365;border-color:#f6d365}#rarebox .tabs2 span i{font-style:normal;opacity:.75;margin-left:3px}#rarebox .tabs2 span.bad:not(.on){border-color:#ff5d7a;color:#ffd3dc}#rarebox .tabs2 span.new:not(.on){border-color:#f6d365;color:#ffe9a8}' +
       '#rarebox .rmore{margin-top:8px;padding-top:8px;border-top:1px solid rgba(207,232,255,.16);font-size:12px;color:#dcecff}#rarebox .rmore img{display:block;width:120px;height:120px;margin:0 auto 6px}#rarebox .rmore ul{margin:4px 0 0;padding:0;list-style:none}#rarebox .rmore li{padding:2px 0 2px 14px;position:relative;color:#ffe9a8;font-weight:600}#rarebox .rmore li:before{content:"\\25C6";position:absolute;left:0;font-size:8px;top:6px}' +
       '#rarebox.flash{animation:rareflash 1.4s ease-out 2}@keyframes rareflash{0%{box-shadow:0 0 0 0 rgba(246,211,101,.9)}100%{box-shadow:0 0 0 22px rgba(246,211,101,0)}}' +
       '@media (max-width:720px){#rarebox{top:auto;bottom:150px;left:7px;transform:none;max-height:30vh}}@media (max-height:560px){#rarebox{display:none}}';
@@ -9980,7 +10094,7 @@ G.addSystem({
     if (btn && btn.parentNode) return btn; const tb = document.getElementById('toolbar'); if (!tb) return null;
     btn = document.createElement('button'); btn.id = 'tb-now'; btn.className = 'btn'; btn.setAttribute('aria-label', 'now'); btn.title = 'What is happening in the pond now: plans, marvels, ships, strangers, dangers';
     btn.innerHTML = ((G.ICON && G.ICON.wave) || '') + '<span class="lab">NOW</span><b class="tbadge"></b>'; tb.insertBefore(btn, tb.firstChild);
-    btn.onclick = function () { if (G.mode !== 'play') return; if (G.sfx) G.sfx('click'); shut = !shut; sig = ''; draw(); };
+    btn.onclick = function () { if (G.mode !== 'play') return; if (G.sfx) G.sfx('click'); if (shut || tab === 'space') { shut = false; tab = 'now'; if (G.closePop) G.closePop(); } else shut = true; sig = ''; draw(); };      /* (NOW opens on what is happening; one panel of the menu at a time) */
     return btn;
   }
   function badge(n, bad) { const b = button(); if (!b) return; const e = b.lastChild, t = n ? String(n) : (bad ? '!' : ''); if (e.textContent !== t) e.textContent = t; e.classList.toggle('bad', !!bad); b.classList.toggle('on', !shut); b.classList.toggle('pulse', !!(n || bad) && shut); }
@@ -10003,13 +10117,13 @@ G.addSystem({
     box.classList.remove('hide'); box.classList.remove('shut');
     // it stands above the bottom menu, beside the zoom buttons, and may be as tall as the room up to the season card
     { const tb = document.getElementById('toolbar'), se = document.getElementById('season'), top = se && !se.classList.contains('hide') ? se.getBoundingClientRect().bottom + 10 : 14, bot = tb ? tb.getBoundingClientRect().top - 10 : window.innerHeight - 90;
-      if (window.innerWidth > 720) { box.style.top = 'auto'; box.style.bottom = Math.round(window.innerHeight - bot) + 'px'; box.style.left = '78px'; box.style.transform = 'none'; box.style.maxHeight = Math.max(170, Math.round(bot - top)) + 'px'; } else { box.style.top = ''; box.style.bottom = ''; box.style.left = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
+      if (window.innerWidth > 720) { box.style.top = 'auto'; box.style.bottom = Math.round(window.innerHeight - bot) + 'px'; box.style.left = '78px'; box.style.transform = 'none'; const hgt = Math.max(280, Math.min(640, Math.round(bot - top))); box.style.height = hgt + 'px'; box.style.maxHeight = hgt + 'px'; } else { box.style.height = '';      /* (always the same height: what is in it scrolls, the panel itself does not jump about) */ box.style.top = ''; box.style.bottom = ''; box.style.left = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
     box.style.zIndex = '9';
     const ps = parts.map(function (p) { return p.sig || ''; }).join('~');
     if (s2 + tab + open + bo + ps === sig) return; sig = s2 + tab + open + bo + ps;
     const dang = cat('dangers'), ppl = cat('people');
     let fresh = false, h = '<div class="rk" title="Close"><span>In the pond now</span><span class="rc"><u>\u2715</u></span></div>';
-    { const T = [['now', 'Now', ''], ['plans', 'Plans', (d ? 1 : 0) + Wk.length || ''], ['marvels', 'Marvels', order.length || ''], ['people', 'People', ''], ['dangers', 'Dangers', dang.length || '']];
+    { const T = [['now', 'Now', ''], ['plans', 'Plans', (d ? 1 : 0) + Wk.length || ''], ['marvels', 'Marvels', order.length || ''], ['people', 'People', ''], ['space', 'Space', cat('spaceN').length || ''], ['dangers', 'Dangers', dang.length || '']];
       h += '<div class="tabs2">' + T.map(function (q) { return '<span data-tab="' + q[0] + '" class="' + (tab === q[0] ? 'on' : '') + (q[0] === 'dangers' && dang.length ? ' bad' : '') + '">' + q[1] + (q[2] ? '<i>' + q[2] + '</i>' : '') + '</span>'; }).join('') + '</div>'; }
     const Mv = tab === 'marvels', Nw = tab === 'now';
     const P = tab === 'plans';
@@ -10039,6 +10153,7 @@ G.addSystem({
       h += '<div class="rrow old" data-go="p' + i + '"><span class="ric">' + (p.how === 'done' ? '✓' : '✕') + '</span><span style="flex:1;min-width:0"><span class="rt"><b>' + esc(p.title) + '</b><span class="rtag' + (p.how === 'done' ? '' : ' no') + '">' + (p.how === 'done' ? 'done' : 'gave up') + ' · gen ' + p.gen + '</span></span><div class="rsub">' + chip(p.kind, p.hue) + ' ' + (p.what ? names('set out to ' + p.what.replace(/\.$/, '') + '.') : names(p.say)) + '</div></span></div>'; }
     if (G.ai.over && G.ai.provider === 'server') { if (P && G.ai.over('deed') && d) h += '<div class="rnone" style="color:#ff9db0">New plans are OFF: their budget for this pond is used up.</div>'; if (Mv && G.ai.over('marvel')) h += '<div class="rnone" style="color:#ff9db0">New marvels are OFF: their budget for this pond is used up.</div>'; }
     if (Nw) { const N = cat('now'); h += N.join(''); if (!N.length && !d && !order.length && !cat('alarmRows').length) h += '<div class="rnone">The pond is quiet just now: no plan under way, no marvel alive, nothing dangerous in it. What matters will show here as it happens.</div>'; }
+    if (tab === 'space') h += cat('space').join('') || '<div class="rnone">Nothing of space yet.</div>';
     if (tab === 'people') h += ppl.join('') || '<div class="rnone">No kind is settled enough yet to say what its people are like.</div>';
     if (tab === 'dangers') h += dang.length ? '<div class="rnone" style="margin-bottom:2px">Harmful things you or events put in the pond, and how far the creatures have got in beating each one.</div>' + dang.join('') : '<div class="rnone">Nothing harmful is in the pond just now.</div>';
     if (Mv && !order.length) h += '<div class="rnone">No marvel alive just now. Once in many generations a creature is born with a rare gift. It shows here, and a click takes you to it.</div>';
@@ -10049,7 +10164,7 @@ G.addSystem({
   H.act('marvel', function (id) { const W = G.W, L = W.cre.filter(function (c) { return !c.dead && c.g.mv === +id; }).sort(function (a, b) { return G.charmOf(b) - G.charmOf(a); }); if (L[0]) { if (G.select) G.select(L[0]); G.focusOn(L[0].x, L[0].y, 2.4); } });
   H.act('cre', function (id) { const c = G.W.cre.filter(function (q) { return q.id === +id && !q.dead; })[0]; if (c) { if (G.select) G.select(c); G.focusOn(c.x, c.y, 1.8); } });
   // NOW is one of the menu's buttons: the old way of asking for it goes there too
-  setTimeout(function () { if (!G.act) return; const a0 = G.act; G.act = function (name) { if (name === 'now') { if (G.mode !== 'play') return; shut = !shut; sig = ''; draw(); return; } return a0(name); }; }, 0);
+  setTimeout(function () { if (!G.act) return; const a0 = G.act; G.act = function (name) { if (name === 'now') { if (G.mode !== 'play') return; shut = !shut; sig = ''; draw(); return; } if (!shut && name !== 'speed') { shut = true; sig = ''; draw(); } return a0(name); };      /* (opening anything else in the menu puts this away) */ }, 0);
   G.on('new-pond', function () { seen = {}; sig = ''; });
   G.on('marvel-icon', function () { sig = ''; });
 })();
@@ -10176,8 +10291,9 @@ G.addSystem({
   /** who goes aboard is theirs to decide: the leader of the ship's builders, then those who built it with their own hands, then those of their kind nearest it.
    *  Each comes back as the creature, with `c.crewWhy` saying why it goes ('their leader', 'built it', 'of their kind'). */
   F.crewFor = function (ship) {
-    const W = G.W, cap = F.holdOf(ship).crew, out = [], ok = function (c) { return c && !c.dead && !c.deedId && out.indexOf(c) < 0; }, dist = function (a, b) { return Math.hypot(a.x - ship.x, a.y - ship.y) - Math.hypot(b.x - ship.x, b.y - ship.y); };
-    const L = G.leaderOf ? G.leaderOf(ship.sp) : null; if (ok(L)) { L.crewWhy = 'their leader'; out.push(L); }
+    const W = G.W, cap = F.holdOf(ship).crew, out = [], ok = function (c) { return c && !c.dead && !c.deedId && c.crewPick !== -1 && out.indexOf(c) < 0; }, dist = function (a, b) { return Math.hypot(a.x - ship.x, a.y - ship.y) - Math.hypot(b.x - ship.x, b.y - ship.y); };
+    W.cre.filter(function (c) { return c.crewPick === 1 && ok(c); }).forEach(function (c) { if (out.length < cap) { c.crewWhy = 'you chose it'; out.push(c); } });      // (you may put anyone in the crew, of any kind, and take anyone out: CREW on its card, or the cross on its face in the crew list)
+    const L = G.leaderOf ? G.leaderOf(ship.sp) : null; if (out.length < cap && ok(L)) { L.crewWhy = 'their leader'; out.push(L); }
     W.cre.filter(function (c) { return ok(c) && c.builtShip === ship.name; }).sort(dist).forEach(function (c) { if (out.length < cap) { c.crewWhy = 'built it'; out.push(c); } });
     W.cre.filter(function (c) { return ok(c) && ship.sp && c.sp === ship.sp; }).sort(dist).forEach(function (c) { if (out.length < cap) { c.crewWhy = 'of their kind'; out.push(c); } });
     if (out.length < 2) W.cre.filter(ok).sort(dist).forEach(function (c) { if (out.length < cap) { c.crewWhy = 'was near'; out.push(c); } });
@@ -10227,16 +10343,34 @@ G.addSystem({
     const W2 = G.W, sh = landShip(pk, true), out = [];
     // they leave the ship and swim out to where the people of the pond are (most of the way: the meeting is left to both sides)
     const meet = (function () { const sy2 = G.shoreY ? G.shoreY(W2) : sh.y + 70; let x = 0, y = 0, n = 0; W2.cre.forEach(function (c) { if (!c.dead) { x += c.x; y += c.y; n++; } }); if (!n) return { x: sh.x - 140, y: sy2 + 70 }; return { x: sh.x + (x / n - sh.x) * 0.7, y: Math.max(sy2 + 60, sy2 + 60 + (y / n - sy2 - 60) * 0.7) }; })();
-    packs.forEach(function (m, k) { const g = G.unpackGenome(m.g); if (!g) return; const c = G.dropCreature(g, meet.x + (k - (packs.length - 1) / 2) * 56, meet.y + (k % 2) * 34); c.guestName = m.name; c.fromPond = 1; c.line = 1; c.crew = 1; c.E = c.ph.Emax; out.push(c); });
+    packs.forEach(function (m, k) { const g = G.unpackGenome(m.g); if (!g) return; const c = G.dropCreature(g, sh.x, sh.y); c.guestName = m.name; c.fromPond = 1; c.line = 1; c.crew = 1; c.E = c.ph.Emax; c.inShip = true; c.outAt = W2.t + 3.8 + k * 1.2; c.goTo = { x: meet.x + (k - (packs.length - 1) / 2) * 56, y: meet.y + (k % 2) * 34, until: W2.t + 20 + k }; out.push(c); });
     W2.farOf = key; rec.mine = lineN();
     G.emit('arrived', F.visiting, out);
     if (G.markDirty) G.markDirty();
     return out;
   };
+  // those who have just landed wait inside the ship and step out one at a time; then (and whenever one is sent somewhere) it walks or swims straight there
+  { const s0 = G.step; G.step = function (dt) { s0(dt); const W = G.W; if (!W || W.title) return;
+      for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue;
+        if (c.outAt !== undefined) { if (W.t < c.outAt) { const sh = F.shipOf(); if (sh) { c.x = c.px = sh.x; c.y = c.py = sh.y - sh.bp.S * 0.3; } c.vx = c.vy = 0; c.inShip = true; c.E = Math.max(c.E, c.ph.Emax * 0.8); continue; } c.outAt = undefined; c.inShip = false; G.emit('stepped-out', c); }
+        const g = c.goTo; if (g) { const dx = g.x - c.x, dy = g.y - c.y, d = Math.hypot(dx, dy); if (d < 26 || W.t > g.until || c.inShip) { if (!c.inShip || d < 26 || W.t > g.until) c.goTo = null; continue; } const st = Math.min(d, Math.max(80, c.ph.speed * 1.4) * dt); c.x += dx / d * st; c.y += dy / d * st; c.vx = dx / d * 20; c.vy = dy / d * 20; c.ang = Math.atan2(dy, dx); c.E = Math.max(c.E, c.ph.Emax * 0.5); } }
+    }; }
+  /** Go and watch a far pond you have been to (your outpost, if any of yours still live there). Nothing is taken there and nothing brought back: the ship
+   *  stays where it is. F.home() brings you back. */
+  F.peek = function (key) {
+    const rec = F.book[key]; if (F.visiting || !rec || !rec.blob || !G.collectWorld || !G.validSave(rec.blob)) return false;
+    const W = G.W, hues = W.species.filter(function (s) { return !s.extinct && s.n > 0; }).sort(function (a, b) { return b.n - a.n; }), ij = key.split(',').map(Number);
+    F.pool(); F.homeLook = { hue: hues.length ? hues[0].hue : 190, kinds: Math.max(1, Math.min(4, hues.length)), gen: W.gen, n: W.cre.length };
+    const blob = G.collectWorld(); if (!blob) return false; F.homeBlob = blob;
+    swap(function () { G.applySave(rec.blob); });
+    F.here = 'far'; F.origin = { i: ij[0], j: ij[1] }; F.visiting = { key: key, i: ij[0], j: ij[1], name: rec.name, hue: rec.hue, adds: 0, adds0: 0, ship: null, peek: true, crew0: 0, mood: F.moodWords({ i: ij[0], j: ij[1] }) };
+    G.W.farOf = key; rec.mine = lineN(); G.emit('arrived', F.visiting, []); if (G.markDirty) G.markDirty();
+    return true;
+  };
   /** While the ship is away there are two ponds to watch: the far one it is at, and your own. You look at one at a time; the other waits as it was left.
    *  F.look('home') takes you to your own pond (the ship is not there: it is away); F.look('far') takes you back to where the ship is. */
   F.look = function (where) {
-    const V = F.visiting; if (!V || !G.collectWorld || !F.homeBlob) return false; const here = F.here === 'home' ? 'home' : 'far'; if (where === here) return true;
+    const V = F.visiting; if (!V || V.peek || !G.collectWorld || !F.homeBlob) return false; const here = F.here === 'home' ? 'home' : 'far'; if (where === here) return true;
     const rec = F.book[V.key] || (F.book[V.key] = { name: V.name, hue: V.hue, visits: 1 });
     if (where === 'home') {
       const W = G.W, all = W.works; W.works = (all || []).filter(function (w) { return !w.visitor; }); rec.mine = lineN(); rec.gen = W.gen; rec.alive = W.cre.length; rec.at = Date.now(); rec.blob = slim(G.collectWorld()); W.works = all;
@@ -10245,17 +10379,18 @@ G.addSystem({
       (G.W.works || []).forEach(function (w) { if (w.bp && w.bp.type === 'ship' && w.name === V.ship.name) w.away = 1; });      // its place at home stands empty: it is away
     } else {
       const blob = G.collectWorld(); if (!blob || !rec.blob) return false; F.homeBlob = blob;
-      swap(function () { G.applySave(rec.blob); }); F.origin = { i: V.i, j: V.j }; F.here = 'far'; landShip(V.ship, true); G.W.farOf = V.key;
+      swap(function () { G.applySave(rec.blob); }); F.origin = { i: V.i, j: V.j }; F.here = 'far'; if (V.ship) landShip(V.ship, true); G.W.farOf = V.key;
     }
     G.emit('looked', where, V); if (G.markDirty) G.markDirty();
     return true;
   };
   /** the ship sails home. `bring` (optional) is one creature of the far pond, yours or theirs, that comes back with it; the rest of yours stay as your outpost */
-  F.home = function (bring) {
+  F.home = function (bring, back) {
     const V = F.visiting; if (!V || !F.homeBlob || !G.collectWorld) return null;
     if (F.here === 'home' && !F.look('far')) return null;      // (the ship is at the far pond: that is where it leaves from)
     const W = G.W, rec = F.book[V.key] || (F.book[V.key] = { name: V.name, hue: V.hue, visits: 1 });
-    let pk = null;
+    let pk = null; const backs = [];
+    (back || []).forEach(function (c) { const i = W.cre.indexOf(c); if (i < 0 || c.dead || c === bring) return; backs.push({ g: G.packGenome(c.g), name: c.guestName || nameOfCre(c) }); W.cre.splice(i, 1); });      // those of the crew who are aboard come home
     if (bring && !bring.dead && W.cre.indexOf(bring) >= 0) { pk = { g: G.packGenome(bring.g), name: nameOfCre(bring), theirs: !bring.line, defs: { organs: clone(W.organs || []), designs: clone(W.designs || []), plans: clone(W.plans || []) } }; W.cre.splice(W.cre.indexOf(bring), 1); }
     W.works = (W.works || []).filter(function (w) { return !w.visitor; });      // the ship leaves
     rec.mine = lineN(); rec.gen = W.gen; rec.alive = W.cre.length; rec.at = Date.now(); rec.blob = slim(G.collectWorld());
@@ -10266,9 +10401,11 @@ G.addSystem({
     if (pk) { const H = G.W, sh = F.shipOf() || { x: H.ww / 2, y: H.wh * 0.5 };
       ['organs', 'designs', 'plans'].forEach(function (k) { (pk.defs[k] || []).forEach(function (d) { if (d && d.id >= 500 && !(H[k] || []).some(function (x) { return x.id === d.id; }) && (H[k] = H[k] || []).length < 14) H[k].push(d); }); });      // what was invented over there and it carries comes with it
       const g = G.unpackGenome(pk.g); if (g) { c = G.dropCreature(g, sh.x + 60, sh.y + 60); c.guestName = pk.name; c.fromPond = 1; c.line = 1; c.E = c.ph.Emax; } }
-    G.emit('came-home', rec, c, V);
+    const home2 = [];      // the crew is home: they are of this pond, not strangers to it
+    { const H = G.W, sh = F.shipOf() || { x: H.ww / 2, y: H.wh * 0.5 }; backs.forEach(function (m, k) { const g = G.unpackGenome(m.g); if (!g) return; const q = G.makeCreature(g, null, null, []); q.x = q.px = sh.x; q.y = q.py = sh.y; q.E = q.ph.Emax * 0.9; q.P = q.ph.Emax * 0.4; q.beenTo = V.name; q.inShip = true; q.outAt = H.t + 3.8 + k * 1.2; q.goTo = { x: sh.x + (sh.x < H.ww / 2 ? 1 : -1) * (120 + k * 50), y: (G.shoreY ? G.shoreY(H) : sh.y) + 70 + (k % 2) * 30, until: H.t + 18 + k }; q.snap = G.snapOf ? G.snapOf(q) : null; H.cre.push(q); home2.push(q); }); if (home2.length && G.updateSpecies) G.updateSpecies(); }
+    G.emit('came-home', rec, c, V, home2);
     if (G.markDirty) G.markDirty();
-    return { rec: rec, brought: c };
+    return { rec: rec, brought: c, crew: home2 };
   };
 
   // ── kept with the save ──
@@ -10704,7 +10841,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   const STEPW = { gather: 'the crew is gathering at the ship', board: 'they are going aboard', countdown: 'all aboard: counting down', liftoff: 'lift-off' };
   let picking = null;       // the ship a destination is being chosen for (you are out in space, choosing)
   let want = null;          // { p, ship }: a voyage that is decided on and waits for the kind to be free of another plan
-  let flight = null, pickEl = null, bar = null, aboardBtn = null, crewNow = [], tick = 0, lastCount = -1;
+  let flight = null, pickEl = null, bar = null, aboardBtn = null, crewNow = [], mineNow = [], tick = 0, lastCount = -1;
   const now = function () { return (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000; };
   const say = function (k, t, ms) { if (G.banner) G.banner(k, t, ms || 8000); };
   const tip = function (html) { if (G.toast) G.toast(html); };
@@ -10714,7 +10851,9 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   const homeAt = function () { const W = G.W, o = F.origin || { i: 0, j: 0 }, jo = F.jit(o.i, o.j), cs = unit() * 8; return { x: W.ww / 2 + (-o.i - jo[0]) * cs, y: W.wh / 2 + (-o.j - jo[1]) * cs }; };
   /** the mission that is under way in this pond, or null */
   const plan = function () { const d = G.W && G.W.deed; return d && d.voyage ? d : null; };
-  const members = function (d) { return G.W.cre.filter(function (c) { return c.deedId === d.id && !c.dead; }); };
+  let R = null;             // the flight home being made ready at a far pond: the same stages, run here (the crew are strangers there, with no kind of their own to plan with)
+  const cur = function () { return plan() || (R && F.there() ? R : null); };
+  const members = function (d) { return d === R ? R.crew.filter(function (c) { return !c.dead && G.W.cre.indexOf(c) >= 0; }) : G.W.cre.filter(function (c) { return c.deedId === d.id && !c.dead; }); };
   const shipOfPlan = function (d) { const Wk = (G.W.works || []); for (let i = 0; i < Wk.length; i++) if (Wk[i].name === d.voyage.ship) return Wk[i]; return null; };
 
   function els() {
@@ -10724,14 +10863,14 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       '#voypick{top:58px}#voybar{top:14px}#voypick b,#voybar b{color:#f6d365;letter-spacing:.1em;font-size:10.5px;font-weight:800}#voypick .btn,#voybar .btn{min-height:30px;padding:0 14px;flex:none}#voybar i{font-style:normal;color:#f6d365}#voypick .crew{margin:0}' +
       '#voypick.mission{flex-direction:column;gap:7px;padding:10px 18px 11px;box-shadow:0 8px 34px rgba(0,0,0,.5)}#voypick .mt{font:800 15px system-ui,sans-serif;letter-spacing:.14em;color:#f6d365}#voypick .mrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center}' +
       '#voypick .stg{display:flex;gap:5px}#voypick .stg span{padding:4px 11px;border-radius:999px;font:800 10px system-ui,sans-serif;letter-spacing:.1em;color:#8fb2d6;background:rgba(7,18,31,.5);border:1px solid rgba(207,232,255,.16)}#voypick .stg span.dn{color:#9af0d0;border-color:rgba(51,214,166,.5)}#voypick .stg span.on{color:#14202e;background:#f6d365;border-color:#f6d365;animation:pulse 1.2s ease-in-out infinite}' +
-      '#iaboard{width:100%;margin-top:6px}.crew{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px;justify-content:center}.crew span{position:relative;display:flex;flex-direction:column;align-items:center;width:58px;padding:3px 2px 5px;border-radius:12px;background:rgba(246,211,101,.08);border:1px solid rgba(246,211,101,.35);cursor:pointer}.crew span:hover{background:rgba(246,211,101,.2)}.crew span.in{background:rgba(51,214,166,.18);border-color:rgba(51,214,166,.7)}.crew img{width:44px;height:44px}.crew b{font:800 10.5px system-ui,sans-serif !important;color:#fff !important;letter-spacing:0 !important}.crew i{font:600 9px system-ui,sans-serif;font-style:normal;color:#f6d365;text-align:center;line-height:1.15}.crew span.in i{color:#9af0d0}#zcard .crew,#rarebox .crew{justify-content:flex-start}';
+      '#iaboard{width:100%;margin-top:6px}.crew{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px;justify-content:center}.crew span{position:relative;display:flex;flex-direction:column;align-items:center;width:58px;padding:3px 2px 5px;border-radius:12px;background:rgba(246,211,101,.08);border:1px solid rgba(246,211,101,.35);cursor:pointer}.crew span:hover{background:rgba(246,211,101,.2)}.crew span.in{background:rgba(51,214,166,.18);border-color:rgba(51,214,166,.7)}.crew img{width:44px;height:44px}.crew b{font:800 10.5px system-ui,sans-serif !important;color:#fff !important;letter-spacing:0 !important}.crew i{font:600 9px system-ui,sans-serif;font-style:normal;color:#f6d365;text-align:center;line-height:1.15}.crew span.in i{color:#9af0d0}.crew u{position:absolute;top:-6px;right:-6px;width:17px;height:17px;border-radius:50%;background:#14202e;border:1px solid rgba(255,126,182,.8);color:#ff9ec6;font:800 9px/15px system-ui,sans-serif;text-align:center;text-decoration:none;cursor:pointer}.crew u:hover{background:#ff7eb6;color:#14202e}#zcard .crew,#rarebox .crew{justify-content:flex-start}';
     document.head.appendChild(st);
     const host = $('ui') || document.body;
     pickEl = document.createElement('div'); pickEl.id = 'voypick'; pickEl.className = 'glass hide'; host.appendChild(pickEl);
     bar = document.createElement('div'); bar.id = 'voybar'; bar.className = 'glass hide'; host.appendChild(bar);
     [pickEl, bar].forEach(function (e) { e.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); }); });
     pickEl.addEventListener('click', function (e) { const id = e.target && e.target.id; if (id === 'voyCancel') { if (G.sfx) G.sfx('click'); cancelPick(); } else if (id === 'voyCancel2') { if (G.sfx) G.sfx('click'); G.voyageOff(); } else crewClick(e); });
-    bar.addEventListener('click', function (e) { const id = e.target && e.target.id; if (id === 'voyHome') { if (G.sfx) G.sfx('click'); G.voyageHome(); } else if (id === 'voyLookHome') G.voyageLook('home'); else if (id === 'voyLookFar') G.voyageLook('far'); else if (id === 'voyShip') { const s = F.shipOf(); if (s && G.focusOn) G.focusOn(s.x, s.y, 1.3); } });
+    bar.addEventListener('click', function (e) { const id = e.target && e.target.id; if (id === 'voyHome') { if (G.sfx) G.sfx('click'); G.voyageHome('crew'); } else if (id === 'voyAlone') { if (G.sfx) G.sfx('click'); G.voyageHome('alone'); } else if (id === 'voyLookHome') G.voyageLook('home'); else if (id === 'voyLookFar') G.voyageLook('far'); else if (id === 'voyShip') { const s = F.shipOf(); if (s && G.focusOn) G.focusOn(s.x, s.y, 1.3); } });
   }
   function cancelPick() { picking = null; if (pickEl) pickEl.classList.add('hide'); if (G.farCardHide) G.farCardHide(); if (G.goHome) G.goHome(); }
 
@@ -10739,19 +10878,21 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   const FACE = {}; let faces = 0;
   const faceOf = function (c) { if (FACE[c.id]) return FACE[c.id]; try { const cv = document.createElement('canvas'); cv.width = cv.height = 96; const x = cv.getContext('2d'); x.translate(48, 53); x.scale(0.24, 0.24); G.form.portrait(x, c.g.f, 1.3, {}); if (++faces > 60) { for (const k in FACE) delete FACE[k]; faces = 0; } return (FACE[c.id] = cv.toDataURL('image/png')); } catch (e) { return ''; } };
   /** the crew as a row of faces: who each is, why it goes, and (while they board) whether it is aboard yet */
-  const crewHtml = function (C) { if (!C.length) return '<small>Nobody is near enough to go.</small>'; return '<div class="crew">' + C.map(function (c) { const u = faceOf(c); return '<span data-c="' + c.id + '" class="' + (c.inShip ? 'in' : '') + '" title="' + esc((G.characterOf ? G.characterOf(c) : '') + '. Click to find it in the pond.') + '">' + (u ? '<img alt="" src="' + u + '">' : '') + '<b>#' + c.id + '</b><i>' + esc(c.inShip ? 'aboard' : c.crewWhy || '') + '</i></span>'; }).join('') + '</div>'; };
-  function crewClick(e) { let n = e.target; while (n && !(n.dataset && n.dataset.c)) n = n.parentNode; if (!n) return false; const id = +n.dataset.c, c = G.W.cre.filter(function (q) { return q.id === id && !q.dead; })[0]; if (c && !c.inShip && G.focusOn) { if (G.sfx) G.sfx('click'); G.focusOn(c.x, c.y, 1.7); } return true; }
-  const crewOf = function (ship) { const d = plan(); return d ? members(d) : F.crewFor(ship); };
+  const editable = function () { return !F.visiting && !plan() && !want && !flight; };
+  const crewHtml = function (C, edit) { if (!C.length) return '<small>Nobody is near enough to go.</small>'; return '<div class="crew">' + C.map(function (c) { const u = faceOf(c); return '<span data-c="' + c.id + '" class="' + (c.inShip ? 'in' : '') + '" title="' + esc((G.characterOf ? G.characterOf(c) : '') + '. Click to find it in the pond.') + '">' + (edit ? '<u data-drop="' + c.id + '" title="Take it out of the crew: another goes instead">✕</u>' : '') + (u ? '<img alt="" src="' + u + '">' : '') + '<b>#' + c.id + '</b><i>' + esc(c.inShip ? 'aboard' : c.crewWhy || '') + '</i></span>'; }).join('') + '</div>' + (edit ? '<small style="display:block;opacity:.75">To change who goes: the cross takes one out; to put one in, click it in the pond and press PUT IN THE CREW on its card.</small>' : ''); };
+  function crewClick(e) { let n = e.target; if (n && n.dataset && n.dataset.drop) { const id0 = +n.dataset.drop, c0 = G.W.cre.filter(function (q) { return q.id === id0; })[0]; if (c0 && editable()) { c0.crewPick = -1; if (G.sfx) G.sfx('click'); if (G.hub) G.hub.poke(); } if (e.stopPropagation) e.stopPropagation(); return true; }
+    while (n && !(n.dataset && n.dataset.c)) n = n.parentNode; if (!n) return false; const id = +n.dataset.c, c = G.W.cre.filter(function (q) { return q.id === id && !q.dead; })[0]; if (c && !c.inShip && G.focusOn) { if (G.sfx) G.sfx('click'); G.focusOn(c.x, c.y, 1.7); } return true; }
+  const crewOf = function (ship) { const d = cur(); return d ? members(d) : F.crewFor(ship); };
 
   // ── the ship's card (62b_details.js asks for these) ──
   const isWhole = function (o) { const n = G.buildCount ? G.buildCount(o) : [1, 1, 1]; return !o.fall && !o.ruin && n[0] >= n[2]; };
-  const stateOf = function () { const d = plan(); return F.visiting ? 'v' + (F.here || '') : d ? 'p' + d.i + members(d).map(function (c) { return c.id + (c.inShip ? 'i' : ''); }).join('.') : want ? 'w' : 'h'; };
+  const stateOf = function () { const d = cur(); return (R ? 'R' + R.i + members(R).map(function (c) { return c.id + (c.inShip ? 'i' : ''); }).join('.') : '') + (F.visiting ? 'v' + (F.here || '') + (F.visiting.peek ? 'k' : '') : d ? 'p' + d.i + members(d).map(function (c) { return c.id + (c.inShip ? 'i' : ''); }).join('.') : want ? 'w' : 'h'); };
   G.shipSig = function (o) { return stateOf() + (isWhole(o) ? crewOf(o).map(function (c) { return c.id; }).join('.') : 'x'); };
   G.shipCard = function (o) {
     const h = F.holdOf(o), d = plan();
     if (!isWhole(o)) return '<div class="ilabel">The spaceship</div><small>It is not whole: it cannot fly until every piece is set.</small>';
     if (F.there()) return '<div class="ilabel">Your spaceship</div><small>It waits to take you home. One creature may come back with it: click any creature here, yours or theirs, and press <b>BRING HOME</b> on its card. The rest of yours stay as your outpost.</small><button class="btn sm pulse" id="zsail" style="width:100%;margin-top:8px">FLY HOME</button>';
-    let s = '<div class="ilabel">A spaceship</div><small>It carries <b>' + h.crew + '</b> through space to another pond, and <b>' + h.adds + '</b> ADD' + (h.adds === 1 ? '' : 's') + ' to use where it lands.</small><div class="ilabel">' + (d ? 'The crew' : 'Who would go in it') + '</div>' + crewHtml(crewOf(o));
+    let s = '<div class="ilabel">A spaceship</div><small>It carries <b>' + h.crew + '</b> through space to another pond, and <b>' + h.adds + '</b> ADD' + (h.adds === 1 ? '' : 's') + ' to use where it lands.</small><div class="ilabel">' + (d ? 'The crew' : 'Who would go in it') + '</div>' + crewHtml(crewOf(o), editable());
     if (d) s += '<small>The mission to <b>' + esc(d.voyage.name) + '</b> is under way: ' + esc(STEPW[d.steps[d.i].do] || '') + '.</small>' + (d.steps[d.i].do === 'liftoff' ? '' : '<button class="btn sm" id="zsail" style="width:100%;margin-top:8px">CALL IT OFF</button>');
     else if (want) s += '<small>They will fly to <b>' + esc(want.p.name) + '</b> as soon as they have finished what they are doing.</small><button class="btn sm" id="zsail" style="width:100%;margin-top:8px">CALL IT OFF</button>';
     else s += '<small>That is theirs to decide: their leader, those who built it, then those nearest. Each carries a small gold rocket over its head in the pond.</small><button class="btn sm pulse" id="zsail" style="width:100%;margin-top:8px">PLAN A VOYAGE</button>';
@@ -10811,6 +10952,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   }
   G.voyageOff = function () {
     const d = plan(); if (want) { want = null; tip('<b>The mission is called off.</b>'); }
+    if (R && R.steps[R.i].do !== 'liftoff') { const sh = shipOfPlan(R); if (sh) { sh.lifting = false; if (R.voyage.y0 !== undefined) sh.y = R.voyage.y0; } R.crew.forEach(function (c) { c.inShip = false; c.goTo = null; }); R = null; tip('<b>The flight home is called off.</b><br>They stay where they are.'); }
     if (d && d.steps[d.i].do !== 'liftoff') { settle(d); if (G.deedStop) G.deedStop('off'); }
     if (G.hub) G.hub.poke();
   };
@@ -10832,6 +10974,18 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       if (st.do === 'liftoff') { ship.lifting = true; const u = clamp(d.t / st.secs, 0, 1); ship.y = d.voyage.y0 - u * u * 640; d.voyage.lift = u; M.forEach(function (c) { if (!c.inShip) { c.deedId = 0; } }); d.n0 = Math.max(2, M.filter(function (c) { return c.inShip; }).length); }
       for (let i = 0; i < M.length; i++) { const c = M[i]; if (c.inShip) { c.x = c.px = ship.x; c.y = c.py = ship.y - S * 0.3; c.vx = c.vy = 0; c.E = Math.max(c.E, c.ph.Emax * 0.5); } }
     }; }
+  { const s1 = G.step; G.step = function (dt) { s1(dt); if (!R) return; const W = G.W; if (!W || !F.there()) { R = null; return; }
+      const ship = shipOfPlan(R); if (!ship) { R = null; return; } const st = R.steps[R.i], M = members(R), S = ship.bp.S || 70, late = st.do === 'countdown' || st.do === 'liftoff'; R.t += dt;
+      if (R.voyage.stage !== R.i) { R.voyage.stage = R.i; G.emit('mission-stage', R, st.do, ship); }
+      if (st.do !== 'liftoff') R.voyage.y0 = ship.y;
+      for (let i = 0; i < M.length; i++) { const c = M[i]; c.doomed = false; if (c.inShip) continue; const g = st.do === 'gather';
+        if (st.do !== 'liftoff') c.goTo = { x: ship.x + (g ? Math.cos(i * 2.4) * (52 + 12 * (i % 3)) : 0), y: R.voyage.y0 + 24 + (g ? Math.abs(Math.sin(i * 2.4)) * 44 : 0), until: W.t + 2 };
+        if (!g && Math.hypot(c.x - ship.x, c.y - (R.voyage.y0 + 20)) < (late ? 170 : 56) && (late || R.t > i * 1.0)) { c.inShip = true; c.goTo = null; G.emit('went-aboard', c, ship); } }
+      if (st.do === 'gather' && R.t > st.secs - 0.5 && R.t < 30 && M.some(function (c) { return Math.hypot(c.x - ship.x, c.y - (R.voyage.y0 + 24)) > 150; })) st.secs = Math.min(30, R.t + 2);      // nobody is left behind for being slow
+      if (st.do === 'liftoff') { ship.lifting = true; const u = clamp(R.t / st.secs, 0, 1); ship.y = R.voyage.y0 - u * u * 640; R.voyage.lift = u; }
+      for (let i = 0; i < M.length; i++) { const c = M[i]; if (c.inShip) { c.x = c.px = ship.x; c.y = c.py = ship.y - S * 0.3; c.vx = c.vy = 0; c.E = Math.max(c.E, c.ph.Emax * 0.5); } }
+      if (R.t >= st.secs) { R.i++; R.t = 0; if (R.i >= R.steps.length) { const aboard = M.filter(function (c) { return c.inShip; }), bring = R.bring && aboard.indexOf(R.bring) >= 0 ? R.bring : null, y0 = R.voyage.y0; ship.y = y0; ship.lifting = false; R = null; depart(ship, aboard, bring, false); } }
+    }; }
   G.on('mission-stage', function (d, what, ship) {
     if (G.mode !== 'play') return;
     if (what === 'countdown') { if (G.setSpeed) G.setSpeed(1); if (G.select) G.select(null); if (G.selectThing) G.selectThing(null); if (G.hub) G.hub.close(); if (G.focusOn) { G.cam.z = 1.05; G.focusOn(ship.x, d.voyage.y0 - 120, 1.05); } lastCount = -1; }
@@ -10842,14 +10996,14 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     if (how !== 'done' || !ship || crew.length < 1 || G.mode !== 'play') { settle(d); return; }
     // lift-off is done: the ship is away
     const p = d.voyage.p, at = spot(p), y0 = d.voyage.y0; ship.y = y0; ship.lifting = false; d.voyage.lift = 0;
-    fly(ship.bp, W.ww / 2, W.wh / 2, at.x, at.y, 4.4, 'CROSSING SPACE TO ' + esc(p.name.toUpperCase()) + ' · ' + crew.length + ' aboard', function () {
-      crew.forEach(function (c) { c.inShip = false; });
+    fly(ship.bp, ship.x, y0 - 640, at.x, at.y, 7, 'CROSSING SPACE TO ' + esc(p.name.toUpperCase()) + ' · ' + crew.length + ' aboard', function () {
+      crew.forEach(function (c) { c.inShip = false; }); W.cre.forEach(function (c) { c.crewPick = 0; });
       const out = F.sail(p, crew, ship); pickEl.classList.add('hide');
       if (!out) { tip('<b>The ship could not make the crossing.</b>'); if (G.goHome) G.goHome(); return; }
       const V = F.visiting; if (G.setSpeed) G.setSpeed(1);
       say('YOU HAVE ARRIVED AT ' + V.name.toUpperCase(), out.length + ' of yours are set down among its people, who are ' + V.mood + '. Watch how they are taken. You have ' + V.adds + ' ADD' + (V.adds === 1 ? '' : 's') + ' here.', 10000);
       if (G.log) G.log('sp', 'Arrived at ' + V.name, out.length + ' of yours went ashore: ' + out.map(function (c) { return '#' + c.id + (G.characterOf ? ' (' + G.characterOf(c) + ')' : ''); }).join(', ') + '.');
-      const s = F.shipOf(); if (s && G.focusOn) G.focusOn(s.x, s.y + 40, 1.25);
+      land(F.shipOf());
     });
   });
 
@@ -10857,20 +11011,33 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   function fly(bp, x0, y0, x1, y1, T, text, done) {
     els(); const b2 = JSON.parse(JSON.stringify(bp)); b2.P.forEach(function (q) { delete q.t0; q.st = 2; });
     flight = { bp: b2, x0: x0, y0: y0, x1: x1, y1: y1, t0: now(), T: T, done: done };
-    G.flyTo((x0 + x1) / 2, (y0 + y1) / 2, clamp(G.view.h * 0.6 / (Math.hypot(x1 - x0, y1 - y0) * G.view.base + 1), 0.02, FAR_Z), 1.1);
+    flight.z0 = G.cam.z; flight.zFar = clamp(G.view.h * 0.6 / (Math.hypot(x1 - x0, y1 - y0) * G.view.base + 1), 0.02, FAR_Z);
     pickEl.classList.remove('mission'); pickEl._t = ''; pickEl.style.top = '58px'; pickEl.innerHTML = '<span><b>⚑ ' + text + '</b></span>'; pickEl.classList.remove('hide');
     if (G.sfx) G.sfx('discovery'); if (G.hub) G.hub.close();
   }
-  G.voyageHome = function (quiet) {
-    const V = F.visiting; if (!V || flight) return;
+  /** FLY HOME. how: 'crew' (the crew is called back to the ship first: they gather, go aboard, and it lifts off), 'alone' (the ship goes back by itself: those
+   *  of yours who are here stay as your outpost), or true (at once, no ceremony: the pond has fallen still). One creature marked BRING HOME goes too. */
+  G.voyageHome = function (how) {
+    const V = F.visiting; if (!V || flight || R) return;
+    if (V.peek) { const nm = V.name, n0 = F.lineN(); if (G.selectThing) G.selectThing(null); if (G.select) G.select(null); if (F.home(null)) { say('BACK AT YOUR OWN POND', 'You were looking in on ' + nm + ', where ' + n0 + ' of yours live. It waits as you left it.', 6000); if (G.setSpeed) G.setSpeed(1); } return; }
     if (F.here === 'home' && !F.look('far')) return;      // the ship is at the far pond: the flight home starts there
-    const W = G.W, bring = W.cre.filter(function (c) { return c.aboard && !c.dead; })[0] || null, H = homeAt(), s = F.shipOf(), stay = W.cre.filter(function (c) { return !c.dead && c.line && c !== bring; }).length;
+    const W = G.W, s = F.shipOf(), bring = W.cre.filter(function (c) { return c.aboard && !c.dead; })[0] || null;
     if (G.selectThing) G.selectThing(null); if (G.select) G.select(null);
-    fly(s ? s.bp : V.ship.bp, W.ww / 2, W.wh / 2, H.x, H.y, quiet ? 2.6 : 4.4, 'FLYING HOME FROM ' + esc(V.name.toUpperCase()) + (bring ? ' · #' + bring.id + ' is aboard' : ''), function () {
-      const r = F.home(bring); pickEl.classList.add('hide'); if (!r) return; if (G.setSpeed) G.setSpeed(1);
-      say('THE SHIP IS HOME', (stay ? stay + ' of yours stayed at ' + V.name + ': they are your outpost there. ' : 'None of yours stayed at ' + V.name + '. ') + (r.brought ? (r.brought.guestName || 'One creature') + ' came back with the ship, a stranger here: see how your own take to it.' : 'Nobody came back with it.'), 10000);
-      if (G.log) G.log('sp', 'Home from ' + V.name, (stay ? stay + ' stayed there.' : 'Nobody stayed.') + (r.brought ? ' ' + (r.brought.guestName || 'A creature') + ' came back.' : ''));
-      if (r.brought && G.select) { G.select(r.brought); if (G.focusOn) G.focusOn(r.brought.x, r.brought.y, 1.4); }
+    if (how === true || !s) { depart(s, [], bring, true); return; }
+    const crew = how === 'alone' ? [] : W.cre.filter(function (c) { return c.crew && !c.dead; }); if (bring && crew.indexOf(bring) < 0) crew.push(bring);
+    R = { voyage: { name: V.name, ship: s.name, y0: s.y, stage: -1, home: true, lift: 0 }, steps: crew.length ? [{ do: 'gather', secs: 8 }, { do: 'board', secs: 7 }, { do: 'countdown', secs: 6 }, { do: 'liftoff', secs: 3.6 }] : [{ do: 'countdown', secs: 5 }, { do: 'liftoff', secs: 3.6 }], i: 0, t: 0, crew: crew, bring: bring };
+    lastCount = -1; if (G.setSpeed) G.setSpeed(1); if (G.focusOn) G.focusOn(s.x, s.y - 40, 1.1); if (G.hub) G.hub.poke();
+  };
+  /** the ship leaves the far pond for home, with whoever is aboard */
+  function depart(s, aboard, bring, quick) {
+    const V = F.visiting, W = G.W, H = homeAt(), back = aboard.filter(function (c) { return c !== bring; }), stay = W.cre.filter(function (c) { return !c.dead && c.line && aboard.indexOf(c) < 0 && c !== bring; }).length;
+    fly(s ? s.bp : V.ship.bp, s ? s.x : W.ww / 2, s ? s.y - 640 : W.wh / 2, H.x, H.y, quick ? 3 : 7, 'FLYING HOME FROM ' + esc(V.name.toUpperCase()) + ' · ' + (aboard.length + (bring && aboard.indexOf(bring) < 0 ? 1 : 0)) + ' aboard', function () {
+      aboard.forEach(function (c) { c.inShip = false; c.goTo = null; });
+      const r = F.home(bring, back); pickEl.classList.add('hide'); if (!r) return; if (G.setSpeed) G.setSpeed(1);
+      const nb = (r.crew || []).length;
+      say('THE SHIP IS HOME', (nb ? nb + ' of the crew came home in it. ' : 'It came home alone. ') + (stay ? stay + ' of yours stayed at ' + V.name + ': they are your outpost there (SPACE, then LOOK IN, to see them). ' : '') + (r.brought ? (r.brought.guestName || 'One creature') + ' came with it, a stranger here: see how your own take to it.' : ''), 10000);
+      if (G.log) G.log('sp', 'Home from ' + V.name, (nb ? nb + ' of the crew came home. ' : 'The ship came home alone. ') + (stay ? stay + ' stayed there.' : 'Nobody stayed.') + (r.brought ? ' ' + (r.brought.guestName || 'A creature') + ' came back with it.' : ''));
+      land(F.shipOf()); if (r.brought) setTimeout(function () { if (!r.brought.dead && !F.visiting && G.select) G.select(r.brought); }, 5200);
     });
   };
   /** while the ship is away: go and watch your own pond, or go back to where the ship is */
@@ -10881,6 +11048,33 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     else { say('BACK AT ' + V.name.toUpperCase(), 'You are with the ship again. Your own pond stands still until you look at it again.', 7000); const s = F.shipOf(); if (s && G.focusOn) G.focusOn(s.x, s.y + 40, 1.2); }
   };
   /** the ship in flight: it points where it flies, its engine burning behind it */
+  /** the ship comes down where it is to stand: the view goes to it, it descends on its fire, and those aboard step out after (57x_far.js lets them out one by one) */
+  let landing = null; const FXB = [];
+  function land(ship) { if (!ship) return; const W = G.W; landing = { ship: ship, y0: ship.y, t0: W.t, T: 2.8 }; ship.lifting = true; ship.y = landing.y0 - 640; if (G.cam) { G.cam.z = 0.3; G.cam.x = ship.x; G.cam.y = landing.y0 - 200; if (G.applyCam) G.applyCam(); } if (G.flyTo) G.flyTo(ship.x, landing.y0 - 70, 1.12, 1.9); }
+  { const s2 = G.step; G.step = function (dt) { s2(dt); if (!landing) return; const W = G.W, k = landing, sh = k.ship; if (!W || (W.works || []).indexOf(sh) < 0) { landing = null; return; }
+      const u = clamp((W.t - k.t0) / k.T, 0, 1); sh.lifting = true; sh.y = k.y0 - (1 - u) * (1 - u) * 640; k.u = u; if (u >= 1) { sh.y = k.y0; sh.lifting = false; landing = null; if (G.R) G.R.shake = 0.35; if (G.sfx) G.sfx('meteor'); } }; }
+  G.on('went-aboard', function (c, ship) { if (G.mode === 'play') { FXB.push({ x: c.x, y: c.y, ship: ship, t0: now(), id: c.id, in: true }); if (G.sfx) G.sfx('click'); } });
+  G.on('stepped-out', function (c) { const sh = F.shipOf(); if (G.mode === 'play' && sh) { FXB.push({ x: c.goTo ? sh.x + (c.goTo.x - sh.x) * 0.25 : sh.x + 40, y: sh.y + 50, ship: sh, t0: now(), id: c.id, in: false }); if (G.sfx) G.sfx('click'); } });
+  /** boarding and stepping out, made plain: a ramp at the ship while they board, a call over it, and each one seen going in (or coming out) as a spark with its number */
+  function boardFx() {
+    const ctx = G.ctx, v = G.view; if (!ctx || G.mode !== 'play' || (G.pondAsleep && G.pondAsleep())) return; const t = now(), d = cur(), sx = function (x) { return x * v.scale + v.ox; }, sy = function (y) { return y * v.scale + v.oy; };
+    ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); ctx.lineCap = 'round'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (d && !flight) { const st = d.steps[d.i], ship = shipOfPlan(d); if (ship && (st.do === 'gather' || st.do === 'board')) { const S = ship.bp.S || 70, bx = sx(ship.x), by = sy(ship.y + S * 0.45), M = members(d), inN = M.filter(function (c) { return c.inShip; }).length;
+        // the ramp, and the ring that says: here
+        ctx.strokeStyle = 'rgba(246,211,101,' + (0.55 + 0.3 * Math.sin(t * 4)) + ')'; ctx.lineWidth = 2.5; ctx.setLineDash([7, 7]); ctx.lineDashOffset = -t * 26; ctx.beginPath(); ctx.ellipse(bx, by, (S * 1.25) * v.scale, (S * 0.5) * v.scale, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+        ctx.strokeStyle = '#14202e'; ctx.lineWidth = 7 * v.scale + 2; ctx.beginPath(); ctx.moveTo(bx + S * 0.2 * v.scale, by - S * 0.34 * v.scale); ctx.lineTo(bx + S * 0.95 * v.scale, by + 4); ctx.stroke(); ctx.strokeStyle = '#f6d365'; ctx.lineWidth = 4 * v.scale + 1; ctx.stroke();
+        // the call, over the ship
+        const top = sy(ship.y + S * 0.45 - (ship.bp.top || S * 1.6)) - 42, txt = st.do === 'gather' ? 'CREW TO THE SHIP' : 'BOARDING  ' + inN + ' / ' + M.length; ctx.font = '800 13px system-ui, sans-serif'; const tw = ctx.measureText(txt).width + 26; ctx.fillStyle = 'rgba(9,18,30,0.9)'; G.roundRect(ctx, bx - tw / 2, top - 13, tw, 26, 13); ctx.fill(); ctx.strokeStyle = '#f6d365'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = '#f6d365'; ctx.fillText(txt, bx, top + 0.5);
+        // a line from each of them to the ship, so it is seen where they are going
+        ctx.lineWidth = 1.6; ctx.setLineDash([3, 8]); ctx.lineDashOffset = -t * 30; for (let i = 0; i < M.length; i++) { const c = M[i]; if (c.inShip) continue; const cx = sx(c.rx === undefined ? c.x : c.rx), cy = sy(c.ry === undefined ? c.y : c.ry); if (Math.hypot(cx - bx, cy - by) < 40) continue; ctx.strokeStyle = 'rgba(246,211,101,0.6)'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(bx, by - S * 0.2 * v.scale); ctx.stroke(); } ctx.setLineDash([]); } }
+    for (let i = FXB.length - 1; i >= 0; i--) { const k = FXB[i], u = (t - k.t0) / 1.25; if (u >= 1) { FXB.splice(i, 1); continue; } const S = k.ship.bp.S || 70, hx = sx(k.ship.x), hy = sy(k.ship.y + S * 0.1), ax = sx(k.x), ay = sy(k.y), q = Math.min(1, u / 0.55), e = k.in ? q : 1 - q, px = ax + (hx - ax) * e, py = ay + (hy - ay) * e - Math.sin(e * 3.1416) * 34;
+      if (u < 0.6) { const g = ctx.createRadialGradient(px, py, 0, px, py, 16); g.addColorStop(0, 'rgba(255,245,200,0.95)'); g.addColorStop(1, 'rgba(246,211,101,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, 16, 0, TAU); ctx.fill(); ctx.fillStyle = '#fff3c8'; ctx.beginPath(); ctx.arc(px, py, 4, 0, TAU); ctx.fill(); }
+      const a = Math.min(1, (1 - u) * 3), ty = (k.in ? hy : ay) - 34 - u * 22, txt = '#' + k.id + (k.in ? '  aboard ✓' : '  steps out'); ctx.font = '800 12px system-ui, sans-serif'; const tw = ctx.measureText(txt).width + 18, tx = k.in ? hx : ax; ctx.fillStyle = 'rgba(9,18,30,' + 0.88 * a + ')'; G.roundRect(ctx, tx - tw / 2, ty - 11, tw, 22, 11); ctx.fill(); ctx.fillStyle = 'rgba(' + (k.in ? '154,240,208' : '246,211,101') + ',' + a + ')'; ctx.fillText(txt, tx, ty + 0.5); }
+    // coming down: its fire under it
+    if (landing && (G.W.works || []).indexOf(landing.ship) >= 0) { const sh = landing.ship, S = sh.bp.S || 70, x = sx(sh.x), y = sy(sh.y + S * 0.5), Lf = (70 + 150 * (1 - (landing.u || 0))) * v.scale * (0.8 + 0.25 * Math.sin(t * 29)), w = S * 0.28 * v.scale, fg = ctx.createLinearGradient(0, y, 0, y + Lf); fg.addColorStop(0, 'rgba(255,250,220,0.95)'); fg.addColorStop(0.3, 'rgba(255,190,90,0.85)'); fg.addColorStop(1, 'rgba(255,110,60,0)'); ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(x - w, y - 4); ctx.quadraticCurveTo(x, y + Lf * 1.5, x + w, y - 4); ctx.closePath(); ctx.fill();
+      const gy = sy(landing.y0 + S * 0.55); for (let i = 0; i < 12; i++) { const q = (t * 0.9 + i / 12) % 1, side = i % 2 ? 1 : -1; ctx.fillStyle = 'rgba(232,238,248,' + 0.3 * (1 - q) * (landing.u || 0) + ')'; ctx.beginPath(); ctx.arc(x + side * (10 + 120 * q) * v.scale, gy - q * 14 * v.scale, (12 + 30 * q) * v.scale, 0, TAU); ctx.fill(); } }
+    ctx.restore();
+  }
   function shipAt(ctx, bp, sx, sy, hd, t, size) {
     const S = bp.S || 70, top = Math.max(40, bp.top || (G.buildTop ? G.buildTop({ bp: bp }) + S * 0.45 : S * 1.6)), k = size / top;
     ctx.save(); ctx.translate(sx, sy); ctx.rotate(hd + Math.sin(t * 1.7) * 0.03);
@@ -10891,7 +11085,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   }
   /** smoke and fire under the ship, and the count in great numbers */
   function launchFx(ctx, v, t) {
-    const d = plan(); if (!d || (G.pondAsleep && G.pondAsleep())) return; const st = d.steps[d.i]; if (st.do !== 'countdown' && st.do !== 'liftoff') return;
+    const d = cur(); if (!d || (G.pondAsleep && G.pondAsleep())) return; const st = d.steps[d.i]; if (st.do !== 'countdown' && st.do !== 'liftoff') return;
     const ship = shipOfPlan(d); if (!ship) return; const S = ship.bp.S || 70, lift = d.voyage.lift || 0, left = st.do === 'countdown' ? st.secs - d.t : 0, heat = st.do === 'liftoff' ? 1 : clamp(1 - left / 4, 0, 1);
     const sx = ship.x * v.scale + v.ox, sy = (ship.y + S * 0.5) * v.scale + v.oy, gy = (d.voyage.y0 + S * 0.55) * v.scale + v.oy;
     ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
@@ -10905,14 +11099,15 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = '800 13px system-ui, sans-serif'; ctx.fillStyle = 'rgba(246,211,101,0.95)'; if (n) ctx.fillText('T  M I N U S', cx, cy - 78);
       ctx.font = '800 ' + Math.round((n ? 132 : 76) * pop) + 'px system-ui, sans-serif'; ctx.lineWidth = 10; ctx.strokeStyle = 'rgba(9,16,26,0.75)'; ctx.lineJoin = 'round'; ctx.strokeText(txt, cx, cy); ctx.shadowColor = 'rgba(246,211,101,0.9)'; ctx.shadowBlur = 34; ctx.fillStyle = n && n <= 3 ? '#ffd0a0' : '#fff3c8'; ctx.fillText(txt, cx, cy); ctx.shadowBlur = 0;
-      ctx.font = '800 13px system-ui, sans-serif'; ctx.fillStyle = 'rgba(234,244,255,0.95)'; ctx.fillText('MISSION TO ' + d.voyage.name.toUpperCase(), cx, cy + (n ? 84 : 56)); }
+      ctx.font = '800 13px system-ui, sans-serif'; ctx.fillStyle = 'rgba(234,244,255,0.95)'; ctx.fillText((d.voyage.home ? 'HOME FROM ' : 'MISSION TO ') + d.voyage.name.toUpperCase(), cx, cy + (n ? 84 : 56)); }
     ctx.restore();
   }
   function draw() {
     const ctx = G.ctx, v = G.view; if (!ctx || G.mode !== 'play') return;
     const t = now(); launchFx(ctx, v, t);
     if (!flight) return;
-    const f = flight, u0 = clamp((t - f.t0) / f.T, 0, 1), u = u0 * u0 * (3 - 2 * u0), x = f.x0 + (f.x1 - f.x0) * u, y = f.y0 + (f.y1 - f.y0) * u;
+    const ease = function (q) { return q < 0.5 ? 2 * q * q : 1 - 2 * (1 - q) * (1 - q); };
+    const f = flight, u0 = clamp((t - f.t0) / f.T, 0, 1), u = ease(u0), x = f.x0 + (f.x1 - f.x0) * u, y = f.y0 + (f.y1 - f.y0) * u;
     { const sx = x * v.scale + v.ox, sy = y * v.scale + v.oy, ax = f.x0 * v.scale + v.ox, ay = f.y0 * v.scale + v.oy, dx = f.x1 - f.x0, dy = f.y1 - f.y0, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
       ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
       const g = ctx.createLinearGradient(ax, ay, sx, sy); g.addColorStop(0, 'rgba(246,211,101,0)'); g.addColorStop(1, 'rgba(246,211,101,0.75)'); ctx.strokeStyle = g; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.setLineDash([3, 9]); ctx.lineDashOffset = -t * 30; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(sx, sy); ctx.stroke(); ctx.setLineDash([]);
@@ -10924,8 +11119,10 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   }
   // those who go (or would go) in the ship carry a small gold rocket over their heads, so you can see who they are
   function marks() {
-    if (!crewNow.length || flight || G.mode !== 'play') return; const ctx = G.ctx, v = G.view; if (!ctx || v.scale < 0.3 || (G.pondAsleep && G.pondAsleep())) return;
+    if ((!crewNow.length && !mineNow.length) || flight || G.mode !== 'play') return; const ctx = G.ctx, v = G.view; if (!ctx || v.scale < 0.3 || (G.pondAsleep && G.pondAsleep())) return;
     const t = now(); ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); ctx.lineJoin = 'round';
+    for (let i = 0; i < mineNow.length; i++) { const c = mineNow[i]; if (c.dead) continue; const x = (c.rx === undefined ? c.x : c.rx) * v.scale + v.ox + c.ph.r * 0.5 * v.scale, y = ((c.ry === undefined ? c.y : c.ry) - c.ph.r * 2.1) * v.scale + v.oy - 4; if (x < -20 || y < -20 || x > v.w + 20 || y > v.h + 20) continue;      /* those born there of your people: a small gold pennant */
+      ctx.strokeStyle = '#14202e'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, y + 9); ctx.lineTo(x, y - 7); ctx.stroke(); ctx.fillStyle = '#f6d365'; ctx.beginPath(); ctx.moveTo(x, y - 7); ctx.lineTo(x + 9 + Math.sin(t * 5 + c.id), y - 3.5); ctx.lineTo(x, y); ctx.closePath(); ctx.fill(); ctx.lineWidth = 1; ctx.stroke(); }
     for (let i = 0; i < crewNow.length; i++) { const c = crewNow[i]; if (c.dead || c.inShip) continue; const x = (c.rx === undefined ? c.x : c.rx) * v.scale + v.ox, y = ((c.ry === undefined ? c.y : c.ry) - c.ph.r * 2.2) * v.scale + v.oy - 12 + Math.sin(t * 3 + c.id) * 2.5, k = clamp(v.scale, 0.75, 1.5);
       if (x < -20 || y < -20 || x > v.w + 20 || y > v.h + 20) continue;
       ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.fillStyle = 'rgba(255,170,80,0.9)'; ctx.beginPath(); ctx.moveTo(-2.5, 6); ctx.lineTo(0, 11 + 2 * Math.sin(t * 20 + i)); ctx.lineTo(2.5, 6); ctx.closePath(); ctx.fill();
@@ -10934,26 +11131,51 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       ctx.fillStyle = '#14202e'; ctx.beginPath(); ctx.arc(0, -2, 1.5, 0, TAU); ctx.fill(); ctx.restore(); }
     ctx.restore();
   }
-  G.addSystem({ name: 'voyage', draw: function () { marks(); draw(); } });
+  function flightCam() {
+    const f = flight; if (!f || G.mode !== 'play') return; const u0 = clamp((now() - f.t0) / f.T, 0, 1), sm = function (q) { q = clamp(q, 0, 1); return q * q * (3 - 2 * q); }, e = u0 < 0.5 ? 2 * u0 * u0 : 1 - 2 * (1 - u0) * (1 - u0);
+    const zEnd = 0.26, z = u0 < 0.34 ? f.z0 * Math.pow(f.zFar / f.z0, sm(u0 / 0.34)) : u0 < 0.76 ? f.zFar : f.zFar * Math.pow(zEnd / f.zFar, sm((u0 - 0.76) / 0.24));
+    G.cam.z = z; G.cam.x = f.x0 + (f.x1 - f.x0) * e; G.cam.y = f.y0 + (f.y1 - f.y0) * e; if (G.applyCam) G.applyCam();
+  }
+  G.addSystem({ name: 'voyage', update: function () { flightCam(); }, draw: function () { marks(); boardFx(); draw(); } });
 
   // ── in the NOW panel: the ship, the mission with its crew, your outposts ──
   if (G.hub) {
     G.hub.add(function (W) {
-      const out = { sig: stateOf(), now: [], people: [], news: [] }, d = plan(), V = F.visiting, ship = F.shipOf();
-      if (V && F.here === 'home') { const r0 = F.book[V.key] || {}; out.sig += 'H' + (r0.mine | 0); out.now.push(G.hub.row({ icon: '▲', title: 'Your ship is at ' + V.name, tag: 'away', live: true, sub: (r0.mine | 0) + ' of yours are there. You are watching your own pond; that one stands still until you go back.', extra: '<span class="hbtn" data-act="voyThere">GO THERE</span><span class="hbtn q" data-act="voyHome">FLY HOME</span>' })); }
-      else if (V) { const mine = F.lineN(); out.sig += 'V' + mine + V.adds; out.now.push(G.hub.row({ icon: '⚑', title: 'You are at ' + V.name, tag: 'visiting', live: true, sub: 'Its people are ' + esc(V.mood) + '. ' + mine + ' of yours live here · ' + V.adds + ' of ' + V.adds0 + ' ADD' + (V.adds0 === 1 ? '' : 's') + ' left.', extra: '<span class="hbtn" data-act="voyHome">FLY HOME</span><span class="hbtn q" data-act="voyWatchHome">WATCH HOME</span><span class="hbtn q" data-act="voyShip">THE SHIP</span>' })); }
+      const out = { sig: stateOf(), now: [], space: [], spaceN: [], news: [] }, d = plan(), V = F.visiting, ship = F.shipOf(), Wk = W.works || [];
+      const port = Wk.filter(function (w) { return w.bp && w.bp.type === 'port' && !w.fall; })[0], anyShip = Wk.filter(function (w) { return w.bp && w.bp.type === 'ship' && !w.visitor; })[0], dd = W.deed, making = dd && dd.result && (dd.result.port || dd.result.ship) ? dd : null;
+      const both = function (row) { out.now.push(row); out.space.push(row); };
+      const pic = function (w, sign) { const u = w && w.bp && G.buildPic ? G.buildPic(w, 34) : ''; return u ? '<img alt="" src="' + u + '" style="width:30px;height:30px">' : sign; };
+      // 1. what is happening with the ship right now
+      if (V && V.peek) { const mine0 = F.lineN(); out.sig += 'K' + mine0; both(G.hub.row({ icon: '⚑', title: 'Looking in on ' + V.name, tag: 'your outpost', live: true, sub: mine0 + ' of yours live here, among people who are ' + esc(V.mood) + '. Your ship is at home.', extra: '<span class="hbtn" data-act="voyHome">BACK TO MY POND</span>' })); } else if (V && F.here === 'home') { const r0 = F.book[V.key] || {}; out.sig += 'H' + (r0.mine | 0); both(G.hub.row({ icon: '▲', title: 'Your ship is at ' + V.name, tag: 'away', live: true, sub: (r0.mine | 0) + ' of yours are there. You are watching your own pond; that one stands still until you go back.', extra: '<span class="hbtn" data-act="voyThere">GO THERE</span><span class="hbtn q" data-act="voyHome">FLY HOME</span>' })); }
+      else if (V) { const mine = F.lineN(); out.sig += 'V' + mine + V.adds; both(G.hub.row({ icon: '⚑', title: 'You are at ' + V.name, tag: 'visiting', live: true, sub: 'Its people are ' + esc(V.mood) + '. ' + mine + ' of yours live here · ' + V.adds + ' of ' + V.adds0 + ' ADD' + (V.adds0 === 1 ? '' : 's') + ' left.', extra: '<span class="hbtn" data-act="voyHome">FLY HOME</span><span class="hbtn q" data-act="voyWatchHome">WATCH HOME</span><span class="hbtn q" data-act="voyShip">THE SHIP</span>' })); }
       else if (d) { const M = members(d), inN = M.filter(function (c) { return c.inShip; }).length, st = d.steps[d.i]; out.sig += inN + ':' + Math.round(d.t);
-        out.now.push(G.hub.row({ icon: '▲', title: 'The crew', tag: inN + ' of ' + M.length + ' aboard', live: true, sub: 'For the mission to ' + esc(d.voyage.name) + '. Each carries a gold rocket over its head.', extra: crewHtml(M) + (st.do === 'liftoff' ? '' : '<span class="hbtn q" data-act="voyOff">CALL IT OFF</span>') })); }
-      else if (want) out.now.push(G.hub.row({ icon: '▲', title: 'Mission to ' + want.p.name, tag: 'waiting', live: true, sub: W.deed ? 'They will go as soon as they have finished ' + esc(W.deed.title) + '.' : 'The crew is making ready.', extra: '<span class="hbtn q" data-act="voyOff">CALL IT OFF</span>' }));
+        both(G.hub.row({ icon: '▲', title: 'Mission to ' + d.voyage.name, tag: (STEPW[st.do] || '').replace(/^the crew is |^they are |^all aboard: /, ''), live: true, sub: inN + ' of ' + M.length + ' aboard. Each of the crew carries a gold rocket over its head.', extra: crewHtml(M) + (st.do === 'liftoff' ? '' : '<span class="hbtn q" data-act="voyOff">CALL IT OFF</span>') })); }
+      else if (want) both(G.hub.row({ icon: '▲', title: 'Mission to ' + want.p.name, tag: 'waiting', live: true, sub: W.deed ? 'They will go as soon as they have finished ' + esc(W.deed.title) + '.' : 'The crew is making ready.', extra: '<span class="hbtn q" data-act="voyOff">CALL IT OFF</span>' }));
       else if (ship) { const C = F.crewFor(ship), h = F.holdOf(ship); out.sig += C.map(function (c) { return c.id; }).join('.'); out.news.push('ship' + ship.name);
-        out.now.push(G.hub.row({ icon: '▲', title: ship.name, tag: 'ready to fly', sub: 'A spaceship of the ' + esc(ship.by) + '. It carries ' + h.crew + ' to another pond, and ' + h.adds + ' ADD' + (h.adds === 1 ? '' : 's') + '. Who would go:', extra: crewHtml(C) + '<span class="hbtn" data-act="voyPick">PLAN A VOYAGE</span><span class="hbtn q" data-act="voyShip">SHOW IT</span>' })); }
+        both(G.hub.row({ icon: pic(ship, '▲'), title: ship.name, tag: 'ready to fly', sub: 'A spaceship of the ' + esc(ship.by) + ', standing on its port. It carries ' + h.crew + ' to another pond, and ' + h.adds + ' ADD' + (h.adds === 1 ? '' : 's') + '. Who would go:', extra: crewHtml(C, true) + '<span class="hbtn" data-act="voyPick">PLAN A VOYAGE</span><span class="hbtn q" data-act="voyShip">SHOW IT</span>' })); }
+      // 2. the port and the ship, always (SPACE): what stands, what is being built, what is still to come
+      const pc = function (w) { const n = w && w.bp ? G.buildCount(w) : null; return n ? n[0] + ' of ' + n[2] + ' pieces' : 'no pieces yet'; };
+      if (!V || F.here === 'home') {
+        if (making) { out.sig += 'mk' + (making.bp ? G.buildCount(making).join('.') : 'plan'); const row = G.hub.row({ icon: pic(making, '⚒'), title: making.title, tag: 'being built', live: true, sub: 'The ' + esc(making.kind) + ' are building ' + (making.result.port ? 'a spaceport on the shore: the pad a spaceship will stand on.' : 'their spaceship on the port.') + (making.bp ? ' ' + pc(making) + ' set.' : ' They are working out its shape.'), act: 'voyDeed' }); out.space.push(row); out.now.push(row); out.news.push('mk' + making.title); }
+        if (port) { out.sig += 'p' + G.buildCount(port).join('.'); out.spaceN.push(1); out.news.push('port' + port.name); out.space.push(G.hub.row({ icon: pic(port, '▭'), title: port.name, tag: 'the spaceport', sub: 'Built by the ' + esc(port.by) + ' in generation ' + port.gen + ', on the land at the edge of the pond. ' + pc(port) + ' stand.' + (anyShip || (making && making.result.ship) ? '' : ' A spaceship will be built on it next.'), act: 'voyPort' })); }
+        else if (!making) out.space.push('<div class="rnone"><b style="color:#f6d365">No spaceport yet.</b> A kind that has made itself a place of its own will, in time, build a spaceport on the land at the edge of the pond, and then a spaceship standing on it. Both will show here, and the ship can then be sent to another pond.</div>');
+        if (anyShip && !ship && !d) { out.sig += 's' + G.buildCount(anyShip).join('.') + (anyShip.away ? 'a' : ''); if (!anyShip.away) out.space.push(G.hub.row({ icon: pic(anyShip, '▲'), title: anyShip.name, tag: 'not whole', bad: true, sub: pc(anyShip) + ' stand. Its keepers are mending it: it cannot fly until every piece is set.', act: 'voyShip2' })); }
+        if (anyShip) out.spaceN.push(1);
+      }
+      // 3. the far ponds you have been to
       const keys = Object.keys(F.book).filter(function (k) { return !F.there() || k !== V.key; });
-      keys.forEach(function (k) { const r = F.book[k]; out.sig += k + r.mine + '|'; out.people.push(G.hub.row({ icon: '⚑', title: r.name, tag: r.mine ? 'your outpost: ' + r.mine : 'visited', sub: 'A far pond. You have been there ' + (r.visits === 1 ? 'once' : r.visits + ' times') + (r.mine ? '; ' + r.mine + ' of your people live there.' : '; none of yours live there now.') })); });
+      if (keys.length) out.space.push('<div class="rh">Far ponds you have been to</div>');
+      keys.forEach(function (k) { const r = F.book[k]; out.sig += k + r.mine + '|'; out.space.push(G.hub.row({ icon: '⚑', title: r.name, tag: r.mine ? 'your outpost: ' + r.mine : 'visited', sub: 'You have been there ' + (r.visits === 1 ? 'once' : r.visits + ' times') + (r.mine ? '; ' + r.mine + ' of your people live there.' : '; none of yours live there now.'), extra: !V && r.blob ? '<span class="hbtn' + (r.mine ? '' : ' q') + '" data-act="voyPeek" data-arg="' + k + '">LOOK IN</span>' : '' })); });
       return out;
     });
+    const goWork = function (w) { if (w) { if (G.select) G.select(null); if (G.focusOn) G.focusOn(w.x, w.y - 20, 1.4); if (G.selectThing) G.selectThing({ k: 'work', o: w }); } };
+    G.hub.act('voyPort', function () { goWork((G.W.works || []).filter(function (w) { return w.bp && w.bp.type === 'port'; })[0]); });
+    G.hub.act('voyShip2', function () { goWork((G.W.works || []).filter(function (w) { return w.bp && w.bp.type === 'ship'; })[0]); });
+    G.hub.act('voyDeed', function () { const dd = G.W.deed; if (dd && G.focusOn) G.focusOn(dd.x, dd.y - 20, 1.4); });
     G.hub.act('voyPick', function () { G.voyagePick(); });
     G.hub.act('voyOff', function () { G.voyageOff(); });
-    G.hub.act('voyHome', function () { G.voyageHome(); });
+    G.hub.act('voyHome', function () { G.voyageHome('crew'); });
+    G.hub.act('voyPeek', function (key) { if (F.visiting || flight || plan()) return; if (G.selectThing) G.selectThing(null); if (G.select) G.select(null); if (F.peek(key)) { const V = F.visiting; if (G.hub) G.hub.close(); if (G.setSpeed) G.setSpeed(1); say('LOOKING IN ON ' + V.name.toUpperCase(), F.lineN() + ' of yours live here: each carries a gold pennant. Your own pond waits as you left it.', 8000); } else tip('<b>That pond cannot be looked in on just now.</b>'); });
     G.hub.act('voyThere', function () { G.voyageLook('far'); });
     G.hub.act('voyWatchHome', function () { G.voyageLook('home'); });
     G.hub.act('voyShip', function () { const s = F.shipOf(); if (s) { if (G.focusOn) G.focusOn(s.x, s.y, 1.3); if (G.selectThing) G.selectThing({ k: 'work', o: s }); } });
@@ -10964,17 +11186,19 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   setInterval(function () {
     try {
       els(); { const se = $('season'), pn = $('panel'), a = se && !se.classList.contains('hide') && se.offsetWidth ? se.getBoundingClientRect().right + 10 : 14, b = pn && !pn.classList.contains('hide') && pn.offsetWidth ? pn.getBoundingClientRect().left - 10 : window.innerWidth - 14, wide = window.innerWidth > 900 && b - a > 360; [pickEl, bar].forEach(function (e) { if (wide && e.style.top !== '58px') { e.style.left = Math.round((a + b) / 2) + 'px'; e.style.maxWidth = Math.round(b - a) + 'px'; } else { e.style.left = ''; e.style.maxWidth = ''; } }); }
-      const V = F.visiting, T = F.there(), W = G.W, on = !!(V && W && G.mode === 'play' && !W.title && !flight), d = W && !W.title && G.mode === 'play' ? plan() : null;
+      const V = F.visiting, T = F.there(), W = G.W, on = !!(V && W && G.mode === 'play' && !W.title && !flight), d = W && !W.title && G.mode === 'play' ? cur() : null;
       if (want && W && !W.deed && G.mode === 'play') start();
       const gh = $('gohome'); if (gh) { const sp = gh.querySelector('span'), t = T ? 'BACK TO ' + T.name.toUpperCase() : 'BACK TO MY POND'; if (sp && sp.textContent !== t) sp.textContent = t; }
-      if (!on) { if (!bar.classList.contains('hide')) bar.classList.add('hide'); }
+      if (!on || (R && T)) { if (!bar.classList.contains('hide')) bar.classList.add('hide'); }
       else { const mine = F.lineN(), wish = $('wish'), top = wish && !wish.classList.contains('hide') && wish.offsetHeight && window.innerWidth > 720 ? Math.round(wish.getBoundingClientRect().bottom + 8) : 14;
-        const r0 = F.book[V.key] || {}, t = T ? '<span><b>⚑ VISITING ' + esc(V.name.toUpperCase()) + '</b> · its people are ' + esc(V.mood) + '<br><i>' + mine + '</i> of yours live here · <i>' + V.adds + '</i> of ' + V.adds0 + ' ADD' + (V.adds0 === 1 ? '' : 's') + ' left</span><button class="btn sm" id="voyShip">THE SHIP</button><button class="btn sm" id="voyLookHome">WATCH HOME</button><button class="btn sm" id="voyHome">FLY HOME</button>'
+        const r0 = F.book[V.key] || {}, crewN = T ? W.cre.filter(function (q) { return q.crew && !q.dead; }).length : 0, marked = T ? W.cre.filter(function (q) { return q.aboard && !q.dead; })[0] : null;
+        const t = V.peek ? '<span><b>⚑ LOOKING IN ON ' + esc(V.name.toUpperCase()) + '</b> · its people are ' + esc(V.mood) + '<br><i>' + mine + '</i> of yours live here' + (mine ? ': each carries a gold pennant' : ' now') + '</span><button class="btn sm" id="voyHome">BACK TO MY POND</button>'
+          : T ? '<span><b>⚑ VISITING ' + esc(V.name.toUpperCase()) + '</b> · its people are ' + esc(V.mood) + '<br><i>' + mine + '</i> of yours live here (the crew carry gold rockets) · <i>' + V.adds + '</i> of ' + V.adds0 + ' ADD' + (V.adds0 === 1 ? '' : 's') + ' left' + (marked ? ' · #' + marked.id + ' is to come home' : '') + '</span><button class="btn sm" id="voyShip">THE SHIP</button><button class="btn sm" id="voyLookHome">WATCH HOME</button><button class="btn sm" id="voyHome">' + (crewN ? 'CREW HOME (' + crewN + ')' : 'FLY HOME') + '</button>' + (crewN ? '<button class="btn sm" id="voyAlone">SHIP ALONE</button>' : '')
           : '<span><b>▲ YOUR SHIP IS AT ' + esc(V.name.toUpperCase()) + '</b><br><i>' + (r0.mine | 0) + '</i> of yours are there · you are watching your own pond</span><button class="btn sm" id="voyLookFar">GO THERE</button><button class="btn sm" id="voyHome">FLY HOME</button>';
         if (bar._t !== t) { bar._t = t; bar.innerHTML = t; } bar.style.top = top + 'px'; bar.classList.remove('hide'); }
       // the mission bar, at the top of the pond: its stages, what they are doing now, and who is aboard
       if (d && !flight && !picking && !(G.pondAsleep && G.pondAsleep())) { const M = members(d), st = d.steps[d.i], inN = M.filter(function (c) { return c.inShip; }).length;
-        const t = '<div class="mt">▲ MISSION TO ' + esc(d.voyage.name.toUpperCase()) + '</div><div class="stg">' + STAGES.map(function (q, i) { return '<span class="' + (i < d.i ? 'dn' : i === d.i ? 'on' : '') + '">' + q[1] + '</span>'; }).join('') + '</div>' +
+        const t = '<div class="mt">▲ ' + (d.voyage.home ? 'THE FLIGHT HOME FROM ' : 'MISSION TO ') + esc(d.voyage.name.toUpperCase()) + '</div><div class="stg">' + STAGES.filter(function (q) { return d.steps.some(function (s) { return s.do === q[0]; }); }).map(function (q, i) { return '<span class="' + (i < d.i ? 'dn' : i === d.i ? 'on' : '') + '">' + q[1] + '</span>'; }).join('') + '</div>' +
           '<div class="mrow"><span>' + esc((STEPW[st.do] || '').replace(/^./, function (m) { return m.toUpperCase(); })) + ' · <b style="font-size:12px;letter-spacing:0">' + inN + ' of ' + M.length + ' aboard</b></span>' + crewHtml(M) + (st.do === 'liftoff' ? '' : '<button class="btn sm" id="voyCancel2">' + (st.do === 'countdown' ? 'ABORT' : 'CALL IT OFF') + '</button>') + '</div>';
         if (pickEl._t !== t) { pickEl._t = t; pickEl.innerHTML = t; }
         pickEl.classList.add('mission'); pickEl.style.top = '14px'; pickEl.classList.remove('hide'); }
@@ -10982,11 +11206,15 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       // BRING HOME on a creature's card, in a far pond
       const at = $('idoing'), c = G.R && G.R.sel;
       if (at && !aboardBtn) { aboardBtn = document.createElement('button'); aboardBtn.id = 'iaboard'; aboardBtn.className = 'btn sm'; at.parentNode.insertBefore(aboardBtn, at);
-        aboardBtn.onclick = function () { const q = G.R && G.R.sel; if (!q || !F.there()) return; if (G.sfx) G.sfx('click'); const was = !!q.aboard; G.W.cre.forEach(function (o) { o.aboard = false; }); q.aboard = !was; aboardBtn._t = ''; }; }
-      if (aboardBtn) { const show = !!(T && c && !c.dead && c.g && !flight && F.shipOf()); aboardBtn.style.display = show ? '' : 'none';
-        if (show) { const t = c.aboard ? '⚑ COMING HOME WITH THE SHIP (undo)' : '⚑ BRING HOME with the ship'; if (aboardBtn._t !== t) { aboardBtn._t = t; aboardBtn.textContent = t; aboardBtn.style.borderColor = c.aboard ? 'var(--gold)' : ''; aboardBtn.title = 'One creature of this pond, yours or theirs, may come back with the ship when it flies home.'; } } }
+        aboardBtn.onclick = function () { const q = G.R && G.R.sel; if (!q) return; if (G.sfx) G.sfx('click'); if (F.there()) { const was = !!q.aboard; G.W.cre.forEach(function (o) { o.aboard = false; }); q.aboard = !was; } else if (editable()) { const s3 = F.shipOf(), inIt = s3 && F.crewFor(s3).indexOf(q) >= 0; q.crewPick = inIt ? -1 : 1; if (G.hub) G.hub.poke(); } aboardBtn._t = ''; }; }
+      if (aboardBtn) { const s3 = c && !c.dead && c.g && !flight ? F.shipOf() : null, far = !!(T && !V.peek && s3 && !R), home = !!(!V && s3 && editable() && !c.deedId), show = far || home; aboardBtn.style.display = show ? '' : 'none';
+        if (show) { const inIt = home && F.crewFor(s3).indexOf(c) >= 0, t = far ? (c.aboard ? '⚑ COMING HOME WITH THE SHIP (undo)' : c.crew ? '⚑ One of the crew: it comes home when they are called' : '⚑ BRING HOME with the ship') : inIt ? '▲ IN THE CREW · take it out' : '▲ PUT IN THE CREW of the ' + s3.name;
+          if (aboardBtn._t !== t) { aboardBtn._t = t; aboardBtn.textContent = t; aboardBtn.style.borderColor = c.aboard || inIt ? 'var(--gold)' : ''; aboardBtn.title = far ? 'One creature of this pond, yours or theirs, may come back with the ship when it flies home.' : 'Who flies is theirs to decide, and yours to change: anyone you put in goes first.'; } } }
+      { const tb = $('toolbar'), Wk2 = (W && W.works) || [], has = !!(W && !W.title && G.mode === 'play' && (V || Object.keys(F.book).length || Wk2.some(function (w) { return w.bp && (w.bp.type === 'port' || w.bp.type === 'ship'); }))); let sb = $('tb-space');
+        if (tb && has && !sb) { sb = document.createElement('button'); sb.id = 'tb-space'; sb.className = 'btn'; sb.title = 'The spaceport, the spaceship and your missions to other ponds'; sb.innerHTML = '<span style="color:#f6d365;font-size:13px;margin-right:6px">▲</span><span class="lab">SPACE</span>'; sb.style.borderColor = 'rgba(246,211,101,.6)'; const nb = $('tb-now'); tb.insertBefore(sb, nb ? nb.nextSibling : tb.firstChild); sb.onclick = function () { if (G.mode !== 'play') return; if (G.sfx) G.sfx('click'); if (G.hub) { if (G.hub.tab() === 'space') G.hub.close(); else { if (G.closePop) G.closePop(); G.hub.open('space'); } } }; }
+        if (sb) { sb.style.display = has ? '' : 'none'; const ready = !!(W && !V && !d && !want && F.shipOf()); sb.classList.toggle('pulse', ready); } }
       // who would go: marked in the pond
-      if (++tick % 2 === 0) { const s2 = !V && !flight && G.mode === 'play' && W && !W.title ? F.shipOf() : null; crewNow = d ? members(d) : s2 ? F.crewFor(s2) : []; }
+      if (++tick % 2 === 0) { const s2 = !V && !flight && G.mode === 'play' && W && !W.title ? F.shipOf() : null; crewNow = d ? members(d) : T ? W.cre.filter(function (q) { return q.crew && !q.dead; }) : s2 ? F.crewFor(s2) : []; mineNow = T ? W.cre.filter(function (q) { return q.line && !q.crew && !q.dead; }) : []; }
     } catch (e) { console.error(e); }
   }, 450);
   // the ship carries only so many ADDs
@@ -10994,7 +11222,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   // news
   G.on('deed-end', function (d, how, made) { if (G.mode === 'play' && made && made.bp && made.bp.type === 'ship' && !F.visiting) setTimeout(function () { if (G.note) G.note('They have a spaceship', 'Open NOW (bottom left) or click the ' + made.name + ', and PLAN A VOYAGE to another pond.'); if (G.log) G.log('sp', 'A spaceship', 'The ' + made.by + ' built the ' + made.name + '. It can fly to another pond.'); }, 5000); });
   G.on('extinct', function () { const V = F.there(); if (!V || G.mode !== 'play') return; setTimeout(function () { if (F.visiting !== V) return; say('NOTHING LIVES AT ' + V.name.toUpperCase() + ' NOW', 'The pond has fallen still. The ship turns for home.', 8000); G.voyageHome(true); }, 1500); });
-  G.on('new-pond', function (opts) { if (opts && opts.voyage) return; picking = null; flight = null; want = null; crewNow = []; if (pickEl) pickEl.classList.add('hide'); if (bar) bar.classList.add('hide'); });
+  G.on('new-pond', function (opts) { if (opts && opts.voyage) return; picking = null; flight = null; want = null; R = null; crewNow = []; mineNow = []; if (pickEl) pickEl.classList.add('hide'); if (bar) bar.classList.add('hide'); });
 })();
 
 </script>
@@ -11085,7 +11313,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const tb = el('div', 'glass hide', '', ui); tb.id = 'toolbar';
     const btns = [
       ['add', 'plus', 'ADD', 'T'], ['world', 'globe', 'WORLD', ''], ['speed', 'play', '1×', 'Space'], ['guide', 'book', 'BOOK', 'F'],
-      ['tree', 'tree', 'TREE', 'G'], ['new', 'drop', 'NEW', 'N'], ['sound', 'speaker', '', 'Esc'],
+      ['tree', 'tree', 'TREE', 'G'], ['sound', 'speaker', '', 'Esc'],
     ];
     btns.forEach(function (b) {
       const bt = el('button', 'btn' + (b[0] === 'sound' ? ' ic' : ''), ICON[b[1]] + (b[2] ? '<span class="lab">' + b[2] + '</span>' : ''), tb);
@@ -11592,8 +11820,8 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       '<div id="ifit" style="font-size:11.5px;line-height:1.4"></div>' +
       '<div class="irows"><div id="iE"></div><div id="iAge"></div><div id="iPar" style="grid-column:span 2"></div><div class="meter"><i id="iEb"></i></div></div>' +
       '<div class="imut" id="imut"></div>' +
-      '<button class="btn sm" id="iwhy" style="width:100%;margin-top:8px" title="Its marks explained, its energy, its family and what is new in it">ABOUT THIS CREATURE</button>' +
-      '<button class="btn sm" id="igenes" style="width:100%;margin-top:8px" title="See what this creature is made of and watch its brain work">GENES AND BRAIN</button>' +
+      '<button class="btn sm" id="iwhy" style="width:100%;margin-top:8px" title="Everything about it in one window: its marks and its life, what it is made of, and its brain at work">ABOUT IT · GENES · BRAIN</button>' +
+      '<button class="btn sm" id="igenes" style="display:none">GENES AND BRAIN</button>' +
       '<style>#inspector .ihead{flex-direction:column;align-items:center;text-align:center;position:relative;gap:0}#inspector .ihead canvas{width:150px;height:150px;margin:-14px 0 -10px}#inspector .ihead>div{width:100%}#inspector .ihead b{font-size:15px}#inspector .x{position:absolute;top:-6px;right:-6px;margin:0}#isub{text-align:left;margin-top:5px}#iacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}#iacts .btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:0 4px;font-size:10px;letter-spacing:.06em;white-space:nowrap}#iacts .btn svg{width:14px;height:14px;flex:none;margin:0}#iacts .btn i{font-style:normal;font-size:14px;line-height:1}#iacts #ikeep i{color:var(--gold)}#iacts #ibreed i{color:var(--rose)}#imarvel{margin:8px 0 6px;padding:9px 11px;border-radius:12px;background:rgba(246,211,101,.12);border:1.5px solid rgba(246,211,101,.7);text-align:left}#imarvel .mk{font:800 9.5px system-ui,sans-serif;letter-spacing:.2em;color:#f6d365}#imarvel .mn{display:flex;align-items:center;gap:8px;font:800 16px system-ui,sans-serif;color:#fff;margin:2px 0 3px}#imarvel .mn img{width:30px;height:30px;flex:none}#imarvel .mw{font:600 12.5px/1.4 system-ui,sans-serif;color:#fff}#imarvel ul{margin:6px 0 0;padding:0;list-style:none}#imarvel li{font:600 11.5px/1.35 system-ui,sans-serif;color:#ffe9a8;padding:3px 0 3px 16px;position:relative}#imarvel li:before{content:"\\25C6";position:absolute;left:0;font-size:9px;top:5px}#imarvel .my{font-size:10.5px;opacity:.75;margin-top:5px;font-style:italic}</style>' +
       '<div id="iacts"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond."><i>★</i>KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection."><i>♥</i>BREED</button><button class="btn sm" id="itree" title="Its family tree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide" title="Its kind, in the Book of Life">' + ICON.book + 'KIND</button></div>';
     $('iclose').onclick = function () { G.select(null); };
@@ -11752,26 +11980,38 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     '#gbwin .gsay{font:700 14px/1.45 system-ui,sans-serif;color:#fff;margin:10px 2px 6px;min-height:40px}#gbwin .gsay em{font-style:normal;color:#f6d365}' +
     '#gbwin .gleg{display:flex;flex-wrap:wrap;gap:6px 16px;font:500 12px system-ui,sans-serif;color:#b9cde2}#gbwin .gleg span{display:flex;align-items:center;gap:6px}#gbwin .gleg i{display:inline-block;width:22px;height:4px;border-radius:2px}#gbwin .gleg i.d{width:10px;height:10px;border-radius:50%}' +
     '#gbwin.about{width:min(620px,calc(100% - 20px))}#gbwin .arow{display:grid;grid-template-columns:86px minmax(0,1fr) 34px;gap:4px 10px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(207,232,255,.08)}#gbwin .arow b{font:700 13.5px system-ui,sans-serif;color:#fff}#gbwin .arow i{font:800 14px system-ui,sans-serif;font-style:normal;color:#f6d365;text-align:right}#gbwin .arow small{grid-column:1 / -1;font:500 12px/1.45 system-ui,sans-serif;color:#b9cde2}#gbwin .atext p{font:500 13px/1.55 system-ui,sans-serif;color:#dcecff;margin:0 0 6px}#gbwin .atext small{font-size:13px}' +
-    '#gbwin .gnote{font:500 12px/1.5 system-ui,sans-serif;color:#a9bfd6;margin:8px 2px 0}';
+    '#gbwin .gnote{font:500 12px/1.5 system-ui,sans-serif;color:#a9bfd6;margin:8px 2px 0}' +
+    '#gbwin .gtabs{display:flex;gap:6px;margin:10px 0 4px}#gbwin .gtabs span{flex:0 0 auto;min-width:120px;text-align:center;padding:8px 16px;border-radius:999px;cursor:pointer;font:800 11px system-ui,sans-serif;letter-spacing:.16em;color:#b9cde2;background:rgba(7,18,31,.5);border:1px solid rgba(207,232,255,.18)}#gbwin .gtabs span.on{color:#14202e;background:#f6d365;border-color:#f6d365}#gbwin .gtabs span:hover:not(.on){border-color:#f6d365;color:#ffe9a8}' +
+    '#gbwin #gbgenes{columns:3 250px;column-gap:28px}#gbwin #gbgenes section{break-inside:avoid;margin:0 0 10px}#gbwin #gbgenes section h4{margin-top:4px}#gbwin #gbgenes .gnone{margin:-3px 0 2px 113px !important;font-size:10.5px !important;line-height:1.25}' +
+    '#gbwin #gbbrain{max-height:50vh;width:auto;max-width:100%;margin:0 auto}#gbwin .bcols{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:18px;align-items:start}@media (max-width:820px){#gbwin .bcols{grid-template-columns:minmax(0,1fr)}}#gbwin .bcols .gleg{flex-direction:column;gap:7px}' +
+    '#gbwin .acols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:6px 26px;align-items:start}@media (max-width:820px){#gbwin .acols{grid-template-columns:minmax(0,1fr)}}#gbwin .acols h3:first-child{margin-top:6px}#gbwin .acols .arow{padding:5px 0}#gbwin .acols .arow small{font-size:11.5px;line-height:1.35}#gbwin .acols .atext p{font-size:12.5px;line-height:1.45;margin-bottom:5px}';
   document.head.appendChild(st);
 
   function close() { if (win) { win.remove(); win = null; } shownId = 0; if (raf) { cancelAnimationFrame(raf); raf = 0; } }
   G.closeGenes = close;
-  G.openGenes = function () {
-    if (win) { close(); return; }
+  let tabNow = 'genes', aboutSig = '', lastAbout = 0;
+  function setTab(t) { tabNow = t; if (!win) return; ['about', 'genes', 'brain'].forEach(function (k) { const p = $('gp-' + k), b = win.querySelector('[data-t="' + k + '"]'); if (p) p.style.display = k === t ? '' : 'none'; if (b) b.classList.toggle('on', k === t); }); aboutSig = ''; lastAbout = 0; }
+  /** the creature's window: ABOUT it (its marks, its life, how it is doing), its GENES, its BRAIN at work. `tab` says which to show first. */
+  G.openGenes = function (tab) {
+    tab = tab === 'about' || tab === 'brain' ? tab : 'genes';
+    if (win) { if (tab !== tabNow) { setTab(tab); return; } close(); return; }
     if (!G.R.sel) return;
     win = el('div', '', '', $('ui')); win.id = 'gbwin';
     win.innerHTML = '<div class="gtop"><canvas id="gbprev" width="184" height="184"></canvas><div><b id="gbname"></b><small id="gbsub"></small></div><button class="btn sm" id="gbclose">' + (G.ICON.close || '') + 'CLOSE</button></div>' +
-      '<div class="gcols"><div><h3>GENES · WHAT IT IS MADE OF</h3><div id="gbgenes"></div></div>' +
-      '<div><h3>BRAIN · WATCH IT THINK</h3><canvas id="gbbrain" width="1160" height="760"></canvas><div class="gsay" id="gbsay"></div>' +
+      '<div class="gtabs"><span data-t="about">ABOUT IT</span><span data-t="genes">GENES</span><span data-t="brain">BRAIN</span></div>' +
+      '<div id="gp-about"></div>' +
+      '<div id="gp-genes"><div id="gbgenes"></div></div>' +
+      '<div id="gp-brain"><div class="bcols"><div><canvas id="gbbrain" width="1160" height="760"></canvas></div><div><div class="gsay" id="gbsay"></div>' +
       '<div class="gleg"><span><i style="background:' + PAL.algae + '"></i>a wire that says "do it"</span><span><i style="background:' + PAL.rose + '"></i>a wire that says "do not"</span><span><i style="background:#fff;height:7px"></i>thicker = stronger</span><span><i class="d" style="background:#fff"></i>moving dots = a signal passing right now</span><span><i style="background:' + PAL.gold + ';height:7px"></i>gold edge = changed by what it learned in its life</span></div>' +
-      '<p class="gnote">The wires are genes: a creature is born with them, from both parents, with small changes. During its life it also learns: wires that were in use just before a meal grow stronger, wires in use just before it was hurt or ate what makes it ill grow weaker. Your GOOD and BAD do the same, more strongly. What it learned is passed on too: its children are born with half of it, and the young pick it up from their elders.</p></div></div>';
+      '<p class="gnote">The wires are genes: it is born with them, from both parents, with small changes. In its life it also learns: wires in use just before a meal grow stronger, wires in use just before it was hurt grow weaker. Your GOOD and BAD do the same, more strongly. Its children are born with half of what it learned, and the young pick it up from their elders.</p></div></div></div>';
+    win.querySelector('.gtabs').addEventListener('click', function (e) { let n = e.target; while (n && !(n.dataset && n.dataset.t)) n = n.parentNode; if (n) { G.sfx('click'); setTab(n.dataset.t); } });
+    setTab(tab);
     $('gbclose').onclick = function () { G.sfx('click'); close(); };
     win.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
     win.addEventListener('wheel', function (e) { e.stopPropagation(); }, { passive: true });
     frame();
   };
-  window.addEventListener('keydown', function (e) { if (win && e.key === 'Escape') { e.stopPropagation(); close(); } else if (about && e.key === 'Escape') { e.stopPropagation(); closeAbout(); } }, true);
+  window.addEventListener('keydown', function (e) { if (win && e.key === 'Escape') { e.stopPropagation(); close(); } }, true);
   // ── About this creature: its marks explained, how it is doing, its family, what is new in it. A window like the one above; the card itself stays short. ──
   // ── its life, as short tags ──
   // (what it eats, where it lives, what it has learned, where it came from: each a word or two, with the full sentence when you rest on it)
@@ -11786,7 +12026,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     if (c.lessons > 3 && c.learned > 0.05) add('learned \u00d7' + c.lessons, 'It has learned from ' + c.lessons + ' meals and mishaps in its own life.', 'v');
     if (c.bornKnowing > 0.05) add('born knowing', 'It was born knowing some of what its parents had learned.', 'v');
     if (c.taught > 2) add('taught by elders', 'It has been learning from its elders.', 'v');
-    if (c.judged) add((c.judged > 0 ? 'GOOD' : 'BAD') + ' \u00d7' + Math.abs(c.judged), 'You have told it ' + (c.judged > 0 ? 'GOOD' : 'BAD') + ' ' + Math.abs(c.judged) + (Math.abs(c.judged) === 1 ? ' time.' : ' times.'), c.judged > 0 ? 'g' : 'r');
+    if (c.goodN || c.badN) add('you: ♥ ' + (c.goodN || 0) + ' · ✕ ' + (c.badN || 0), 'You have told it GOOD ' + (c.goodN || 0) + ' times and BAD ' + (c.badN || 0) + ' times.', (c.goodN || 0) >= (c.badN || 0) ? 'g' : 'r');
     if (c.gave) add('shared \u00d7' + c.gave, 'It has given of its own food ' + c.gave + (c.gave === 1 ? ' time.' : ' times.'), 'g');
     if (c.danced) add('danced \u00d7' + c.danced, 'It has danced ' + c.danced + (c.danced === 1 ? ' time.' : ' times.'));
     if (c.builtShip) add('built the ship', 'It set pieces of the ' + c.builtShip + ' with its own hands: it is among the first to go in it.', 'g');
@@ -11806,22 +12046,17 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       el = document.createElement('div'); el.id = 'itags'; const hd = sub.closest ? sub.closest('.ihead') : null; if (hd && hd.parentNode) hd.parentNode.insertBefore(el, hd.nextSibling); else sub.parentNode.appendChild(el); }
     const h = tags(c); if (el._h !== h) { el._h = h; el.innerHTML = h; } el.style.display = h ? '' : 'none';
   };
-  let about = null, aboutT = 0, aboutSig = '';
-  function closeAbout() { if (about) { about.remove(); about = null; } if (aboutT) { clearInterval(aboutT); aboutT = 0; } aboutSig = ''; }
-  function fillAbout() {
-    const c = G.R.sel; if (!about || !c || G.mode !== 'play') { closeAbout(); return; }
+  function aboutHtml(c) {
     const sp = G.speciesById(c.sp), txt = function (id) { const e = $(id); return e ? e.innerHTML : ''; }, says = Array.prototype.slice.call(document.querySelectorAll('#ifit small')).map(function (e) { return e.innerHTML; }).filter(Boolean);
     const bar = function (m) { const v = G.markOf(c, m.id); return '<div class="arow"><b>' + m.label + '</b><span class="gbar"><u style="width:' + Math.round(v * 100) + '%;background:#f6d365"></u></span><i>' + (v * 10).toFixed(1) + '</i><small>' + esc(String(m.note).replace(/^[A-Za-z]+: /, '').replace(/, out of 10.?/, '.')) + '</small></div>'; };
-    const h = '<div class="gtop"><div><b>' + esc((sp ? sp.name : 'Blob') + ' #' + c.id) + '</b><small>' + esc(G.kindOf(c.g).full) + '</small></div><button class="btn sm" id="abclose">' + (G.ICON.close || '') + 'CLOSE</button></div>' +
-      '<h3>ITS MARKS · OUT OF 10</h3>' + (G.MARKS || []).map(bar).join('') + '<div class="arow"><b>Appeal</b><span></span><i>' + (G.charmOf(c) * 10).toFixed(1) + '</i><small>All its marks together. Appeal, with having fed well, is its fitness: who breeds and who fades.</small></div>' +
-      '<h3>ITS KIND AND ITS LIFE</h3><div class="atext"><p>' + esc(sp ? G.describeSpecies(sp) : 'A newborn: its kind is sorted out in autumn.') + '</p><p>' + esc((G.lifeText ? G.lifeText(c) : '') + (G.societyText ? ' ' + G.societyText(c) : '')) + '</p></div>' +
-      '<h3>WHAT IS SAID OF IT</h3><div class="atext">' + says.map(function (t) { return '<p>' + t + '</p>'; }).join('') + '</div>' +
-      '<h3>HOW IT IS DOING</h3><div class="atext"><p>' + txt('iE') + '</p><p>' + txt('iAge') + '</p><p>' + txt('iPar') + '</p></div>' +
-      '<h3>WHAT IS NEW IN IT</h3><div class="atext"><p>' + txt('imut') + '</p></div>';
-    if (h === aboutSig) return; aboutSig = h; const sc = about.scrollTop; about.innerHTML = h; about.scrollTop = sc; $('abclose').onclick = function () { G.sfx('click'); closeAbout(); };
+    return '<div class="acols"><div><h3>ITS MARKS · OUT OF 10</h3>' + (G.MARKS || []).map(bar).join('') + '<div class="arow"><b>Appeal</b><span></span><i>' + (G.charmOf(c) * 10).toFixed(1) + '</i><small>All its marks together. Appeal, with having fed well, is its fitness: who breeds and who fades.</small></div></div>' +
+      '<div><h3>ITS KIND AND ITS LIFE</h3><div class="atext"><p>' + esc(sp ? G.describeSpecies(sp) : 'A newborn: its kind is sorted out in autumn.') + '</p><p>' + esc((G.lifeText ? G.lifeText(c) : '') + (G.societyText ? ' ' + G.societyText(c) : '')) + '</p></div>' +
+      '<h3>HOW IT IS DOING</h3><div class="atext"><p>' + txt('iE') + ' ' + txt('iAge') + '</p><p>' + txt('iPar') + '</p></div>' +
+      (says.length ? '<h3>WHAT IS SAID OF IT</h3><div class="atext">' + says.map(function (t) { return '<p>' + t + '</p>'; }).join('') + '</div>' : '') +
+      '<h3>WHAT IS NEW IN IT</h3><div class="atext"><p>' + (txt('imut') || 'Nothing: it is as its parents were.') + '</p></div></div></div>';
   }
-  G.openAbout = function () { if (about) { closeAbout(); return; } if (!G.R.sel) return; about = el('div', '', '', $('ui')); about.id = 'gbwin'; about.classList.add('about'); about.addEventListener('pointerdown', function (e) { e.stopPropagation(); }); about.addEventListener('wheel', function (e) { e.stopPropagation(); }, { passive: true }); fillAbout(); aboutT = setInterval(function () { try { fillAbout(); } catch (e) { console.error(e); closeAbout(); } }, 500); };
-  G.on('new-pond', closeAbout);
+  G.openAbout = function () { G.openGenes('about'); };
+
   // ── good and bad: nature's own voice ──
   // The player never tells a creature what to do. They can only say GOOD or BAD of what it is doing right now, and that goes straight into its brain as the
   // strongest reward or punishment it knows (G.learn): the wires that were just in use grow stronger or weaker. What it makes of that is its own affair.
@@ -11949,15 +12184,16 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       const sp = G.speciesById(c.sp);
       $('gbname').textContent = (sp ? sp.name : 'Blob') + ' #' + c.id + ' · ' + G.kindOf(c.g).full;
       $('gbsub').innerHTML = '<div class="gchips gtags"><span>born in generation ' + c.born + '</span>' + tags(c) + '</div>' + (G.societyText ? '<div class="gsoc">' + esc(G.societyText(c)) + '</div>' : '');
-      $('gbgenes').innerHTML = genes(c);
-      lastSay = 0;
+      $('gbgenes').innerHTML = '<section>' + genes(c).split('<h4>').filter(Boolean).map(function (q) { return '<h4>' + q; }).join('</section><section>') + '</section>';
+      lastSay = 0; aboutSig = ''; lastAbout = 0;
     }
     try {
       const pv = $('gbprev'), px = pv.getContext('2d'), prev = G.R.selPrev;
       px.setTransform(1, 0, 0, 1, 0, 0); px.clearRect(0, 0, 184, 184);
       if (prev) G.drawFit(px, prev, 92, 92, 84, G.rt);
-      brain(c, performance.now() / 1000);
       const now = performance.now();
+      if (tabNow === 'brain') brain(c, now / 1000);
+      if (tabNow === 'about' && now - lastAbout > 600) { lastAbout = now; const h = aboutHtml(c); if (h !== aboutSig) { aboutSig = h; $('gp-about').innerHTML = h; } }
       if (now - lastSay > 500) { lastSay = now; $('gbsay').innerHTML = saying(c); }
     } catch (e) { console.error(e); close(); }
   }
@@ -12908,6 +13144,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     m.addEventListener('pointerdown', function (e) { if (e.target === m) G.closeMenu(); });
     UI.menuEl = m;
     buildSoundControls($('mnBody'), true);
+    { const nb = el('button', 'btn', (ICON.drop || '') + 'START A NEW POND', $('mnBody')); nb.style.cssText = 'width:100%;margin-top:14px'; nb.title = 'Leave this pond and begin another (you are asked first)'; nb.onclick = function () { G.sfx('click'); G.closeMenu(); G.confirmNew(); }; }
     $('mnClose').onclick = function () { G.closeMenu(); };
   };
   G.closeMenu = function () {
@@ -13495,7 +13732,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const W = G.W;
     if (!W || W.title) return null;
     const out = {
-      v: 1, at: Date.now(), far: G.voyCollect ? undefined : W.farKeep || undefined, hstyle: W.houseStyle || undefined, taught: W.taught || undefined, works: (W.works || []).filter(function (w) { return w.bp; }).slice(-24).map(function (w) { const b = w.bp; return { n: w.name, l: w.looks, x: Math.round(w.x), y: Math.round(w.y), r: Math.round(w.r), by: w.by, hue: Math.round(w.hue || 0), sp: w.sp || 0, plan: w.plan, what: w.what, why: w.why, gen: w.gen, b: [b.seed, b.type, Math.round(b.S), Math.round(b.hue), b.spiky, +b.brain.toFixed(2), b.wet === false ? 0 : 1], pk: G.blueprintPack ? G.blueprintPack(b) || undefined : undefined, st: b.P.map(function (p) { return p.st; }).join('') }; }), room: +(W.room || 0).toFixed(1), shore: +(W.shore || G.SHORE0).toFixed(3), rich: +(W.richS || 1).toFixed(3), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
+      v: 1, at: Date.now(), craft: W.craft || undefined, far: G.voyCollect ? undefined : W.farKeep || undefined, hstyle: W.houseStyle || undefined, taught: W.taught || undefined, works: (W.works || []).filter(function (w) { return w.bp; }).slice(-24).map(function (w) { const b = w.bp; return { n: w.name, l: w.looks, x: Math.round(w.x), y: Math.round(w.y), r: Math.round(w.r), by: w.by, hue: Math.round(w.hue || 0), sp: w.sp || 0, plan: w.plan, what: w.what, why: w.why, gen: w.gen, b: [b.seed, b.type, Math.round(b.S), Math.round(b.hue), b.spiky, +b.brain.toFixed(2), b.wet === false ? 0 : 1], pk: G.blueprintPack ? G.blueprintPack(b) || undefined : undefined, st: b.P.map(function (p) { return p.st; }).join('') }; }), room: +(W.room || 0).toFixed(1), shore: +(W.shore || G.SHORE0).toFixed(3), rich: +(W.richS || 1).toFixed(3), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
       set: W.set, disc: W.disc, nextSp: W.nextSp, ai: G.ai && G.ai.model ? G.ai.model : '', drawn: G.ai && G.ai.drawn ? 1 : 0, spend: G.ai ? G.ai.life : {},
       hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species, +(h.look || 0).toFixed(3), +(h.lookTop || 0).toFixed(2), +(h.whole || 0).toFixed(3), +(h.wholeTop || 0).toFixed(2), +(h.body || 0).toFixed(1), +(h.bodyTop || 0).toFixed(1), +(h.size || 0).toFixed(1), +(h.sizeTop || 0).toFixed(1), (G.MARKS_X || []).map(function (m) { const q = h.mx && h.mx[m.id]; return q ? [+q[0].toFixed(3), +q[1].toFixed(2)] : 0; }), +(h.room || 0).toFixed(1)]; }),
       discLog: W.discLog.slice(-40),
@@ -13521,7 +13758,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const maxC = Math.min(sorted.length, 220);
     for (let i = 0; i < maxC; i++) {
       const c = sorted[i];
-      out.cre.push([G.packGenome(c.g), Math.round(c.x), Math.round(c.y), Math.round(c.E), c.age, c.sp, c.born, c.eb === undefined ? -1 : +c.eb.toFixed(2), c.ew === undefined ? -1 : +c.ew.toFixed(2), c.real ? 1 : 0, c.real ? c.real.why : '', (G.MARKS_X || []).map(function (m) { return c.mx && c.mx[m.id] !== undefined ? +c.mx[m.id].toFixed(2) : -1; }), c.line ? 1 : 0]);
+      out.cre.push([G.packGenome(c.g), Math.round(c.x), Math.round(c.y), Math.round(c.E), c.age, c.sp, c.born, c.eb === undefined ? -1 : +c.eb.toFixed(2), c.ew === undefined ? -1 : +c.ew.toFixed(2), c.real ? 1 : 0, c.real ? c.real.why : '', (G.MARKS_X || []).map(function (m) { return c.mx && c.mx[m.id] !== undefined ? +c.mx[m.id].toFixed(2) : -1; }), c.line ? (c.crew ? 2 : 1) : 0]);
     }
     // children already on their way (spring's births come a few at a time) are saved as born, so a save in spring does not lose them
     (W.births || []).slice(0, 60).forEach(function (b) { const c = b && b.c; if (!c || !c.g || out.cre.length >= 240) return; out.cre.push([G.packGenome(c.g), Math.round(b.x), Math.round(b.y), Math.round(c.E), c.age || 0, c.sp || 0, c.born === undefined ? W.gen : c.born, -1, -1, 0, '']); });
@@ -13647,9 +13884,10 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     G.newWorld({ seed: num(d.seed, 1, 4e9, 1) });
     const W = G.W;
     W.gen = Math.floor(num(d.gen, 1, 1e6, 1));
+    if (d.craft && typeof d.craft === 'object') { W.craft = {}; Object.keys(d.craft).slice(0, 40).forEach(function (k) { if (isFinite(+k)) W.craft[+k] = Math.floor(num(d.craft[k], 0, 99, 0)); }); }
     W.farKeep = d.far && typeof d.far === 'object' ? d.far : undefined; if (G.farLoaded) G.farLoaded(d);      // the far ponds you have been to (kept as they came where there is nobody to read them: the server that lives the pond for you while you are out)
     if (d.hstyle && typeof d.hstyle === 'object') { W.houseStyle = {}; Object.keys(d.hstyle).slice(0, 12).forEach(function (k) { const q = d.hstyle[k]; if (q && Array.isArray(q.pieces) && isFinite(+k)) W.houseStyle[+k] = { about: String(q.about || '').replace(/[<>]/g, '').slice(0, 120), pieces: q.pieces.slice(0, 14) }; }); }
-    if (d.taught && typeof d.taught === 'object') { W.taught = {}; ['strike', 'build', 'help', 'attack', 'hunt'].forEach(function (k) { const r = d.taught[k]; if (r && typeof r === 'object') W.taught[k] = { good: num(r.good, 0, 1e6, 0), bad: num(r.bad, 0, 1e6, 0), rate0: num(r.rate0, 0, 1e4, 0), gen0: num(r.gen0, 0, 1e6, 0) }; }); }
+    if (d.taught && typeof d.taught === 'object') { W.taught = {}; Object.keys(G.JUDGE_KINDS || { strike: 1, build: 1, help: 1, attack: 1, hunt: 1 }).forEach(function (k) { const r = d.taught[k]; if (r && typeof r === 'object') W.taught[k] = { good: num(r.good, 0, 1e6, 0), bad: num(r.bad, 0, 1e6, 0), rate0: num(r.rate0, 0, 1e4, 0), gen0: num(r.gen0, 0, 1e6, 0) }; }); }
     if (Array.isArray(d.works) && G.blueprintFrom) W.works = d.works.slice(0, 24).filter(function (q) { return q && Array.isArray(q.b) && ['wall', 'huts', 'spire', 'hall', 'house', 'ship', 'port'].indexOf(q.b[1]) >= 0; }).map(function (q) { const t = function (s, n) { return String(s || '').replace(/[<>]/g, '').slice(0, n); }; return { name: t(q.n, 40), looks: t(q.l, 200), x: num(q.x, 0, 1e5, 500), y: num(q.y, 0, 1e5, 500), r: num(q.r, 20, 200, 80), by: t(q.by, 40), hue: num(q.hue, 0, 360, 50), sp: num(q.sp, 0, 1e6, 0), plan: t(q.plan, 80), what: t(q.what, 200), why: t(q.why, 200), gen: num(q.gen, 0, 1e6, 0), until: 1e9, field: 0, bp: G.blueprintUnpack(G.blueprintFrom({ seed: num(q.b[0], 0, 4294967295, 1), type: q.b[1], S: num(q.b[2], 40, 130, 80), hue: num(q.b[3], 0, 360, 50), spiky: q.b[4] ? 1 : 0, brain: num(q.b[5], 0, 1, 0.3), wet: q.b[6] === 0 ? false : true }, String(q.st || '')), q.pk, String(q.st || '')) }; });
     W.room = num(d.room, 0, G.ROOM_MAX || 10, 0);
     W.richS = num(d.rich, 1, 5000, num(d.gen, 0, 1e6, 0) > 50 ? 3.8 : 1); W.rich = W.richS;      /* (a pond saved before richness was kept: an old one is taken to be rich enough for the bodies it has) */ W.sizeCap = Math.min(G.sizeCapOf(W.richS), Math.max(14, 1.2 * Math.sqrt(0.03 * (+d.ww || W.ww) * (+d.wh || W.wh) / (125 * 11.34))));      // before any creature is rebuilt: how big a body may be depends on it
@@ -13747,7 +13985,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       c.E = num(r[3], 1, c.ph.Emax, c.ph.Emax * 0.5); c.age = Math.floor(num(r[4], 0, 20, 0)); c.sp = Math.floor(num(r[5], 0, 1e6, 0)); c.born = Math.floor(num(r[6], 0, 1e6, 1));
       if (r[7] >= 0 && r[8] >= 0) { c.eb = num(r[7], 0, 1, 0.3); c.ew = num(r[8], 0, 1, 0.3); c.st = r[9] ? 0 : 2; if (r[9]) c.real = { b: c.eb, w: c.ew, why: String(r[10] || '').replace(/[<>]/g, '').slice(0, 70), gen: c.born }; c.ph.charm = c.eb; c.ph.whole = c.ew; W.eyeN = (W.eyeN || 0) + (r[9] ? 1 : 0); }
       if (Array.isArray(r[11]) && G.MARKS_X) { c.mx = c.mx || G.markPrior(c.g); G.MARKS_X.forEach(function (m, k) { if (r[11][k] >= 0) c.mx[m.id] = num(r[11][k], 0, 1, c.mx[m.id]); }); }
-      if (r[12]) c.line = 1;      // of the line of one who came from another pond
+      if (r[12]) c.line = 1; if (r[12] === 2) c.crew = 1;      // of the line of one who came from another pond
       c.snap = G.snapOf(c);
       W.cre.push(c);
     });

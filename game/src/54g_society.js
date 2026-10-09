@@ -157,7 +157,7 @@
   /** whom it follows or who follows it, what it has given and danced, and what its people are like */
   G.societyText = function (c) { const L = c.leader && !c.leader.dead ? c.leader : null, so = c.sp ? G.societyOf(c.sp) : null;
     return ((c.fol || 0) >= 3 ? c.fol + ' follow it. ' : L ? 'It follows #' + L.id + (L.sp !== c.sp ? ', one of another kind' : '') + (c.swayed ? ' (talked into it by #' + c.swayed + ')' : '') + '. ' : 'It follows nobody. ') + (c.gave ? 'It has shared its food ' + c.gave + (c.gave === 1 ? ' time. ' : ' times. ') : '') + (c.danced ? 'It has danced ' + c.danced + (c.danced === 1 ? ' time. ' : ' times. ') : '') + (so ? 'Its people: ' + so.text : ''); };
-  if (G.lifeText) { const t0 = G.lifeText; G.lifeText = function (c) { return t0(c) + ' Character: ' + G.characterOf(c) + '.' + (c.stranger !== undefined ? (c.fromPond === 0 ? ' You set it down here yourself.' : ' It came here from another pond.') + ({ led: ' They follow it.', few: ' A few follow it.', looked: ' They looked at it and went back to their own.', shunned: ' They kept away from it.', left: ' Its following has left it.' }[c.met] || '') : c.line ? ' It is descended from one who came here from another pond.' : ''); }; }
+  if (G.lifeText) { const t0 = G.lifeText; G.lifeText = function (c) { return t0(c) + ' Character: ' + G.characterOf(c) + '.' + (c.beenTo ? ' It flew to ' + c.beenTo + ' and came home.' : '') + (c.stranger !== undefined ? (c.fromPond === 0 ? ' You set it down here yourself.' : ' It came here from another pond.') + ({ led: ' They follow it.', few: ' A few follow it.', looked: ' They looked at it and went back to their own.', shunned: ' They kept away from it.', left: ' Its following has left it.' }[c.met] || '') : c.line ? ' It is descended from one who came here from another pond.' : ''); }; }
   // The stranger's own strip, above the moments: who came, how many are looking and following right now, and then what the pond made of it. It stays on
   // screen for a while after the verdict (banners are often busy with other news), and a click on it goes to the stranger.
   if (typeof document !== 'undefined') setInterval(function () {
@@ -185,7 +185,7 @@
       if (line) { out.sig += 'ln' + line; out.people.push(G.hub.row({ icon: '\u2691', title: (G.far && G.far.visiting ? 'Born here of your people' : 'Born of strangers') + ': ' + line, sub: 'Descended from those who came from another pond. They carry their character on.' })); }
       W.species.filter(function (s) { return !s.extinct && s.n >= 3; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 7).forEach(function (s) { const so = G.societyOf(s.id); if (!so) return; const top = so.top;
         out.sig += s.id + ':' + so.heads + ':' + (top ? top.id + '.' + top.fol : '') + '|';
-        out.people.push(G.hub.row({ icon: so.heads ? '\u2691' : '\u2022', title: 'The ' + s.name, tag: so.n + ' alive', sub: so.text, act: top ? 'cre' : 'kind', arg: top ? top.id : s.id }));
+        const cr = G.craftOf ? G.craftOf(s.id) : 0; out.sig += 'c' + cr; out.people.push(G.hub.row({ icon: so.heads ? '\u2691' : '\u2022', title: 'The ' + s.name, tag: so.n + ' alive', sub: so.text + (cr ? ' <span style="color:#f6d365">Builders: ' + cr + (cr === 1 ? ' building raised' : ' buildings raised') + (cr >= 5 ? ' (masters of it)' : cr >= 2 ? ' (practised)' : '') + '.</span>' : ''), act: top ? 'cre' : 'kind', arg: top ? top.id : s.id }));
         if (top && top.fol >= 5) out.news.push('L' + s.id + ':' + top.id); });
       return out;
     });

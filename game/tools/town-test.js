@@ -7,6 +7,9 @@
 //   4. ROOM              no building stands on another, and there is a gap between neighbours
 //   5. ORDER             neighbours share a ground line: buildings make rows, not a scatter
 //   6. IT LASTS          buildings are not lost for no reason (few fall, and only when nobody lives round them)
+//  10. THE WATERLINE    nothing is built across it or close to it
+//  11. THE SIDES        nobody and nothing is out in the dark at the left and right edges
+//  12. THEY GET BETTER  kinds grow practised, and add to what already stands
 //   7. THEY WORK TOGETHER  a building goes up in reasonable time, with few hands idle, and by hauling (not by being mended afterwards)
 // A second part checks the plain sense applied to free designs (as the AI makes them): given designs with pieces hanging in the air, they are let down
 // onto what they rest on, and can then be built in order.
@@ -19,7 +22,7 @@ const gens = +process.argv[2] || 160, seeds = (process.argv[3] || '11,23,57').sp
 const fails = [], check = (ok, what) => { console.log((ok ? '  ok    ' : '  FAIL  ') + what); if (!ok) fails.push(what); };
 const mean = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
 
-const all = { abandoned: 0, houses: [], atHome: [], count: [], whole: [], loose: 0, overlaps: 0, rowed: [], fallen: 0, secs: [], idle: [], hauledShare: [], early: [], late: [] };
+const all = { across: 0, dark: 0, grown: 0, craft: [], abandoned: 0, houses: [], atHome: [], count: [], whole: [], loose: 0, overlaps: 0, rowed: [], fallen: 0, secs: [], idle: [], hauledShare: [], early: [], late: [] };
 for (const seed of seeds) {
   G.newWorld({ seed }); G.founderPond(); G.mode = 'play'; G.speed = 1;
   let last = 0, gone = 0, at60 = 0; const builds = [];
@@ -38,6 +41,7 @@ for (const seed of seeds) {
   console.log('   ' + Wk.map((w) => w.name + ' [' + w.bp.type + ', ' + G.buildCount(w).join('/') + ', x' + Math.round(w.x) + ' y' + Math.round(w.y) + ']').join('  '));
   console.log('   built: ' + builds.map((b) => b.pieces + ' pieces in ' + b.secs + ' s by ' + b.hands + ' hands, idle ' + Math.round(b.idle * 100) + '%, hauled ' + b.hauled).join(' · '));
   { const hs = Wk.filter((w) => w.bp.type === 'house'), asleep = W.cre.filter((c) => c.asleep), home = asleep.filter((c) => c.atHome); all.houses.push(hs.length); if (hs.length && asleep.length) all.atHome.push(home.length / asleep.length); console.log('   houses ' + hs.length + ' · asleep now ' + asleep.length + ', of them at a house ' + home.length + ' · slept at home so far ' + (W.stats.sleptHome || 0) + ' · lost: ' + (JSON.stringify(why) === '{}' ? 'none' : JSON.stringify(why))); }
+  { const sy = G.shoreY(W), e = G.sideEdge(W); Wk.forEach((w) => { if (w.bp.type === 'ship') return; const foot = w.y + w.bp.S * 0.45, top = foot - (w.bp.top || 60); if (w.bp.wet === false || w.bp.type === 'port' ? foot > sy - 12 : top < sy + 12) all.across++; if (w.x - (w.bp.hw || 40) < e || w.x + (w.bp.hw || 40) > W.ww - e) all.dark++; all.grown += w.grown || 0; }); W.cre.forEach((c) => { if (c.x < e || c.x > W.ww - e) all.dark++; }); W.species.forEach((sp) => { if (!sp.extinct && sp.n >= 8) all.craft.push(G.craftOf(sp.id)); }); }
   all.count.push(Wk.length); all.early.push(at60); all.late.push(Wk.length); all.whole.push(...whole); all.loose += loose; all.overlaps += overlaps / 2; if (withNb) all.rowed.push(rowed / withNb); all.fallen += gone;
   builds.forEach((b) => { all.secs.push(b.secs); all.idle.push(b.idle); all.hauledShare.push(Math.min(1, b.placed / b.pieces)); });
 }
@@ -49,6 +53,9 @@ check(all.loose === 0, '3. it stands up: ' + all.loose + ' pieces rest on nothin
 check(all.overlaps === 0, '4. room: ' + all.overlaps + ' pairs of buildings stand on each other (must be 0)');
 check(mean(all.rowed) >= 0.6, '5. order: ' + Math.round(mean(all.rowed) * 100) + '% of buildings with a neighbour share its ground line (at least 60%)');
 check(all.abandoned <= seeds.length, '6. it lasts: ' + all.abandoned + ' buildings were lost by being abandoned (at most one a pond); ' + (all.fallen - all.abandoned) + ' more fell to attack');
+check(all.across === 0, '10. the waterline: ' + all.across + ' buildings stand across it or within a step of it (must be 0): what is under water is under it, what is on land is on it');
+check(all.dark === 0, '11. the sides: ' + all.dark + ' creatures or buildings are out in the dark at the sides of the pond (must be 0)');
+check(Math.max(0, ...all.craft) >= 2, '12. they get better: the most practised kind has raised ' + Math.max(0, ...all.craft) + ' buildings (at least 2); ' + all.grown + ' things were added to buildings already standing');
 check(mean(all.houses) >= 2, '9. houses: ' + mean(all.houses).toFixed(1) + ' houses a pond on average (at least 2)');
 check(all.secs.length > 0 && mean(all.secs) <= 150, '7. together: a building takes ' + Math.round(mean(all.secs)) + ' s of pond time on average (at most 150)');
 check(mean(all.idle) <= 0.4, '7. ... with ' + Math.round(mean(all.idle) * 100) + '% of the builders\' time spent idle (at most 40%)');

@@ -38,7 +38,7 @@ const path = require('path');
     await page.waitForTimeout(350); }
   console.log('stages seen: ' + await fr.evaluate(() => _stages.join(' > ')));
   console.log('arrived: ' + await fr.evaluate(() => { const V = G.far.visiting; return V ? V.name + ', generation ' + G.W.gen + ', ' + G.W.cre.filter((c) => !c.line).length + ' of theirs, ' + G.W.cre.filter((c) => c.line).length + ' of ours, another pond: ' + (G.W.seed !== _home.seed) + ', bar: ' + document.getElementById('voybar').innerText.replace(/\n+/g, ' / ') : 'NOT VISITING'; }));
-  await page.waitForTimeout(1800); await shot('6-arrived');
+  await page.waitForTimeout(1500); await shot('6a-landing'); await page.waitForTimeout(5500); await shot('6b-stepping-out'); await page.waitForTimeout(4000); await shot('6-arrived');
   for (let i = 0; i < 40 && (await fr.evaluate(() => _met.length)) < 2; i++) await page.waitForTimeout(1000);
   console.log('what they made of ours: ' + await fr.evaluate(() => _met.join(', ')));
   // two ponds to watch
@@ -49,14 +49,17 @@ const path = require('path');
   // one of theirs is told to come home with the ship
   await fr.evaluate(() => { const c = G.W.cre.filter((x) => !x.dead && !x.line).sort((a, b) => b.g.s[0] - a.g.s[0])[0]; G.select(c); G.focusOn(c.x, c.y, 1.4); }); await page.waitForTimeout(1300);
   await fr.locator('#iaboard').click(); await page.waitForTimeout(500); await shot('8-bring-home');
-  await fr.evaluate(() => G.select(null)); await fr.locator('#voyHome').click(); await page.waitForTimeout(6500);
+  await fr.evaluate(() => G.select(null)); await fr.locator('#voyHome').click();
+  { let got = false; for (let i = 0; i < 160; i++) { await page.waitForTimeout(500); const st = await fr.evaluate(() => ({ v: !!G.far.visiting, bar: (document.getElementById('voypick') || {}).innerText || '' })); if (!got && /BOARD|aboard/.test(st.bar) && i > 16) { got = true; await shot('8b-called-back'); console.log('  flight home: ' + st.bar.split(String.fromCharCode(10)).filter(Boolean).join(' / ').slice(0, 160)); } if (!st.v) break; } await page.waitForTimeout(1500); await shot('8c-landing-home'); await page.waitForTimeout(7000); }
   console.log('home: ' + await fr.evaluate(() => 'same pond ' + (G.W.seed === _home.seed) + ', generation ' + G.W.gen + ', ' + G.W.cre.length + ' alive, visiting ' + !!G.far.visiting + ', strangers here ' + G.W.cre.filter((c) => c.stranger !== undefined).map((c) => c.guestName + ' (' + G.characterOf(c) + ')').join('; ') + ', ship here ' + !!G.far.shipOf() + ', book ' + JSON.stringify(Object.keys(G.far.book).map((k) => G.far.book[k].name + ': ' + G.far.book[k].mine + ' of ours'))));
   await page.waitForTimeout(1200); await shot('9-home');
   // the tidied cards
   await fr.evaluate(() => { const c = G.W.cre.filter((x) => !x.dead && x.age > 0).sort((a, b) => (b.lessons || 0) - (a.lessons || 0))[0]; G.select(c); G.focusOn(c.x, c.y, 1.6); }); await page.waitForTimeout(1300); await shot('10-creature-card');
-  await fr.evaluate(() => G.openGenes()); await page.waitForTimeout(900); await shot('11-genes'); await fr.evaluate(() => G.openGenes());
+  await fr.evaluate(() => G.openGenes('about')); await page.waitForTimeout(1200); await shot('11a-about'); await fr.evaluate(() => G.openGenes('genes')); await page.waitForTimeout(900); await shot('11-genes'); await fr.evaluate(() => G.openGenes('brain')); await page.waitForTimeout(900); await shot('11b-brain'); console.log('creature window scrolls: ' + await fr.evaluate(() => { const w = document.getElementById('gbwin'); return w ? (w.scrollHeight > w.clientHeight + 2) + ' (' + w.scrollHeight + ' in ' + w.clientHeight + ')' : 'none'; })); await fr.evaluate(() => G.closeGenes());
   await fr.evaluate(() => { G.select(null); const w = (G.W.works || []).filter((q) => q.bp && q.bp.type !== 'ship' && q.bp.type !== 'port')[0]; if (w) { G.selectThing({ k: 'work', o: w }); G.focusOn(w.x, w.y, 1.4); } }); await page.waitForTimeout(1300); await shot('12-building-card');
-  await fr.evaluate(() => { G.selectThing(null); G.hub.open('people'); }); await page.waitForTimeout(900); await shot('13-now-people');
+  await fr.evaluate(() => { G.selectThing(null); G.hub.open('people'); }); await page.waitForTimeout(1100); await shot('13-now-people'); console.log('PEOPLE: ' + (await fr.locator('#rarebox').innerText()).split(String.fromCharCode(10)).filter(Boolean).join(' / ').slice(0, 300));
+  await fr.evaluate(() => G.hub.open('space')); await page.waitForTimeout(1100); await shot('14-now-space'); console.log('SPACE: ' + (await fr.locator('#rarebox').innerText()).split(String.fromCharCode(10)).filter(Boolean).join(' / ').slice(0, 420));
+  await fr.evaluate(() => { G.hub.close(); const c = G.W.cre.filter((x) => !x.dead)[5]; G.select(c); G.judge(c, true); G.openTaught(); }); await page.waitForTimeout(1200); await shot('15-taught');
   console.log(errs.slice(0, 8).join('\n') || 'no errors');
   await browser.close();
 })().catch((e) => { console.error(e); process.exit(1); });

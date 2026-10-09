@@ -195,6 +195,8 @@
     return t;
   };
 
+  /** how near the left and right edges of the pond anything that lives may come (the mist begins at a tenth of the pond's lesser side) */
+  G.sideEdge = function (W) { return Math.min(W.ww, W.wh) * 0.058; };
   G.spawnFood = function (W, x, y, tag, any, ownRoom) {
     if (!ownRoom && W.food.length - (W.landFood || 0) >= foodCap(W)) return null;      // (the water's food is counted without the land's)
     if (x === null || x === undefined) {
@@ -206,6 +208,7 @@
       }
       x = bx; y = by;
     }
+    { const e = G.sideEdge(W) + 6; x = Math.max(e, Math.min(W.ww - e, x)); }      // (food does not grow in the dark at the sides, where nobody can come for it)
     if (tag === null || tag === undefined) {
       const r = G.rand();
       // the shallows grow green algae; the deep gets gold scraps and blue minerals
@@ -571,10 +574,11 @@
         }
       }
       c.x += c.vx * dt; c.y += c.vy * dt;
-      if (c.x < ph.r) { c.x = ph.r; c.vx = Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; }
-      else if (c.x > ww - ph.r) { c.x = ww - ph.r; c.vx = -Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; }
+      // at its two sides the pond fades into mist and then the dark: a creature may go a little way into the mist and no further (it is lost to sight beyond)
+      { const side = G.sideEdge(W) + ph.r; if (c.x < side) { c.x = side; c.vx = Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; }
+        else if (c.x > ww - side) { c.x = ww - side; c.vx = -Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; } }
       // a creature of the water stops at the shore; a creature of the land only paddles in the shallows; one at home in both goes where it likes
-      const crew = c.deedId && W.deed && W.deed.id === c.deedId && (W.deed.voyage || (W.deed.result && (W.deed.result.port || W.deed.result.ship)));      // (those building a spaceport or its ship, and the crew of a mission, walk to the port wherever it is: up the beach, or down to the water's edge)
+      const crew = c.goTo || c.inShip || (c.deedId && W.deed && W.deed.id === c.deedId && (W.deed.voyage || (W.deed.result && (W.deed.result.port || W.deed.result.ship))));      // (those building a spaceport or its ship, and the crew of a mission, walk to the port wherever it is: up the beach, or down to the water's edge)
       const top = (crew ? 0 : landTop) + ph.r, bot = crew ? wh - ph.r : botLim;
       if (c.y < top) { c.y = top; c.vy = Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
       else if (c.y > bot) { c.y = bot; c.vy = -Math.abs(c.vy) * 0.5; c.ang = -c.ang; }

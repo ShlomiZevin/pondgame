@@ -26,26 +26,38 @@
     '#gbwin .gsay{font:700 14px/1.45 system-ui,sans-serif;color:#fff;margin:10px 2px 6px;min-height:40px}#gbwin .gsay em{font-style:normal;color:#f6d365}' +
     '#gbwin .gleg{display:flex;flex-wrap:wrap;gap:6px 16px;font:500 12px system-ui,sans-serif;color:#b9cde2}#gbwin .gleg span{display:flex;align-items:center;gap:6px}#gbwin .gleg i{display:inline-block;width:22px;height:4px;border-radius:2px}#gbwin .gleg i.d{width:10px;height:10px;border-radius:50%}' +
     '#gbwin.about{width:min(620px,calc(100% - 20px))}#gbwin .arow{display:grid;grid-template-columns:86px minmax(0,1fr) 34px;gap:4px 10px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(207,232,255,.08)}#gbwin .arow b{font:700 13.5px system-ui,sans-serif;color:#fff}#gbwin .arow i{font:800 14px system-ui,sans-serif;font-style:normal;color:#f6d365;text-align:right}#gbwin .arow small{grid-column:1 / -1;font:500 12px/1.45 system-ui,sans-serif;color:#b9cde2}#gbwin .atext p{font:500 13px/1.55 system-ui,sans-serif;color:#dcecff;margin:0 0 6px}#gbwin .atext small{font-size:13px}' +
-    '#gbwin .gnote{font:500 12px/1.5 system-ui,sans-serif;color:#a9bfd6;margin:8px 2px 0}';
+    '#gbwin .gnote{font:500 12px/1.5 system-ui,sans-serif;color:#a9bfd6;margin:8px 2px 0}' +
+    '#gbwin .gtabs{display:flex;gap:6px;margin:10px 0 4px}#gbwin .gtabs span{flex:0 0 auto;min-width:120px;text-align:center;padding:8px 16px;border-radius:999px;cursor:pointer;font:800 11px system-ui,sans-serif;letter-spacing:.16em;color:#b9cde2;background:rgba(7,18,31,.5);border:1px solid rgba(207,232,255,.18)}#gbwin .gtabs span.on{color:#14202e;background:#f6d365;border-color:#f6d365}#gbwin .gtabs span:hover:not(.on){border-color:#f6d365;color:#ffe9a8}' +
+    '#gbwin #gbgenes{columns:3 250px;column-gap:28px}#gbwin #gbgenes section{break-inside:avoid;margin:0 0 10px}#gbwin #gbgenes section h4{margin-top:4px}#gbwin #gbgenes .gnone{margin:-3px 0 2px 113px !important;font-size:10.5px !important;line-height:1.25}' +
+    '#gbwin #gbbrain{max-height:50vh;width:auto;max-width:100%;margin:0 auto}#gbwin .bcols{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:18px;align-items:start}@media (max-width:820px){#gbwin .bcols{grid-template-columns:minmax(0,1fr)}}#gbwin .bcols .gleg{flex-direction:column;gap:7px}' +
+    '#gbwin .acols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:6px 26px;align-items:start}@media (max-width:820px){#gbwin .acols{grid-template-columns:minmax(0,1fr)}}#gbwin .acols h3:first-child{margin-top:6px}#gbwin .acols .arow{padding:5px 0}#gbwin .acols .arow small{font-size:11.5px;line-height:1.35}#gbwin .acols .atext p{font-size:12.5px;line-height:1.45;margin-bottom:5px}';
   document.head.appendChild(st);
 
   function close() { if (win) { win.remove(); win = null; } shownId = 0; if (raf) { cancelAnimationFrame(raf); raf = 0; } }
   G.closeGenes = close;
-  G.openGenes = function () {
-    if (win) { close(); return; }
+  let tabNow = 'genes', aboutSig = '', lastAbout = 0;
+  function setTab(t) { tabNow = t; if (!win) return; ['about', 'genes', 'brain'].forEach(function (k) { const p = $('gp-' + k), b = win.querySelector('[data-t="' + k + '"]'); if (p) p.style.display = k === t ? '' : 'none'; if (b) b.classList.toggle('on', k === t); }); aboutSig = ''; lastAbout = 0; }
+  /** the creature's window: ABOUT it (its marks, its life, how it is doing), its GENES, its BRAIN at work. `tab` says which to show first. */
+  G.openGenes = function (tab) {
+    tab = tab === 'about' || tab === 'brain' ? tab : 'genes';
+    if (win) { if (tab !== tabNow) { setTab(tab); return; } close(); return; }
     if (!G.R.sel) return;
     win = el('div', '', '', $('ui')); win.id = 'gbwin';
     win.innerHTML = '<div class="gtop"><canvas id="gbprev" width="184" height="184"></canvas><div><b id="gbname"></b><small id="gbsub"></small></div><button class="btn sm" id="gbclose">' + (G.ICON.close || '') + 'CLOSE</button></div>' +
-      '<div class="gcols"><div><h3>GENES · WHAT IT IS MADE OF</h3><div id="gbgenes"></div></div>' +
-      '<div><h3>BRAIN · WATCH IT THINK</h3><canvas id="gbbrain" width="1160" height="760"></canvas><div class="gsay" id="gbsay"></div>' +
+      '<div class="gtabs"><span data-t="about">ABOUT IT</span><span data-t="genes">GENES</span><span data-t="brain">BRAIN</span></div>' +
+      '<div id="gp-about"></div>' +
+      '<div id="gp-genes"><div id="gbgenes"></div></div>' +
+      '<div id="gp-brain"><div class="bcols"><div><canvas id="gbbrain" width="1160" height="760"></canvas></div><div><div class="gsay" id="gbsay"></div>' +
       '<div class="gleg"><span><i style="background:' + PAL.algae + '"></i>a wire that says "do it"</span><span><i style="background:' + PAL.rose + '"></i>a wire that says "do not"</span><span><i style="background:#fff;height:7px"></i>thicker = stronger</span><span><i class="d" style="background:#fff"></i>moving dots = a signal passing right now</span><span><i style="background:' + PAL.gold + ';height:7px"></i>gold edge = changed by what it learned in its life</span></div>' +
-      '<p class="gnote">The wires are genes: a creature is born with them, from both parents, with small changes. During its life it also learns: wires that were in use just before a meal grow stronger, wires in use just before it was hurt or ate what makes it ill grow weaker. Your GOOD and BAD do the same, more strongly. What it learned is passed on too: its children are born with half of it, and the young pick it up from their elders.</p></div></div>';
+      '<p class="gnote">The wires are genes: it is born with them, from both parents, with small changes. In its life it also learns: wires in use just before a meal grow stronger, wires in use just before it was hurt grow weaker. Your GOOD and BAD do the same, more strongly. Its children are born with half of what it learned, and the young pick it up from their elders.</p></div></div></div>';
+    win.querySelector('.gtabs').addEventListener('click', function (e) { let n = e.target; while (n && !(n.dataset && n.dataset.t)) n = n.parentNode; if (n) { G.sfx('click'); setTab(n.dataset.t); } });
+    setTab(tab);
     $('gbclose').onclick = function () { G.sfx('click'); close(); };
     win.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
     win.addEventListener('wheel', function (e) { e.stopPropagation(); }, { passive: true });
     frame();
   };
-  window.addEventListener('keydown', function (e) { if (win && e.key === 'Escape') { e.stopPropagation(); close(); } else if (about && e.key === 'Escape') { e.stopPropagation(); closeAbout(); } }, true);
+  window.addEventListener('keydown', function (e) { if (win && e.key === 'Escape') { e.stopPropagation(); close(); } }, true);
   // ── About this creature: its marks explained, how it is doing, its family, what is new in it. A window like the one above; the card itself stays short. ──
   // ── its life, as short tags ──
   // (what it eats, where it lives, what it has learned, where it came from: each a word or two, with the full sentence when you rest on it)
@@ -60,7 +72,7 @@
     if (c.lessons > 3 && c.learned > 0.05) add('learned \u00d7' + c.lessons, 'It has learned from ' + c.lessons + ' meals and mishaps in its own life.', 'v');
     if (c.bornKnowing > 0.05) add('born knowing', 'It was born knowing some of what its parents had learned.', 'v');
     if (c.taught > 2) add('taught by elders', 'It has been learning from its elders.', 'v');
-    if (c.judged) add((c.judged > 0 ? 'GOOD' : 'BAD') + ' \u00d7' + Math.abs(c.judged), 'You have told it ' + (c.judged > 0 ? 'GOOD' : 'BAD') + ' ' + Math.abs(c.judged) + (Math.abs(c.judged) === 1 ? ' time.' : ' times.'), c.judged > 0 ? 'g' : 'r');
+    if (c.goodN || c.badN) add('you: ♥ ' + (c.goodN || 0) + ' · ✕ ' + (c.badN || 0), 'You have told it GOOD ' + (c.goodN || 0) + ' times and BAD ' + (c.badN || 0) + ' times.', (c.goodN || 0) >= (c.badN || 0) ? 'g' : 'r');
     if (c.gave) add('shared \u00d7' + c.gave, 'It has given of its own food ' + c.gave + (c.gave === 1 ? ' time.' : ' times.'), 'g');
     if (c.danced) add('danced \u00d7' + c.danced, 'It has danced ' + c.danced + (c.danced === 1 ? ' time.' : ' times.'));
     if (c.builtShip) add('built the ship', 'It set pieces of the ' + c.builtShip + ' with its own hands: it is among the first to go in it.', 'g');
@@ -80,22 +92,17 @@
       el = document.createElement('div'); el.id = 'itags'; const hd = sub.closest ? sub.closest('.ihead') : null; if (hd && hd.parentNode) hd.parentNode.insertBefore(el, hd.nextSibling); else sub.parentNode.appendChild(el); }
     const h = tags(c); if (el._h !== h) { el._h = h; el.innerHTML = h; } el.style.display = h ? '' : 'none';
   };
-  let about = null, aboutT = 0, aboutSig = '';
-  function closeAbout() { if (about) { about.remove(); about = null; } if (aboutT) { clearInterval(aboutT); aboutT = 0; } aboutSig = ''; }
-  function fillAbout() {
-    const c = G.R.sel; if (!about || !c || G.mode !== 'play') { closeAbout(); return; }
+  function aboutHtml(c) {
     const sp = G.speciesById(c.sp), txt = function (id) { const e = $(id); return e ? e.innerHTML : ''; }, says = Array.prototype.slice.call(document.querySelectorAll('#ifit small')).map(function (e) { return e.innerHTML; }).filter(Boolean);
     const bar = function (m) { const v = G.markOf(c, m.id); return '<div class="arow"><b>' + m.label + '</b><span class="gbar"><u style="width:' + Math.round(v * 100) + '%;background:#f6d365"></u></span><i>' + (v * 10).toFixed(1) + '</i><small>' + esc(String(m.note).replace(/^[A-Za-z]+: /, '').replace(/, out of 10.?/, '.')) + '</small></div>'; };
-    const h = '<div class="gtop"><div><b>' + esc((sp ? sp.name : 'Blob') + ' #' + c.id) + '</b><small>' + esc(G.kindOf(c.g).full) + '</small></div><button class="btn sm" id="abclose">' + (G.ICON.close || '') + 'CLOSE</button></div>' +
-      '<h3>ITS MARKS · OUT OF 10</h3>' + (G.MARKS || []).map(bar).join('') + '<div class="arow"><b>Appeal</b><span></span><i>' + (G.charmOf(c) * 10).toFixed(1) + '</i><small>All its marks together. Appeal, with having fed well, is its fitness: who breeds and who fades.</small></div>' +
-      '<h3>ITS KIND AND ITS LIFE</h3><div class="atext"><p>' + esc(sp ? G.describeSpecies(sp) : 'A newborn: its kind is sorted out in autumn.') + '</p><p>' + esc((G.lifeText ? G.lifeText(c) : '') + (G.societyText ? ' ' + G.societyText(c) : '')) + '</p></div>' +
-      '<h3>WHAT IS SAID OF IT</h3><div class="atext">' + says.map(function (t) { return '<p>' + t + '</p>'; }).join('') + '</div>' +
-      '<h3>HOW IT IS DOING</h3><div class="atext"><p>' + txt('iE') + '</p><p>' + txt('iAge') + '</p><p>' + txt('iPar') + '</p></div>' +
-      '<h3>WHAT IS NEW IN IT</h3><div class="atext"><p>' + txt('imut') + '</p></div>';
-    if (h === aboutSig) return; aboutSig = h; const sc = about.scrollTop; about.innerHTML = h; about.scrollTop = sc; $('abclose').onclick = function () { G.sfx('click'); closeAbout(); };
+    return '<div class="acols"><div><h3>ITS MARKS · OUT OF 10</h3>' + (G.MARKS || []).map(bar).join('') + '<div class="arow"><b>Appeal</b><span></span><i>' + (G.charmOf(c) * 10).toFixed(1) + '</i><small>All its marks together. Appeal, with having fed well, is its fitness: who breeds and who fades.</small></div></div>' +
+      '<div><h3>ITS KIND AND ITS LIFE</h3><div class="atext"><p>' + esc(sp ? G.describeSpecies(sp) : 'A newborn: its kind is sorted out in autumn.') + '</p><p>' + esc((G.lifeText ? G.lifeText(c) : '') + (G.societyText ? ' ' + G.societyText(c) : '')) + '</p></div>' +
+      '<h3>HOW IT IS DOING</h3><div class="atext"><p>' + txt('iE') + ' ' + txt('iAge') + '</p><p>' + txt('iPar') + '</p></div>' +
+      (says.length ? '<h3>WHAT IS SAID OF IT</h3><div class="atext">' + says.map(function (t) { return '<p>' + t + '</p>'; }).join('') + '</div>' : '') +
+      '<h3>WHAT IS NEW IN IT</h3><div class="atext"><p>' + (txt('imut') || 'Nothing: it is as its parents were.') + '</p></div></div></div>';
   }
-  G.openAbout = function () { if (about) { closeAbout(); return; } if (!G.R.sel) return; about = el('div', '', '', $('ui')); about.id = 'gbwin'; about.classList.add('about'); about.addEventListener('pointerdown', function (e) { e.stopPropagation(); }); about.addEventListener('wheel', function (e) { e.stopPropagation(); }, { passive: true }); fillAbout(); aboutT = setInterval(function () { try { fillAbout(); } catch (e) { console.error(e); closeAbout(); } }, 500); };
-  G.on('new-pond', closeAbout);
+  G.openAbout = function () { G.openGenes('about'); };
+
   // ── good and bad: nature's own voice ──
   // The player never tells a creature what to do. They can only say GOOD or BAD of what it is doing right now, and that goes straight into its brain as the
   // strongest reward or punishment it knows (G.learn): the wires that were just in use grow stronger or weaker. What it makes of that is its own affair.
@@ -223,15 +230,16 @@
       const sp = G.speciesById(c.sp);
       $('gbname').textContent = (sp ? sp.name : 'Blob') + ' #' + c.id + ' · ' + G.kindOf(c.g).full;
       $('gbsub').innerHTML = '<div class="gchips gtags"><span>born in generation ' + c.born + '</span>' + tags(c) + '</div>' + (G.societyText ? '<div class="gsoc">' + esc(G.societyText(c)) + '</div>' : '');
-      $('gbgenes').innerHTML = genes(c);
-      lastSay = 0;
+      $('gbgenes').innerHTML = '<section>' + genes(c).split('<h4>').filter(Boolean).map(function (q) { return '<h4>' + q; }).join('</section><section>') + '</section>';
+      lastSay = 0; aboutSig = ''; lastAbout = 0;
     }
     try {
       const pv = $('gbprev'), px = pv.getContext('2d'), prev = G.R.selPrev;
       px.setTransform(1, 0, 0, 1, 0, 0); px.clearRect(0, 0, 184, 184);
       if (prev) G.drawFit(px, prev, 92, 92, 84, G.rt);
-      brain(c, performance.now() / 1000);
       const now = performance.now();
+      if (tabNow === 'brain') brain(c, now / 1000);
+      if (tabNow === 'about' && now - lastAbout > 600) { lastAbout = now; const h = aboutHtml(c); if (h !== aboutSig) { aboutSig = h; $('gp-about').innerHTML = h; } }
       if (now - lastSay > 500) { lastSay = now; $('gbsay').innerHTML = saying(c); }
     } catch (e) { console.error(e); close(); }
   }

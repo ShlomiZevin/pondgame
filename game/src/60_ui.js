@@ -84,7 +84,7 @@
     const tb = el('div', 'glass hide', '', ui); tb.id = 'toolbar';
     const btns = [
       ['add', 'plus', 'ADD', 'T'], ['world', 'globe', 'WORLD', ''], ['speed', 'play', '1×', 'Space'], ['guide', 'book', 'BOOK', 'F'],
-      ['tree', 'tree', 'TREE', 'G'], ['new', 'drop', 'NEW', 'N'], ['sound', 'speaker', '', 'Esc'],
+      ['tree', 'tree', 'TREE', 'G'], ['sound', 'speaker', '', 'Esc'],
     ];
     btns.forEach(function (b) {
       const bt = el('button', 'btn' + (b[0] === 'sound' ? ' ic' : ''), ICON[b[1]] + (b[2] ? '<span class="lab">' + b[2] + '</span>' : ''), tb);
@@ -591,8 +591,8 @@
       '<div id="ifit" style="font-size:11.5px;line-height:1.4"></div>' +
       '<div class="irows"><div id="iE"></div><div id="iAge"></div><div id="iPar" style="grid-column:span 2"></div><div class="meter"><i id="iEb"></i></div></div>' +
       '<div class="imut" id="imut"></div>' +
-      '<button class="btn sm" id="iwhy" style="width:100%;margin-top:8px" title="Its marks explained, its energy, its family and what is new in it">ABOUT THIS CREATURE</button>' +
-      '<button class="btn sm" id="igenes" style="width:100%;margin-top:8px" title="See what this creature is made of and watch its brain work">GENES AND BRAIN</button>' +
+      '<button class="btn sm" id="iwhy" style="width:100%;margin-top:8px" title="Everything about it in one window: its marks and its life, what it is made of, and its brain at work">ABOUT IT · GENES · BRAIN</button>' +
+      '<button class="btn sm" id="igenes" style="display:none">GENES AND BRAIN</button>' +
       '<style>#inspector .ihead{flex-direction:column;align-items:center;text-align:center;position:relative;gap:0}#inspector .ihead canvas{width:150px;height:150px;margin:-14px 0 -10px}#inspector .ihead>div{width:100%}#inspector .ihead b{font-size:15px}#inspector .x{position:absolute;top:-6px;right:-6px;margin:0}#isub{text-align:left;margin-top:5px}#iacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}#iacts .btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:0 4px;font-size:10px;letter-spacing:.06em;white-space:nowrap}#iacts .btn svg{width:14px;height:14px;flex:none;margin:0}#iacts .btn i{font-style:normal;font-size:14px;line-height:1}#iacts #ikeep i{color:var(--gold)}#iacts #ibreed i{color:var(--rose)}#imarvel{margin:8px 0 6px;padding:9px 11px;border-radius:12px;background:rgba(246,211,101,.12);border:1.5px solid rgba(246,211,101,.7);text-align:left}#imarvel .mk{font:800 9.5px system-ui,sans-serif;letter-spacing:.2em;color:#f6d365}#imarvel .mn{display:flex;align-items:center;gap:8px;font:800 16px system-ui,sans-serif;color:#fff;margin:2px 0 3px}#imarvel .mn img{width:30px;height:30px;flex:none}#imarvel .mw{font:600 12.5px/1.4 system-ui,sans-serif;color:#fff}#imarvel ul{margin:6px 0 0;padding:0;list-style:none}#imarvel li{font:600 11.5px/1.35 system-ui,sans-serif;color:#ffe9a8;padding:3px 0 3px 16px;position:relative}#imarvel li:before{content:"\\25C6";position:absolute;left:0;font-size:9px;top:5px}#imarvel .my{font-size:10.5px;opacity:.75;margin-top:5px;font-style:italic}</style>' +
       '<div id="iacts"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond."><i>★</i>KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection."><i>♥</i>BREED</button><button class="btn sm" id="itree" title="Its family tree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide" title="Its kind, in the Book of Life">' + ICON.book + 'KIND</button></div>';
     $('iclose').onclick = function () { G.select(null); };

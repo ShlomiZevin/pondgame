@@ -75,8 +75,9 @@
   /** who goes aboard is theirs to decide: the leader of the ship's builders, then those who built it with their own hands, then those of their kind nearest it.
    *  Each comes back as the creature, with `c.crewWhy` saying why it goes ('their leader', 'built it', 'of their kind'). */
   F.crewFor = function (ship) {
-    const W = G.W, cap = F.holdOf(ship).crew, out = [], ok = function (c) { return c && !c.dead && !c.deedId && out.indexOf(c) < 0; }, dist = function (a, b) { return Math.hypot(a.x - ship.x, a.y - ship.y) - Math.hypot(b.x - ship.x, b.y - ship.y); };
-    const L = G.leaderOf ? G.leaderOf(ship.sp) : null; if (ok(L)) { L.crewWhy = 'their leader'; out.push(L); }
+    const W = G.W, cap = F.holdOf(ship).crew, out = [], ok = function (c) { return c && !c.dead && !c.deedId && c.crewPick !== -1 && out.indexOf(c) < 0; }, dist = function (a, b) { return Math.hypot(a.x - ship.x, a.y - ship.y) - Math.hypot(b.x - ship.x, b.y - ship.y); };
+    W.cre.filter(function (c) { return c.crewPick === 1 && ok(c); }).forEach(function (c) { if (out.length < cap) { c.crewWhy = 'you chose it'; out.push(c); } });      // (you may put anyone in the crew, of any kind, and take anyone out: CREW on its card, or the cross on its face in the crew list)
+    const L = G.leaderOf ? G.leaderOf(ship.sp) : null; if (out.length < cap && ok(L)) { L.crewWhy = 'their leader'; out.push(L); }
     W.cre.filter(function (c) { return ok(c) && c.builtShip === ship.name; }).sort(dist).forEach(function (c) { if (out.length < cap) { c.crewWhy = 'built it'; out.push(c); } });
     W.cre.filter(function (c) { return ok(c) && ship.sp && c.sp === ship.sp; }).sort(dist).forEach(function (c) { if (out.length < cap) { c.crewWhy = 'of their kind'; out.push(c); } });
     if (out.length < 2) W.cre.filter(ok).sort(dist).forEach(function (c) { if (out.length < cap) { c.crewWhy = 'was near'; out.push(c); } });
@@ -126,16 +127,34 @@
     const W2 = G.W, sh = landShip(pk, true), out = [];
     // they leave the ship and swim out to where the people of the pond are (most of the way: the meeting is left to both sides)
     const meet = (function () { const sy2 = G.shoreY ? G.shoreY(W2) : sh.y + 70; let x = 0, y = 0, n = 0; W2.cre.forEach(function (c) { if (!c.dead) { x += c.x; y += c.y; n++; } }); if (!n) return { x: sh.x - 140, y: sy2 + 70 }; return { x: sh.x + (x / n - sh.x) * 0.7, y: Math.max(sy2 + 60, sy2 + 60 + (y / n - sy2 - 60) * 0.7) }; })();
-    packs.forEach(function (m, k) { const g = G.unpackGenome(m.g); if (!g) return; const c = G.dropCreature(g, meet.x + (k - (packs.length - 1) / 2) * 56, meet.y + (k % 2) * 34); c.guestName = m.name; c.fromPond = 1; c.line = 1; c.crew = 1; c.E = c.ph.Emax; out.push(c); });
+    packs.forEach(function (m, k) { const g = G.unpackGenome(m.g); if (!g) return; const c = G.dropCreature(g, sh.x, sh.y); c.guestName = m.name; c.fromPond = 1; c.line = 1; c.crew = 1; c.E = c.ph.Emax; c.inShip = true; c.outAt = W2.t + 3.8 + k * 1.2; c.goTo = { x: meet.x + (k - (packs.length - 1) / 2) * 56, y: meet.y + (k % 2) * 34, until: W2.t + 20 + k }; out.push(c); });
     W2.farOf = key; rec.mine = lineN();
     G.emit('arrived', F.visiting, out);
     if (G.markDirty) G.markDirty();
     return out;
   };
+  // those who have just landed wait inside the ship and step out one at a time; then (and whenever one is sent somewhere) it walks or swims straight there
+  { const s0 = G.step; G.step = function (dt) { s0(dt); const W = G.W; if (!W || W.title) return;
+      for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue;
+        if (c.outAt !== undefined) { if (W.t < c.outAt) { const sh = F.shipOf(); if (sh) { c.x = c.px = sh.x; c.y = c.py = sh.y - sh.bp.S * 0.3; } c.vx = c.vy = 0; c.inShip = true; c.E = Math.max(c.E, c.ph.Emax * 0.8); continue; } c.outAt = undefined; c.inShip = false; G.emit('stepped-out', c); }
+        const g = c.goTo; if (g) { const dx = g.x - c.x, dy = g.y - c.y, d = Math.hypot(dx, dy); if (d < 26 || W.t > g.until || c.inShip) { if (!c.inShip || d < 26 || W.t > g.until) c.goTo = null; continue; } const st = Math.min(d, Math.max(80, c.ph.speed * 1.4) * dt); c.x += dx / d * st; c.y += dy / d * st; c.vx = dx / d * 20; c.vy = dy / d * 20; c.ang = Math.atan2(dy, dx); c.E = Math.max(c.E, c.ph.Emax * 0.5); } }
+    }; }
+  /** Go and watch a far pond you have been to (your outpost, if any of yours still live there). Nothing is taken there and nothing brought back: the ship
+   *  stays where it is. F.home() brings you back. */
+  F.peek = function (key) {
+    const rec = F.book[key]; if (F.visiting || !rec || !rec.blob || !G.collectWorld || !G.validSave(rec.blob)) return false;
+    const W = G.W, hues = W.species.filter(function (s) { return !s.extinct && s.n > 0; }).sort(function (a, b) { return b.n - a.n; }), ij = key.split(',').map(Number);
+    F.pool(); F.homeLook = { hue: hues.length ? hues[0].hue : 190, kinds: Math.max(1, Math.min(4, hues.length)), gen: W.gen, n: W.cre.length };
+    const blob = G.collectWorld(); if (!blob) return false; F.homeBlob = blob;
+    swap(function () { G.applySave(rec.blob); });
+    F.here = 'far'; F.origin = { i: ij[0], j: ij[1] }; F.visiting = { key: key, i: ij[0], j: ij[1], name: rec.name, hue: rec.hue, adds: 0, adds0: 0, ship: null, peek: true, crew0: 0, mood: F.moodWords({ i: ij[0], j: ij[1] }) };
+    G.W.farOf = key; rec.mine = lineN(); G.emit('arrived', F.visiting, []); if (G.markDirty) G.markDirty();
+    return true;
+  };
   /** While the ship is away there are two ponds to watch: the far one it is at, and your own. You look at one at a time; the other waits as it was left.
    *  F.look('home') takes you to your own pond (the ship is not there: it is away); F.look('far') takes you back to where the ship is. */
   F.look = function (where) {
-    const V = F.visiting; if (!V || !G.collectWorld || !F.homeBlob) return false; const here = F.here === 'home' ? 'home' : 'far'; if (where === here) return true;
+    const V = F.visiting; if (!V || V.peek || !G.collectWorld || !F.homeBlob) return false; const here = F.here === 'home' ? 'home' : 'far'; if (where === here) return true;
     const rec = F.book[V.key] || (F.book[V.key] = { name: V.name, hue: V.hue, visits: 1 });
     if (where === 'home') {
       const W = G.W, all = W.works; W.works = (all || []).filter(function (w) { return !w.visitor; }); rec.mine = lineN(); rec.gen = W.gen; rec.alive = W.cre.length; rec.at = Date.now(); rec.blob = slim(G.collectWorld()); W.works = all;
@@ -144,17 +163,18 @@
       (G.W.works || []).forEach(function (w) { if (w.bp && w.bp.type === 'ship' && w.name === V.ship.name) w.away = 1; });      // its place at home stands empty: it is away
     } else {
       const blob = G.collectWorld(); if (!blob || !rec.blob) return false; F.homeBlob = blob;
-      swap(function () { G.applySave(rec.blob); }); F.origin = { i: V.i, j: V.j }; F.here = 'far'; landShip(V.ship, true); G.W.farOf = V.key;
+      swap(function () { G.applySave(rec.blob); }); F.origin = { i: V.i, j: V.j }; F.here = 'far'; if (V.ship) landShip(V.ship, true); G.W.farOf = V.key;
     }
     G.emit('looked', where, V); if (G.markDirty) G.markDirty();
     return true;
   };
   /** the ship sails home. `bring` (optional) is one creature of the far pond, yours or theirs, that comes back with it; the rest of yours stay as your outpost */
-  F.home = function (bring) {
+  F.home = function (bring, back) {
     const V = F.visiting; if (!V || !F.homeBlob || !G.collectWorld) return null;
     if (F.here === 'home' && !F.look('far')) return null;      // (the ship is at the far pond: that is where it leaves from)
     const W = G.W, rec = F.book[V.key] || (F.book[V.key] = { name: V.name, hue: V.hue, visits: 1 });
-    let pk = null;
+    let pk = null; const backs = [];
+    (back || []).forEach(function (c) { const i = W.cre.indexOf(c); if (i < 0 || c.dead || c === bring) return; backs.push({ g: G.packGenome(c.g), name: c.guestName || nameOfCre(c) }); W.cre.splice(i, 1); });      // those of the crew who are aboard come home
     if (bring && !bring.dead && W.cre.indexOf(bring) >= 0) { pk = { g: G.packGenome(bring.g), name: nameOfCre(bring), theirs: !bring.line, defs: { organs: clone(W.organs || []), designs: clone(W.designs || []), plans: clone(W.plans || []) } }; W.cre.splice(W.cre.indexOf(bring), 1); }
     W.works = (W.works || []).filter(function (w) { return !w.visitor; });      // the ship leaves
     rec.mine = lineN(); rec.gen = W.gen; rec.alive = W.cre.length; rec.at = Date.now(); rec.blob = slim(G.collectWorld());
@@ -165,9 +185,11 @@
     if (pk) { const H = G.W, sh = F.shipOf() || { x: H.ww / 2, y: H.wh * 0.5 };
       ['organs', 'designs', 'plans'].forEach(function (k) { (pk.defs[k] || []).forEach(function (d) { if (d && d.id >= 500 && !(H[k] || []).some(function (x) { return x.id === d.id; }) && (H[k] = H[k] || []).length < 14) H[k].push(d); }); });      // what was invented over there and it carries comes with it
       const g = G.unpackGenome(pk.g); if (g) { c = G.dropCreature(g, sh.x + 60, sh.y + 60); c.guestName = pk.name; c.fromPond = 1; c.line = 1; c.E = c.ph.Emax; } }
-    G.emit('came-home', rec, c, V);
+    const home2 = [];      // the crew is home: they are of this pond, not strangers to it
+    { const H = G.W, sh = F.shipOf() || { x: H.ww / 2, y: H.wh * 0.5 }; backs.forEach(function (m, k) { const g = G.unpackGenome(m.g); if (!g) return; const q = G.makeCreature(g, null, null, []); q.x = q.px = sh.x; q.y = q.py = sh.y; q.E = q.ph.Emax * 0.9; q.P = q.ph.Emax * 0.4; q.beenTo = V.name; q.inShip = true; q.outAt = H.t + 3.8 + k * 1.2; q.goTo = { x: sh.x + (sh.x < H.ww / 2 ? 1 : -1) * (120 + k * 50), y: (G.shoreY ? G.shoreY(H) : sh.y) + 70 + (k % 2) * 30, until: H.t + 18 + k }; q.snap = G.snapOf ? G.snapOf(q) : null; H.cre.push(q); home2.push(q); }); if (home2.length && G.updateSpecies) G.updateSpecies(); }
+    G.emit('came-home', rec, c, V, home2);
     if (G.markDirty) G.markDirty();
-    return { rec: rec, brought: c };
+    return { rec: rec, brought: c, crew: home2 };
   };
 
   // ── kept with the save ──
