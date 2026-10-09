@@ -101,6 +101,7 @@
       cnt[name] = (cnt[name] || 0) + 1;
     });
     Object.keys(cnt).forEach(function (k) { chips.push(k + (cnt[k] > 1 ? ' × ' + cnt[k] + ' sets' : '')); });
+    if (G.SOC_LABEL && g.s) { h += '<h4>Character</h4>'; const NOTE = ['others gather to it', 'keeps out of crowds, bolts from danger', 'gives its food to those short of it', 'learns faster, seeks its elders', 'dances; those near are gladder', 'talks others round to its leader']; for (let i = 0; i < 6; i++) h += row(G.SOC_LABEL[i], g.s[i], ['#f6d365', '#9fd6ff', '#33d6a6', '#a78bfa', '#ff7eb6', '#ffb37a'][i], pct(g.s[i]), mut['s' + i]) + '<div class="gnone" style="margin:-2px 0 3px 113px;font-size:11px">' + NOTE[i] + '</div>'; }
     h += '<h4>How its body is built</h4><div class="gchips">' + chips.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') +
       g.p.map(function (p) { const o = G.organOf(p.k); return '<span class="org" title="' + esc(o ? o.note : '') + '">' + esc(o ? o.name : 'an organ') + '</span>'; }).join('') + '</div>';
     h += '<h4>Brain</h4><div class="gchips"><span>' + g.h + (g.h === 1 ? ' thinking cell' : ' thinking cells') + '</span><span>' + g.w.length + (g.w.length === 1 ? ' wire' : ' wires') + '</span></div>';
@@ -187,7 +188,7 @@
       shownId = c.id;
       const sp = G.speciesById(c.sp);
       $('gbname').textContent = (sp ? sp.name : 'Blob') + ' #' + c.id + ' · ' + G.kindOf(c.g).full;
-      $('gbsub').textContent = 'Born in generation ' + c.born + '. ' + (G.lifeText ? G.lifeText(c) : '');
+      $('gbsub').textContent = 'Born in generation ' + c.born + '. ' + (G.lifeText ? G.lifeText(c) : '') + (G.societyText ? ' ' + G.societyText(c) : '');
       $('gbgenes').innerHTML = genes(c);
       lastSay = 0;
     }

@@ -90,6 +90,7 @@
       h: g.h,
       w: g.w.map(function (w) { return { f: w.f, t: w.t, v: w.v }; }),
       mv: g.mv | 0,
+      s: Array.isArray(g.s) ? g.s.slice(0, 6) : undefined,      // its character
     };
   };
 
@@ -116,6 +117,9 @@
     g.c.length = 15;
     for (let i = 6; i < 15; i++) g.c[i] = clamp(+g.c[i] || 0, 0, 1);
     g.h = clamp(g.h | 0, 0, MAXH);
+    // character: lead, shy, kind, wit, play, sway (54g_society.js). A genome that has none yet (the first life of a pond, a pond saved before this) is dealt one.
+    if (!Array.isArray(g.s) || g.s.length < 6) { g.s = []; for (let i = 0; i < 6; i++) g.s.push(clamp(0.3 + G.randn() * 0.14, 0, 1)); }
+    for (let i = 0; i < 6; i++) g.s[i] = clamp(+g.s[i] || 0, 0, 1); g.s.length = 6;
     g.mv = g.mv && G.marvelOf && G.marvelOf(g.mv) ? g.mv | 0 : 0;      // a marvel the pond does not know is lost
     // organs: one of each
     const seen = {};
@@ -365,6 +369,8 @@
     }
     // an idea from the mutation pool (offline or from the server)
     if (idea && r() < 0.18 * wild) applyIdea(g, idea, note);
+    // character drifts like everything else, one trait at a time
+    for (let i = 0; i < 6; i++) if (g.s && r() < m * 1.6) { g.s[i] = clamp(g.s[i] + n() * 0.13, 0, 1); note('s', i, 'character', false); }
     // a marvel is rare, and so is passing it on: most children of a carrier are born without it (see G.marvelInherits)
     if (g.mv && G.marvelInherits && !G.marvelInherits(g.mv)) g.mv = 0;
     G.validateGenome(g);
@@ -403,6 +409,7 @@
     c.p = a.p.slice(0, pa).map(function (p) { return { k: p.k, a: p.a, s: p.s }; })
       .concat(b.p.slice(pb).map(function (p) { return { k: p.k, a: p.a, s: p.s }; }));
     c.h = r() < 0.5 ? a.h : b.h;
+    if (a.s && b.s) c.s = a.s.map(function (v, i) { const q = r(); return q < 0.4 ? v : q < 0.8 ? b.s[i] : (v + b.s[i]) / 2; });      // each trait of character from one parent or the other, or between them
     c.mv = a.mv && b.mv ? (r() < 0.5 ? a.mv : b.mv) : (a.mv || b.mv) ? (r() < 0.92 ? (a.mv || b.mv) : 0) : 0;      // a marvel is usually handed down, but not always
     const wa = Math.floor(a.w.length * r()), wb = Math.floor(b.w.length * r());
     c.w = a.w.slice(0, wa).map(function (w) { return { f: w.f, t: w.t, v: w.v }; })
@@ -446,7 +453,7 @@
   G.packGenome = function (g) {
     const r2 = function (x) { return Math.round(x * 100) / 100; };
     const flat = []; for (let i = 0; i < g.w.length; i++) flat.push(g.w[i].f, g.w[i].t, Math.round(g.w[i].v * 100));
-    return [g.t.map(r2), g.c.map(function (v) { return Math.round(v * 100); }), g.p.map(function (p) { return [p.k, r2(p.a), r2(p.s)]; }), g.h, flat, 2, 0, G.form.pack(g.f), g.mv | 0];
+    return [g.t.map(r2), g.c.map(function (v) { return Math.round(v * 100); }), g.p.map(function (p) { return [p.k, r2(p.a), r2(p.s)]; }), g.h, flat, 2, 0, G.form.pack(g.f), g.mv | 0, (g.s || []).map(function (v) { return Math.round(v * 100); })];
   };
   G.unpackGenome = function (a) {
     if (!Array.isArray(a) || a.length < 5) return null;
@@ -459,6 +466,7 @@
         h: a[3] | 0,
         w: compact ? wires : (a[4] || []).map(function (w) { return { f: w[0] | 0, t: w[1] | 0, v: +w[2] || 0 }; }),
         mv: a[8] | 0,
+        s: Array.isArray(a[9]) && a[9].length >= 6 ? a[9].slice(0, 6).map(function (v) { return (+v || 0) / 100; }) : undefined,
         f: a[7] ? G.form.unpack(a[7]) : null,      // a pond saved before bodies were grown from genes starts again from cells
       };
       if (g.t.length < 3 || g.c.length < 9) return null;

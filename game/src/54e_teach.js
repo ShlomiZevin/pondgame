@@ -19,6 +19,8 @@
     for (let i = 0; i < K.length; i++) { const x = A && A[K[i]], y = B && B[K[i]]; if (x === undefined && y === undefined) continue; c.lw[i] = BIRTH * ((x || 0) + (y || 0)) / ((x !== undefined && x !== 0 ? 1 : 0) + (y !== undefined && y !== 0 ? 1 : 0) || 1); sum += Math.abs(c.lw[i]); }
     c.learned = sum; c.bornKnowing = sum;
   });
+  /** one creature takes on a little of what another has learned (used by the witty, who go to their elders for it: 54g_society.js) */
+  G.teachFrom = function (c, e) { const E = learned(e); if (!E || !c.ph || !c.ph.bv) return false; const K = ensure(c); if (K.length !== c.lw.length) return false; let sum = 0; for (let i = 0; i < K.length; i++) { const v = E[K[i]]; if (v !== undefined) c.lw[i] += (v - c.lw[i]) * TEACH; sum += Math.abs(c.lw[i]); } c.learned = sum; c.taught = (c.taught || 0) + 1; return true; };
   // the young learn from the old: a few pairs are looked at each moment, so it costs next to nothing
   let acc = 0;
   { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (!W || W.title || W.cre.length < 4) return; acc += dt; if (acc < 0.5) return; acc = 0;

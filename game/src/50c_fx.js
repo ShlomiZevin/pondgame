@@ -44,6 +44,9 @@
       ctx.restore(); }
   }
   // the player's word: a heart or a cross rises from whoever heard it (smaller from those who only overheard)
+  // society (54g_society.js): a dancer gives off notes, a gift is seen passing, and a leader carries a pennant
+  G.on('dance', function (c) { if (G.mode !== 'play' || G.speed > 16) return; add({ k: 'god', a: c, T: 2.4, good: true, soft: true, ch: '\u266B' }); });
+  G.on('share', function (a, b) { if (!on()) return; add({ k: 'gift', a: a, b: b, T: 0.7 }); });
   G.on('glad', function (c) { if (G.mode !== 'play' || G.speed > 16) return; add({ k: 'god', a: c, T: 2.2, good: true, soft: true, ch: '\u266A' }); });      // a note rises from a creature that is glad
   G.on('judged-by-god', function (c, good, soft) { if (G.mode !== 'play') return; add({ k: 'god', a: c, T: soft ? 1.1 : 1.6, good: good, soft: soft }); });
   G.on('new-pond', function () { FX.length = 0; });
@@ -69,15 +72,20 @@
   }
 
   G.drawFx = function (ctx) {
-    if (!G.W || (!FX.length && !(G.W.shots && G.W.shots.length))) return;
+    if (!G.W) return;
     const v = G.view, s = v.scale * v.dpr, now = G.rt || 0, inv = 1 / Math.max(0.7, v.scale);
     ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     try { shots(ctx); } catch (er) { console.error(er); }
+    if (G.speed <= 16 && v.scale > 0.3) for (let i = 0; i < G.W.cre.length; i++) { const c = G.W.cre[i]; if (c.dead || (c.fol || 0) < 3) continue; const x = px(c) + c.ph.r * 0.2, y = py(c) - c.ph.r * 2.9, h = c.ph.r * 0.9 + 8 + Math.min(12, c.fol), fl = Math.sin(now * 5 + c.id) * h * 0.08;      // a leader's pennant, longer the more that follow
+      ctx.strokeStyle = INK; ctx.lineWidth = 1.5 * inv + 0.4; ctx.beginPath(); ctx.moveTo(x, y + h * 0.3); ctx.lineTo(x, y - h); ctx.stroke(); ctx.fillStyle = GOLD; ctx.lineWidth = 1 * inv + 0.2; ctx.beginPath(); ctx.moveTo(x, y - h); ctx.lineTo(x + h * 0.75 + fl, y - h * 0.78); ctx.lineTo(x, y - h * 0.56); ctx.closePath(); ctx.fill(); ctx.stroke(); }
     for (let i = FX.length - 1; i >= 0; i--) {
       const e = FX[i], u = (now - e.t0) / e.T;
       if (u >= 1 || u < 0) { FX.splice(i, 1); continue; }
       const fade = u < 0.7 ? 1 : (1 - u) / 0.3;
-      if (e.k === 'god') {
+      if (e.k === 'gift') {
+        const a = e.a, b = e.b; if (!a || !b || b.dead) continue; const ax = px(a), ay = py(a) - a.ph.r, bx = px(b), by = py(b) - b.ph.r, x = ax + (bx - ax) * u, y = ay + (by - ay) * u - Math.sin(u * 3.1416) * 18;
+        ctx.fillStyle = '#5fe6b8'; ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(x, y, 3.6 * (1 - 0.3 * u) + 1, 0, TAU); ctx.fill(); ctx.stroke();
+      } else if (e.k === 'god') {
         const a = e.a; if (!a || a.dead) continue; const x = px(a), y = py(a) - a.ph.r * 2.6 - u * 34 * inv, sz = (e.soft ? 13 : 22) * inv;
         ctx.save(); ctx.globalAlpha = fade * (e.soft ? 0.75 : 1); ctx.font = '800 ' + sz + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3 * inv; ctx.strokeStyle = INK; ctx.fillStyle = e.good ? '#5fe6b8' : '#ff8fbd';
         { const ch = e.ch || (e.good ? '\u2665' : '\u2715'), sway = e.ch ? Math.sin(u * 9 + a.id) * 6 * inv : 0; if (e.ch) { ctx.fillStyle = '#f6d365'; ctx.font = '800 ' + (18 * inv) + 'px system-ui, sans-serif'; } ctx.strokeText(ch, x + sway, y); ctx.fillText(ch, x + sway, y); } ctx.restore();
