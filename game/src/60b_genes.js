@@ -25,6 +25,7 @@
     '#gbwin #gbbrain{display:block;width:100%;border-radius:14px;background:rgba(4,12,22,.75);border:1px solid rgba(207,232,255,.12)}' +
     '#gbwin .gsay{font:700 14px/1.45 system-ui,sans-serif;color:#fff;margin:10px 2px 6px;min-height:40px}#gbwin .gsay em{font-style:normal;color:#f6d365}' +
     '#gbwin .gleg{display:flex;flex-wrap:wrap;gap:6px 16px;font:500 12px system-ui,sans-serif;color:#b9cde2}#gbwin .gleg span{display:flex;align-items:center;gap:6px}#gbwin .gleg i{display:inline-block;width:22px;height:4px;border-radius:2px}#gbwin .gleg i.d{width:10px;height:10px;border-radius:50%}' +
+    '#gbwin.about{width:min(620px,calc(100% - 20px))}#gbwin .arow{display:grid;grid-template-columns:86px minmax(0,1fr) 34px;gap:4px 10px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(207,232,255,.08)}#gbwin .arow b{font:700 13.5px system-ui,sans-serif;color:#fff}#gbwin .arow i{font:800 14px system-ui,sans-serif;font-style:normal;color:#f6d365;text-align:right}#gbwin .arow small{grid-column:1 / -1;font:500 12px/1.45 system-ui,sans-serif;color:#b9cde2}#gbwin .atext p{font:500 13px/1.55 system-ui,sans-serif;color:#dcecff;margin:0 0 6px}#gbwin .atext small{font-size:13px}' +
     '#gbwin .gnote{font:500 12px/1.5 system-ui,sans-serif;color:#a9bfd6;margin:8px 2px 0}';
   document.head.appendChild(st);
 
@@ -44,7 +45,23 @@
     win.addEventListener('wheel', function (e) { e.stopPropagation(); }, { passive: true });
     frame();
   };
-  window.addEventListener('keydown', function (e) { if (win && e.key === 'Escape') { e.stopPropagation(); close(); } }, true);
+  window.addEventListener('keydown', function (e) { if (win && e.key === 'Escape') { e.stopPropagation(); close(); } else if (about && e.key === 'Escape') { e.stopPropagation(); closeAbout(); } }, true);
+  // ── About this creature: its marks explained, how it is doing, its family, what is new in it. A window like the one above; the card itself stays short. ──
+  let about = null, aboutT = 0, aboutSig = '';
+  function closeAbout() { if (about) { about.remove(); about = null; } if (aboutT) { clearInterval(aboutT); aboutT = 0; } aboutSig = ''; }
+  function fillAbout() {
+    const c = G.R.sel; if (!about || !c || G.mode !== 'play') { closeAbout(); return; }
+    const sp = G.speciesById(c.sp), txt = function (id) { const e = $(id); return e ? e.innerHTML : ''; }, says = Array.prototype.slice.call(document.querySelectorAll('#ifit small')).map(function (e) { return e.innerHTML; }).filter(Boolean);
+    const bar = function (m) { const v = G.markOf(c, m.id); return '<div class="arow"><b>' + m.label + '</b><span class="gbar"><u style="width:' + Math.round(v * 100) + '%;background:#f6d365"></u></span><i>' + (v * 10).toFixed(1) + '</i><small>' + esc(String(m.note).replace(/^[A-Za-z]+: /, '').replace(/, out of 10.?/, '.')) + '</small></div>'; };
+    const h = '<div class="gtop"><div><b>' + esc((sp ? sp.name : 'Blob') + ' #' + c.id) + '</b><small>' + esc(G.kindOf(c.g).full) + '</small></div><button class="btn sm" id="abclose">' + (G.ICON.close || '') + 'CLOSE</button></div>' +
+      '<h3>ITS MARKS · OUT OF 10</h3>' + (G.MARKS || []).map(bar).join('') + '<div class="arow"><b>Appeal</b><span></span><i>' + (G.charmOf(c) * 10).toFixed(1) + '</i><small>All its marks together. Appeal, with having fed well, is its fitness: who breeds and who fades.</small></div>' +
+      '<h3>WHAT IS SAID OF IT</h3><div class="atext">' + says.map(function (t) { return '<p>' + t + '</p>'; }).join('') + '</div>' +
+      '<h3>HOW IT IS DOING</h3><div class="atext"><p>' + txt('iE') + '</p><p>' + txt('iAge') + '</p><p>' + txt('iPar') + '</p></div>' +
+      '<h3>WHAT IS NEW IN IT</h3><div class="atext"><p>' + txt('imut') + '</p></div>';
+    if (h === aboutSig) return; aboutSig = h; const sc = about.scrollTop; about.innerHTML = h; about.scrollTop = sc; $('abclose').onclick = function () { G.sfx('click'); closeAbout(); };
+  }
+  G.openAbout = function () { if (about) { closeAbout(); return; } if (!G.R.sel) return; about = el('div', '', '', $('ui')); about.id = 'gbwin'; about.classList.add('about'); about.addEventListener('pointerdown', function (e) { e.stopPropagation(); }); about.addEventListener('wheel', function (e) { e.stopPropagation(); }, { passive: true }); fillAbout(); aboutT = setInterval(function () { try { fillAbout(); } catch (e) { console.error(e); closeAbout(); } }, 500); };
+  G.on('new-pond', closeAbout);
   G.on('new-pond', close);
 
   const pct = function (v) { return Math.round(100 * Math.max(0, Math.min(1, v))) + '%'; };
