@@ -190,7 +190,7 @@
     G.keptDesigns = [];
     if (Array.isArray(d.colD)) d.colD.slice(0, 24).forEach(function (q) { const o = G.cleanDesign(q); if (!o) return; o.id = Math.floor(num(q.id, 100000, 999999, 100000)); if (!G.keptDesigns.some(function (x) { return x.id === o.id; })) G.keptDesigns.push(o); });
     G.collection = [];
-    if (Array.isArray(d.col)) d.col.slice(-16).forEach(function (q) { if (!q || !Array.isArray(q.g) || !G.unpackGenome(q.g)) return; G.collection.push({ name: String(q.name || 'Creature').replace(/[<>]/g, '').slice(0, 44), kind: String(q.kind || '').replace(/[<>]/g, '').slice(0, 50), age: String(q.age || '').replace(/[<>]/g, '').slice(0, 70), gen: num(q.gen, 0, 1e6, 0), g: q.g, mv: q.mv && typeof q.mv === 'object' ? q.mv : undefined }); });
+    if (Array.isArray(d.col)) d.col.slice(-16).forEach(function (q) { if (!q || !Array.isArray(q.g) || !G.unpackGenome(q.g)) return; G.collection.push({ name: String(q.name || 'Creature').replace(/[<>]/g, '').slice(0, 44), kind: String(q.kind || '').replace(/[<>]/g, '').slice(0, 50), age: String(q.age || '').replace(/[<>]/g, '').slice(0, 70), gen: num(q.gen, 0, 1e6, 0), g: q.g, mv: q.mv && typeof q.mv === 'object' ? q.mv : undefined, pond: num(q.pond, 0, 2e9, 0) || undefined, led: num(q.led, 0, 999, 0) || undefined }); });
     // the pond's own kinds of part first: every body is measured and drawn with them
     W.designs = [];
     if (Array.isArray(d.designs)) d.designs.slice(0, 8).forEach(function (q) { const o = G.cleanDesign(q); if (!o) return; o.id = Math.floor(num(q.id, 1, 1e6, 1)); o.gen = num(q.gen, 0, 1e6, 0); if (!W.designs.some(function (x) { return x.id === o.id; })) W.designs.push(o); });

@@ -150,7 +150,7 @@
         const mateC = UI.breedWith ? G.W.cre.filter(function (q) { return q.id === UI.breedWith && !q.dead; })[0] : null;
         if (UI.breedWith && !mateC) UI.breedWith = 0;
         if (mateC) { const sp0 = G.speciesById(mateC.sp), hd = el('div', 'khead', '<span><b style="color:var(--rose)">♥ Choose a mate for ' + esc((sp0 ? sp0.name : 'Creature') + ' #' + mateC.id) + '.</b> Click one of your kept creatures: six children of the two are born in the pond.</span>', body); const cx = el('button', 'btn sm', 'CANCEL', hd); cx.onclick = function () { UI.breedWith = 0; UI.guideTab = 'coll'; G.openGuide(); }; }
-        else el('div', 'desc', 'What you keep outlives the pond. RELEASE sets a family of it free here; to breed one with a living creature, click that creature in the pond and press ♥ BREED.', body).style.margin = '0 0 10px';
+        else el('div', 'desc', 'What you keep outlives the pond. RELEASE A FAMILY sets eight of its kind free here; SET DOWN ALONE sets down just the one, a stranger among those who live here; to breed one with a living creature, click that creature in the pond and press ♥ BREED.', body).style.margin = '0 0 10px';
         const cards = el('div', 'kcards', '', body);
         list.forEach(function (it) {
           const g = G.unpackGenome(it.g); if (!g) return;
@@ -158,7 +158,7 @@
           const card = el('div', 'kcard' + (mateC && !self ? ' pick' : ''), '', cards);
           const top = el('div', 'ktop', '', card);
           cardCanvas(top, g, 5);
-          el('div', '', '<b>' + esc(it.name) + '</b><div class="kkind">' + esc(it.kind) + '</div>' + (legend ? '<span class="kleg">★ ' + esc(it.age) + '</span>' : ''), top);
+          el('div', '', '<b>' + esc(it.name) + '</b><div class="kkind">' + esc(it.kind) + '</div>' + (legend ? '<span class="kleg">★ ' + esc(it.age) + '</span>' : '') + (G.characterOf && g.s ? '<div class="kkind" style="opacity:.85">' + esc(G.characterOf({ g: g })) + (it.led ? ' · led ' + (it.led | 0) + ' in its pond' : '') + '</div>' : ''), top);
           el('div', 'kfacts', esc(G.form.facts(g.f).slice(0, 4).join(', ')), card);
           el('div', 'kmeta', 'Kept in generation ' + it.gen + (it.age && !legend ? ' · ' + esc(it.age) : ''), card);
           const row = el('div', 'kact', '', card);
@@ -169,6 +169,7 @@
           } else {
             const b = el('button', 'btn sm', 'RELEASE INTO THE POND', row); b.title = 'Eight of its kind are set free here, to breed with what lives in this pond.';
             b.onclick = function () { closeModal(); G.sfx('click'); G.release(it); };
+            if (G.setDown) { b.textContent = 'RELEASE A FAMILY'; const one = el('button', 'btn sm', 'SET DOWN ALONE', row); one.title = 'Only this one creature is set down, a stranger among those who live here. It keeps its character: see whether they follow it, look and leave it, or keep away.'; one.onclick = function () { closeModal(); G.sfx('discovery'); G.setDown(it); }; }
             const x = el('button', 'kx', '✕', card); x.title = 'Let it go: remove it from your collection'; x.setAttribute('aria-label', 'Remove from collection');
             x.onclick = function () { G.confirm('Remove ' + it.name + ' from your collection?', 'REMOVE', function () { const i = G.collection.indexOf(it); if (i >= 0) G.collection.splice(i, 1); G.markDirty(); UI.guideTab = 'coll'; G.openGuide(); }); };
           }

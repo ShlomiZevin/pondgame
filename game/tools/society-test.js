@@ -7,6 +7,7 @@
 //   5. THE CLEVER LEARN MORE       the same lesson moves a clever one further than a simple one
 //   6. A LEADER CARRIED ELSEWHERE  the strongest leader of one pond and a nobody of that pond are set down in other ponds, and what happens is told (it is the
 //                                  ponds' own affair: nothing is required of it); what IS required: of two strangers alike in all but Leading, the leader is followed more
+//   8. CARRIED BY HAND             a creature kept in one pond can be set down alone in another, with its character
 //   7. NATURE IS LEFT ALONE        the ponds live (no extinction), as they did before there was any character
 const fs = require('fs'), path = require('path'), vm = require('vm');
 global.window = globalThis; globalThis.addEventListener = () => {};
@@ -19,7 +20,8 @@ const mean = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0, sd =
 const corr = (a, b) => { const ma = mean(a), mb = mean(b); let n = 0, da = 0, db = 0; for (let i = 0; i < a.length; i++) { n += (a[i] - ma) * (b[i] - mb); da += (a[i] - ma) ** 2; db += (b[i] - mb) ** 2; } return da && db ? n / Math.sqrt(da * db) : 0; };
 const N = G.SOC_LABEL;
 
-let shares = 0, dances = 0; const giver = [], dancer = [], kid = [], par = [];
+let shares = 0, dances = 0; const met = [];
+G.on('stranger-met', (c, end, text) => met.push({ id: c.id, end, text })); const giver = [], dancer = [], kid = [], par = [];
 G.on('share', (c) => { shares++; giver.push(G.soc(c)[2]); });
 G.on('dance', (c) => { dances++; dancer.push(G.soc(c)[4]); });
 G.on('birth', (c, a, b) => { if (a && b && kid.length < 6000) for (let i = 0; i < 6; i++) { kid.push(c.g.s[i]); par.push((a.g.s[i] + b.g.s[i]) / 2); } });
@@ -65,6 +67,15 @@ check(shares > 20 && dances > 20, '4. they share and dance: ' + shares + ' gifts
   }
   console.log('   as nature made them: the strongest leader of the first pond (Leading ' + A.topLead.toFixed(2) + ') was followed in ' + nat[2] + ' strange ponds by ' + (nat[0] / Math.max(1, nat[2])).toFixed(1) + ' on average, a nobody of its pond (Leading ' + A.lowLead.toFixed(2) + ') by ' + (nat[1] / Math.max(1, nat[2])).toFixed(1));
   check(trials > 0 && lead > nobody && lead / trials >= 2, '6. of two strangers alike in all but Leading (0.95 and 0.05), the leader is followed in a strange pond (by ' + (lead / Math.max(1, trials)).toFixed(1) + ' on average) and the other is not (' + (nobody / Math.max(1, trials)).toFixed(1) + ')'); }
+{ const said = {}; met.forEach((m) => { said[m.end] = (said[m.end] || 0) + 1; }); console.log('   what the ponds made of their strangers: ' + JSON.stringify(said)); met.slice(0, 3).forEach((m) => console.log('      ' + m.text));
+  check(met.length >= 4 && met.every((m) => ['led', 'few', 'looked', 'shunned', 'dead'].indexOf(m.end) >= 0), '6. ... and every pond says what it made of its stranger (' + met.length + ' verdicts)'); }
+// 8. carried by hand: a creature KEPT in one pond is SET DOWN ALONE in another, with its character, as a stranger
+{ G.newWorld({ seed: 77 }); G.founderPond(); G.mode = 'play'; while (G.W.gen <= 6 && !G.W.extinct) G.step(0.1);
+  const src = G.W.cre.filter((c) => !c.dead)[0], it = G.keep(src), sA = src.g.s.slice(), n0 = G.collection.length;
+  G.newWorld({ seed: 78 }); G.founderPond(); G.mode = 'play'; while (G.W.gen <= 6 && !G.W.extinct) G.step(0.1);
+  const before = G.W.cre.length, c = G.setDown(it);
+  check(!!c && G.W.cre.length === before + 1 && c.fromPond === 1 && c.stranger !== undefined && c.g.s.every((v, i) => Math.abs(v - sA[i]) < 0.006) && G.collection.length === n0, '8. carried by hand: one kept creature is set down alone in another pond, a stranger with the character it had (' + (c ? G.characterOf(c) : '-') + ')');
+  const d = G.W.cre.filter((o) => o !== c && !o.dead).map((o) => Math.hypot(o.x - c.x, o.y - c.y)).sort((a, b) => a - b); check(d.length > 3 && d[3] < 400, '8. ... and it is set down among those who live there (the 4th nearest is ' + Math.round(d[3] || 0) + ' away)'); }
 check(ponds.every((p) => !p.extinct && p.n >= 20), '7. nature is left alone: every pond lives (' + ponds.map((p) => p.n).join(', ') + ' alive)');
 
 console.log(fails.length ? '\n' + fails.length + ' CHECK(S) FAILED' : '\nALL CHECKS PASSED');
