@@ -65,10 +65,12 @@
   // ── good and bad: nature's own voice ──
   // The player never tells a creature what to do. They can only say GOOD or BAD of what it is doing right now, and that goes straight into its brain as the
   // strongest reward or punishment it knows (G.learn): the wires that were just in use grow stronger or weaker. What it makes of that is its own affair.
-  G.judge = function (c, good) { if (!c || c.dead || !G.learn) return; G.learn(c, good ? 1 : -1); G.learn(c, good ? 1 : -1); c.judged = (c.judged || 0) + (good ? 1 : -1); c.godV = good ? 1 : -1;      /* and it HEARS it for a few moments (sense 14), so a brain can come to be wired to it */ c.flash = 1; if (good) c.mend = 1; else c.startle = 1; G.emit('judged-by-god', c, good); };
+  // (G.judge itself is in 54f_judge.js; here are its two buttons on a creature's card, with a line saying what the creature is doing: that is what the word is about)
   { const t = setInterval(function () { const b = $('iwhy'); if (!b) return; clearInterval(t); const row = document.createElement('div'); row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px';
       row.innerHTML = '<button class="btn sm" id="igood" title="Tell it that what it is doing right now is good. It will do more of it. It learns; you do not command." style="border-color:rgba(51,214,166,.7);color:#dffbf1">\u2665 GOOD</button><button class="btn sm" id="ibad" title="Tell it that what it is doing right now is bad. It will do less of it." style="border-color:rgba(255,126,182,.7);color:#ffd3e2">\u2715 BAD</button>';
-      b.parentNode.insertBefore(row, b); $('igood').onclick = function () { G.sfx('click'); G.judge(G.R.sel, true); }; $('ibad').onclick = function () { G.sfx('click'); G.judge(G.R.sel, false); }; }, 400); }
+      const say = document.createElement('div'); say.id = 'idoing'; say.style.cssText = 'font-size:11.5px;line-height:1.4;margin-top:8px;color:rgba(207,232,255,.85)'; b.parentNode.insertBefore(say, b); b.parentNode.insertBefore(row, b);
+      const more = document.createElement('div'); more.style.cssText = 'font-size:10.5px;margin-top:4px;opacity:.7;cursor:pointer;text-decoration:underline'; more.textContent = 'what you have taught this pond'; more.onclick = function () { if (G.openTaught) G.openTaught(); }; b.parentNode.insertBefore(more, b);
+      setInterval(function () { const c = G.R.sel; if (!c || c.dead || !G.doingWords) return; const t = 'Right now it is <b style="color:#f6d365">' + G.doingWords(c) + '</b>. Your word is about that:'; if (say._t !== t) { say._t = t; say.innerHTML = t; } }, 400); $('igood').onclick = function () { G.sfx('click'); G.judge(G.R.sel, true); }; $('ibad').onclick = function () { G.sfx('click'); G.judge(G.R.sel, false); }; }, 400); }
   G.on('new-pond', close);
 
   const pct = function (v) { return Math.round(100 * Math.max(0, Math.min(1, v))) + '%'; };

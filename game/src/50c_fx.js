@@ -43,6 +43,9 @@
       else { ctx.fillStyle = 'hsl(' + q.hue + ',70%,78%)'; ctx.strokeStyle = q.shot === 'web' || q.shot === 'bubble' || q.shot === 'beam' ? 'hsla(' + q.hue + ',85%,82%,0.95)' : INK; ctx.lineWidth = 1.4; ctx.lineCap = 'round'; (SHOT[q.shot] || SHOT.bullet)(ctx, L); }
       ctx.restore(); }
   }
+  // the player's word: a heart or a cross rises from whoever heard it (smaller from those who only overheard)
+  G.on('glad', function (c) { if (G.mode !== 'play' || G.speed > 16) return; add({ k: 'god', a: c, T: 2.2, good: true, soft: true, ch: '\u266A' }); });      // a note rises from a creature that is glad
+  G.on('judged-by-god', function (c, good, soft) { if (G.mode !== 'play') return; add({ k: 'god', a: c, T: soft ? 1.1 : 1.6, good: good, soft: soft }); });
   G.on('new-pond', function () { FX.length = 0; });
 
   function label(ctx, x, y, txt, col, a, inv) {
@@ -74,7 +77,12 @@
       const e = FX[i], u = (now - e.t0) / e.T;
       if (u >= 1 || u < 0) { FX.splice(i, 1); continue; }
       const fade = u < 0.7 ? 1 : (1 - u) / 0.3;
-      if (e.k === 'swing') {
+      if (e.k === 'god') {
+        const a = e.a; if (!a || a.dead) continue; const x = px(a), y = py(a) - a.ph.r * 2.6 - u * 34 * inv, sz = (e.soft ? 13 : 22) * inv;
+        ctx.save(); ctx.globalAlpha = fade * (e.soft ? 0.75 : 1); ctx.font = '800 ' + sz + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3 * inv; ctx.strokeStyle = INK; ctx.fillStyle = e.good ? '#5fe6b8' : '#ff8fbd';
+        { const ch = e.ch || (e.good ? '\u2665' : '\u2715'), sway = e.ch ? Math.sin(u * 9 + a.id) * 6 * inv : 0; if (e.ch) { ctx.fillStyle = '#f6d365'; ctx.font = '800 ' + (18 * inv) + 'px system-ui, sans-serif'; } ctx.strokeText(ch, x + sway, y); ctx.fillText(ch, x + sway, y); } ctx.restore();
+        if (!e.soft) { ctx.strokeStyle = e.good ? 'rgba(95,230,184,' + (0.7 * (1 - u)) + ')' : 'rgba(255,143,189,' + (0.7 * (1 - u)) + ')'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(px(a), py(a) - a.ph.r, a.ph.r * (1.4 + 4 * u), 0, TAU); ctx.stroke(); }
+      } else if (e.k === 'swing') {
         const z = e.z, o = e.o; if (!z || !o) continue; const a0 = Math.atan2((o.ph ? o.y - o.ph.r : o.y) - z.y, o.x - z.x), rr = Math.hypot(o.x - z.x, o.y - z.y) * 0.85 + 14;
         ctx.globalAlpha = fade; ctx.strokeStyle = INK; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(z.x, z.y, rr, a0 - 0.9 + u * 1.2, a0 - 0.2 + u * 1.2); ctx.stroke();
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.stroke(); ctx.globalAlpha = 1;

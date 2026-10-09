@@ -3,7 +3,9 @@
 //     stone  on the floor of the pond, where it has sunk          reed  growing on the land and along the waterline          shell  where a creature has died
 // and what is to be built is a PLAN OF PIECES (blocks, posts, a roof, a door, a banner), worked out from who is building: what the thing is for decides
 // its sort (a walled ring, a cluster of huts, a tall beacon, a hall), the kind's own body decides its style (a spiny kind builds spires, a round one domes)
-// and its brain how elaborate it dares to be. Each builder goes and fetches the material the next piece needs, hauls it back (slowly, and slower still
+// and its brain how elaborate it dares to be. That is only the fallback, though: where there is an AI to ask, the SHAPE IS THEIRS TO DECIDE. The kind's
+// shared mind is asked to design the thing, piece by piece, in any shape it likes, knowing who they are, why they build and what already stands near
+// (G.designFrom): so no two ponds build alike, and nothing here says what a building looks like. Each builder goes and fetches the material the next piece needs, hauls it back (slowly, and slower still
 // with nothing to grip it with) and sets it in place, from the ground up; when the frame stands they go round it again and colour it in their own colours.
 // So a building is watched being made, by many hands, and a half-built one shows exactly how far they got.
 // What they build stays while their kind lives to keep it up; when the kind is gone it crumbles from the top, piece by piece, into a ruin. The player,
@@ -69,14 +71,52 @@
   }
   const count = function (bp) { let a = 0, b = 0; for (let i = 0; i < bp.P.length; i++) { if (bp.P[i].st > 0) a++; if (bp.P[i].st > 1) b++; } return [a, b, bp.P.length]; };
   G.buildCount = function (o) { return o && o.bp ? count(o.bp) : null; };
+  const halfW = function (bp) { let m = 0, top = 0; for (let i = 0; i < bp.P.length; i++) { const p = bp.P[i]; m = Math.max(m, Math.abs(p.x) + p.w / 2); top = Math.max(top, -p.y + (p.s === 'lamp' ? p.w / 2 : p.h)); } bp.top = top; return Math.max(30, m); };
+  /** how far above its place on the map a building's top is (for its label) */
+  G.buildTop = function (o) { const bp = o.bp; if (!bp) return 60; if (bp.top === undefined) bp.hw = halfW(bp); return bp.top - bp.S * 0.45; };
+  /** where it will stand. Their common sense about a place: build beside what your own kind has built; stand on the same ground line as your neighbours, so
+   *  that buildings make a row and not a scatter; leave a gap; never build on top of another. */
+  function site(W, d) {
+    const bp = d.bp, hw = bp.hw = halfW(bp), Wk = (W.works || []).filter(function (w) { return w.bp && !w.fall; }), sy = G.shoreY ? G.shoreY(W) : 0, onLand = d.y < sy;
+    let x = d.x, y = d.y; const mine = Wk.filter(function (w) { return w.sp === d.sp; });
+    if (mine.length) { x = mine[mine.length - 1].x; y = mine[0].y; d.beside = mine[0].name; }
+    else { let nb = null, nd = 460; Wk.forEach(function (w) { const dd = Math.hypot(w.x - x, w.y - y); if (dd < nd && (w.y < sy) === onLand) { nd = dd; nb = w; } }); if (nb) y = nb.y; }
+    const free = function (px) { for (let i = 0; i < Wk.length; i++) { const w = Wk[i], gap = (w.bp.hw || halfW(w.bp)) + hw + 26; if (Math.abs(w.x - px) < gap && Math.abs(w.y - y) < 150) return false; } return px > hw + 40 && px < W.ww - hw - 40; };
+    const step = hw * 0.8 + 40; let ok = free(x); for (let k = 1; k < 40 && !ok; k++) { const px = x + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * step; if (free(px)) { x = px; ok = true; } }
+    d.x = clamp(x, hw + 40, W.ww - hw - 40); d.y = onLand ? clamp(y, 70, Math.max(80, sy - 40)) : clamp(y, sy + 110, W.wh - 90);
+  }
+  // ── the shape is theirs to decide ──
+  const SHAPE = { block: 'rect', column: 'rect', slab: 'rect', dome: 'dome', cone: 'tri', ball: 'circ', arch: 'door', beam: 'beam', wing: 'wing', lamp: 'lamp', flag: 'flag' };
+  const COL = { main: [0, 55, 55], second: [38, 50, 62], light: [14, 34, 82], dark: [0, 30, 16], glow: [50, 95, 72] };      // their own colour, a neighbour of it, a pale of it: colours that sit together
+  /** the pieces of a design, checked: any shape is allowed, but every piece is one the pond knows how to draw, of a sane size, and they go up from the ground */
+  G.designFrom = function (raw, S, maxN) {
+    const L = raw && Array.isArray(raw.pieces) ? raw.pieces : null; if (!L) return null; const P = [];
+    for (let i = 0; i < L.length && P.length < maxN; i++) { const q = L[i] || {}, s = SHAPE[q.s]; if (!s) continue; const x = +q.x, y = +q.y, w = +q.w, h = +q.h; if (![x, y, w, h].every(isFinite)) continue;
+      const c = (COL[q.c] || COL.main).slice(); if (q.s === 'slab') c[2] -= 8;
+      P.push({ s: s, x: clamp(x, -1.4, 1.4) * S, y: -clamp(y, 0, 2.8) * S, w: clamp(w, 0.05, 1.8) * S, h: clamp(h, 0.04, 1.4) * S, m: Math.max(0, ['stone', 'reed', 'shell'].indexOf(q.m)), c: c, st: 0, rr: q.s === 'column' ? 0.4 : q.s === 'slab' ? 0.1 : 0 }); }
+    if (P.length < 4) return null;
+    P.forEach(function (p, i) { p._i = i; }); P.sort(function (a, b) { return (b.y - a.y) || (a._i - b._i); }); P.forEach(function (p) { delete p._i; });      // from the ground up
+    return P;
+  };
+  const live = function () { return G.mode === 'play' && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai && G.ai.provider === 'server' && G.ai.hasFuel(); };
+  function askDesign(W, d) {
+    if (typeof document === 'undefined' || !live() || !G.ai.allow('deed')) { d.design = false; return; }
+    const base = blueprint(d), sp = G.speciesById(d.sp), f = sp && sp.rep ? sp.rep.f : null, r = d.result || {}, maxN = Math.round(12 + 26 * base.brain);
+    const near = (W.works || []).filter(function (w) { return w.bp && !w.fall && Math.hypot(w.x - d.x, w.y - d.y) < 900; }).slice(-5).map(function (w) { return { name: w.name, by: w.by, what: w.bp.about || w.looks || '' }; });
+    const info = { builders: d.kind, body: f && G.form.kind ? G.form.kind(f).full + (G.form.facts ? ': ' + G.form.facts(f).slice(0, 6).join('; ') : '') : '', name: r.name || '', looks: r.looks || '', why: d.why || '', what: d.what || '', purpose: r.solid ? 'it shuts others out: only they may pass' : r.feed > 0.05 ? 'it feeds them' : r.pull > 0.1 ? 'it draws them together' : r.hurt > 0.05 ? 'it harms what comes near' : 'a place of their own', where: d.y < (G.shoreY ? G.shoreY(W) : 0) ? 'on the land' : 'under water, on the pond floor', pieces: [Math.round(maxN * 0.55), maxN], near: near, model: G.ai.model || undefined };
+    d.design = null;
+    G.host.call('ai.build', info, 60000).then(function (res) { G.ai.tally('deed', res && res.source, res && res.usd); if (G.W !== W || W.deed !== d || d.bp) return; const P = res && res.build ? G.designFrom(res.build, base.S, maxN) : null; if (!P) { d.design = false; return; } base.P = P; base.designed = true; base.about = String(res.build.about || '').replace(/[<>]/g, '').slice(0, 120); d.design = base; }, function () { if (W.deed === d) d.design = false; });
+  }
   /** the plan of what a kind is about to build */
   function blueprint(d) {
     const W = G.W, r = d.result || {}, m = Math.min(W.ww, W.wh), sp = G.speciesById(d.sp), f = sp && sp.rep ? sp.rep.f : null;
     let spiky = 0; if (f) { (f.rules || []).forEach(function (q) { if (q.k === 2 || q.k === 7) spiky = 1; }); if (f.crest > 0.25) spiky = 1; }
     let h = 0, n = 0; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].sp === d.sp) { h += W.cre[i].g.h; n++; }
     const o = { seed: (G.hash ? G.hash(String(d.title) + d.id) : d.id * 7919) >>> 0, type: r.solid ? 'wall' : r.feed > 0.05 ? 'huts' : r.pull > 0.1 ? 'spire' : 'hall', S: clamp((r.size || 0.08) * m, 55, 118), hue: d.hue || 50, spiky: spiky, brain: clamp((n ? h / n : 0) / 7, 0, 1) };
-    o.P = plan(o); return o;
+    o.P = plan(o); return o;      // (the fallback shape: used when the kind's own design cannot be had)
   }
+  G.blueprintPack = function (bp) { return bp.designed ? { about: bp.about || '', P: bp.P.map(function (p) { return [p.s, Math.round(p.x), Math.round(p.y), Math.round(p.w), Math.round(p.h), p.m, p.c[0], p.c[1], p.c[2], p.rr || 0]; }) } : null; };
+  G.blueprintUnpack = function (bp, pk, states) { if (!pk || !Array.isArray(pk.P)) return bp; const ok = ['rect', 'tri', 'dome', 'circ', 'door', 'beam', 'wing', 'lamp', 'flag']; const P = pk.P.slice(0, 60).filter(function (q) { return Array.isArray(q) && ok.indexOf(q[0]) >= 0; }).map(function (q, i) { return { s: q[0], x: clamp(+q[1] || 0, -400, 400), y: clamp(+q[2] || 0, -600, 0), w: clamp(+q[3] || 10, 2, 500), h: clamp(+q[4] || 10, 2, 400), m: clamp(q[5] | 0, 0, 2), c: [+q[6] || 0, clamp(+q[7] || 50, 0, 100), clamp(+q[8] || 50, 0, 100)], rr: +q[9] || 0, st: clamp(+String(states || '').charAt(i) || 0, 0, 2) }; }); if (P.length >= 4) { bp.P = P; bp.designed = true; bp.about = String(pk.about || '').replace(/[<>]/g, '').slice(0, 120); } return bp; };
   G.blueprintFrom = function (o, states) { const bp = { seed: o.seed, type: o.type, S: o.S, hue: o.hue, spiky: o.spiky, brain: o.brain }; bp.P = plan(bp); if (typeof states === 'string') for (let i = 0; i < bp.P.length; i++) bp.P[i].st = clamp(+states.charAt(i) || 0, 0, 2); return bp; };
   // what the creatures build is drawn by the game, so no picture is asked of the AI for it
   if (G.figureFor) { const f0 = G.figureFor; G.figureFor = function (info, typed) { if (info && /Built by small pond creatures/.test(String(info.note || ''))) return Promise.resolve(null); return f0(info, typed); }; }
@@ -84,12 +124,16 @@
   // ── the work of building ──
   const baseOf = function (o) { return [o.x, o.y + (o.bp ? o.bp.S * 0.45 : 30)]; };
   function buildStep(W, d, dt) {
-    if (!d.bp) { d.bp = blueprint(d); const mine = (W.works || []).filter(function (w) { return w.bp && w.sp === d.sp && !w.fall; }); if (mine.length) { const w0 = mine[0], k = mine.length, side = k % 2 ? 1 : -1, gap = (w0.bp.S + d.bp.S) * 1.25 * Math.ceil(k / 2); d.x = clamp(w0.x + side * gap, 120, W.ww - 120); d.y = clamp(w0.y + (k % 3 - 1) * 14, 120, W.wh - 90); d.beside = w0.name; } }
+    if (!d.bp) {
+      if (d.design === undefined) askDesign(W, d);
+      if (d.design === null && Date.now() - (d.designAt || (d.designAt = Date.now())) < 30000) {      /* (by the clock on the wall: the answer takes a few seconds however fast the pond runs) */ d.t = Math.min(d.t, 0.5); d.wait = 'plan'; d.progress = 0; return; }      /* they are working out what it shall look like */
+      d.bp = d.design || blueprint(d); site(W, d);
+    }
     const bp = d.bp, P = bp.P, base = baseOf(d), M = []; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].deedId === d.id && !W.cre[i].dead) M.push(W.cre[i]);
     const busyP = {}, busyM = new Set(); M.forEach(function (c) { const j = c.bj; if (j && j.d === d.id) { if (j.p >= 0) busyP[j.p] = 1; if (j.mat) busyM.add(j.mat); } });
     d.wait = '';
     // any of the kind whose own brain says HELP (action 6) and who is near joins the work
-    d.helpT = (d.helpT || 0) - dt; if (d.helpT <= 0 && M.length < 22) { d.helpT = 1; for (let k = 0; k < 8; k++) { const c = W.cre[(G.rand() * W.cre.length) | 0]; if (c.dead || c.deedId || c.sp !== d.sp || !(c.out[6] > 0.55) || Math.hypot(c.x - d.x, c.y - d.y) > 700) continue; c.deedId = d.id; c.deedJ = M.length; c.helper = true; M.push(c); d.helpers = (d.helpers || 0) + 1; } }
+    d.helpT = (d.helpT || 0) - dt; if (d.helpT <= 0 && M.length < 22) { d.helpT = 1; for (let k = 0; k < 8; k++) { const c = W.cre[(G.rand() * W.cre.length) | 0]; if (c.dead || c.deedId || c.sp !== d.sp || !(c.out[6] > 0.55) || Math.hypot(c.x - d.x, c.y - d.y) > 700) continue; c.deedId = d.id; c.deedJ = M.length; c.helper = true; M.push(c); d.helpers = (d.helpers || 0) + 1; G.emit('joined-build', c, d); } }
     for (let k = 0; k < M.length; k++) {
       const c = M[k]; let j = c.bj && c.bj.d === d.id ? c.bj : null;
       if (j && j.ph === 'fetch' && W.mats.indexOf(j.mat) < 0) j = null;                       // somebody else took it
@@ -143,6 +187,8 @@
   /** nature strikes a building down: it falls piece by piece */
   G.razeWork = function (w) { if (w && w.bp) { w.fall = true; w.upT = 0; } };
   if (G.on) {
+    // when it stands, those of the kind who are near are glad: they are fed a little by it, it is a lesson worth keeping, and it shows
+    G.on('deed-end', function (d, how, made) { const W = G.W; if (W && made && d.bp && how === 'done') for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.sp !== d.sp || Math.hypot(c.x - d.x, c.y - d.y) > 420) continue; c.E = Math.min(c.ph.Emax, c.E + 0.12 * c.ph.Emax); c.mend = 1; c.glad = 6; c.vy -= 60; if (G.learn) G.learn(c, 0.6); G.emit('glad', c); } });
     G.on('deed-end', function (d, how, made) { if (made && d.bp) { made.bp = d.bp; made.sp = d.sp; { const F = (G.W && G.W.fields) || []; for (let k = 0; k < F.length; k++) if (F[k].id === made.field) F[k].hidden = true; } made.until = (G.W ? G.W.t : 0) + 9999; } });
     G.on('new-pond', function () { if (G.W) G.W.mats = null; });
   }
@@ -201,13 +247,14 @@
     const age = t - (p.t0 || -9), pop = age < 0.3 ? 0.6 + 0.4 * (age / 0.3) + 0.15 * Math.sin(age * 10.5) : 1, mc = MAT[p.um === undefined ? p.m : p.um].col;
     const raw = hsl(mc[0], mc[1], mc[2]), fin = p.c[2] < 20 ? hsl(hue, 30, p.c[2]) : hsl(hue + p.c[0], p.c[1], p.c[2]), fill = p.st > 1 ? fin : raw, w = p.w * pop, h = p.h * pop;
     ctx.fillStyle = fill; ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.beginPath();
-    if (p.s === 'rect') { G.roundRect(ctx, p.x - w / 2, p.y - h, w, h, Math.min(w, h) * 0.16); }
+    if (p.s === 'rect') { G.roundRect(ctx, p.x - w / 2, p.y - h, w, h, Math.min(w, h) * (p.rr || 0.16)); }
     else if (p.s === 'tri') { ctx.moveTo(p.x - w / 2, p.y); ctx.lineTo(p.x, p.y - h); ctx.lineTo(p.x + w / 2, p.y); ctx.closePath(); }
     else if (p.s === 'dome') { ctx.moveTo(p.x - w / 2, p.y); ctx.ellipse(p.x, p.y, w / 2, h, 0, Math.PI, TAU); ctx.closePath(); }
     else if (p.s === 'circ') { ctx.arc(p.x, p.y - h / 2, w / 2, 0, TAU); }
     else if (p.s === 'door') { ctx.moveTo(p.x - w / 2, p.y); ctx.lineTo(p.x - w / 2, p.y - h + w / 2); ctx.arc(p.x, p.y - h + w / 2, w / 2, Math.PI, TAU); ctx.lineTo(p.x + w / 2, p.y); ctx.closePath(); }
-    else if (p.s === 'beam') { G.roundRect(ctx, p.x - w / 2, p.y - h, w, h, h * 0.4); }
+    else if (p.s === 'beam') { G.roundRect(ctx, p.x - w / 2, p.y - h, w, h, Math.min(w, h) * 0.4); }
     else if (p.s === 'lamp') { if (p.st > 1) { const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, w * 3); g.addColorStop(0, hsl(hue + 50, 95, 75, 0.5 + 0.2 * Math.sin(t * 3))); g.addColorStop(1, hsl(hue + 50, 95, 75, 0)); ctx.fillStyle = g; ctx.arc(p.x, p.y, w * 3, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.fillStyle = fill; } ctx.arc(p.x, p.y, w / 2, 0, TAU); }
+    else if (p.s === 'wing') { const dd = p.x < 0 ? -1 : 1; ctx.moveTo(p.x - dd * w / 2, p.y); ctx.lineTo(p.x + dd * w / 2, p.y - h * 0.25); ctx.lineTo(p.x - dd * w / 2, p.y - h); ctx.closePath(); }
     else if (p.s === 'flag') { ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, p.y - h); ctx.stroke(); ctx.beginPath(); const fl = Math.sin(t * 5 + p.x) * w * 0.12; ctx.moveTo(p.x, p.y - h); ctx.lineTo(p.x + w + fl, p.y - h + w * 0.3); ctx.lineTo(p.x, p.y - h + w * 0.6); ctx.closePath(); }
     ctx.fill(); ctx.stroke();
     if (p.st > 1 && (p.s === 'rect' || p.s === 'dome') && w > 14) { ctx.fillStyle = 'rgba(255,255,255,0.13)'; ctx.beginPath(); if (p.s === 'rect') ctx.rect(p.x - w / 2 + 2.5, p.y - h + 2.5, w * 0.3, h - 5); else ctx.ellipse(p.x - w * 0.16, p.y - h * 0.5, w * 0.12, h * 0.3, 0, 0, TAU); ctx.fill(); }
@@ -216,7 +263,7 @@
   G.drawBlueprint = function (ctx, o, building) {
     const bp = o.bp; if (!bp) return; const b = baseOf(o), t = G.W.t, P = bp.P, S = bp.S;
     ctx.save(); ctx.translate(b[0], b[1]);
-    ctx.fillStyle = 'rgba(8,16,26,0.28)'; ctx.beginPath(); ctx.ellipse(0, S * 0.1, S * (bp.type === 'wall' ? 1.25 : 0.95), S * (bp.type === 'wall' ? 0.74 : 0.22), 0, 0, TAU); ctx.fill();
+    { const hw = bp.hw || (bp.hw = halfW(bp)), ring = bp.type === 'wall' && !bp.designed; ctx.fillStyle = 'rgba(8,16,26,0.28)'; ctx.beginPath(); ctx.ellipse(0, S * 0.1, ring ? S * 1.25 : hw * 1.12, ring ? S * 0.74 : Math.max(10, hw * 0.2), 0, 0, TAU); ctx.fill(); }
     if (building) { ctx.setLineDash([4, 5]); ctx.lineWidth = 1.2; ctx.strokeStyle = hsl(bp.hue, 70, 78, 0.4); for (let i = 0; i < P.length; i++) if (P[i].st === 0) { const p = P[i]; ctx.beginPath(); if (p.s === 'circ' || p.s === 'lamp') ctx.arc(p.x, p.y - (p.s === 'circ' ? p.h / 2 : 0), p.w / 2, 0, TAU); else ctx.rect(p.x - p.w / 2, p.y - p.h, p.w, p.h); ctx.stroke(); } ctx.setLineDash([]); }      // where the pieces still to come will go
     for (let i = 0; i < P.length; i++) if (P[i].st > 0) piece(ctx, P[i], bp.hue, t);
     ctx.restore();

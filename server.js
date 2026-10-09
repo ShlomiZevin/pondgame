@@ -227,6 +227,10 @@ function createApp(opts = {}) {
       const r = await ai.figure(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr });
       return send(res, r.error === 'refused' ? 422 : r.error ? 400 : 200, r);
     }
+    if (route === 'POST /api/ai/build') {      // what a kind of creature builds, designed by its own shared mind, piece by piece
+      const body = await readJson(req, 8000);
+      return send(res, 200, await ai.build(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr }));
+    }
     if (route === 'POST /api/ai/plan') {
       const body = await readJson(req, 12000);
       return send(res, 200, await ai.plan(body, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr }));

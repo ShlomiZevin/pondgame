@@ -81,7 +81,7 @@
         const pow = 2.5 + 4 * Math.min(2, c.ph.spike || 0) + 3 * Math.min(2, c.ph.bite || 0) + 0.12 * c.ph.r;
         if (z.alive > 0.25) z.health = Math.max(0, (z.health || 0) - pow * 0.004); else z.life -= pow * 0.35;
         z.struck = 1; z.hit = (z.hit || 0) + pow * 0.002; z._atk = (z._atk | 0) + 1; c.strikeT = 1; c.strike = 0.6; c.E -= 1.2; c.struckBack = (c.struckBack || 0) + 1;
-        if (G.learn) G.learn(c, 0.4); G.emit('act-hit', c, z, null); break; } }
+        if (G.learn) G.learn(c, 0.4); G.emit('act-hit', c, z, null); G.emit('struck-back', c, z); break; } }
   }
   /** whom this thing goes for: the nearest it may attack within `far` */
   function target(z, far) {
