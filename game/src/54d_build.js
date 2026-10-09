@@ -84,7 +84,7 @@
   // ── the work of building ──
   const baseOf = function (o) { return [o.x, o.y + (o.bp ? o.bp.S * 0.45 : 30)]; };
   function buildStep(W, d, dt) {
-    if (!d.bp) d.bp = blueprint(d);
+    if (!d.bp) { d.bp = blueprint(d); const mine = (W.works || []).filter(function (w) { return w.bp && w.sp === d.sp && !w.fall; }); if (mine.length) { const w0 = mine[0], k = mine.length, side = k % 2 ? 1 : -1, gap = (w0.bp.S + d.bp.S) * 1.25 * Math.ceil(k / 2); d.x = clamp(w0.x + side * gap, 120, W.ww - 120); d.y = clamp(w0.y + (k % 3 - 1) * 14, 120, W.wh - 90); d.beside = w0.name; } }
     const bp = d.bp, P = bp.P, base = baseOf(d), M = []; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].deedId === d.id && !W.cre[i].dead) M.push(W.cre[i]);
     const busyP = {}, busyM = new Set(); M.forEach(function (c) { const j = c.bj; if (j && j.d === d.id) { if (j.p >= 0) busyP[j.p] = 1; if (j.mat) busyM.add(j.mat); } });
     d.wait = '';
@@ -95,7 +95,7 @@
       if (!j) {
         let pi = -1; for (let i = 0; i < P.length; i++) if (P[i].st === 0 && !busyP[i]) { pi = i; break; }      // from the ground up
         if (pi >= 0) {
-          let best = null, bd = 1e12, any = null, ad = 1e12; for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (busyM.has(q)) continue; const dd = (q.x - c.x) * (q.x - c.x) + (q.y - c.y) * (q.y - c.y); if (dd < ad) { ad = dd; any = q; } if (q.k === P[pi].m && dd < bd) { bd = dd; best = q; } }
+          let best = null, bd = 1e12, any = null, ad = 1e12; const sy = G.shoreY ? G.shoreY(W) : 0; for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (busyM.has(q) || (!c.ph.lungs && q.y < sy + 6)) continue; const dd = (q.x - c.x) * (q.x - c.x) + (q.y - c.y) * (q.y - c.y); if (dd < ad) { ad = dd; any = q; } if (q.k === P[pi].m && dd < bd) { bd = dd; best = q; } }
           const mat = best || any;      // the right stuff if there is any; else they make do with what there is
           if (mat) { j = { d: d.id, ph: 'fetch', p: pi, mat: mat }; busyP[pi] = 1; busyM.add(mat); } else d.wait = MAT[P[pi].m].id;
         } else { for (let i = 0; i < P.length; i++) if (P[i].st === 1 && !busyP[i]) { pi = i; break; } if (pi >= 0) { j = { d: d.id, ph: 'paint', p: pi, t: 0 }; busyP[pi] = 1; } }
@@ -125,7 +125,7 @@
       const P = w.bp.P;
       w.lone = kin < 3 ? (w.lone || 0) + 1 : 0;      /* (kinds are sorted afresh each autumn: a short gap in the count is not the end of them) */
       if (w.fall || w.lone > 8) { let top = -1; for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { top = k; break; } if (top >= 0) { P[top].st = 0; G.emit('build-fall', w, P[top]); if (!w.fall && !w.ruin) { w.ruin = true; G.emit('work-ruin', w); } } }
-      else { for (let k = 0; k < P.length; k++) if (P[k].st < 2) { P[k].st++; P[k].t0 = W.t; break; } }      // its keepers mend and colour it
+      else if (!(w.dmg > 0 && W.gen === w.hitGen)) { for (let k = 0; k < P.length; k++) if (P[k].st < 2) { P[k].st++; P[k].t0 = W.t; break; } }      // its keepers mend and colour it
       const n = count(w.bp);
       if (n[0] === 0) { Wk.splice(i, 1); G.emit('work-gone', w); continue; }
       const F = W.fields || []; for (let k = 0; k < F.length; k++) if (F[k].id === w.field) { if (n[0] >= n[2] * 0.6 && !w.fall) F[k].life = Math.max(F[k].life, 30); else F[k].life = Math.min(F[k].life, 6); }      // it does what it was built for while most of it stands

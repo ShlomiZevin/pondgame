@@ -47,6 +47,7 @@
     if (L.diet >= 0) out.push('Lives mostly on ' + FOODS[L.diet] + ' food.');
     { const ph = c.ph; if (ph && ph.love > 0.3) out.push('Made for ' + FOODS[ph.fav] + ' food' + (ph.bane >= 0 ? '; ' + FOODS[ph.bane] + ' food makes it ill' + (c.ill ? ' (it has found that out ' + (c.ill === 1 ? 'once' : c.ill + ' times') + ')' : '') : '') + '.'); }
     if (c.lessons > 3 && c.learned > 0.05) out.push('It has learned from ' + c.lessons + ' meals and mishaps.');
+    if (c.bornKnowing > 0.05) out.push('It was born knowing some of what its parents had learned.'); if (c.taught > 2) out.push('It has been learning from its elders.'); if (c.judged) out.push('You have told it ' + (c.judged > 0 ? 'GOOD' : 'BAD') + ' ' + Math.abs(c.judged) + (Math.abs(c.judged) === 1 ? ' time.' : ' times.'));
     if (L.land > 0.3) out.push('Spends its days on the shore.'); else if (L.shore > 0.3) out.push('Keeps to the water by the shore.'); else if (L.deep > 0.5) out.push('Lives in the dark deep.'); else if ((c.liveT || 0) > 3) out.push('Lives in open water.');
     return out.join(' ');
   };

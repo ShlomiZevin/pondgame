@@ -67,6 +67,7 @@
     if (a.prey) { const low = a.prey.toLowerCase(); for (let i = 0; i < W.zones.length; i++) { const o = W.zones[i]; if (o !== z && String(o.word).toLowerCase() === low) return o; } if (a.only) return null; }      /* the one it came for, wherever it is */
     if (a.side !== 'friend' || true) for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue; if (a.side === 'friend' && !((c.ph.aggro || 0) > 0.38 || c.cool > 0.6)) continue; const d = dist(c, z) - c.ph.r; if (d < bd) { bd = d; best = c; } }
     if (a.side !== 'foe') for (let i = 0; i < W.zones.length; i++) { const o = W.zones[i]; if (o === z || o.haven) continue; if (a.side === 'friend' ? !G.isBad(o) : !o.act) continue; const d = dist(o, z) - o.r * 0.5; if (d < bd) { bd = d; best = o; } }
+    if (a.side !== 'friend' && W.works) for (let i = 0; i < W.works.length; i++) { const w = W.works[i]; if (!w.bp || w.fall) continue; const d = dist(w, z) - w.bp.S * 0.6; if (d < bd * 0.5) { bd = d * 2; best = w; } }      /* what the creatures built, when it is close by */
     return best;
   }
   /** harm done to a creature or to another thing */
@@ -80,8 +81,10 @@
       if (G.learn) G.learn(o, -0.7);                       // it learns what was near when it was hit
       z.hurt = (z.hurt || 0) + dmg;
       if (o.E <= 0) { z.deaths = (z.deaths || 0) + 1; W.stats.killed = (W.stats.killed || 0) + 1; if (G.zoneEvent && z.deaths === 1) G.zoneEvent(z, 'It struck down its first creature'); G.killCreature(o, 'fought', null); }
+    } else if (o.bp) {   // something the creatures built: a piece is knocked off
+      o.dmg = (o.dmg || 0) + dmg; if (o.dmg > 110) { o.dmg = 0; const P = o.bp.P; for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { P[k].st = 0; G.emit('build-fall', o, P[k]); break; } o.hitBy = z.word; o.hitGen = W.gen; }
     } else {         // another thing
-      if (o.alive > 0.25) o.health = Math.max(0, (o.health || 0) - dmg * 0.012); else o.life -= dmg * 0.5;
+      if (o.alive > 0.25) o.health = Math.max(0, (o.health || 0) - dmg * 0.006); else o.life -= dmg * 0.14;      /* a thing takes many blows: a fight between two of them is something to watch */
       if ((o.alive > 0.25 ? o.health <= 0 : o.life <= 0) && !o.felled) { o.felled = z.word; if (G.zoneEvent) G.zoneEvent(z, 'It brought down ' + o.word); if (G.mode === 'play' && G.log) G.log('disc', z.word + ' brought down ' + o.word, 'One thing you added has destroyed another.'); if (G.note) G.note('It happened in the pond', z.word + ' brought down ' + o.word + '.'); }
       o.struck = 1; o.bite = 1;
     }

@@ -3043,6 +3043,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (L.diet >= 0) out.push('Lives mostly on ' + FOODS[L.diet] + ' food.');
     { const ph = c.ph; if (ph && ph.love > 0.3) out.push('Made for ' + FOODS[ph.fav] + ' food' + (ph.bane >= 0 ? '; ' + FOODS[ph.bane] + ' food makes it ill' + (c.ill ? ' (it has found that out ' + (c.ill === 1 ? 'once' : c.ill + ' times') + ')' : '') : '') + '.'); }
     if (c.lessons > 3 && c.learned > 0.05) out.push('It has learned from ' + c.lessons + ' meals and mishaps.');
+    if (c.bornKnowing > 0.05) out.push('It was born knowing some of what its parents had learned.'); if (c.taught > 2) out.push('It has been learning from its elders.'); if (c.judged) out.push('You have told it ' + (c.judged > 0 ? 'GOOD' : 'BAD') + ' ' + Math.abs(c.judged) + (Math.abs(c.judged) === 1 ? ' time.' : ' times.'));
     if (L.land > 0.3) out.push('Spends its days on the shore.'); else if (L.shore > 0.3) out.push('Keeps to the water by the shore.'); else if (L.deep > 0.5) out.push('Lives in the dark deep.'); else if ((c.liveT || 0) > 3) out.push('Lives in open water.');
     return out.join(' ');
   };
@@ -8751,6 +8752,7 @@ G.addSystem({
     if (a.prey) { const low = a.prey.toLowerCase(); for (let i = 0; i < W.zones.length; i++) { const o = W.zones[i]; if (o !== z && String(o.word).toLowerCase() === low) return o; } if (a.only) return null; }      /* the one it came for, wherever it is */
     if (a.side !== 'friend' || true) for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue; if (a.side === 'friend' && !((c.ph.aggro || 0) > 0.38 || c.cool > 0.6)) continue; const d = dist(c, z) - c.ph.r; if (d < bd) { bd = d; best = c; } }
     if (a.side !== 'foe') for (let i = 0; i < W.zones.length; i++) { const o = W.zones[i]; if (o === z || o.haven) continue; if (a.side === 'friend' ? !G.isBad(o) : !o.act) continue; const d = dist(o, z) - o.r * 0.5; if (d < bd) { bd = d; best = o; } }
+    if (a.side !== 'friend' && W.works) for (let i = 0; i < W.works.length; i++) { const w = W.works[i]; if (!w.bp || w.fall) continue; const d = dist(w, z) - w.bp.S * 0.6; if (d < bd * 0.5) { bd = d * 2; best = w; } }      /* what the creatures built, when it is close by */
     return best;
   }
   /** harm done to a creature or to another thing */
@@ -8764,8 +8766,10 @@ G.addSystem({
       if (G.learn) G.learn(o, -0.7);                       // it learns what was near when it was hit
       z.hurt = (z.hurt || 0) + dmg;
       if (o.E <= 0) { z.deaths = (z.deaths || 0) + 1; W.stats.killed = (W.stats.killed || 0) + 1; if (G.zoneEvent && z.deaths === 1) G.zoneEvent(z, 'It struck down its first creature'); G.killCreature(o, 'fought', null); }
+    } else if (o.bp) {   // something the creatures built: a piece is knocked off
+      o.dmg = (o.dmg || 0) + dmg; if (o.dmg > 110) { o.dmg = 0; const P = o.bp.P; for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { P[k].st = 0; G.emit('build-fall', o, P[k]); break; } o.hitBy = z.word; o.hitGen = W.gen; }
     } else {         // another thing
-      if (o.alive > 0.25) o.health = Math.max(0, (o.health || 0) - dmg * 0.012); else o.life -= dmg * 0.5;
+      if (o.alive > 0.25) o.health = Math.max(0, (o.health || 0) - dmg * 0.006); else o.life -= dmg * 0.14;      /* a thing takes many blows: a fight between two of them is something to watch */
       if ((o.alive > 0.25 ? o.health <= 0 : o.life <= 0) && !o.felled) { o.felled = z.word; if (G.zoneEvent) G.zoneEvent(z, 'It brought down ' + o.word); if (G.mode === 'play' && G.log) G.log('disc', z.word + ' brought down ' + o.word, 'One thing you added has destroyed another.'); if (G.note) G.note('It happened in the pond', z.word + ' brought down ' + o.word + '.'); }
       o.struck = 1; o.bite = 1;
     }
@@ -8905,7 +8909,7 @@ G.addSystem({
   // ── the work of building ──
   const baseOf = function (o) { return [o.x, o.y + (o.bp ? o.bp.S * 0.45 : 30)]; };
   function buildStep(W, d, dt) {
-    if (!d.bp) d.bp = blueprint(d);
+    if (!d.bp) { d.bp = blueprint(d); const mine = (W.works || []).filter(function (w) { return w.bp && w.sp === d.sp && !w.fall; }); if (mine.length) { const w0 = mine[0], k = mine.length, side = k % 2 ? 1 : -1, gap = (w0.bp.S + d.bp.S) * 1.25 * Math.ceil(k / 2); d.x = clamp(w0.x + side * gap, 120, W.ww - 120); d.y = clamp(w0.y + (k % 3 - 1) * 14, 120, W.wh - 90); d.beside = w0.name; } }
     const bp = d.bp, P = bp.P, base = baseOf(d), M = []; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].deedId === d.id && !W.cre[i].dead) M.push(W.cre[i]);
     const busyP = {}, busyM = new Set(); M.forEach(function (c) { const j = c.bj; if (j && j.d === d.id) { if (j.p >= 0) busyP[j.p] = 1; if (j.mat) busyM.add(j.mat); } });
     d.wait = '';
@@ -8916,7 +8920,7 @@ G.addSystem({
       if (!j) {
         let pi = -1; for (let i = 0; i < P.length; i++) if (P[i].st === 0 && !busyP[i]) { pi = i; break; }      // from the ground up
         if (pi >= 0) {
-          let best = null, bd = 1e12, any = null, ad = 1e12; for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (busyM.has(q)) continue; const dd = (q.x - c.x) * (q.x - c.x) + (q.y - c.y) * (q.y - c.y); if (dd < ad) { ad = dd; any = q; } if (q.k === P[pi].m && dd < bd) { bd = dd; best = q; } }
+          let best = null, bd = 1e12, any = null, ad = 1e12; const sy = G.shoreY ? G.shoreY(W) : 0; for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (busyM.has(q) || (!c.ph.lungs && q.y < sy + 6)) continue; const dd = (q.x - c.x) * (q.x - c.x) + (q.y - c.y) * (q.y - c.y); if (dd < ad) { ad = dd; any = q; } if (q.k === P[pi].m && dd < bd) { bd = dd; best = q; } }
           const mat = best || any;      // the right stuff if there is any; else they make do with what there is
           if (mat) { j = { d: d.id, ph: 'fetch', p: pi, mat: mat }; busyP[pi] = 1; busyM.add(mat); } else d.wait = MAT[P[pi].m].id;
         } else { for (let i = 0; i < P.length; i++) if (P[i].st === 1 && !busyP[i]) { pi = i; break; } if (pi >= 0) { j = { d: d.id, ph: 'paint', p: pi, t: 0 }; busyP[pi] = 1; } }
@@ -8946,7 +8950,7 @@ G.addSystem({
       const P = w.bp.P;
       w.lone = kin < 3 ? (w.lone || 0) + 1 : 0;      /* (kinds are sorted afresh each autumn: a short gap in the count is not the end of them) */
       if (w.fall || w.lone > 8) { let top = -1; for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { top = k; break; } if (top >= 0) { P[top].st = 0; G.emit('build-fall', w, P[top]); if (!w.fall && !w.ruin) { w.ruin = true; G.emit('work-ruin', w); } } }
-      else { for (let k = 0; k < P.length; k++) if (P[k].st < 2) { P[k].st++; P[k].t0 = W.t; break; } }      // its keepers mend and colour it
+      else if (!(w.dmg > 0 && W.gen === w.hitGen)) { for (let k = 0; k < P.length; k++) if (P[k].st < 2) { P[k].st++; P[k].t0 = W.t; break; } }      // its keepers mend and colour it
       const n = count(w.bp);
       if (n[0] === 0) { Wk.splice(i, 1); G.emit('work-gone', w); continue; }
       const F = W.fields || []; for (let k = 0; k < F.length; k++) if (F[k].id === w.field) { if (n[0] >= n[2] * 0.6 && !w.fall) F[k].life = Math.max(F[k].life, 30); else F[k].life = Math.min(F[k].life, 6); }      // it does what it was built for while most of it stands
@@ -8999,6 +9003,36 @@ G.addSystem({
       if (f0) f0(ctx);
     }; }
   G.drawHauls = function (ctx) { const W = G.W, d = W && W.deed; if (!d) return; const t = G.rt || 0; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.deedId !== d.id || !(c.haul >= 0) || c.dead) continue; matDraw(ctx, { x: c.x, y: c.y - c.ph.r * 2.9 - 5 + Math.sin(t * 7 + c.id) * 1.2, k: c.haul, s: (c.id % 10) / 10 }, t); } };
+})();
+
+</script>
+<script data-part="54e_teach">
+// ── What is learned outlives the learner ──
+// A creature learns in its own life (G.learn: meals, pain, and the player's GOOD and BAD strengthen or weaken the wires that were in use). By itself that
+// would be lost at every death. Two things carry it on:
+//   · a child is born half-knowing: wire for wire, it starts with half of what its parents had learned (where it has the same wire as they do);
+//   · the young learn from the old: a creature living near an older one of its own kind slowly takes on what that one has learned.
+// So a lesson that keeps being useful settles into a kind over the generations, one that stops being useful fades (each passing-on halves it), and a
+// kind whose elders all die at once loses what only they knew. It touches no gene: this is a second inheritance beside the genes.
+(function () {
+  'use strict';
+  const BIRTH = 0.5, TEACH = 0.06;
+  /** the name of every wire of a brain, in the order the brain keeps them (grouped by where they end; see G.derive) */
+  function keys(g) { const nt = g.h + G.NOUT, groups = []; for (let i = 0; i < nt; i++) groups.push([]); for (let i = 0; i < g.w.length; i++) { const w = g.w[i], ti = w.t >= 200 ? g.h + (w.t - 200) : w.t - 100; if (ti >= 0 && ti < nt) groups[ti].push(w.f + '>' + w.t); } return [].concat.apply([], groups); }
+  function learned(c) { if (!c || !c.lw || !c.g) return null; const K = c._wk || (c._wk = keys(c.g)); if (K.length !== c.lw.length) return null; const o = {}; let any = false; for (let i = 0; i < K.length; i++) if (c.lw[i]) { o[K[i]] = c.lw[i]; any = true; } return any ? o : null; }
+  function ensure(c) { const n = c.ph.bv.length; if (!c.lw || c.lw.length !== n) { c.lw = new Float32Array(n); c.el = new Float32Array(n); c.learned = 0; } return c._wk || (c._wk = keys(c.g)); }
+  G.on('birth', function (c, a, b) {
+    if (!c || !c.ph || !c.ph.bv) return;
+    const A = learned(a), B = learned(b); if (!A && !B) return;
+    const K = ensure(c); if (K.length !== c.lw.length) return; let sum = 0;
+    for (let i = 0; i < K.length; i++) { const x = A && A[K[i]], y = B && B[K[i]]; if (x === undefined && y === undefined) continue; c.lw[i] = BIRTH * ((x || 0) + (y || 0)) / ((x !== undefined && x !== 0 ? 1 : 0) + (y !== undefined && y !== 0 ? 1 : 0) || 1); sum += Math.abs(c.lw[i]); }
+    c.learned = sum; c.bornKnowing = sum;
+  });
+  // the young learn from the old: a few pairs are looked at each moment, so it costs next to nothing
+  let acc = 0;
+  { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (!W || W.title || W.cre.length < 4) return; acc += dt; if (acc < 0.5) return; acc = 0;
+      for (let k = 0; k < 6; k++) { const c = W.cre[(G.rand() * W.cre.length) | 0], e = W.cre[(G.rand() * W.cre.length) | 0]; if (c === e || c.dead || e.dead || !c.sp || c.sp !== e.sp || e.age <= c.age) continue; const dx = c.x - e.x, dy = c.y - e.y; if (dx * dx + dy * dy > 160 * 160) continue; const E = learned(e); if (!E) continue; const K = ensure(c); if (K.length !== c.lw.length) continue; let sum = 0; for (let i = 0; i < K.length; i++) { const v = E[K[i]]; if (v !== undefined) c.lw[i] += (v - c.lw[i]) * TEACH; sum += Math.abs(c.lw[i]); } c.learned = sum; c.taught = (c.taught || 0) + 1; }
+    }; }
 })();
 
 </script>
@@ -10788,7 +10822,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       h = head(fp ? '<img alt="" width="64" height="64" style="flex:none;border-radius:14px;background:rgba(7,18,31,.55);padding:4px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(fp) + '">' : blob(o.hue || 50), o.name, cap(dot(o.looks)), 'Built by the ' + o.by + ' in generation ' + o.gen) +
         '<div class="ilabel">What it does</div><small>' + (does ? esc(cap(does)) + '. It does not harm those who built it.' : 'It stands as their mark.') + '</small>' +
         (o.bp ? (function () { const n = G.buildCount(o); return meter('How much of it stands', n[0] / n[2]) + '<small>' + n[0] + ' of ' + n[2] + ' pieces stand, ' + n[1] + ' coloured.' + (o.ruin ? ' <span style="color:var(--rose)">Its builders are gone: it is crumbling.</span>' : ' Its builders keep it up for as long as their kind lives.') + '</small>'; })() : meter('Time left', left / Math.max(1, (f && f.life0) || 120))) +
-        facts([o.plan ? '<b>The plan:</b> ' + esc(o.plan) + '.' : '', o.what ? esc(cap(dot(o.what))) : '', o.why ? '<span style="color:var(--gold)">Why:</span> ' + esc(dot(o.why)) : '', o.bp ? '' : 'It stands for about <b>' + Math.round(left) + '</b> more seconds of pond time.']) + (o.bp && !o.fall ? '<button class="btn sm" id="zraze" style="width:100%;margin-top:8px">STRIKE IT DOWN</button>' : '');
+        facts([o.plan ? '<b>The plan:</b> ' + esc(o.plan) + '.' : '', o.hitBy ? '<span style="color:var(--rose)">' + esc(o.hitBy) + ' has been knocking pieces off it.</span>' : '', o.what ? esc(cap(dot(o.what))) : '', o.why ? '<span style="color:var(--gold)">Why:</span> ' + esc(dot(o.why)) : '', o.bp ? '' : 'It stands for about <b>' + Math.round(left) + '</b> more seconds of pond time.']) + (o.bp && !o.fall ? '<button class="btn sm" id="zraze" style="width:100%;margin-top:8px">STRIKE IT DOWN</button>' : '');
     } else if (cur.k === 'deed') {
       if (W.deed !== o) { G.selectThing(null); return; }
       const st = o.steps[o.i] || {}, n = W.cre.filter(function (x) { return x.deedId === o.id && !x.dead; }).length, togo = Math.max(1, Math.ceil(o.steps.slice(o.i).reduce(function (a, q) { return a + q.secs; }, 0) - o.t));
