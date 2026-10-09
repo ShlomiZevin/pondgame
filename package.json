@@ -9,7 +9,7 @@
     "build": "node game/tools/build.js",
     "pull-game": "node scripts/pull-game.js",
     "sync": "node scripts/sync-sim.js",
-    "test": "node --test test/server.test.js test/sound.test.js",
+    "test": "node --test test/server.test.js test/sound.test.js test/town.test.js",
     "e2e": "node scripts/e2e.js",
     "real": "node scripts/real-check.js"
   },
