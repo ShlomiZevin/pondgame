@@ -74,7 +74,13 @@
       '<div class="ilabel">Its story</div><div class="log" style="height:auto;max-height:96px" id="zev">' + ev + '</div>' +
       '<div id="zfacts" style="font-size:11.5px;line-height:1.45;margin-top:6px">' + facts.join(' ') + '</div>';
     $('zclose').onclick = function () { G.selectZone(null); };
+    if (!z.haven || true) { const row = el('div', '', '<button class="btn sm" id="zmove">' + (moving === z ? 'CLICK WHERE…' : 'MOVE IT') + '</button><button class="btn sm" id="zgone">REMOVE IT</button>', card); row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px';
+      $('zmove').onclick = function () { G.sfx('click'); moving = moving === z ? null : z; shownId = 0; };
+      $('zgone').onclick = function () { G.sfx('click'); z.alive = 0; z.health = 0; z.life = 0; if (z.p.vault > 0.2) z.life = -1; G.selectZone(null); }; }
   }
+  // the next click on the pond puts the thing that is being moved there
+  let moving = null;
+  G.on('pond-click', function (c) { const z = moving; if (!z || !c || !G.W || G.W.zones.indexOf(z) < 0) { moving = null; return; } moving = null; z.x = G.clamp(c.x, 50, G.W.ww - 50); z.y = G.clamp(c.y, 50, G.W.wh - 50); z.hx = z.x; z.hy = z.y; if (G.zoneEvent) G.zoneEvent(z, 'You moved it'); G.select(null); if (G.selectThing) G.selectThing(null); G.selectZone(z); });
 
   G.addSystem({
     name: 'things',

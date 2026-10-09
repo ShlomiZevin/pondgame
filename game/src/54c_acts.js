@@ -61,6 +61,28 @@
   { const bad0 = G.isBad; G.isBad = function (z) { return bad0(z) || !!(z && z.foe && z.act); }; }
 
   const dist = function (a, b) { return Math.hypot(a.x - b.x, a.y - b.y); };
+  // ── what a creature's own brain is told, and what it may choose ──
+  // Senses 12 to 15: something armed is near · its own kind is building, or has built, near · the player's voice (GOOD above zero, BAD below, fading) ·
+  // it has just been hurt. Actions 5 and 6: strike (hit back at an armed thing within reach) · help build (join its kind's building work).
+  // Nothing is wired in: a newborn's brain has no wire to any of these. Mutation grows the wires, and living (and the player's voice) teaches their use.
+  G.senseMore = function (c, inp, range) {
+    const W = G.W; let arm = 0, bld = 0;
+    for (let i = 0; i < W.zones.length; i++) { const z = W.zones[i]; if (!z.act || !z.foe) continue; const p = 1 - (dist(z, c) - z.r * 0.5) / (range * 1.6 + 60); if (p > arm) arm = p; }
+    const d = W.deed; if (d && d.sp === c.sp && d.bp) bld = Math.max(bld, 1 - dist(d, c) / 600);
+    if (W.works) for (let i = 0; i < W.works.length; i++) { const w = W.works[i]; if (w.bp && w.sp === c.sp) bld = Math.max(bld, 1 - dist(w, c) / 500); }
+    c.godV = (c.godV || 0) * 0.985;
+    inp[12] = clamp(arm, 0, 1); inp[13] = clamp(bld, 0, 1); inp[14] = c.godV; inp[15] = Math.min(1, Math.max(0, c.startle || 0));
+  };
+  /** creatures whose brains say STRIKE hit the armed thing they are next to: it costs them, it wears the thing down, and it is a lesson that it worked */
+  function strikeBack(W, dt) {
+    const Z = W.zones.filter(function (z) { return z.act && z.foe; }); if (!Z.length) return;
+    for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.strikeT > 0) { c.strikeT -= dt; continue; } if (c.dead || !(c.out[5] > 0.6)) continue;
+      for (let k = 0; k < Z.length; k++) { const z = Z[k]; if (dist(z, c) > c.ph.r + z.r * 0.5 + 30) continue;
+        const pow = 2.5 + 4 * Math.min(2, c.ph.spike || 0) + 3 * Math.min(2, c.ph.bite || 0) + 0.12 * c.ph.r;
+        if (z.alive > 0.25) z.health = Math.max(0, (z.health || 0) - pow * 0.004); else z.life -= pow * 0.35;
+        z.struck = 1; z.hit = (z.hit || 0) + pow * 0.002; z._atk = (z._atk | 0) + 1; c.strikeT = 1; c.strike = 0.6; c.E -= 1.2; c.struckBack = (c.struckBack || 0) + 1;
+        if (G.learn) G.learn(c, 0.4); G.emit('act-hit', c, z, null); break; } }
+  }
   /** whom this thing goes for: the nearest it may attack within `far` */
   function target(z, far) {
     const W = G.W, a = z.act; let best = null, bd = far;
@@ -132,6 +154,6 @@
     }
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.wardT > 0) c.wardT -= dt; }
   }
-  { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (W && !W.title && W.zones && W.zones.length) { let any = W.shots && W.shots.length; for (let i = 0; i < W.zones.length && !any; i++) if (W.zones[i].act) any = true; if (any) stepActs(dt); } }; }
+  { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (W && !W.title && W.zones && W.zones.length) { let any = W.shots && W.shots.length; for (let i = 0; i < W.zones.length && !any; i++) if (W.zones[i].act) any = true; if (any) { stepActs(dt); strikeBack(W, dt); } } }; }
   if (G.on) G.on('new-pond', function () { if (G.W) G.W.shots = []; });
 })();

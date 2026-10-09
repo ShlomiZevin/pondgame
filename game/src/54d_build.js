@@ -88,6 +88,8 @@
     const bp = d.bp, P = bp.P, base = baseOf(d), M = []; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].deedId === d.id && !W.cre[i].dead) M.push(W.cre[i]);
     const busyP = {}, busyM = new Set(); M.forEach(function (c) { const j = c.bj; if (j && j.d === d.id) { if (j.p >= 0) busyP[j.p] = 1; if (j.mat) busyM.add(j.mat); } });
     d.wait = '';
+    // any of the kind whose own brain says HELP (action 6) and who is near joins the work
+    d.helpT = (d.helpT || 0) - dt; if (d.helpT <= 0 && M.length < 22) { d.helpT = 1; for (let k = 0; k < 8; k++) { const c = W.cre[(G.rand() * W.cre.length) | 0]; if (c.dead || c.deedId || c.sp !== d.sp || !(c.out[6] > 0.55) || Math.hypot(c.x - d.x, c.y - d.y) > 700) continue; c.deedId = d.id; c.deedJ = M.length; c.helper = true; M.push(c); d.helpers = (d.helpers || 0) + 1; } }
     for (let k = 0; k < M.length; k++) {
       const c = M[k]; let j = c.bj && c.bj.d === d.id ? c.bj : null;
       if (j && j.ph === 'fetch' && W.mats.indexOf(j.mat) < 0) j = null;                       // somebody else took it
@@ -107,7 +109,7 @@
       const dx = tx - c.x, dy = ty - c.y, dist = Math.hypot(dx, dy) || 1, grip = c.ph.hands || c.ph.limbs > 0 ? 0.8 : 0.5, sp = Math.min(c.ph.speed * 2.4 * (j.ph === 'bring' ? grip : 1), dist * 2.4)      /* they go about it with a will */, k2 = Math.min(1, dt * 5);
       c.vx += (dx / dist * sp - c.vx) * k2; c.vy += (dy / dist * sp - c.vy) * k2; if (dist > 8) c.ang = Math.atan2(dy, dx);
       if (j.ph === 'fetch' && dist < c.ph.r + 12) { const at = W.mats.indexOf(j.mat); if (at >= 0) W.mats.splice(at, 1); j.k = j.mat.k; j.mat = null; j.ph = 'bring'; }
-      else if (j.ph === 'bring' && (dist < 46 || (j.bt = (j.bt || 0) + dt) > 14)) { pc.st = 1; pc.um = j.k; pc.t0 = W.t; c.bj = null; c.haul = -1; d.placed = (d.placed || 0) + 1; G.emit('build-piece', d, pc, c); }
+      else if (j.ph === 'bring' && (dist < 46 || (j.bt = (j.bt || 0) + dt) > 14)) { pc.st = 1; pc.um = j.k; pc.t0 = W.t; c.bj = null; c.haul = -1; d.placed = (d.placed || 0) + 1; if (G.learn) G.learn(c, 0.35); G.emit('build-piece', d, pc, c); }
       else if (j.ph === 'paint' && dist < 50) { j.t += dt; c.vx *= 0.6; c.vy *= 0.6; if (j.t > 0.7) { pc.st = 2; pc.t0 = W.t; c.bj = null; G.emit('build-piece', d, pc, c); } }
     }
     const n = count(bp); d.progress = (n[0] + n[1]) / (2 * n[2]);
@@ -123,6 +125,10 @@
       w.upT = (w.upT || 0) - dt; if (w.upT > 0) continue; w.upT = w.fall ? 0.12 : 5;
       let kin = 0; for (let k = 0; k < W.cre.length; k++) if (W.cre[k].sp === w.sp && !W.cre[k].dead) kin++;
       const P = w.bp.P;
+      // other kinds: a fierce band of strangers at a building that its own kind is not there to hold knocks it about and takes what they find
+      { let foes = 0, mine = 0, who = 0; const S = w.bp.S; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (c.dead) continue; const dd = Math.hypot(c.x - w.x, c.y - w.y); if (c.sp === w.sp) { if (dd < S * 2.4) mine++; } else if (dd < S * 1.6 && (c.ph.aggro || 0) > 0.38) { foes++; who = c.sp; c.E = Math.min(c.ph.Emax, c.E + 2); } }
+        if (foes >= 3 && foes > mine && !w.fall) { for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { P[k].st = 0; G.emit('build-fall', w, P[k]); break; } const sp = G.speciesById(who); w.hitBy = 'A band of ' + (sp ? sp.name : 'strangers'); w.hitGen = W.gen; w.dmg = 1; if (!w.raided && G.mode === 'play' && G.log) { w.raided = true; G.log('sel', w.name + ' is raided', w.hitBy + ' is knocking it about while its builders are away.'); } continue; } }
+      if (w.shun && !w.fall) { w.shunT = (w.shunT || 0) + 1; if (w.shunT % 3 === 0) { for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { P[k].st = 0; G.emit('build-fall', w, P[k]); break; } } if (count(w.bp)[0] === 0) { Wk.splice(i, 1); G.emit('work-gone', w); } continue; }      /* the one the watcher found spoils the place is left to fall */
       w.lone = kin < 3 ? (w.lone || 0) + 1 : 0;      /* (kinds are sorted afresh each autumn: a short gap in the count is not the end of them) */
       if (w.fall || w.lone > 8) { let top = -1; for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { top = k; break; } if (top >= 0) { P[top].st = 0; G.emit('build-fall', w, P[top]); if (!w.fall && !w.ruin) { w.ruin = true; G.emit('work-ruin', w); } } }
       else if (!(w.dmg > 0 && W.gen === w.hitGen)) { for (let k = 0; k < P.length; k++) if (P[k].st < 2) { P[k].st++; P[k].t0 = W.t; break; } }      // its keepers mend and colour it
@@ -141,6 +147,34 @@
 
   // ── seen ──
   if (typeof document === 'undefined') return;
+  // ── the pond as a place ──
+  // Now and then (every thirty generations, and only once the pond holds two buildings or more) the watcher is shown the whole pond, drawn small, and says
+  // how well it hangs together as a place and which building, if any, spoils it. That one is no longer kept up, and falls. So order is not laid down:
+  // what looks right is what lasts. One look, about a third of a cent.
+  function picture(W) {
+    const cw = 720, k = cw / W.ww, ch = Math.round(W.wh * k), cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const x = cv.getContext('2d'), sy = G.shoreY ? G.shoreY(W) : 0;
+    const g = x.createLinearGradient(0, 0, 0, ch); g.addColorStop(0, '#1d5a66'); g.addColorStop(1, '#0c2536'); x.fillStyle = g; x.fillRect(0, 0, cw, ch); x.fillStyle = '#7d8a55'; x.fillRect(0, 0, cw, sy * k);
+    x.save(); x.scale(k, k); for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; x.fillStyle = hsl(c.g.f ? c.g.f.hue : 200, 80, 68); x.beginPath(); x.arc(c.x, c.y, Math.max(5, c.ph.r * 0.8), 0, TAU); x.fill(); }
+    const Wk = (W.works || []).filter(function (w) { return w.bp; }); Wk.forEach(function (w) { G.drawBlueprint(x, w, false); }); x.restore();
+    x.font = '700 13px system-ui, sans-serif'; x.textAlign = 'center'; Wk.forEach(function (w) { const tx = w.x * k, ty = (w.y - w.bp.S * 1.4) * k; x.fillStyle = 'rgba(0,0,0,0.6)'; x.fillRect(tx - 60, ty - 12, 120, 17); x.fillStyle = '#fff'; x.fillText(w.name.slice(0, 18), tx, ty + 1); });
+    try { return cv.toDataURL('image/jpeg', 0.8).split(',')[1] || null; } catch (e) { return null; }
+  }
+  let asking = false;
+  G.placeLook = function (force) {
+    const W = G.W; if (!W || W.title || asking || G.mode !== 'play') return false;
+    const Wk = (W.works || []).filter(function (w) { return w.bp && !w.fall; }); if (Wk.length < 2 || (!force && W.gen - (W.placeGen === undefined ? -99 : W.placeGen) < 30)) return false;
+    if (!(G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.provider === 'server') || !G.ai.allow('judge')) return false;
+    const img = picture(W); if (!img) return false; asking = true; W.placeGen = W.gen;
+    G.host.call('ai.judge', { image: img, mime: 'image/jpeg', place: 1, buildings: Wk.map(function (w) { return w.name; }), model: G.ai.model || undefined }, 60000).then(function (r) {
+      asking = false; G.ai.tally('judge', r && r.source, r && r.usd); if (G.W !== W || !r || !r.place) return;
+      const p = r.place; W.place = { order: clamp(+p.order || 0, 0, 1), why: String(p.why || '').replace(/[<>]/g, '').slice(0, 160), worst: String(p.worst || ''), gen: W.gen };
+      const bad = W.place.order < 0.6 && W.place.worst ? Wk.filter(function (w) { return w.name === W.place.worst; })[0] : null; if (bad) bad.shun = true;
+      if (G.log) G.log('disc', 'The pond as a place: ' + (W.place.order * 10).toFixed(0) + ' of 10', W.place.why + (bad ? ' ' + bad.name + ' spoils it: it will no longer be kept up.' : ''));
+      if (G.note) G.note('The watcher looked at the whole pond', (W.place.order * 10).toFixed(0) + ' of 10 as a place. ' + W.place.why);
+    }, function () { asking = false; });
+    return true;
+  };
+  G.on('scored', function () { try { G.placeLook(false); } catch (e) { console.error(e); } });
   function piece(ctx, p, hue, t) {
     const age = t - (p.t0 || -9), pop = age < 0.3 ? 0.6 + 0.4 * (age / 0.3) + 0.15 * Math.sin(age * 10.5) : 1, mc = MAT[p.um === undefined ? p.m : p.um].col;
     const raw = hsl(mc[0], mc[1], mc[2]), fin = p.c[2] < 20 ? hsl(hue, 30, p.c[2]) : hsl(hue + p.c[0], p.c[1], p.c[2]), fill = p.st > 1 ? fin : raw, w = p.w * pop, h = p.h * pop;

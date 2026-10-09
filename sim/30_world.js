@@ -492,6 +492,7 @@
         inp[9] = clamp(c.lit / 1.5, 0, 1.2);
         inp[10] = Math.min(kin, 6) / 3;
         inp[11] = Math.sin((W.t * 0.8 + c.id * 0.37) * 3.14159);
+        if (G.senseMore) G.senseMore(c, inp, range);      // what is armed and near, its kind's building, the player's voice, pain (54c_acts.js)
         G.think(c);
         c.colony = (c.out[4] > 0.5 && kinStick >= 2);
       }

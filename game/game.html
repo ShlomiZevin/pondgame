@@ -478,12 +478,12 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 (function () {
   'use strict';
   const clamp = G.clamp;
-  const NIN = 12, NOUT = 5, MAXH = 16, MAXP = 6;
+  const NIN = 16, NOUT = 7, MAXH = 32, MAXP = 6;      // (it was 12 senses, 5 actions, 16 cells: a brain that could not sense a knight, a building or its god, nor choose to hit back or to help)
   // the nine things the pond can press for; the body answers each in its own way (see form)
   const PT = ['mouth', 'fin', 'spike', 'armor', 'eye', 'lamp', 'gland', 'tail', 'tentacle'];
   const TAGHUE = [45, 100, 160, 210, 260, 330];
-  const INAMES = ['bias', 'food ahead', 'food beside', 'prey ahead', 'prey beside', 'danger ahead', 'danger beside', 'energy', 'temperature', 'light', 'kin near', 'rhythm'];
-  const ONAMES = ['swim', 'turn', 'sprint', 'glow', 'stick'];
+  const INAMES = ['bias', 'food ahead', 'food beside', 'prey ahead', 'prey beside', 'danger ahead', 'danger beside', 'energy', 'temperature', 'light', 'kin near', 'rhythm', 'armed thing near', 'my kind builds near', 'your voice', 'just hurt'];
+  const ONAMES = ['swim', 'turn', 'sprint', 'glow', 'stick', 'strike', 'help build'];
   Object.assign(G, { NIN, NOUT, MAXH, MAXP, PT, TAGHUE, INAMES, ONAMES });
 
   G.K = Object.assign(G.K, {
@@ -3488,6 +3488,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         inp[9] = clamp(c.lit / 1.5, 0, 1.2);
         inp[10] = Math.min(kin, 6) / 3;
         inp[11] = Math.sin((W.t * 0.8 + c.id * 0.37) * 3.14159);
+        if (G.senseMore) G.senseMore(c, inp, range);      // what is armed and near, its kind's building, the player's voice, pain (54c_acts.js)
         G.think(c);
         c.colony = (c.out[4] > 0.5 && kinStick >= 2);
       }
@@ -8746,6 +8747,28 @@ G.addSystem({
   { const bad0 = G.isBad; G.isBad = function (z) { return bad0(z) || !!(z && z.foe && z.act); }; }
 
   const dist = function (a, b) { return Math.hypot(a.x - b.x, a.y - b.y); };
+  // ── what a creature's own brain is told, and what it may choose ──
+  // Senses 12 to 15: something armed is near · its own kind is building, or has built, near · the player's voice (GOOD above zero, BAD below, fading) ·
+  // it has just been hurt. Actions 5 and 6: strike (hit back at an armed thing within reach) · help build (join its kind's building work).
+  // Nothing is wired in: a newborn's brain has no wire to any of these. Mutation grows the wires, and living (and the player's voice) teaches their use.
+  G.senseMore = function (c, inp, range) {
+    const W = G.W; let arm = 0, bld = 0;
+    for (let i = 0; i < W.zones.length; i++) { const z = W.zones[i]; if (!z.act || !z.foe) continue; const p = 1 - (dist(z, c) - z.r * 0.5) / (range * 1.6 + 60); if (p > arm) arm = p; }
+    const d = W.deed; if (d && d.sp === c.sp && d.bp) bld = Math.max(bld, 1 - dist(d, c) / 600);
+    if (W.works) for (let i = 0; i < W.works.length; i++) { const w = W.works[i]; if (w.bp && w.sp === c.sp) bld = Math.max(bld, 1 - dist(w, c) / 500); }
+    c.godV = (c.godV || 0) * 0.985;
+    inp[12] = clamp(arm, 0, 1); inp[13] = clamp(bld, 0, 1); inp[14] = c.godV; inp[15] = Math.min(1, Math.max(0, c.startle || 0));
+  };
+  /** creatures whose brains say STRIKE hit the armed thing they are next to: it costs them, it wears the thing down, and it is a lesson that it worked */
+  function strikeBack(W, dt) {
+    const Z = W.zones.filter(function (z) { return z.act && z.foe; }); if (!Z.length) return;
+    for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.strikeT > 0) { c.strikeT -= dt; continue; } if (c.dead || !(c.out[5] > 0.6)) continue;
+      for (let k = 0; k < Z.length; k++) { const z = Z[k]; if (dist(z, c) > c.ph.r + z.r * 0.5 + 30) continue;
+        const pow = 2.5 + 4 * Math.min(2, c.ph.spike || 0) + 3 * Math.min(2, c.ph.bite || 0) + 0.12 * c.ph.r;
+        if (z.alive > 0.25) z.health = Math.max(0, (z.health || 0) - pow * 0.004); else z.life -= pow * 0.35;
+        z.struck = 1; z.hit = (z.hit || 0) + pow * 0.002; z._atk = (z._atk | 0) + 1; c.strikeT = 1; c.strike = 0.6; c.E -= 1.2; c.struckBack = (c.struckBack || 0) + 1;
+        if (G.learn) G.learn(c, 0.4); G.emit('act-hit', c, z, null); break; } }
+  }
   /** whom this thing goes for: the nearest it may attack within `far` */
   function target(z, far) {
     const W = G.W, a = z.act; let best = null, bd = far;
@@ -8817,7 +8840,7 @@ G.addSystem({
     }
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.wardT > 0) c.wardT -= dt; }
   }
-  { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (W && !W.title && W.zones && W.zones.length) { let any = W.shots && W.shots.length; for (let i = 0; i < W.zones.length && !any; i++) if (W.zones[i].act) any = true; if (any) stepActs(dt); } }; }
+  { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (W && !W.title && W.zones && W.zones.length) { let any = W.shots && W.shots.length; for (let i = 0; i < W.zones.length && !any; i++) if (W.zones[i].act) any = true; if (any) { stepActs(dt); strikeBack(W, dt); } } }; }
   if (G.on) G.on('new-pond', function () { if (G.W) G.W.shots = []; });
 })();
 
@@ -8913,6 +8936,8 @@ G.addSystem({
     const bp = d.bp, P = bp.P, base = baseOf(d), M = []; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].deedId === d.id && !W.cre[i].dead) M.push(W.cre[i]);
     const busyP = {}, busyM = new Set(); M.forEach(function (c) { const j = c.bj; if (j && j.d === d.id) { if (j.p >= 0) busyP[j.p] = 1; if (j.mat) busyM.add(j.mat); } });
     d.wait = '';
+    // any of the kind whose own brain says HELP (action 6) and who is near joins the work
+    d.helpT = (d.helpT || 0) - dt; if (d.helpT <= 0 && M.length < 22) { d.helpT = 1; for (let k = 0; k < 8; k++) { const c = W.cre[(G.rand() * W.cre.length) | 0]; if (c.dead || c.deedId || c.sp !== d.sp || !(c.out[6] > 0.55) || Math.hypot(c.x - d.x, c.y - d.y) > 700) continue; c.deedId = d.id; c.deedJ = M.length; c.helper = true; M.push(c); d.helpers = (d.helpers || 0) + 1; } }
     for (let k = 0; k < M.length; k++) {
       const c = M[k]; let j = c.bj && c.bj.d === d.id ? c.bj : null;
       if (j && j.ph === 'fetch' && W.mats.indexOf(j.mat) < 0) j = null;                       // somebody else took it
@@ -8932,7 +8957,7 @@ G.addSystem({
       const dx = tx - c.x, dy = ty - c.y, dist = Math.hypot(dx, dy) || 1, grip = c.ph.hands || c.ph.limbs > 0 ? 0.8 : 0.5, sp = Math.min(c.ph.speed * 2.4 * (j.ph === 'bring' ? grip : 1), dist * 2.4)      /* they go about it with a will */, k2 = Math.min(1, dt * 5);
       c.vx += (dx / dist * sp - c.vx) * k2; c.vy += (dy / dist * sp - c.vy) * k2; if (dist > 8) c.ang = Math.atan2(dy, dx);
       if (j.ph === 'fetch' && dist < c.ph.r + 12) { const at = W.mats.indexOf(j.mat); if (at >= 0) W.mats.splice(at, 1); j.k = j.mat.k; j.mat = null; j.ph = 'bring'; }
-      else if (j.ph === 'bring' && (dist < 46 || (j.bt = (j.bt || 0) + dt) > 14)) { pc.st = 1; pc.um = j.k; pc.t0 = W.t; c.bj = null; c.haul = -1; d.placed = (d.placed || 0) + 1; G.emit('build-piece', d, pc, c); }
+      else if (j.ph === 'bring' && (dist < 46 || (j.bt = (j.bt || 0) + dt) > 14)) { pc.st = 1; pc.um = j.k; pc.t0 = W.t; c.bj = null; c.haul = -1; d.placed = (d.placed || 0) + 1; if (G.learn) G.learn(c, 0.35); G.emit('build-piece', d, pc, c); }
       else if (j.ph === 'paint' && dist < 50) { j.t += dt; c.vx *= 0.6; c.vy *= 0.6; if (j.t > 0.7) { pc.st = 2; pc.t0 = W.t; c.bj = null; G.emit('build-piece', d, pc, c); } }
     }
     const n = count(bp); d.progress = (n[0] + n[1]) / (2 * n[2]);
@@ -8948,6 +8973,10 @@ G.addSystem({
       w.upT = (w.upT || 0) - dt; if (w.upT > 0) continue; w.upT = w.fall ? 0.12 : 5;
       let kin = 0; for (let k = 0; k < W.cre.length; k++) if (W.cre[k].sp === w.sp && !W.cre[k].dead) kin++;
       const P = w.bp.P;
+      // other kinds: a fierce band of strangers at a building that its own kind is not there to hold knocks it about and takes what they find
+      { let foes = 0, mine = 0, who = 0; const S = w.bp.S; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (c.dead) continue; const dd = Math.hypot(c.x - w.x, c.y - w.y); if (c.sp === w.sp) { if (dd < S * 2.4) mine++; } else if (dd < S * 1.6 && (c.ph.aggro || 0) > 0.38) { foes++; who = c.sp; c.E = Math.min(c.ph.Emax, c.E + 2); } }
+        if (foes >= 3 && foes > mine && !w.fall) { for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { P[k].st = 0; G.emit('build-fall', w, P[k]); break; } const sp = G.speciesById(who); w.hitBy = 'A band of ' + (sp ? sp.name : 'strangers'); w.hitGen = W.gen; w.dmg = 1; if (!w.raided && G.mode === 'play' && G.log) { w.raided = true; G.log('sel', w.name + ' is raided', w.hitBy + ' is knocking it about while its builders are away.'); } continue; } }
+      if (w.shun && !w.fall) { w.shunT = (w.shunT || 0) + 1; if (w.shunT % 3 === 0) { for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { P[k].st = 0; G.emit('build-fall', w, P[k]); break; } } if (count(w.bp)[0] === 0) { Wk.splice(i, 1); G.emit('work-gone', w); } continue; }      /* the one the watcher found spoils the place is left to fall */
       w.lone = kin < 3 ? (w.lone || 0) + 1 : 0;      /* (kinds are sorted afresh each autumn: a short gap in the count is not the end of them) */
       if (w.fall || w.lone > 8) { let top = -1; for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { top = k; break; } if (top >= 0) { P[top].st = 0; G.emit('build-fall', w, P[top]); if (!w.fall && !w.ruin) { w.ruin = true; G.emit('work-ruin', w); } } }
       else if (!(w.dmg > 0 && W.gen === w.hitGen)) { for (let k = 0; k < P.length; k++) if (P[k].st < 2) { P[k].st++; P[k].t0 = W.t; break; } }      // its keepers mend and colour it
@@ -8966,6 +8995,34 @@ G.addSystem({
 
   // ── seen ──
   if (typeof document === 'undefined') return;
+  // ── the pond as a place ──
+  // Now and then (every thirty generations, and only once the pond holds two buildings or more) the watcher is shown the whole pond, drawn small, and says
+  // how well it hangs together as a place and which building, if any, spoils it. That one is no longer kept up, and falls. So order is not laid down:
+  // what looks right is what lasts. One look, about a third of a cent.
+  function picture(W) {
+    const cw = 720, k = cw / W.ww, ch = Math.round(W.wh * k), cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const x = cv.getContext('2d'), sy = G.shoreY ? G.shoreY(W) : 0;
+    const g = x.createLinearGradient(0, 0, 0, ch); g.addColorStop(0, '#1d5a66'); g.addColorStop(1, '#0c2536'); x.fillStyle = g; x.fillRect(0, 0, cw, ch); x.fillStyle = '#7d8a55'; x.fillRect(0, 0, cw, sy * k);
+    x.save(); x.scale(k, k); for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; x.fillStyle = hsl(c.g.f ? c.g.f.hue : 200, 80, 68); x.beginPath(); x.arc(c.x, c.y, Math.max(5, c.ph.r * 0.8), 0, TAU); x.fill(); }
+    const Wk = (W.works || []).filter(function (w) { return w.bp; }); Wk.forEach(function (w) { G.drawBlueprint(x, w, false); }); x.restore();
+    x.font = '700 13px system-ui, sans-serif'; x.textAlign = 'center'; Wk.forEach(function (w) { const tx = w.x * k, ty = (w.y - w.bp.S * 1.4) * k; x.fillStyle = 'rgba(0,0,0,0.6)'; x.fillRect(tx - 60, ty - 12, 120, 17); x.fillStyle = '#fff'; x.fillText(w.name.slice(0, 18), tx, ty + 1); });
+    try { return cv.toDataURL('image/jpeg', 0.8).split(',')[1] || null; } catch (e) { return null; }
+  }
+  let asking = false;
+  G.placeLook = function (force) {
+    const W = G.W; if (!W || W.title || asking || G.mode !== 'play') return false;
+    const Wk = (W.works || []).filter(function (w) { return w.bp && !w.fall; }); if (Wk.length < 2 || (!force && W.gen - (W.placeGen === undefined ? -99 : W.placeGen) < 30)) return false;
+    if (!(G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.provider === 'server') || !G.ai.allow('judge')) return false;
+    const img = picture(W); if (!img) return false; asking = true; W.placeGen = W.gen;
+    G.host.call('ai.judge', { image: img, mime: 'image/jpeg', place: 1, buildings: Wk.map(function (w) { return w.name; }), model: G.ai.model || undefined }, 60000).then(function (r) {
+      asking = false; G.ai.tally('judge', r && r.source, r && r.usd); if (G.W !== W || !r || !r.place) return;
+      const p = r.place; W.place = { order: clamp(+p.order || 0, 0, 1), why: String(p.why || '').replace(/[<>]/g, '').slice(0, 160), worst: String(p.worst || ''), gen: W.gen };
+      const bad = W.place.order < 0.6 && W.place.worst ? Wk.filter(function (w) { return w.name === W.place.worst; })[0] : null; if (bad) bad.shun = true;
+      if (G.log) G.log('disc', 'The pond as a place: ' + (W.place.order * 10).toFixed(0) + ' of 10', W.place.why + (bad ? ' ' + bad.name + ' spoils it: it will no longer be kept up.' : ''));
+      if (G.note) G.note('The watcher looked at the whole pond', (W.place.order * 10).toFixed(0) + ' of 10 as a place. ' + W.place.why);
+    }, function () { asking = false; });
+    return true;
+  };
+  G.on('scored', function () { try { G.placeLook(false); } catch (e) { console.error(e); } });
   function piece(ctx, p, hue, t) {
     const age = t - (p.t0 || -9), pop = age < 0.3 ? 0.6 + 0.4 * (age / 0.3) + 0.15 * Math.sin(age * 10.5) : 1, mc = MAT[p.um === undefined ? p.m : p.um].col;
     const raw = hsl(mc[0], mc[1], mc[2]), fin = p.c[2] < 20 ? hsl(hue, 30, p.c[2]) : hsl(hue + p.c[0], p.c[1], p.c[2]), fill = p.st > 1 ? fin : raw, w = p.w * pop, h = p.h * pop;
@@ -10415,7 +10472,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   const PAL = G.PAL, el = G.el, $ = G.$, esc = G.escapeHtml;
   const FOOD = ['gold', 'lime', 'green', 'blue', 'violet', 'pink'], FOODCOL = [PAL.gold, '#c9ee7a', PAL.algae, '#8fc7ff', PAL.violet, PAL.rose];
   const SENSE = { 'bias': 'always on', 'kin near': 'family near', 'energy': 'its own energy', 'temperature': 'warmth', 'rhythm': 'inner rhythm' };
-  const ACT = { 'stick': 'stay with family' }, DOING = ['swimming', 'turning', 'sprinting', 'glowing', 'staying with its family'];
+  const ACT = { 'stick': 'stay with family' }, DOING = ['swimming', 'turning', 'sprinting', 'glowing', 'staying with its family', 'striking back', 'wanting to help build'];
   const KMANY = ['legs', 'fins', 'spikes', 'tentacles', 'feelers', 'plates', 'frills', 'horns', 'new growths'];
   let win = null, shownId = 0, raf = 0;
 
@@ -10446,7 +10503,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       '<div class="gcols"><div><h3>GENES · WHAT IT IS MADE OF</h3><div id="gbgenes"></div></div>' +
       '<div><h3>BRAIN · WATCH IT THINK</h3><canvas id="gbbrain" width="1160" height="760"></canvas><div class="gsay" id="gbsay"></div>' +
       '<div class="gleg"><span><i style="background:' + PAL.algae + '"></i>a wire that says "do it"</span><span><i style="background:' + PAL.rose + '"></i>a wire that says "do not"</span><span><i style="background:#fff;height:7px"></i>thicker = stronger</span><span><i class="d" style="background:#fff"></i>moving dots = a signal passing right now</span><span><i style="background:' + PAL.gold + ';height:7px"></i>gold edge = changed by what it learned in its life</span></div>' +
-      '<p class="gnote">The wires are genes: a creature is born with them, from both parents, with small changes. During its life it also learns: wires that were in use just before a meal grow stronger, wires in use just before it was hurt or ate what makes it ill grow weaker. What it learned stays its own; its children get the genes, not the lessons.</p></div></div>';
+      '<p class="gnote">The wires are genes: a creature is born with them, from both parents, with small changes. During its life it also learns: wires that were in use just before a meal grow stronger, wires in use just before it was hurt or ate what makes it ill grow weaker. Your GOOD and BAD do the same, more strongly. What it learned is passed on too: its children are born with half of it, and the young pick it up from their elders.</p></div></div>';
     $('gbclose').onclick = function () { G.sfx('click'); close(); };
     win.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
     win.addEventListener('wheel', function (e) { e.stopPropagation(); }, { passive: true });
@@ -10472,7 +10529,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   // ── good and bad: nature's own voice ──
   // The player never tells a creature what to do. They can only say GOOD or BAD of what it is doing right now, and that goes straight into its brain as the
   // strongest reward or punishment it knows (G.learn): the wires that were just in use grow stronger or weaker. What it makes of that is its own affair.
-  G.judge = function (c, good) { if (!c || c.dead || !G.learn) return; G.learn(c, good ? 1 : -1); G.learn(c, good ? 1 : -1); c.judged = (c.judged || 0) + (good ? 1 : -1); c.flash = 1; if (good) c.mend = 1; else c.startle = 1; G.emit('judged-by-god', c, good); };
+  G.judge = function (c, good) { if (!c || c.dead || !G.learn) return; G.learn(c, good ? 1 : -1); G.learn(c, good ? 1 : -1); c.judged = (c.judged || 0) + (good ? 1 : -1); c.godV = good ? 1 : -1;      /* and it HEARS it for a few moments (sense 14), so a brain can come to be wired to it */ c.flash = 1; if (good) c.mend = 1; else c.startle = 1; G.emit('judged-by-god', c, good); };
   { const t = setInterval(function () { const b = $('iwhy'); if (!b) return; clearInterval(t); const row = document.createElement('div'); row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px';
       row.innerHTML = '<button class="btn sm" id="igood" title="Tell it that what it is doing right now is good. It will do more of it. It learns; you do not command." style="border-color:rgba(51,214,166,.7);color:#dffbf1">\u2665 GOOD</button><button class="btn sm" id="ibad" title="Tell it that what it is doing right now is bad. It will do less of it." style="border-color:rgba(255,126,182,.7);color:#ffd3e2">\u2715 BAD</button>';
       b.parentNode.insertBefore(row, b); $('igood').onclick = function () { G.sfx('click'); G.judge(G.R.sel, true); }; $('ibad').onclick = function () { G.sfx('click'); G.judge(G.R.sel, false); }; }, 400); }
@@ -10719,7 +10776,13 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       '<div class="ilabel">Its story</div><div class="log" style="height:auto;max-height:96px" id="zev">' + ev + '</div>' +
       '<div id="zfacts" style="font-size:11.5px;line-height:1.45;margin-top:6px">' + facts.join(' ') + '</div>';
     $('zclose').onclick = function () { G.selectZone(null); };
+    if (!z.haven || true) { const row = el('div', '', '<button class="btn sm" id="zmove">' + (moving === z ? 'CLICK WHERE…' : 'MOVE IT') + '</button><button class="btn sm" id="zgone">REMOVE IT</button>', card); row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px';
+      $('zmove').onclick = function () { G.sfx('click'); moving = moving === z ? null : z; shownId = 0; };
+      $('zgone').onclick = function () { G.sfx('click'); z.alive = 0; z.health = 0; z.life = 0; if (z.p.vault > 0.2) z.life = -1; G.selectZone(null); }; }
   }
+  // the next click on the pond puts the thing that is being moved there
+  let moving = null;
+  G.on('pond-click', function (c) { const z = moving; if (!z || !c || !G.W || G.W.zones.indexOf(z) < 0) { moving = null; return; } moving = null; z.x = G.clamp(c.x, 50, G.W.ww - 50); z.y = G.clamp(c.y, 50, G.W.wh - 50); z.hx = z.x; z.hy = z.y; if (G.zoneEvent) G.zoneEvent(z, 'You moved it'); G.select(null); if (G.selectThing) G.selectThing(null); G.selectZone(z); });
 
   G.addSystem({
     name: 'things',
@@ -10822,7 +10885,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       h = head(fp ? '<img alt="" width="64" height="64" style="flex:none;border-radius:14px;background:rgba(7,18,31,.55);padding:4px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(fp) + '">' : blob(o.hue || 50), o.name, cap(dot(o.looks)), 'Built by the ' + o.by + ' in generation ' + o.gen) +
         '<div class="ilabel">What it does</div><small>' + (does ? esc(cap(does)) + '. It does not harm those who built it.' : 'It stands as their mark.') + '</small>' +
         (o.bp ? (function () { const n = G.buildCount(o); return meter('How much of it stands', n[0] / n[2]) + '<small>' + n[0] + ' of ' + n[2] + ' pieces stand, ' + n[1] + ' coloured.' + (o.ruin ? ' <span style="color:var(--rose)">Its builders are gone: it is crumbling.</span>' : ' Its builders keep it up for as long as their kind lives.') + '</small>'; })() : meter('Time left', left / Math.max(1, (f && f.life0) || 120))) +
-        facts([o.plan ? '<b>The plan:</b> ' + esc(o.plan) + '.' : '', o.hitBy ? '<span style="color:var(--rose)">' + esc(o.hitBy) + ' has been knocking pieces off it.</span>' : '', o.what ? esc(cap(dot(o.what))) : '', o.why ? '<span style="color:var(--gold)">Why:</span> ' + esc(dot(o.why)) : '', o.bp ? '' : 'It stands for about <b>' + Math.round(left) + '</b> more seconds of pond time.']) + (o.bp && !o.fall ? '<button class="btn sm" id="zraze" style="width:100%;margin-top:8px">STRIKE IT DOWN</button>' : '');
+        facts([o.plan ? '<b>The plan:</b> ' + esc(o.plan) + '.' : '', o.hitBy ? '<span style="color:var(--rose)">' + esc(o.hitBy) + ' has been knocking pieces off it.</span>' : '', o.shun ? '<span style="color:var(--rose)">The watcher found it spoils the pond as a place: it is no longer kept up.</span>' : '', W.place ? 'The pond as a place, by the watcher: <b>' + (W.place.order * 10).toFixed(0) + ' of 10</b>. <i>' + esc(W.place.why) + '</i>' : '', o.what ? esc(cap(dot(o.what))) : '', o.why ? '<span style="color:var(--gold)">Why:</span> ' + esc(dot(o.why)) : '', o.bp ? '' : 'It stands for about <b>' + Math.round(left) + '</b> more seconds of pond time.']) + (o.bp && !o.fall ? '<button class="btn sm" id="zraze" style="width:100%;margin-top:8px">STRIKE IT DOWN</button>' : '');
     } else if (cur.k === 'deed') {
       if (W.deed !== o) { G.selectThing(null); return; }
       const st = o.steps[o.i] || {}, n = W.cre.filter(function (x) { return x.deedId === o.id && !x.dead; }).length, togo = Math.max(1, Math.ceil(o.steps.slice(o.i).reduce(function (a, q) { return a + q.secs; }, 0) - o.t));
@@ -10891,7 +10954,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     if (!order.length) { if (!box.classList.contains('hide')) box.classList.add('hide'); sig = ''; return; }
     box.classList.remove('hide');
     // it sits on the right, under the evolution panel (the left side is the rare box's): the two no longer share a column
-    { const pn = document.getElementById('panel'), ins = document.getElementById('inspector'), wide = window.innerWidth > 720; if (wide) { const top = pn && !pn.classList.contains('hide') ? pn.getBoundingClientRect().bottom + 10 : 14, bot = ins && !ins.classList.contains('hide') ? ins.getBoundingClientRect().top - 10 : window.innerHeight - 14; box.style.left = 'auto'; box.style.right = '14px'; box.style.top = Math.round(top) + 'px'; box.style.maxHeight = Math.max(44, Math.round(bot - top)) + 'px'; box.style.overflowY = 'auto'; box.style.zIndex = '3'; } else { box.style.left = ''; box.style.right = ''; box.style.top = ''; box.style.maxHeight = ''; } }
+    { const pn = document.getElementById('panel'), ins = document.getElementById('inspector'), wide = window.innerWidth > 720; if (wide) { const top = pn && !pn.classList.contains('hide') ? pn.getBoundingClientRect().bottom + 10 : 14, zc = document.getElementById('zcard'), low = [ins, zc].filter(function (e) { return e && !e.classList.contains('hide') && e.offsetHeight; }).map(function (e) { return e.getBoundingClientRect().top - 10; }), bot = low.length ? Math.min.apply(null, low) : window.innerHeight - 14;      /* never over the card of a creature or of a thing */ box.style.left = 'auto'; box.style.right = '14px'; box.style.top = Math.round(top) + 'px'; box.style.maxHeight = Math.max(44, Math.round(bot - top)) + 'px'; box.style.visibility = bot - top < 40 ? 'hidden' : ''; box.style.overflowY = 'auto'; box.style.zIndex = '3'; } else { box.style.left = ''; box.style.right = ''; box.style.top = ''; box.style.maxHeight = ''; } }
     // the heading folds the card away; under it, one line says what the card is
     if (shut === null) { try { shut = !!localStorage.getItem('primordia.versusShut'); } catch (e) { shut = false; } }
     let html = '<div id="vsHead" title="' + (shut ? 'Open' : 'Fold away') + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer"><span class="ilabel" style="margin:0;color:var(--gold)">' + (shut ? 'DANGERS' : 'DANGERS IN THE POND') + '</span><span style="display:flex;align-items:center;gap:6px">' + (shut ? '<small style="padding:1px 8px;border-radius:999px;border:1px solid rgba(255,126,182,.6);color:#ffd3e2">' + order.length + '</small>' : '') + '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;background:rgba(7,18,31,.55);border:1px solid rgba(207,232,255,.25)">' + (shut ? '▸' : '▾') + '</span></span></div>';

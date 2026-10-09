@@ -2,12 +2,12 @@
 (function () {
   'use strict';
   const clamp = G.clamp;
-  const NIN = 12, NOUT = 5, MAXH = 16, MAXP = 6;
+  const NIN = 16, NOUT = 7, MAXH = 32, MAXP = 6;      // (it was 12 senses, 5 actions, 16 cells: a brain that could not sense a knight, a building or its god, nor choose to hit back or to help)
   // the nine things the pond can press for; the body answers each in its own way (see form)
   const PT = ['mouth', 'fin', 'spike', 'armor', 'eye', 'lamp', 'gland', 'tail', 'tentacle'];
   const TAGHUE = [45, 100, 160, 210, 260, 330];
-  const INAMES = ['bias', 'food ahead', 'food beside', 'prey ahead', 'prey beside', 'danger ahead', 'danger beside', 'energy', 'temperature', 'light', 'kin near', 'rhythm'];
-  const ONAMES = ['swim', 'turn', 'sprint', 'glow', 'stick'];
+  const INAMES = ['bias', 'food ahead', 'food beside', 'prey ahead', 'prey beside', 'danger ahead', 'danger beside', 'energy', 'temperature', 'light', 'kin near', 'rhythm', 'armed thing near', 'my kind builds near', 'your voice', 'just hurt'];
+  const ONAMES = ['swim', 'turn', 'sprint', 'glow', 'stick', 'strike', 'help build'];
   Object.assign(G, { NIN, NOUT, MAXH, MAXP, PT, TAGHUE, INAMES, ONAMES });
 
   G.K = Object.assign(G.K, {

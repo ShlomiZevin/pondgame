@@ -8,7 +8,7 @@
   const PAL = G.PAL, el = G.el, $ = G.$, esc = G.escapeHtml;
   const FOOD = ['gold', 'lime', 'green', 'blue', 'violet', 'pink'], FOODCOL = [PAL.gold, '#c9ee7a', PAL.algae, '#8fc7ff', PAL.violet, PAL.rose];
   const SENSE = { 'bias': 'always on', 'kin near': 'family near', 'energy': 'its own energy', 'temperature': 'warmth', 'rhythm': 'inner rhythm' };
-  const ACT = { 'stick': 'stay with family' }, DOING = ['swimming', 'turning', 'sprinting', 'glowing', 'staying with its family'];
+  const ACT = { 'stick': 'stay with family' }, DOING = ['swimming', 'turning', 'sprinting', 'glowing', 'staying with its family', 'striking back', 'wanting to help build'];
   const KMANY = ['legs', 'fins', 'spikes', 'tentacles', 'feelers', 'plates', 'frills', 'horns', 'new growths'];
   let win = null, shownId = 0, raf = 0;
 
@@ -39,7 +39,7 @@
       '<div class="gcols"><div><h3>GENES · WHAT IT IS MADE OF</h3><div id="gbgenes"></div></div>' +
       '<div><h3>BRAIN · WATCH IT THINK</h3><canvas id="gbbrain" width="1160" height="760"></canvas><div class="gsay" id="gbsay"></div>' +
       '<div class="gleg"><span><i style="background:' + PAL.algae + '"></i>a wire that says "do it"</span><span><i style="background:' + PAL.rose + '"></i>a wire that says "do not"</span><span><i style="background:#fff;height:7px"></i>thicker = stronger</span><span><i class="d" style="background:#fff"></i>moving dots = a signal passing right now</span><span><i style="background:' + PAL.gold + ';height:7px"></i>gold edge = changed by what it learned in its life</span></div>' +
-      '<p class="gnote">The wires are genes: a creature is born with them, from both parents, with small changes. During its life it also learns: wires that were in use just before a meal grow stronger, wires in use just before it was hurt or ate what makes it ill grow weaker. What it learned stays its own; its children get the genes, not the lessons.</p></div></div>';
+      '<p class="gnote">The wires are genes: a creature is born with them, from both parents, with small changes. During its life it also learns: wires that were in use just before a meal grow stronger, wires in use just before it was hurt or ate what makes it ill grow weaker. Your GOOD and BAD do the same, more strongly. What it learned is passed on too: its children are born with half of it, and the young pick it up from their elders.</p></div></div>';
     $('gbclose').onclick = function () { G.sfx('click'); close(); };
     win.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
     win.addEventListener('wheel', function (e) { e.stopPropagation(); }, { passive: true });
@@ -65,7 +65,7 @@
   // ── good and bad: nature's own voice ──
   // The player never tells a creature what to do. They can only say GOOD or BAD of what it is doing right now, and that goes straight into its brain as the
   // strongest reward or punishment it knows (G.learn): the wires that were just in use grow stronger or weaker. What it makes of that is its own affair.
-  G.judge = function (c, good) { if (!c || c.dead || !G.learn) return; G.learn(c, good ? 1 : -1); G.learn(c, good ? 1 : -1); c.judged = (c.judged || 0) + (good ? 1 : -1); c.flash = 1; if (good) c.mend = 1; else c.startle = 1; G.emit('judged-by-god', c, good); };
+  G.judge = function (c, good) { if (!c || c.dead || !G.learn) return; G.learn(c, good ? 1 : -1); G.learn(c, good ? 1 : -1); c.judged = (c.judged || 0) + (good ? 1 : -1); c.godV = good ? 1 : -1;      /* and it HEARS it for a few moments (sense 14), so a brain can come to be wired to it */ c.flash = 1; if (good) c.mend = 1; else c.startle = 1; G.emit('judged-by-god', c, good); };
   { const t = setInterval(function () { const b = $('iwhy'); if (!b) return; clearInterval(t); const row = document.createElement('div'); row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px';
       row.innerHTML = '<button class="btn sm" id="igood" title="Tell it that what it is doing right now is good. It will do more of it. It learns; you do not command." style="border-color:rgba(51,214,166,.7);color:#dffbf1">\u2665 GOOD</button><button class="btn sm" id="ibad" title="Tell it that what it is doing right now is bad. It will do less of it." style="border-color:rgba(255,126,182,.7);color:#ffd3e2">\u2715 BAD</button>';
       b.parentNode.insertBefore(row, b); $('igood').onclick = function () { G.sfx('click'); G.judge(G.R.sel, true); }; $('ibad').onclick = function () { G.sfx('click'); G.judge(G.R.sel, false); }; }, 400); }
