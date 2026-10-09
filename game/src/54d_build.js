@@ -39,24 +39,33 @@
     const r = G.rng ? G.rng((o.seed >>> 0) + 17) : Math.random, S = o.S, P = [], sp = o.spiky > 0.5, rich = o.brain;
     const add = function (s, x, y, w, h, m, c) { P.push({ s: s, x: x, y: y, w: w, h: h, m: m, c: c, st: 0 }); };
     const dry = o.wet === false;      // it stands on land, in the air: built as land things are (under water: domes and shells; on land: pitched roofs of reed)
-    const roof = function (x, y, w, h) { if (dry) { add('tri', x, y, w * 1.06, h * 1.7, 1, [34, 52, 50]); add('beam', x, y, w * 1.16, Math.max(4, h * 0.16), 1, [30, 40, 34]); } else if (sp) add('tri', x, y, w, h * 1.5, 1, [20, 60, 52]); else { add('dome', x, y, w, h, 2, [20, 62, 58]); if (o.wet && w > S * 0.5) add('circ', x, y - h, w * 0.16, w * 0.16, 2, [45, 80, 78]); } };
+    const way = ((o.seed >>> 3) % 3 + 3) % 3;      // each building has its own way with roofs
+    const roof = function (x, y, w, h) {
+      if (dry) add('bell', x, y, w * 1.14, h * 1.9, 1, [34, 52, 50]);      // on land: a sweeping roof of thatch, eaves turned up
+      else if (sp) add('tri', x, y, w, h * 1.5, 1, [20, 60, 52]);
+      else if (way === 1) add('cap', x, y, w * 1.2, h * 1.3, 2, [20, 62, 58]);      // under water: a mushroom's cap,
+      else if (way === 2) add('onion', x, y, w * 0.92, h * 1.75, 2, [20, 62, 58]);      // an onion of shell,
+      else { add('dome', x, y, w, h, 2, [20, 62, 58]); if (o.wet && w > S * 0.5) add('circ', x, y - h, w * 0.16, w * 0.16, 2, [45, 80, 78]); }      // or a dome with a bubble on it
+    };
+    const win = function (x, cy, d) { add('window', x, cy + d * 0.65, d * 0.95, d * 1.3, 2, [14, 34, 82]); };      // a window, its middle at cy
+    const fronds = function (hw, hh) { if (o.wet) { add('frond', -hw, 0, S * 0.2, hh, 1, [95, 52, 46]); add('frond', hw, 0, S * 0.2, hh, 1, [95, 52, 46]); } };      // under water, weed grows at its sides
     if (o.type === 'wall') {
       const N = 10 + Math.round(4 * rich), rx = S * 1.05, ry = S * 0.62, posts = [];
       for (let i = 0; i < N; i++) { const a = -Math.PI / 2 + (i + 0.5) / N * TAU, gate = Math.abs(a - Math.PI / 2) < 0.36; posts.push([Math.cos(a) * rx, Math.sin(a) * ry, gate]); }
       posts.sort(function (p, q) { return p[1] - q[1]; });      // the far side first
-      posts.forEach(function (p) { const h = S * (p[2] ? 0.62 : 0.44) * (0.9 + 0.2 * r()), w = S * 0.2; add('rect', p[0], p[1], w, h, 0, [0, 22, 46]); if (sp) add('tri', p[0], p[1] - h, w * 1.1, w * 0.9, 1, [20, 60, 52]); else add('dome', p[0], p[1] - h, w * 1.15, w * 0.6, 2, [20, 62, 60]); });
+      posts.forEach(function (p) { const h = S * (p[2] ? 0.62 : 0.44) * (0.9 + 0.2 * r()), w = S * 0.2; add('rect', p[0], p[1], w, h, 0, [0, 22, 46]); if (sp) add('tri', p[0], p[1] - h, w * 1.1, w * 0.9, 1, [20, 60, 52]); else if (way) add('drop', p[0], p[1] - h, w * 0.95, w * 1.1, 2, [20, 62, 60]); else add('dome', p[0], p[1] - h, w * 1.15, w * 0.6, 2, [20, 62, 60]); });
       add('beam', 0, ry - S * 0.6, S * 0.74, S * 0.08, 1, [35, 65, 58]); add('flag', 0, ry - S * 0.68, S * 0.2, S * 0.3, 1, [0, 85, 60]);
     } else if (o.type === 'huts') {
       const N = 3 + Math.round(2 * rich), huts = [];
       for (let i = 0; i < N; i++) { const a = Math.PI * (0.15 + 0.7 * i / (N - 1)); huts.push([Math.cos(a) * S * 0.95, -Math.sin(a) * S * 0.32 * (i % 2 ? 0.4 : 1)]); }
       huts.sort(function (p, q) { return p[1] - q[1]; });
       huts.forEach(function (p) { const w = S * (0.36 + 0.1 * r()), h = w * 0.62; add('rect', p[0], p[1], w, h, 0, [0, 24, 50]); roof(p[0], p[1] - h, w * 1.25, w * 0.6); add('door', p[0], p[1], w * 0.3, h * 0.62, 1, [0, 30, 16]); });
-      add('circ', 0, S * 0.14, S * 0.28, S * 0.28, 2, [40, 75, 62]);      // the store in the middle
+      add('vase', 0, S * 0.14, S * 0.32, S * 0.38, 2, [40, 75, 62]);      // the store in the middle: a great jar
       if (rich > 0.5) add('flag', 0, -S * 0.14, S * 0.16, S * 0.26, 1, [0, 85, 60]);
     } else if (o.type === 'spire') {
       const N = 4 + Math.round(3 * rich); let y = 0, w = S * 0.5;
       add('rect', 0, 0, w * 1.5, S * 0.14, 0, [0, 20, 40]); y -= S * 0.14;
-      for (let i = 0; i < N; i++) { const h = S * 0.24; add('rect', 0, y, w, h, 0, [0, 24, 48 + 3 * i]); if (i % 2) add('circ', 0, y - h * 0.5, w * 0.24, w * 0.24, 2, [45, 80, 68]); y -= h; w *= 0.88; }
+      for (let i = 0; i < N; i++) { const h = S * 0.24; add('rect', 0, y, w, h, 0, [0, 24, 48 + 3 * i]); if (i % 2) win(0, y - h * 0.5, w * 0.3); y -= h; w *= 0.88; }
       roof(0, y, w * 1.3, w * 0.7); add('lamp', 0, y - (sp ? w * 1.2 : w * 0.75), S * 0.16, S * 0.16, 2, [50, 95, 72]);
       for (let i = 0; i < 4; i++) add('rect', (i - 1.5) * S * 0.42, S * 0.1, S * 0.14, S * 0.12, 0, [0, 18, 44]);
     } else if (o.type === 'port') {      // a spaceport: a wide flat pad on the shore (its middle clear, for a ship to stand on), marked at its edges, with a gantry tower at one side and lights
@@ -76,12 +85,12 @@
       if (sp) add('tri', 0, -eh - bh, bw * 1.04, bw * 0.95, 1, [20, 60, 52]); else add('dome', 0, -eh - bh, bw * 1.04, bw * 0.62, 2, [20, 62, 58]);
       add('lamp', 0, -eh - bh - (sp ? bw * 0.95 : bw * 0.62), S * 0.13, S * 0.13, 2, [50, 95, 72]);
     } else if (o.type === 'house') {      // a small house: walls, a door, a roof, and, for the cleverer, a window and a smoke-hole
-      const w = S * (1.2 + 0.3 * r()), h = S * 0.62; add('rect', 0, 0, w, h, 0, [0, 24, 50]); add('door', -w * 0.18, 0, w * 0.24, h * 0.7, 1, [0, 30, 16]); if (rich > 0.3) add('circ', w * 0.24, -h * 0.3, w * 0.18, w * 0.18, 2, [45, 80, 68]); roof(0, -h, w * 1.2, w * 0.42); if (rich > 0.6) add('rect', w * 0.3, -h - w * 0.1, w * 0.12, w * 0.3, 0, [0, 20, 40]);
+      const w = S * (1.2 + 0.3 * r()), h = S * 0.62; add('rect', 0, 0, w, h, 0, [0, 24, 50]); add('door', -w * 0.18, 0, w * 0.24, h * 0.7, 1, [0, 30, 16]); if (rich > 0.3) win(w * 0.24, -h * 0.5, w * 0.2); roof(0, -h, w * 1.2, w * 0.42); fronds(w * 0.66, h * 1.15); if (rich > 0.6 && dry) add('rect', w * 0.3, -h - w * 0.1, w * 0.12, w * 0.3, 0, [0, 20, 40]);      /* (a chimney: only where there is air for smoke) */
     } else {      // a hall
       const tiers = 2 + Math.round(2 * rich), bh = S * 0.25, W0 = S * 1.15;
       for (let i = 0; i < tiers; i++) { const n = Math.max(1, 4 - i), tw = W0 * (1 - 0.2 * i), bw = tw / n; for (let k = 0; k < n; k++) add('rect', -tw / 2 + bw * (k + 0.5), -i * bh, bw * 0.96, bh, 0, [0, 24, 46 + 4 * i + 3 * (k % 2)]); }
-      add('door', 0, 0, W0 * 0.2, bh * 0.82, 1, [0, 30, 16]);
-      for (let i = 1; i < tiers; i++) { const tw = W0 * (1 - 0.2 * i); add('circ', -tw * 0.25, -i * bh - bh * 0.5, bh * 0.3, bh * 0.3, 2, [45, 80, 68]); add('circ', tw * 0.25, -i * bh - bh * 0.5, bh * 0.3, bh * 0.3, 2, [45, 80, 68]); }
+      add('door', 0, 0, W0 * 0.2, bh * 0.82, 1, [0, 30, 16]); if (o.wet) add('scallop', 0, -bh * 0.86, W0 * 0.26, bh * 0.2, 2, [14, 34, 82]); fronds(W0 * 0.6 + (rich > 0.45 ? S * 0.22 : 0), bh * 1.9);
+      for (let i = 1; i < tiers; i++) { const tw = W0 * (1 - 0.2 * i); win(-tw * 0.25, -i * bh - bh * 0.5, bh * 0.4); win(tw * 0.25, -i * bh - bh * 0.5, bh * 0.4); }
       const topW = W0 * (1 - 0.2 * (tiers - 1)); roof(0, -tiers * bh, topW * 1.12, topW * 0.42);
       if (rich > 0.45) [-1, 1].forEach(function (sd) { const x = sd * W0 * 0.62; add('rect', x, 0, S * 0.2, bh * 1.5, 0, [0, 22, 44]); roof(x, -bh * 1.5, S * 0.26, S * 0.16); });
       add('flag', 0, -tiers * bh - (sp ? topW * 0.6 : topW * 0.42), S * 0.18, S * 0.3, 1, [0, 85, 60]);
@@ -108,14 +117,16 @@
     d.x = clamp(x, hw + 40, W.ww - hw - 40); d.y = clamp(y, lo, hi);
   }
   // ── the shape is theirs to decide ──
-  const SHAPE = { block: 'rect', column: 'rect', slab: 'rect', dome: 'dome', cone: 'tri', ball: 'circ', arch: 'door', beam: 'beam', wing: 'wing', lamp: 'lamp', flag: 'flag' };
+  const SHAPE = { block: 'rect', column: 'rect', slab: 'rect', boulder: 'rect', dome: 'dome', cone: 'tri', ball: 'circ', arch: 'door', beam: 'beam', wing: 'wing', lamp: 'lamp', flag: 'flag',
+    onion: 'onion', bell: 'bell', cap: 'cap', vase: 'vase', drop: 'drop', window: 'window', stairs: 'stairs', span: 'span', scallop: 'scallop', frond: 'frond', spiral: 'spiral' };      // (the second row: rounder, richer shapes; drawn in 54h_look.js)
+  G.LOOK_SHAPES = ['rect', 'tri', 'dome', 'circ', 'door', 'beam', 'wing', 'lamp', 'flag', 'onion', 'bell', 'cap', 'vase', 'drop', 'window', 'stairs', 'span', 'scallop', 'frond', 'spiral'];
   const COL = { main: [0, 55, 55], second: [38, 50, 62], light: [14, 34, 82], dark: [0, 30, 16], glow: [50, 95, 72] };      // their own colour, a neighbour of it, a pale of it: colours that sit together
   /** the pieces of a design, checked: any shape is allowed, but every piece is one the pond knows how to draw, of a sane size, and they go up from the ground */
   G.designFrom = function (raw, S, maxN) {
     const L = raw && Array.isArray(raw.pieces) ? raw.pieces : null; if (!L) return null; const P = [];
     for (let i = 0; i < L.length && P.length < maxN; i++) { const q = L[i] || {}, s = SHAPE[q.s]; if (!s) continue; const x = +q.x, y = +q.y, w = +q.w, h = +q.h; if (![x, y, w, h].every(isFinite)) continue;
       const c = (COL[q.c] || COL.main).slice(); if (q.s === 'slab') c[2] -= 8;
-      P.push({ s: s, x: clamp(x, -1.4, 1.4) * S, y: -clamp(y, 0, 2.8) * S, w: clamp(w, 0.05, 1.8) * S, h: clamp(h, 0.04, 1.4) * S, m: Math.max(0, ['stone', 'reed', 'shell'].indexOf(q.m)), c: c, st: 0, rr: q.s === 'column' ? 0.4 : q.s === 'slab' ? 0.1 : 0 }); }
+      P.push({ s: s, x: clamp(x, -1.4, 1.4) * S, y: -clamp(y, 0, 2.8) * S, w: clamp(w, 0.05, 1.8) * S, h: clamp(h, 0.04, 1.4) * S, m: Math.max(0, ['stone', 'reed', 'shell'].indexOf(q.m)), c: c, st: 0, rr: q.s === 'column' ? 0.4 : q.s === 'boulder' ? 0.46 : q.s === 'slab' ? 0.1 : 0 }); }
     if (P.length < 4) return null;
     P.forEach(function (p, i) { p._i = i; }); P.sort(function (a, b) { return (b.y - a.y) || (a._i - b._i); }); P.forEach(function (p) { delete p._i; });      // from the ground up
     return P;
@@ -130,7 +141,7 @@
     const base = blueprint(d), sp = G.speciesById(d.sp), f = sp && sp.rep ? sp.rep.f : null, r = d.result || {}, house = !!(r.house), maxN = house ? Math.round(6 + 5 * base.brain) : Math.round(12 + 26 * base.brain);
     const near = (W.works || []).filter(function (w) { return w.bp && !w.fall && Math.hypot(w.x - d.x, w.y - d.y) < 900; }).slice(-5).map(function (w) { return { name: w.name, by: w.by, what: w.bp.about || w.looks || '' }; });
     const wet = base.wet !== false, where = r.ship || r.port ? '' : wet ? ' WHERE IT STANDS: UNDER WATER, on the floor of the pond. Build it as underwater things are built: shell, coral and stone; rounded domes and bubbles, arches, fronds and fins that sway in the current; low, wide and anchored to the floor. Nothing that belongs in dry air: no thatch, no chimney, no flag on a pole.' : ' WHERE IT STANDS: ON DRY LAND, in the open air above the water. Build it as land things are built: reed, wood and stone; walls and posts under a pitched or pointed roof that sheds rain, steps, a smoke-hole, a flag. Taller and lighter than what is built under water; no bubbles, no fronds.';
-    const info = { builders: d.kind, body: f && G.form.kind ? G.form.kind(f).full + (G.form.facts ? ': ' + G.form.facts(f).slice(0, 6).join('; ') : '') : '', name: r.name || '', looks: r.looks || '', why: d.why || '', what: d.what || '', purpose: r.port ? 'a SPACEPORT, on dry land at the very edge of the pond: the place their spaceship will be built on and lift off from. The rest is yours to design, but it must have: a wide, low, flat launch PAD lying on the ground (one "slab" about 2 wide and 0.15 high, at x 0, y 0), whose MIDDLE IS LEFT CLEAR (nothing taller than a marking between x -0.65 and x 0.65: the ship will stand there); and whatever else you give it (towers, gantries, masts, lamps, fuel tanks, flags) standing at its SIDES, outside that middle. Open to the sky: no roof over the pad' : r.ship ? 'a SPACESHIP, to fly a few of them through outer space to another pond: a rocket, a saucer or a pod of their own making. It stands in the clear middle of their launch pad, centred on x 0, its foot (legs, fins or engines) flat on the ground at y 0, no wider than 1.1 in all, nose up, ready to lift off: a body they can sit in with round windows, a nose or a dome on top, fins or wings at its sides, engines at the bottom, a light at its tip. It must read at a glance as a spacecraft (NOT a sailing ship: no mast, no sail, no hull on water; and not a house)' : house ? 'a small house for one family of them to sleep in and raise their young: every house of this kind will be built to this same design, side by side, so keep it simple and their own' : r.solid ? 'it shuts others out: only they may pass' : r.feed > 0.05 ? 'it feeds them' : r.pull > 0.1 ? 'it draws them together' : r.hurt > 0.05 ? 'it harms what comes near' : 'a place of their own', where: d.y < (G.shoreY ? G.shoreY(W) : 0) ? 'on the land' : 'under water, on the pond floor', pieces: [Math.round(maxN * 0.55), maxN], near: near, model: G.ai.model || undefined }; info.purpose = String(info.purpose || '') + where;
+    const info = { builders: d.kind, body: f && G.form.kind ? G.form.kind(f).full + (G.form.facts ? ': ' + G.form.facts(f).slice(0, 6).join('; ') : '') : '', name: r.name || '', looks: r.looks || '', why: d.why || '', what: d.what || '', purpose: r.port ? 'a SPACEPORT, on dry land at the very edge of the pond: the place their spaceship will be built on and lift off from. The rest is yours to design, but it must have: a wide, low, flat launch PAD lying on the ground (one "slab" about 2 wide and 0.15 high, at x 0, y 0), whose MIDDLE IS LEFT CLEAR (nothing taller than a marking between x -0.65 and x 0.65: the ship will stand there); and whatever else you give it (towers, gantries, masts, lamps, fuel tanks, flags) standing at its SIDES, outside that middle. Open to the sky: no roof over the pad' : r.ship ? 'a SPACESHIP, to fly a few of them through outer space to another pond: a rocket, a saucer or a pod of their own making. It stands in the clear middle of their launch pad, centred on x 0, its foot (legs, fins or engines) flat on the ground at y 0, no wider than 1.1 in all, nose up, ready to lift off: a body they can sit in with round windows, a nose or a dome on top, fins or wings at its sides, engines at the bottom, a light at its tip. It must read at a glance as a spacecraft (NOT a sailing ship: no mast, no sail, no hull on water; and not a house)' : house ? 'a small house for one family of them to sleep in and raise their young: every house of this kind will be built to this same design, side by side, so keep it simple and their own' : r.solid ? 'it shuts others out: only they may pass' : r.feed > 0.05 ? 'it feeds them' : r.pull > 0.1 ? 'it draws them together' : r.hurt > 0.05 ? 'it harms what comes near' : 'a place of their own', where: d.y < (G.shoreY ? G.shoreY(W) : 0) ? 'on the land' : 'under water, on the pond floor', pieces: [Math.round(maxN * 0.55), maxN], near: near, model: G.ai.model || undefined }; info.where = where.replace(/^ WHERE IT STANDS: /, '');
     d.design = null;
     G.host.call('ai.build', info, 60000).then(function (res) { G.ai.tally('deed', res && res.source, res && res.usd); if (G.W !== W || W.deed !== d || d.bp) return; const P = res && res.build ? G.designFrom(res.build, base.S, maxN) : null; if (!P) { d.design = false; return; } if (house) { (W.houseStyle = W.houseStyle || {})[styleKey(d.sp, base.wet)] = { about: String(res.build.about || '').slice(0, 120), pieces: res.build.pieces.slice(0, 14) }; } base.P = P; base.designed = true; fit(base, W); settle(base, true); base.about = String(res.build.about || '').replace(/[<>]/g, '').slice(0, 120); d.design = base; }, function () { if (W.deed === d) d.design = false; });
   }
@@ -145,7 +156,7 @@
     o.P = plan(o); fit(o, W); settle(o, true); return o;      // (the fallback shape: used when the kind's own design cannot be had)
   }
   G.blueprintPack = function (bp) { return bp.designed ? { about: bp.about || '', P: bp.P.map(function (p) { return [p.s, Math.round(p.x), Math.round(p.y), Math.round(p.w), Math.round(p.h), p.m, p.c[0], p.c[1], p.c[2], p.rr || 0]; }) } : null; };
-  G.blueprintUnpack = function (bp, pk, states) { if (!pk || !Array.isArray(pk.P)) return bp; const ok = ['rect', 'tri', 'dome', 'circ', 'door', 'beam', 'wing', 'lamp', 'flag']; const P = pk.P.slice(0, 60).filter(function (q) { return Array.isArray(q) && ok.indexOf(q[0]) >= 0; }).map(function (q, i) { return { s: q[0], x: clamp(+q[1] || 0, -400, 400), y: clamp(+q[2] || 0, -600, 0), w: clamp(+q[3] || 10, 2, 500), h: clamp(+q[4] || 10, 2, 400), m: clamp(q[5] | 0, 0, 2), c: [+q[6] || 0, clamp(+q[7] || 50, 0, 100), clamp(+q[8] || 50, 0, 100)], rr: +q[9] || 0, st: clamp(+String(states || '').charAt(i) || 0, 0, 2) }; }); if (P.length >= 4) { bp.P = P; bp.dep = null; bp.designed = true; bp.about = String(pk.about || '').replace(/[<>]/g, '').slice(0, 120); } return bp; };
+  G.blueprintUnpack = function (bp, pk, states) { if (!pk || !Array.isArray(pk.P)) return bp; const ok = G.LOOK_SHAPES; const P = pk.P.slice(0, 60).filter(function (q) { return Array.isArray(q) && ok.indexOf(q[0]) >= 0; }).map(function (q, i) { return { s: q[0], x: clamp(+q[1] || 0, -400, 400), y: clamp(+q[2] || 0, -600, 0), w: clamp(+q[3] || 10, 2, 500), h: clamp(+q[4] || 10, 2, 400), m: clamp(q[5] | 0, 0, 2), c: [+q[6] || 0, clamp(+q[7] || 50, 0, 100), clamp(+q[8] || 50, 0, 100)], rr: +q[9] || 0, st: clamp(+String(states || '').charAt(i) || 0, 0, 2) }; }); if (P.length >= 4) { bp.P = P; bp.dep = null; bp.designed = true; bp.about = String(pk.about || '').replace(/[<>]/g, '').slice(0, 120); } return bp; };
   G.blueprintFrom = function (o, states) { const bp = { seed: o.seed, type: o.type, S: o.S, hue: o.hue, spiky: o.spiky, brain: o.brain, wet: o.wet }; bp.P = plan(bp); settle(bp, true); if (typeof states === 'string') for (let i = 0; i < bp.P.length; i++) bp.P[i].st = clamp(+states.charAt(i) || 0, 0, 2); return bp; };
   // what the creatures build is drawn by the game, so no picture is asked of the AI for it
   if (G.figureFor) { const f0 = G.figureFor; G.figureFor = function (info, typed) { if (info && /Built by small pond creatures/.test(String(info.note || ''))) return Promise.resolve(null); return f0(info, typed); }; }
@@ -214,6 +225,7 @@
   }
   /** What rests on what. A piece stands on the ground, or on a piece under it, or is fixed to the face of a piece it lies within (a door, a window). With
    *  `fix`, a piece that rests on nothing is let down until it does: a builder's plain sense, applied to a design that forgot it. */
+  const HOST = { rect: 1, dome: 1, vase: 1, drop: 1, onion: 1, bell: 1, cap: 1, tri: 1 };      // a window, a door or an ornament may be fixed to the face of any of these
   function settle(bp, fix) {
     if (bp.type === 'wall' && !bp.designed) { bp.dep = bp.P.map(function () { return []; }); bp.loose = 0; bp.hw = halfW(bp); return bp; }      /* (the ring of posts is drawn in depth, far side first: its pieces all stand on the ground) */
     const P = bp.P, S = bp.S, tol = S * 0.09, foot = function (p) { return p.s === 'lamp' ? -p.y - p.w / 2 : -p.y; }, top = function (p) { return p.s === 'lamp' ? -p.y + p.w / 2 : -p.y + p.h; };
@@ -222,7 +234,7 @@
     for (let q = 0; q < order.length; q++) { const i = order[q], p = P[i], fy = foot(p); let dep = [];
       if (fy > tol) {
         for (let k = 0; k < done.length; k++) { const j = done[k], o = P[j]; if (Math.abs(top(o) - fy) <= tol && over(p, o) > Math.min(p.w, o.w) * 0.15) dep.push(j); }
-        if (!dep.length) for (let k = 0; k < done.length; k++) { const j = done[k], o = P[j]; if (Math.abs(p.x - o.x) < o.w / 2 && fy >= foot(o) - tol && fy < top(o) && (o.s === 'rect' || o.s === 'dome')) { dep.push(j); break; } }      /* fixed to the face of the piece it lies within */
+        if (!dep.length) for (let k = 0; k < done.length; k++) { const j = done[k], o = P[j]; if (Math.abs(p.x - o.x) < o.w / 2 && fy >= foot(o) - tol && fy < top(o) && HOST[o.s]) { dep.push(j); break; } }      /* fixed to the face of the piece it lies within */
         if (!dep.length) { loose++; if (fix) { let best = -1, bt = 0; for (let k = 0; k < done.length; k++) { const j = done[k], o = P[j]; if (over(p, o) > Math.min(p.w, o.w) * 0.15 && top(o) <= fy + tol && top(o) > bt) { bt = top(o); best = j; } } const drop = fy - bt; p.y += drop; moved++; if (best >= 0) dep.push(best); } }
       }
       bp.dep[i] = dep; done.push(i); }
@@ -368,6 +380,7 @@
   };
   G.on('scored', function () { try { G.placeLook(false); } catch (e) { console.error(e); } });
   function piece(ctx, p, hue, t) {
+    if (G.pieceDraw) return G.pieceDraw(ctx, p, hue, t);      // (how a piece looks: 54h_look.js; what follows is the plain drawing it replaced)
     const age0 = t - (p.t0 || -9), age = age0 < 0 ? 9 : age0, pop = age < 0.3 ? 0.6 + 0.4 * (age / 0.3) + 0.15 * Math.sin(age * 10.5) : 1, mc = MAT[p.um === undefined ? p.m : p.um].col;
     const raw = hsl(mc[0], mc[1], mc[2]), fin = p.c[2] < 20 ? hsl(hue, 30, p.c[2]) : hsl(hue + p.c[0], p.c[1], p.c[2]), fill = p.st > 1 ? fin : raw, w = p.w * pop, h = p.h * pop;
     ctx.fillStyle = fill; ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.beginPath();
