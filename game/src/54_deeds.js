@@ -98,7 +98,7 @@
       const f = G.addField(G.cleanFields([{ name: r.name, stuff: r.stuff, shape: r.solid ? 'ring' : r.shape, x: d.x / W.ww, y: d.y / W.wh, r: r.size, width: 0.1, solid: r.solid, feed: r.feed, slow: r.slow, hurt: Math.min(r.hurt, 0.5), pull: r.pull, life: r.life }])[0]);
       if (f) { f.spare = d.sp; f.quiet = true; }                                                  // it is theirs: it does not harm them
       made = { name: r.name, looks: r.looks, x: d.x, y: d.y, r: Math.min(r.size * m, 150), until: W.t + r.life, by: d.kind, hue: d.hue, field: f ? f.id : 0, plan: d.title, what: d.what, why: d.why, gen: W.gen };
-      (W.works = W.works || []).push(made); if (W.works.length > 6) W.works.shift();
+      (W.works = W.works || []).push(made); if (W.works.length > 12) W.works.shift();
       if (G.figureFor) G.figureFor({ name: r.name, note: r.looks + ' Built by small pond creatures.', hue: d.hue }, r.looks).then(function (fig) { made.fig = fig || null; });
     }
     G.emit('deed-end', d, how, made);
@@ -165,7 +165,7 @@
     const label = function (x, y, a, b, hue) { ctx.save(); ctx.translate(x, y); ctx.scale(inv, inv); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 12.5px system-ui, sans-serif'; const w1 = ctx.measureText(a).width; ctx.font = '600 10.5px system-ui, sans-serif'; const tw = Math.max(w1, ctx.measureText(b).width) + 22; ctx.fillStyle = 'rgba(9,28,40,0.9)'; ctx.beginPath(); ctx.rect(-tw / 2, -21, tw, 42); ctx.fill(); ctx.strokeStyle = G.hsl(hue, 85, 68, 0.9); ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = '700 12.5px system-ui, sans-serif'; ctx.fillText(a, 0, -8); ctx.fillStyle = '#f6d365'; ctx.font = '600 10.5px system-ui, sans-serif'; ctx.fillText(b, 0, 9); ctx.restore(); };
     // what they have built
     const Wk = W.works || [];
-    for (let i = 0; i < Wk.length; i++) { const w = Wk[i], fade = clamp((w.until - W.t) / 12, 0, 1); ctx.globalAlpha = fade; if (w.bp && G.drawBlueprint) G.drawBlueprint(ctx, w, false); else if (w.fig && G.drawFigure) { const mw = Math.min(w.r * 1.5, 190), k = mw / 200; ctx.save(); ctx.translate(w.x, w.y + mw * 0.55); ctx.scale(k, k); G.drawFigure(ctx, w.fig, { p: {}, bite: 0, _fc: 1 }, 0); ctx.restore(); } else mound(ctx, w.x, w.y + w.r * 0.5, w.r, w.hue, 1); ctx.globalAlpha = 1; label(w.x, w.y - Math.min(w.r * 1.5, 190) * 0.7 - 34, w.name, 'built by the ' + w.by, w.hue); }
+    for (let i = 0; i < Wk.length; i++) { const w = Wk[i], fade = clamp((w.until - W.t) / 12, 0, 1); ctx.globalAlpha = fade; if (w.bp && G.drawBlueprint) G.drawBlueprint(ctx, w, false); else if (w.fig && G.drawFigure) { const mw = Math.min(w.r * 1.5, 190), k = mw / 200; ctx.save(); ctx.translate(w.x, w.y + mw * 0.55); ctx.scale(k, k); G.drawFigure(ctx, w.fig, { p: {}, bite: 0, _fc: 1 }, 0); ctx.restore(); } else mound(ctx, w.x, w.y + w.r * 0.5, w.r, w.hue, 1); ctx.globalAlpha = 1; { let up = 0; for (let q = 0; q < i; q++) if (Math.abs(Wk[q].x - w.x) < 190 && Math.abs(Wk[q].y - w.y) < 120) up++; w._up = up; } label(w.x, w.y - Math.min(w.r * 1.5, 190) * 0.7 - 34 - 46 * inv * (w._up || 0), w.name, 'built by the ' + w.by, w.hue); }
     const d = W.deed;
     if (d) {
       const st = d.steps[d.i], M = members(d), R = d.result ? d.result.size * Math.min(W.ww, W.wh) : 60;

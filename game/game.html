@@ -8192,7 +8192,7 @@ G.addSystem({
   function drawStrip() {
     if (!strip) return;
     const on = G.mode === 'play' && G.W && !G.W.title, L = on ? now().list : [];
-    if (on && G.W.fields) for (let i = 0; i < G.W.fields.length; i++) { const f = G.W.fields[i], coming = G.W.t < f.start; L.push({ name: f.name, left: coming ? f.start - G.W.t : f.life, of: coming ? Math.max(1, f.after) : f.life0, does: coming ? 'coming' : (G.fieldWords ? G.fieldWords(f) : '') }); }
+    if (on && G.W.fields) for (let i = 0; i < G.W.fields.length; i++) { if (G.W.fields[i].hidden) continue; const f = G.W.fields[i], coming = G.W.t < f.start; L.push({ name: f.name, left: coming ? f.start - G.W.t : f.life, of: coming ? Math.max(1, f.after) : f.life0, does: coming ? 'coming' : (G.fieldWords ? G.fieldWords(f) : '') }); }
     document.body.classList.toggle('wxon', L.length > 0);
     const wish = document.getElementById('wish'), below = wish && !wish.classList.contains('hide') && window.innerWidth > 720 ? Math.round(wish.getBoundingClientRect().bottom) + 6 : 14;
     if (window.innerWidth > 720) strip.style.top = below + 'px'; else strip.style.top = '';
@@ -8441,6 +8441,7 @@ G.addSystem({
     for (let i = 0; i < SC.length; i++) { const q = SC[i], age = W.t - q.t; if (age > 14) continue; const a = 1 - age / 14; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * 0.8, 0, TAU); ctx.fillStyle = 'rgba(8,10,16,' + 0.35 * a + ')'; ctx.fill(); if (age < 0.7) { ctx.beginPath(); ctx.arc(q.x, q.y, q.r * (0.3 + age * 2.2), 0, TAU); ctx.strokeStyle = G.hsl(q.hue, 95, 75, 1 - age / 0.7); ctx.lineWidth = 9 * (1 - age / 0.7) + 1; ctx.stroke(); ctx.beginPath(); ctx.arc(q.x, q.y, q.r * 0.9, 0, TAU); ctx.fillStyle = G.hsl(q.hue, 100, 85, 0.75 * (1 - age / 0.7)); ctx.fill(); } }
     for (let i = 0; i < ST.length; i++) { const q = ST[i], left = q.t - W.t; if (left > 1.2 || left < 0) continue; const r = q.r * m; ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, TAU); ctx.strokeStyle = G.hsl(q.hue, 95, 70, 0.4 + 0.5 * (1 - left / 1.2)); ctx.lineWidth = 2.5; ctx.setLineDash([8, 7]); ctx.stroke(); ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(q.x + left * 260, q.y - left * 700); ctx.lineTo(q.x + left * 300, q.y - left * 800); ctx.strokeStyle = G.hsl(q.hue, 100, 80, 0.9); ctx.lineWidth = 5; ctx.stroke(); }
     for (let k = 0; k < F.length; k++) {
+      if (F[k].hidden) continue;      /* what it does is carried by a building the creatures raised, which is drawn as itself (54d_build.js) */
       const f = F[k], coming = W.t < f.start, sat = SAT[f.stuff] === undefined ? 78 : SAT[f.stuff], hp = clamp(f.life / f.life0, 0, 1), rr = G.rng ? G.rng(f.id * 977 + 13) : Math.random;
       const body = G.hsl(f.hue, sat, f.stuff === 'dark' ? 10 : 62, 1), light = G.hsl(f.hue, sat, f.stuff === 'dark' ? 30 : 84, 1);
       if (coming) { path(ctx, f, W); ctx.strokeStyle = G.hsl(f.hue, sat, 78, 0.45 + 0.35 * Math.sin(t * 7)); ctx.lineWidth = 3; ctx.setLineDash([10, 9]); ctx.stroke(); ctx.setLineDash([]); }
@@ -8584,7 +8585,7 @@ G.addSystem({
       const f = G.addField(G.cleanFields([{ name: r.name, stuff: r.stuff, shape: r.solid ? 'ring' : r.shape, x: d.x / W.ww, y: d.y / W.wh, r: r.size, width: 0.1, solid: r.solid, feed: r.feed, slow: r.slow, hurt: Math.min(r.hurt, 0.5), pull: r.pull, life: r.life }])[0]);
       if (f) { f.spare = d.sp; f.quiet = true; }                                                  // it is theirs: it does not harm them
       made = { name: r.name, looks: r.looks, x: d.x, y: d.y, r: Math.min(r.size * m, 150), until: W.t + r.life, by: d.kind, hue: d.hue, field: f ? f.id : 0, plan: d.title, what: d.what, why: d.why, gen: W.gen };
-      (W.works = W.works || []).push(made); if (W.works.length > 6) W.works.shift();
+      (W.works = W.works || []).push(made); if (W.works.length > 12) W.works.shift();
       if (G.figureFor) G.figureFor({ name: r.name, note: r.looks + ' Built by small pond creatures.', hue: d.hue }, r.looks).then(function (fig) { made.fig = fig || null; });
     }
     G.emit('deed-end', d, how, made);
@@ -8651,7 +8652,7 @@ G.addSystem({
     const label = function (x, y, a, b, hue) { ctx.save(); ctx.translate(x, y); ctx.scale(inv, inv); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 12.5px system-ui, sans-serif'; const w1 = ctx.measureText(a).width; ctx.font = '600 10.5px system-ui, sans-serif'; const tw = Math.max(w1, ctx.measureText(b).width) + 22; ctx.fillStyle = 'rgba(9,28,40,0.9)'; ctx.beginPath(); ctx.rect(-tw / 2, -21, tw, 42); ctx.fill(); ctx.strokeStyle = G.hsl(hue, 85, 68, 0.9); ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = '700 12.5px system-ui, sans-serif'; ctx.fillText(a, 0, -8); ctx.fillStyle = '#f6d365'; ctx.font = '600 10.5px system-ui, sans-serif'; ctx.fillText(b, 0, 9); ctx.restore(); };
     // what they have built
     const Wk = W.works || [];
-    for (let i = 0; i < Wk.length; i++) { const w = Wk[i], fade = clamp((w.until - W.t) / 12, 0, 1); ctx.globalAlpha = fade; if (w.bp && G.drawBlueprint) G.drawBlueprint(ctx, w, false); else if (w.fig && G.drawFigure) { const mw = Math.min(w.r * 1.5, 190), k = mw / 200; ctx.save(); ctx.translate(w.x, w.y + mw * 0.55); ctx.scale(k, k); G.drawFigure(ctx, w.fig, { p: {}, bite: 0, _fc: 1 }, 0); ctx.restore(); } else mound(ctx, w.x, w.y + w.r * 0.5, w.r, w.hue, 1); ctx.globalAlpha = 1; label(w.x, w.y - Math.min(w.r * 1.5, 190) * 0.7 - 34, w.name, 'built by the ' + w.by, w.hue); }
+    for (let i = 0; i < Wk.length; i++) { const w = Wk[i], fade = clamp((w.until - W.t) / 12, 0, 1); ctx.globalAlpha = fade; if (w.bp && G.drawBlueprint) G.drawBlueprint(ctx, w, false); else if (w.fig && G.drawFigure) { const mw = Math.min(w.r * 1.5, 190), k = mw / 200; ctx.save(); ctx.translate(w.x, w.y + mw * 0.55); ctx.scale(k, k); G.drawFigure(ctx, w.fig, { p: {}, bite: 0, _fc: 1 }, 0); ctx.restore(); } else mound(ctx, w.x, w.y + w.r * 0.5, w.r, w.hue, 1); ctx.globalAlpha = 1; { let up = 0; for (let q = 0; q < i; q++) if (Math.abs(Wk[q].x - w.x) < 190 && Math.abs(Wk[q].y - w.y) < 120) up++; w._up = up; } label(w.x, w.y - Math.min(w.r * 1.5, 190) * 0.7 - 34 - 46 * inv * (w._up || 0), w.name, 'built by the ' + w.by, w.hue); }
     const d = W.deed;
     if (d) {
       const st = d.steps[d.i], M = members(d), R = d.result ? d.result.size * Math.min(W.ww, W.wh) : 60;
@@ -8975,20 +8976,23 @@ G.addSystem({
       const P = w.bp.P;
       // other kinds: a fierce band of strangers at a building that its own kind is not there to hold knocks it about and takes what they find
       { let foes = 0, mine = 0, who = 0; const S = w.bp.S; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (c.dead) continue; const dd = Math.hypot(c.x - w.x, c.y - w.y); if (c.sp === w.sp) { if (dd < S * 2.4) mine++; } else if (dd < S * 1.6 && (c.ph.aggro || 0) > 0.38) { foes++; who = c.sp; c.E = Math.min(c.ph.Emax, c.E + 2); } }
-        if (foes >= 3 && foes > mine && !w.fall) { for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { P[k].st = 0; G.emit('build-fall', w, P[k]); break; } const sp = G.speciesById(who); w.hitBy = 'A band of ' + (sp ? sp.name : 'strangers'); w.hitGen = W.gen; w.dmg = 1; if (!w.raided && G.mode === 'play' && G.log) { w.raided = true; G.log('sel', w.name + ' is raided', w.hitBy + ' is knocking it about while its builders are away.'); } continue; } }
+        if (foes >= 4 && foes > mine + 1 && !w.fall && (w.raidT = (w.raidT || 0) + 1) % 2 === 0) { for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { P[k].st = 0; G.emit('build-fall', w, P[k]); break; } const sp = G.speciesById(who); w.hitBy = 'A band of ' + (sp ? sp.name : 'strangers'); w.hitGen = W.gen; w.dmg = 1; if (!w.raided && G.mode === 'play' && G.log) { w.raided = true; G.log('sel', w.name + ' is raided', w.hitBy + ' is knocking it about while its builders are away.'); } continue; } }
       if (w.shun && !w.fall) { w.shunT = (w.shunT || 0) + 1; if (w.shunT % 3 === 0) { for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { P[k].st = 0; G.emit('build-fall', w, P[k]); break; } } if (count(w.bp)[0] === 0) { Wk.splice(i, 1); G.emit('work-gone', w); } continue; }      /* the one the watcher found spoils the place is left to fall */
+      if (kin < 3) { let heir = null; for (let k = 0; k < W.species.length; k++) { const s = W.species[k]; if (!s.extinct && s.n >= 3 && s.parent === w.sp && (!heir || s.n > heir.n)) heir = s; }      /* the builders' kind has changed or gone: their descendants keep it; failing them, whoever lives round it */
+        if (!heir) { const near = {}; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (!c.dead && c.sp && Math.hypot(c.x - w.x, c.y - w.y) < w.bp.S * 3.2) near[c.sp] = (near[c.sp] || 0) + 1; } let b = 0; for (const id in near) if (near[id] >= 3 && near[id] > b) { b = near[id]; heir = G.speciesById(+id); } }
+        if (heir) { w.sp = heir.id; w.keptBy = heir.name; kin = heir.n; } }
       w.lone = kin < 3 ? (w.lone || 0) + 1 : 0;      /* (kinds are sorted afresh each autumn: a short gap in the count is not the end of them) */
-      if (w.fall || w.lone > 8) { let top = -1; for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { top = k; break; } if (top >= 0) { P[top].st = 0; G.emit('build-fall', w, P[top]); if (!w.fall && !w.ruin) { w.ruin = true; G.emit('work-ruin', w); } } }
+      if (w.fall || (w.lone > 24 && w.lone % 3 === 0)) { let top = -1; for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { top = k; break; } if (top >= 0) { P[top].st = 0; G.emit('build-fall', w, P[top]); if (!w.fall && !w.ruin) { w.ruin = true; G.emit('work-ruin', w); } } }
       else if (!(w.dmg > 0 && W.gen === w.hitGen)) { for (let k = 0; k < P.length; k++) if (P[k].st < 2) { P[k].st++; P[k].t0 = W.t; break; } }      // its keepers mend and colour it
       const n = count(w.bp);
       if (n[0] === 0) { Wk.splice(i, 1); G.emit('work-gone', w); continue; }
-      const F = W.fields || []; for (let k = 0; k < F.length; k++) if (F[k].id === w.field) { if (n[0] >= n[2] * 0.6 && !w.fall) F[k].life = Math.max(F[k].life, 30); else F[k].life = Math.min(F[k].life, 6); }      // it does what it was built for while most of it stands
+      const F = W.fields || []; for (let k = 0; k < F.length; k++) if (F[k].id === w.field || (!w.field && F[k].name === w.name)) { w.field = F[k].id; F[k].hidden = true; if (n[0] >= n[2] * 0.6 && !w.fall) F[k].life = Math.max(F[k].life, 30); else F[k].life = Math.min(F[k].life, 6); }      // it does what it was built for while most of it stands
     }
   }
   /** nature strikes a building down: it falls piece by piece */
   G.razeWork = function (w) { if (w && w.bp) { w.fall = true; w.upT = 0; } };
   if (G.on) {
-    G.on('deed-end', function (d, how, made) { if (made && d.bp) { made.bp = d.bp; made.sp = d.sp; made.until = (G.W ? G.W.t : 0) + 9999; } });
+    G.on('deed-end', function (d, how, made) { if (made && d.bp) { made.bp = d.bp; made.sp = d.sp; { const F = (G.W && G.W.fields) || []; for (let k = 0; k < F.length; k++) if (F[k].id === made.field) F[k].hidden = true; } made.until = (G.W ? G.W.t : 0) + 9999; } });
     G.on('new-pond', function () { if (G.W) G.W.mats = null; });
   }
   { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (!W || W.title) return; matsStep(W, dt); const d = W.deed; if (d && d.result && d.steps[d.i] && d.steps[d.i].do === 'build') buildStep(W, d, dt); worksStep(W, dt); }; }
@@ -9023,6 +9027,25 @@ G.addSystem({
     return true;
   };
   G.on('scored', function () { try { G.placeLook(false); } catch (e) { console.error(e); } });
+  // ── a kind makes itself a home ──
+  // Besides what a kind may take into its head (the plans the AI imagines for it), an established kind builds for itself, with nobody asked: the first thing is
+  // a place of its own, and what it builds follows from how it is faring: hungry, it builds huts round a store; among fierce strangers or armed things, a
+  // wall; otherwise a hall, and later a tower beside it. One more for every forty generations the kind has lasted, up to four. So a pond fills, slowly, with
+  // what its creatures made, and each kind's quarter is its own. (It costs nothing: the plan of pieces is worked out by the game.)
+  G.on('scored', function () {
+    const W = G.W; if (!W || W.title || W.deed || G.mode !== 'play' || W.gen < 12 || (W.works || []).length >= 10 || G.rand() > 0.3) return;
+    const kinds = W.species.filter(function (s) { return !s.extinct && s.n >= 10 && W.gen - s.born >= 6; }); if (!kinds.length) return;
+    let fierce = 0, armed = 0; for (let i = 0; i < W.cre.length; i++) if ((W.cre[i].ph.aggro || 0) > 0.38) fierce++; for (let i = 0; i < W.zones.length; i++) if (W.zones[i].act && W.zones[i].foe) armed++;
+    for (let k = 0; k < kinds.length; k++) { const s = kinds[(k + W.gen) % kinds.length], mine = (W.works || []).filter(function (w) { return w.bp && w.sp === s.id; }), may = Math.min(4, 1 + Math.floor((W.gen - s.born) / 40)); if (mine.length >= may) continue;
+      let e = 0, n = 0, x = 0, y = 0, own = 0; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.sp !== s.id) continue; e += c.E / c.ph.Emax; x += c.x; y += c.y; n++; if ((c.ph.aggro || 0) > 0.38) own++; } if (n < 8) continue;
+      const has = function (t) { return mine.some(function (w) { return w.bp.type === t; }); }, threatened = armed > 0 || fierce - own > W.cre.length * 0.3, hungry = e / n < 0.5;
+      const type = !mine.length ? (hungry ? 'huts' : 'hall') : threatened && !has('wall') ? 'wall' : hungry && !has('huts') ? 'huts' : !has('spire') ? 'spire' : !has('huts') ? 'huts' : !has('hall') ? 'hall' : 'wall', nw = String(s.name).split(' '), first = nw.length >= 3 ? nw[nw.length - 2] : nw[0];      /* first a place of their own; then what they are short of */
+      const name = first + ' ' + { wall: 'Ring', huts: 'Huts', hall: 'Hall', spire: 'Tower' }[type], why = type === 'wall' ? (armed ? 'something armed is loose in the pond' : 'fierce strangers are all about them') : type === 'huts' ? 'they are going hungry' : mine.length ? 'their place has room for more' : 'they have no place of their own';
+      G.deedStart({ kind: s.name, title: name, say: '', what: 'build ' + (type === 'wall' ? 'a ring of posts to live inside' : type === 'huts' ? 'huts round a store of food' : type === 'hall' ? 'a hall to gather in' : 'a tower to be seen from afar'), why: why, share: 0.6, own: true,
+        steps: [{ do: 'gather', secs: 5, cry: '' }, { do: 'build', secs: 34, cry: '' }], place: { x: clamp(x / n / W.ww, 0.12, 0.88), y: clamp(y / n / W.wh, 0.3, 0.85) },
+        result: { name: name, looks: 'made of what lay about the pond', stuff: 'rock', shape: 'circle', size: 0.075, solid: type === 'wall', feed: type === 'huts' ? 0.25 : 0, slow: 0, hurt: 0, pull: type === 'spire' ? 0.2 : type === 'hall' ? 0.12 : 0, life: 240 } });
+      return; }
+  });
   function piece(ctx, p, hue, t) {
     const age = t - (p.t0 || -9), pop = age < 0.3 ? 0.6 + 0.4 * (age / 0.3) + 0.15 * Math.sin(age * 10.5) : 1, mc = MAT[p.um === undefined ? p.m : p.um].col;
     const raw = hsl(mc[0], mc[1], mc[2]), fin = p.c[2] < 20 ? hsl(hue, 30, p.c[2]) : hsl(hue + p.c[0], p.c[1], p.c[2]), fill = p.st > 1 ? fin : raw, w = p.w * pop, h = p.h * pop;
@@ -9056,6 +9079,7 @@ G.addSystem({
   // the materials lie under everything else that is drawn in the water; what a builder hauls rides above its head
   { const f0 = G.drawFields; G.drawFields = function (ctx) {
       const W = G.W;
+      if (W && W.works && W.fields) for (let i = 0; i < W.works.length; i++) { const w = W.works[i]; if (!w.bp) continue; for (let k = 0; k < W.fields.length; k++) if (W.fields[k].id === w.field || W.fields[k].name === w.name) W.fields[k].hidden = true; }      /* a building is drawn as itself: the patch of water that carries what it does is not drawn as well */
       if (W && !W.title && W.mats && G.mode === 'play') { const v = G.view, s = v.scale * v.dpr; if (v.scale > 0.22) { const x0 = -v.ox / v.scale - 20, y0 = -v.oy / v.scale - 20, x1 = x0 + v.w / v.scale + 40, y1 = y0 + v.h / v.scale + 40, t = G.rt || 0; ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (q.x > x0 && q.x < x1 && q.y > y0 && q.y < y1) matDraw(ctx, q, t); } ctx.restore(); } }
       if (f0) f0(ctx);
     }; }
@@ -9214,7 +9238,7 @@ G.addSystem({
     st.textContent = '#rarebox{position:fixed;left:14px;top:50%;transform:translateY(-50%);width:min(340px,calc(100vw - 28px));padding:10px 12px 12px;border-radius:18px;z-index:2;font:500 12.5px/1.45 system-ui,sans-serif;color:#eaf4ff;max-height:54vh;overflow-y:auto;scrollbar-width:thin}' +
       '#rarebox.shut{width:auto;padding:7px 10px 7px 12px;border-radius:999px}' +
       '#rarebox .rk{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;min-height:28px}#rarebox .rk>span:first-child{font:800 10.5px system-ui,sans-serif;letter-spacing:.16em;color:#f6d365;text-transform:uppercase;white-space:nowrap}' +
-      '#rarebox .rc{display:flex;align-items:center;gap:5px}#rarebox .rc em{font:700 10.5px system-ui,sans-serif;font-style:normal;padding:2px 8px;border-radius:999px;background:rgba(246,211,101,.16);border:1px solid rgba(246,211,101,.55);color:#ffe9a8;white-space:nowrap}' +
+      '#rarebox{overflow-x:hidden}#rarebox:not(.shut) .rc em{display:none}#rarebox .rc{display:flex;align-items:center;gap:5px;min-width:0}#rarebox .rc em{font:700 10.5px system-ui,sans-serif;font-style:normal;padding:2px 8px;border-radius:999px;background:rgba(246,211,101,.16);border:1px solid rgba(246,211,101,.55);color:#ffe9a8;white-space:nowrap}' +
       '#rarebox .rk u{text-decoration:none;display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;font-size:11px}#rarebox .rk:hover u{background:rgba(255,255,255,.22)}' +
       '#rarebox .rh{font:800 9px system-ui,sans-serif;letter-spacing:.16em;color:#8fb2d6;text-transform:uppercase;margin:11px 2px 5px}' +
       '#rarebox .rrow{position:relative;display:flex;gap:10px;align-items:flex-start;padding:9px 26px 10px 9px;margin-top:6px;border-radius:13px;cursor:pointer;background:rgba(7,18,31,.38);border:1px solid rgba(207,232,255,.12);transition:background .15s,border-color .15s}#rarebox .rrow:hover{background:rgba(246,211,101,.1);border-color:rgba(246,211,101,.5)}' +
@@ -10885,7 +10909,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       h = head(fp ? '<img alt="" width="64" height="64" style="flex:none;border-radius:14px;background:rgba(7,18,31,.55);padding:4px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(fp) + '">' : blob(o.hue || 50), o.name, cap(dot(o.looks)), 'Built by the ' + o.by + ' in generation ' + o.gen) +
         '<div class="ilabel">What it does</div><small>' + (does ? esc(cap(does)) + '. It does not harm those who built it.' : 'It stands as their mark.') + '</small>' +
         (o.bp ? (function () { const n = G.buildCount(o); return meter('How much of it stands', n[0] / n[2]) + '<small>' + n[0] + ' of ' + n[2] + ' pieces stand, ' + n[1] + ' coloured.' + (o.ruin ? ' <span style="color:var(--rose)">Its builders are gone: it is crumbling.</span>' : ' Its builders keep it up for as long as their kind lives.') + '</small>'; })() : meter('Time left', left / Math.max(1, (f && f.life0) || 120))) +
-        facts([o.plan ? '<b>The plan:</b> ' + esc(o.plan) + '.' : '', o.hitBy ? '<span style="color:var(--rose)">' + esc(o.hitBy) + ' has been knocking pieces off it.</span>' : '', o.shun ? '<span style="color:var(--rose)">The watcher found it spoils the pond as a place: it is no longer kept up.</span>' : '', W.place ? 'The pond as a place, by the watcher: <b>' + (W.place.order * 10).toFixed(0) + ' of 10</b>. <i>' + esc(W.place.why) + '</i>' : '', o.what ? esc(cap(dot(o.what))) : '', o.why ? '<span style="color:var(--gold)">Why:</span> ' + esc(dot(o.why)) : '', o.bp ? '' : 'It stands for about <b>' + Math.round(left) + '</b> more seconds of pond time.']) + (o.bp && !o.fall ? '<button class="btn sm" id="zraze" style="width:100%;margin-top:8px">STRIKE IT DOWN</button>' : '');
+        facts([o.plan ? '<b>The plan:</b> ' + esc(o.plan) + '.' : '', o.hitBy ? '<span style="color:var(--rose)">' + esc(o.hitBy) + ' has been knocking pieces off it.</span>' : '', o.keptBy ? 'It is kept up now by the <b>' + esc(o.keptBy) + '</b>.' : '', o.shun ? '<span style="color:var(--rose)">The watcher found it spoils the pond as a place: it is no longer kept up.</span>' : '', W.place ? 'The pond as a place, by the watcher: <b>' + (W.place.order * 10).toFixed(0) + ' of 10</b>. <i>' + esc(W.place.why) + '</i>' : '', o.what ? esc(cap(dot(o.what))) : '', o.why ? '<span style="color:var(--gold)">Why:</span> ' + esc(dot(o.why)) : '', o.bp ? '' : 'It stands for about <b>' + Math.round(left) + '</b> more seconds of pond time.']) + (o.bp && !o.fall ? '<button class="btn sm" id="zraze" style="width:100%;margin-top:8px">STRIKE IT DOWN</button>' : '');
     } else if (cur.k === 'deed') {
       if (W.deed !== o) { G.selectThing(null); return; }
       const st = o.steps[o.i] || {}, n = W.cre.filter(function (x) { return x.deedId === o.id && !x.dead; }).length, togo = Math.max(1, Math.ceil(o.steps.slice(o.i).reduce(function (a, q) { return a + q.secs; }, 0) - o.t));
@@ -12170,7 +12194,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const W = G.W;
     if (!W || W.title) return null;
     const out = {
-      v: 1, at: Date.now(), works: (W.works || []).filter(function (w) { return w.bp; }).slice(-6).map(function (w) { const b = w.bp; return { n: w.name, l: w.looks, x: Math.round(w.x), y: Math.round(w.y), r: Math.round(w.r), by: w.by, hue: Math.round(w.hue || 0), sp: w.sp || 0, plan: w.plan, what: w.what, why: w.why, gen: w.gen, b: [b.seed, b.type, Math.round(b.S), Math.round(b.hue), b.spiky, +b.brain.toFixed(2)], st: b.P.map(function (p) { return p.st; }).join('') }; }), room: +(W.room || 0).toFixed(1), shore: +(W.shore || G.SHORE0).toFixed(3), rich: +(W.richS || 1).toFixed(3), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
+      v: 1, at: Date.now(), works: (W.works || []).filter(function (w) { return w.bp; }).slice(-12).map(function (w) { const b = w.bp; return { n: w.name, l: w.looks, x: Math.round(w.x), y: Math.round(w.y), r: Math.round(w.r), by: w.by, hue: Math.round(w.hue || 0), sp: w.sp || 0, plan: w.plan, what: w.what, why: w.why, gen: w.gen, b: [b.seed, b.type, Math.round(b.S), Math.round(b.hue), b.spiky, +b.brain.toFixed(2)], st: b.P.map(function (p) { return p.st; }).join('') }; }), room: +(W.room || 0).toFixed(1), shore: +(W.shore || G.SHORE0).toFixed(3), rich: +(W.richS || 1).toFixed(3), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
       set: W.set, disc: W.disc, nextSp: W.nextSp, ai: G.ai && G.ai.model ? G.ai.model : '', drawn: G.ai && G.ai.drawn ? 1 : 0, spend: G.ai ? G.ai.life : {},
       hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species, +(h.look || 0).toFixed(3), +(h.lookTop || 0).toFixed(2), +(h.whole || 0).toFixed(3), +(h.wholeTop || 0).toFixed(2), +(h.body || 0).toFixed(1), +(h.bodyTop || 0).toFixed(1), +(h.size || 0).toFixed(1), +(h.sizeTop || 0).toFixed(1), (G.MARKS_X || []).map(function (m) { const q = h.mx && h.mx[m.id]; return q ? [+q[0].toFixed(3), +q[1].toFixed(2)] : 0; }), +(h.room || 0).toFixed(1)]; }),
       discLog: W.discLog.slice(-40),
@@ -12322,7 +12346,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     G.newWorld({ seed: num(d.seed, 1, 4e9, 1) });
     const W = G.W;
     W.gen = Math.floor(num(d.gen, 1, 1e6, 1));
-    if (Array.isArray(d.works) && G.blueprintFrom) W.works = d.works.slice(0, 6).filter(function (q) { return q && Array.isArray(q.b) && ['wall', 'huts', 'spire', 'hall'].indexOf(q.b[1]) >= 0; }).map(function (q) { const t = function (s, n) { return String(s || '').replace(/[<>]/g, '').slice(0, n); }; return { name: t(q.n, 40), looks: t(q.l, 200), x: num(q.x, 0, 1e5, 500), y: num(q.y, 0, 1e5, 500), r: num(q.r, 20, 200, 80), by: t(q.by, 40), hue: num(q.hue, 0, 360, 50), sp: num(q.sp, 0, 1e6, 0), plan: t(q.plan, 80), what: t(q.what, 200), why: t(q.why, 200), gen: num(q.gen, 0, 1e6, 0), until: 1e9, field: 0, bp: G.blueprintFrom({ seed: num(q.b[0], 0, 4294967295, 1), type: q.b[1], S: num(q.b[2], 40, 130, 80), hue: num(q.b[3], 0, 360, 50), spiky: q.b[4] ? 1 : 0, brain: num(q.b[5], 0, 1, 0.3) }, String(q.st || '')) }; });
+    if (Array.isArray(d.works) && G.blueprintFrom) W.works = d.works.slice(0, 12).filter(function (q) { return q && Array.isArray(q.b) && ['wall', 'huts', 'spire', 'hall'].indexOf(q.b[1]) >= 0; }).map(function (q) { const t = function (s, n) { return String(s || '').replace(/[<>]/g, '').slice(0, n); }; return { name: t(q.n, 40), looks: t(q.l, 200), x: num(q.x, 0, 1e5, 500), y: num(q.y, 0, 1e5, 500), r: num(q.r, 20, 200, 80), by: t(q.by, 40), hue: num(q.hue, 0, 360, 50), sp: num(q.sp, 0, 1e6, 0), plan: t(q.plan, 80), what: t(q.what, 200), why: t(q.why, 200), gen: num(q.gen, 0, 1e6, 0), until: 1e9, field: 0, bp: G.blueprintFrom({ seed: num(q.b[0], 0, 4294967295, 1), type: q.b[1], S: num(q.b[2], 40, 130, 80), hue: num(q.b[3], 0, 360, 50), spiky: q.b[4] ? 1 : 0, brain: num(q.b[5], 0, 1, 0.3) }, String(q.st || '')) }; });
     W.room = num(d.room, 0, G.ROOM_MAX || 10, 0);
     W.richS = num(d.rich, 1, 5000, num(d.gen, 0, 1e6, 0) > 50 ? 3.8 : 1); W.rich = W.richS;      /* (a pond saved before richness was kept: an old one is taken to be rich enough for the bodies it has) */ W.sizeCap = Math.min(G.sizeCapOf(W.richS), Math.max(14, 1.2 * Math.sqrt(0.03 * (+d.ww || W.ww) * (+d.wh || W.wh) / (125 * 11.34))));      // before any creature is rebuilt: how big a body may be depends on it
     W.shore = num(d.shore, G.SHORE0, 0.5, G.SHORE0);      // a pond saved when the land began smaller comes back with the bigger land

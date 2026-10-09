@@ -175,7 +175,7 @@
   function drawStrip() {
     if (!strip) return;
     const on = G.mode === 'play' && G.W && !G.W.title, L = on ? now().list : [];
-    if (on && G.W.fields) for (let i = 0; i < G.W.fields.length; i++) { const f = G.W.fields[i], coming = G.W.t < f.start; L.push({ name: f.name, left: coming ? f.start - G.W.t : f.life, of: coming ? Math.max(1, f.after) : f.life0, does: coming ? 'coming' : (G.fieldWords ? G.fieldWords(f) : '') }); }
+    if (on && G.W.fields) for (let i = 0; i < G.W.fields.length; i++) { if (G.W.fields[i].hidden) continue; const f = G.W.fields[i], coming = G.W.t < f.start; L.push({ name: f.name, left: coming ? f.start - G.W.t : f.life, of: coming ? Math.max(1, f.after) : f.life0, does: coming ? 'coming' : (G.fieldWords ? G.fieldWords(f) : '') }); }
     document.body.classList.toggle('wxon', L.length > 0);
     const wish = document.getElementById('wish'), below = wish && !wish.classList.contains('hide') && window.innerWidth > 720 ? Math.round(wish.getBoundingClientRect().bottom) + 6 : 14;
     if (window.innerWidth > 720) strip.style.top = below + 'px'; else strip.style.top = '';

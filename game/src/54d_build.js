@@ -127,20 +127,23 @@
       const P = w.bp.P;
       // other kinds: a fierce band of strangers at a building that its own kind is not there to hold knocks it about and takes what they find
       { let foes = 0, mine = 0, who = 0; const S = w.bp.S; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (c.dead) continue; const dd = Math.hypot(c.x - w.x, c.y - w.y); if (c.sp === w.sp) { if (dd < S * 2.4) mine++; } else if (dd < S * 1.6 && (c.ph.aggro || 0) > 0.38) { foes++; who = c.sp; c.E = Math.min(c.ph.Emax, c.E + 2); } }
-        if (foes >= 3 && foes > mine && !w.fall) { for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { P[k].st = 0; G.emit('build-fall', w, P[k]); break; } const sp = G.speciesById(who); w.hitBy = 'A band of ' + (sp ? sp.name : 'strangers'); w.hitGen = W.gen; w.dmg = 1; if (!w.raided && G.mode === 'play' && G.log) { w.raided = true; G.log('sel', w.name + ' is raided', w.hitBy + ' is knocking it about while its builders are away.'); } continue; } }
+        if (foes >= 4 && foes > mine + 1 && !w.fall && (w.raidT = (w.raidT || 0) + 1) % 2 === 0) { for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { P[k].st = 0; G.emit('build-fall', w, P[k]); break; } const sp = G.speciesById(who); w.hitBy = 'A band of ' + (sp ? sp.name : 'strangers'); w.hitGen = W.gen; w.dmg = 1; if (!w.raided && G.mode === 'play' && G.log) { w.raided = true; G.log('sel', w.name + ' is raided', w.hitBy + ' is knocking it about while its builders are away.'); } continue; } }
       if (w.shun && !w.fall) { w.shunT = (w.shunT || 0) + 1; if (w.shunT % 3 === 0) { for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { P[k].st = 0; G.emit('build-fall', w, P[k]); break; } } if (count(w.bp)[0] === 0) { Wk.splice(i, 1); G.emit('work-gone', w); } continue; }      /* the one the watcher found spoils the place is left to fall */
+      if (kin < 3) { let heir = null; for (let k = 0; k < W.species.length; k++) { const s = W.species[k]; if (!s.extinct && s.n >= 3 && s.parent === w.sp && (!heir || s.n > heir.n)) heir = s; }      /* the builders' kind has changed or gone: their descendants keep it; failing them, whoever lives round it */
+        if (!heir) { const near = {}; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (!c.dead && c.sp && Math.hypot(c.x - w.x, c.y - w.y) < w.bp.S * 3.2) near[c.sp] = (near[c.sp] || 0) + 1; } let b = 0; for (const id in near) if (near[id] >= 3 && near[id] > b) { b = near[id]; heir = G.speciesById(+id); } }
+        if (heir) { w.sp = heir.id; w.keptBy = heir.name; kin = heir.n; } }
       w.lone = kin < 3 ? (w.lone || 0) + 1 : 0;      /* (kinds are sorted afresh each autumn: a short gap in the count is not the end of them) */
-      if (w.fall || w.lone > 8) { let top = -1; for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { top = k; break; } if (top >= 0) { P[top].st = 0; G.emit('build-fall', w, P[top]); if (!w.fall && !w.ruin) { w.ruin = true; G.emit('work-ruin', w); } } }
+      if (w.fall || (w.lone > 24 && w.lone % 3 === 0)) { let top = -1; for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { top = k; break; } if (top >= 0) { P[top].st = 0; G.emit('build-fall', w, P[top]); if (!w.fall && !w.ruin) { w.ruin = true; G.emit('work-ruin', w); } } }
       else if (!(w.dmg > 0 && W.gen === w.hitGen)) { for (let k = 0; k < P.length; k++) if (P[k].st < 2) { P[k].st++; P[k].t0 = W.t; break; } }      // its keepers mend and colour it
       const n = count(w.bp);
       if (n[0] === 0) { Wk.splice(i, 1); G.emit('work-gone', w); continue; }
-      const F = W.fields || []; for (let k = 0; k < F.length; k++) if (F[k].id === w.field) { if (n[0] >= n[2] * 0.6 && !w.fall) F[k].life = Math.max(F[k].life, 30); else F[k].life = Math.min(F[k].life, 6); }      // it does what it was built for while most of it stands
+      const F = W.fields || []; for (let k = 0; k < F.length; k++) if (F[k].id === w.field || (!w.field && F[k].name === w.name)) { w.field = F[k].id; F[k].hidden = true; if (n[0] >= n[2] * 0.6 && !w.fall) F[k].life = Math.max(F[k].life, 30); else F[k].life = Math.min(F[k].life, 6); }      // it does what it was built for while most of it stands
     }
   }
   /** nature strikes a building down: it falls piece by piece */
   G.razeWork = function (w) { if (w && w.bp) { w.fall = true; w.upT = 0; } };
   if (G.on) {
-    G.on('deed-end', function (d, how, made) { if (made && d.bp) { made.bp = d.bp; made.sp = d.sp; made.until = (G.W ? G.W.t : 0) + 9999; } });
+    G.on('deed-end', function (d, how, made) { if (made && d.bp) { made.bp = d.bp; made.sp = d.sp; { const F = (G.W && G.W.fields) || []; for (let k = 0; k < F.length; k++) if (F[k].id === made.field) F[k].hidden = true; } made.until = (G.W ? G.W.t : 0) + 9999; } });
     G.on('new-pond', function () { if (G.W) G.W.mats = null; });
   }
   { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (!W || W.title) return; matsStep(W, dt); const d = W.deed; if (d && d.result && d.steps[d.i] && d.steps[d.i].do === 'build') buildStep(W, d, dt); worksStep(W, dt); }; }
@@ -175,6 +178,25 @@
     return true;
   };
   G.on('scored', function () { try { G.placeLook(false); } catch (e) { console.error(e); } });
+  // ── a kind makes itself a home ──
+  // Besides what a kind may take into its head (the plans the AI imagines for it), an established kind builds for itself, with nobody asked: the first thing is
+  // a place of its own, and what it builds follows from how it is faring: hungry, it builds huts round a store; among fierce strangers or armed things, a
+  // wall; otherwise a hall, and later a tower beside it. One more for every forty generations the kind has lasted, up to four. So a pond fills, slowly, with
+  // what its creatures made, and each kind's quarter is its own. (It costs nothing: the plan of pieces is worked out by the game.)
+  G.on('scored', function () {
+    const W = G.W; if (!W || W.title || W.deed || G.mode !== 'play' || W.gen < 12 || (W.works || []).length >= 10 || G.rand() > 0.3) return;
+    const kinds = W.species.filter(function (s) { return !s.extinct && s.n >= 10 && W.gen - s.born >= 6; }); if (!kinds.length) return;
+    let fierce = 0, armed = 0; for (let i = 0; i < W.cre.length; i++) if ((W.cre[i].ph.aggro || 0) > 0.38) fierce++; for (let i = 0; i < W.zones.length; i++) if (W.zones[i].act && W.zones[i].foe) armed++;
+    for (let k = 0; k < kinds.length; k++) { const s = kinds[(k + W.gen) % kinds.length], mine = (W.works || []).filter(function (w) { return w.bp && w.sp === s.id; }), may = Math.min(4, 1 + Math.floor((W.gen - s.born) / 40)); if (mine.length >= may) continue;
+      let e = 0, n = 0, x = 0, y = 0, own = 0; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.sp !== s.id) continue; e += c.E / c.ph.Emax; x += c.x; y += c.y; n++; if ((c.ph.aggro || 0) > 0.38) own++; } if (n < 8) continue;
+      const has = function (t) { return mine.some(function (w) { return w.bp.type === t; }); }, threatened = armed > 0 || fierce - own > W.cre.length * 0.3, hungry = e / n < 0.5;
+      const type = !mine.length ? (hungry ? 'huts' : 'hall') : threatened && !has('wall') ? 'wall' : hungry && !has('huts') ? 'huts' : !has('spire') ? 'spire' : !has('huts') ? 'huts' : !has('hall') ? 'hall' : 'wall', nw = String(s.name).split(' '), first = nw.length >= 3 ? nw[nw.length - 2] : nw[0];      /* first a place of their own; then what they are short of */
+      const name = first + ' ' + { wall: 'Ring', huts: 'Huts', hall: 'Hall', spire: 'Tower' }[type], why = type === 'wall' ? (armed ? 'something armed is loose in the pond' : 'fierce strangers are all about them') : type === 'huts' ? 'they are going hungry' : mine.length ? 'their place has room for more' : 'they have no place of their own';
+      G.deedStart({ kind: s.name, title: name, say: '', what: 'build ' + (type === 'wall' ? 'a ring of posts to live inside' : type === 'huts' ? 'huts round a store of food' : type === 'hall' ? 'a hall to gather in' : 'a tower to be seen from afar'), why: why, share: 0.6, own: true,
+        steps: [{ do: 'gather', secs: 5, cry: '' }, { do: 'build', secs: 34, cry: '' }], place: { x: clamp(x / n / W.ww, 0.12, 0.88), y: clamp(y / n / W.wh, 0.3, 0.85) },
+        result: { name: name, looks: 'made of what lay about the pond', stuff: 'rock', shape: 'circle', size: 0.075, solid: type === 'wall', feed: type === 'huts' ? 0.25 : 0, slow: 0, hurt: 0, pull: type === 'spire' ? 0.2 : type === 'hall' ? 0.12 : 0, life: 240 } });
+      return; }
+  });
   function piece(ctx, p, hue, t) {
     const age = t - (p.t0 || -9), pop = age < 0.3 ? 0.6 + 0.4 * (age / 0.3) + 0.15 * Math.sin(age * 10.5) : 1, mc = MAT[p.um === undefined ? p.m : p.um].col;
     const raw = hsl(mc[0], mc[1], mc[2]), fin = p.c[2] < 20 ? hsl(hue, 30, p.c[2]) : hsl(hue + p.c[0], p.c[1], p.c[2]), fill = p.st > 1 ? fin : raw, w = p.w * pop, h = p.h * pop;
@@ -208,6 +230,7 @@
   // the materials lie under everything else that is drawn in the water; what a builder hauls rides above its head
   { const f0 = G.drawFields; G.drawFields = function (ctx) {
       const W = G.W;
+      if (W && W.works && W.fields) for (let i = 0; i < W.works.length; i++) { const w = W.works[i]; if (!w.bp) continue; for (let k = 0; k < W.fields.length; k++) if (W.fields[k].id === w.field || W.fields[k].name === w.name) W.fields[k].hidden = true; }      /* a building is drawn as itself: the patch of water that carries what it does is not drawn as well */
       if (W && !W.title && W.mats && G.mode === 'play') { const v = G.view, s = v.scale * v.dpr; if (v.scale > 0.22) { const x0 = -v.ox / v.scale - 20, y0 = -v.oy / v.scale - 20, x1 = x0 + v.w / v.scale + 40, y1 = y0 + v.h / v.scale + 40, t = G.rt || 0; ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (q.x > x0 && q.x < x1 && q.y > y0 && q.y < y1) matDraw(ctx, q, t); } ctx.restore(); } }
       if (f0) f0(ctx);
     }; }
