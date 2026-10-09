@@ -7,7 +7,7 @@
 (function () {
   'use strict';
   if (typeof document === 'undefined' || !G.banner) return;
-  const BIG = /marvel|decided|did it|came to nothing|wish came true|new age|it happened|stranger/i;
+  const BIG = /marvel|decided|did it|came to nothing|wish came true|new age|it happened|stranger|arrived|is home/i;
   const short = function (s, n) { s = String(s || ''); if (s.length <= n) return s; const cut = s.slice(0, n), dot = cut.lastIndexOf('. '); return dot > n * 0.5 ? cut.slice(0, dot + 1) : cut.replace(/\s+\S*$/, '') + '…'; };
   const esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   // notes: one line at a time, bottom right
@@ -20,6 +20,7 @@
     box.style.opacity = '1'; box.style.transform = 'translate(-50%,0)';
     busy = setTimeout(function () { box.style.opacity = '0'; box.style.transform = 'translate(-50%,8px)'; busy = setTimeout(show, 500); }, Q.length ? 3800 : 5500);
   }
+  G.on('new-pond', function () { Q.length = 0; });      // what was waiting to be said was about the pond you have left
   G.note = function (kicker, text) { if (Q.length >= 3) Q.shift(); Q.push([kicker, text]); if (!busy) show(); };
   // the banner: big moments only
   const banner0 = G.banner; let last = '';

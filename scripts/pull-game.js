@@ -16,7 +16,7 @@ const copyDir = (a, b, keep) => {
 };
 const src = copyDir(path.join(from, 'src'), path.join(to, 'src'), (f) => /\.(js|html)$/.test(f));
 // the build script and the headless tests; the one-off patch scripts that made past edits are history, not tools
-const tools = copyDir(path.join(from, 'tools'), path.join(to, 'tools'), (f) => ['build.js', 'form-test.js', 'long-test.js', 'div-test.js', 'fork-test.js', 'evo-test.js', 'oracle-test.js', 'react-test.js', 'marvel-test.js', 'marvel-spread.js', 'town-test.js', 'society-test.js', 'design-samples.json'].includes(f));
+const tools = copyDir(path.join(from, 'tools'), path.join(to, 'tools'), (f) => ['build.js', 'form-test.js', 'long-test.js', 'div-test.js', 'fork-test.js', 'evo-test.js', 'oracle-test.js', 'react-test.js', 'marvel-test.js', 'marvel-spread.js', 'town-test.js', 'society-test.js', 'voyage-test.js', 'design-samples.json'].includes(f));
 let extra = 0;
 for (const f of ['game.html', 'lab.html', 'idea.txt', 'plan.json', 'visual.json']) if (fs.existsSync(path.join(from, f))) { fs.copyFileSync(path.join(from, f), path.join(to, f)); extra++; }
 console.log('game/: ' + src + ' source files, ' + tools + ' tools, ' + extra + ' other files, from ' + from);

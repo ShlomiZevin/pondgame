@@ -393,6 +393,7 @@
   // ── the still pond (extinction) ──
   G.on('extinct', function () {
     if (G.mode !== 'play') return;
+    if (G.far && G.far.there && G.far.there()) return;      // a far pond fell still while you were there: the ship takes you home (59_voyage.js)
     const W = G.W;
     G.sfx('extinct');
     const best = W.fossils.slice().sort(function (a, b) { return b.peak - a.peak; })[0];

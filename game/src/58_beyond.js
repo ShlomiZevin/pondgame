@@ -51,23 +51,21 @@
   G.goHome = function () { const v = G.view; G.flyTo(v.ww / 2, v.wh / 2, 1, 1.0); hideCard(); };
 
   // ── what lies out there: made from where it lies, so it is the same every time you come back, and never runs out ──
-  const hash = function (i, j, k) { let h = (i * 374761393 + j * 668265263 + k * 2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; h ^= h >>> 16; return (h >>> 0) / 4294967296; };
-  const A1 = ['Lu', 'Mar', 'Vey', 'Tor', 'Ash', 'Nim', 'Oro', 'Sel', 'Kai', 'Bre', 'Dun', 'Ila', 'Quo', 'Zet', 'Wyn', 'Thal', 'Eri', 'Mo', 'Pell', 'Yar'], A2 = ['a', 'e', 'i', 'o', 'u', 'an', 'el', 'or', 'is', ''], A3 = ['mere', 'pool', 'deep', 'water', 'hollow', 'tarn', 'well', 'glass', 'shallows', 'reach'];
-  const nameOf = function (i, j) { return A1[(hash(i, j, 11) * A1.length) | 0] + A2[(hash(i, j, 12) * A2.length) | 0] + ' ' + A3[(hash(i, j, 13) * A3.length) | 0].replace(/^./, function (m) { return m.toUpperCase(); }); };
+  const F = G.far, hash = F.hash;
   /** the pond's place does not depend on how big it has grown: space is measured in ponds as they are at the start */
   const unit = function () { const v = G.view; return Math.max(v.ww, v.wh) / (v.grow || 1); };
   const cellSize = function () { return unit() * 8; };
   /** the far pond of one cell of space, or null (the cell is empty, or it is ours) */
-  function farPond(i, j, cs, cx, cy) {
+  function farPond(i, j, cs, cx, cy) {      // (i, j) is counted from the pond you are IN; space itself is counted from your own pond (57x_far.js)
     if (!i && !j) return null;
-    const roll = hash(i, j, 1);
-    if (roll > 0.64) return null;
-    if (roll > 0.5) return { free: true, i: i, j: j, x: cx + (i + (hash(i, j, 2) - 0.5) * 0.5) * cs, y: cy + (j + (hash(i, j, 3) - 0.5) * 0.5) * cs, r: unit() * 0.3, hue: 48, name: 'An empty place', kinds: 0 };      // nobody's yet: a place where a pond could be put
-    return { i: i, j: j, x: cx + (i + (hash(i, j, 2) - 0.5) * 0.5) * cs, y: cy + (j + (hash(i, j, 3) - 0.5) * 0.5) * cs, r: unit() * 0.3 * (0.85 + 0.55 * hash(i, j, 4)), hue: (150 + hash(i, j, 5) * 170) % 360, name: nameOf(i, j), kinds: 2 + ((hash(i, j, 6) * 3) | 0), rings: hash(i, j, 7) < 0.45, moons: (hash(i, j, 8) * 3) | 0 };
+    const o = F.origin, I = i + (o ? o.i : 0), J = j + (o ? o.j : 0), jo = o ? F.jit(o.i, o.j) : [0, 0], jt = F.jit(I, J), x = cx + (i + jt[0] - jo[0]) * cs, y = cy + (j + jt[1] - jo[1]) * cs;
+    if (!I && !J) { const L = F.homeLook || {}; return { home: true, i: 0, j: 0, li: i, lj: j, x: x, y: y, r: unit() * 0.3, hue: L.hue === undefined ? 190 : L.hue, name: 'Your pond', kinds: L.kinds || 2 }; }      // seen from a far pond, your own is one of the ponds out there
+    const c = F.cell(I, J); if (!c) return null;
+    c.li = i; c.lj = j; c.x = x; c.y = y; c.r = unit() * 0.3 * (c.size || 1); return c;
   }
   function visiblePonds() {
     const v = G.view, cs = cellSize(), cx = v.ww / 2, cy = v.wh / 2, x0 = -v.ox / v.scale, y0 = -v.oy / v.scale, x1 = x0 + v.w / v.scale, y1 = y0 + v.h / v.scale, out = [];
-    const i0 = Math.floor((x0 - cx) / cs - 0.5), i1 = Math.ceil((x1 - cx) / cs + 0.5), j0 = Math.floor((y0 - cy) / cs - 0.5), j1 = Math.ceil((y1 - cy) / cs + 0.5);
+    const i0 = Math.floor((x0 - cx) / cs - 1), i1 = Math.ceil((x1 - cx) / cs + 1), j0 = Math.floor((y0 - cy) / cs - 1), j1 = Math.ceil((y1 - cy) / cs + 1);
     if ((i1 - i0) * (j1 - j0) > 900) return out;
     for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const p = farPond(i, j, cs, cx, cy); if (p) out.push(p); }
     return out;
@@ -78,14 +76,9 @@
   const KIND = {};
   function kindsOf(p) {
     const key = p.i + ',' + p.j; if (KIND[key]) return KIND[key];
-    const W = G.W, pool = (W.species || []).filter(function (s) { return s.rep && s.rep.f && s.rep.f.bd; }).map(function (s) { return s.rep; }).concat((W.cre || []).filter(function (c) { return c.g.f.bd; }).slice(0, 12).map(function (c) { return c.g; }));
-    if (!pool.length) return [];
-    const out = [];
-    for (let k = 0; k < p.kinds; k++) {
-      const g = pool[(hash(p.i, p.j, 100 + k) * pool.length) | 0], cv = document.createElement('canvas'); cv.width = cv.height = 120;
-      try { const f = G.form.clone(g.f); f.hue = (p.hue + 140 * k + 360 * hash(p.i, p.j, 110 + k) * 0.3) % 360; if (f.hue2 !== undefined) f.hue2 = (hash(p.i, p.j, 120 + k) - 0.5) * 240;
-        const x = cv.getContext('2d'); x.translate(60, 66); x.scale(0.3, 0.3); G.form.portrait(x, f, 1.3 + k, {}); out.push(cv); } catch (e) { console.error(e); }
-    }
+    const Gs = p.home || p.free ? [] : F.kindsOf(p), out = [];
+    for (let k = 0; k < Gs.length; k++) { const cv = document.createElement('canvas'); cv.width = cv.height = 120;
+      try { const x = cv.getContext('2d'); x.translate(60, 66); x.scale(0.3, 0.3); G.form.portrait(x, Gs[k].f, 1.3 + k, {}); out.push(cv); } catch (e) { console.error(e); } }
     if (Object.keys(KIND).length > 80) for (const q in KIND) { delete KIND[q]; break; }
     return (KIND[key] = out);
   }
@@ -199,11 +192,11 @@
       const n = Math.min(9, Math.floor(pr / 4)); for (let q = 0; q < n; q++) { const a = hash(p.i, p.j, 40 + q) * TAU + t * (0.09 + 0.12 * hash(p.i, p.j, 60 + q)) * (q % 2 ? 1 : -1), d = 0.15 + 0.6 * hash(p.i, p.j, 80 + q); ctx.fillStyle = 'hsla(' + (h + 70 + q * 47) % 360 + ',95%,80%,0.55)'; ctx.beginPath(); ctx.arc(px + Math.cos(a) * hw2 * 0.8 * d, py + hh2 * 0.22 + Math.sin(a) * hh2 * 0.6 * d, Math.max(1, pr * 0.045), 0, TAU); ctx.fill(); }
       for (let q = 0; q < 40; q++) { const a = hash(p.i, p.j, 140 + q) * TAU, u = (t * (0.006 + 0.01 * hash(p.i, p.j, 160 + q)) + hash(p.i, p.j, 180 + q)) % 1, ca = Math.cos(a), sa = Math.sin(a), k0 = 1 / Math.max(Math.abs(ca) / hw2, Math.abs(sa) / hh2), kk = k0 * 0.85 + FM * k * 0.9 * u; ctx.fillStyle = col(15, 80, 76, 0.5 * Math.sin(3.1416 * Math.min(1, u * 1.15))); ctx.beginPath(); ctx.arc(px + ca * kk, py + sa * kk, 0.7 + 0.8 * hash(p.i, q, 190), 0, TAU); ctx.fill(); }
     }
-    if (pr > 16) {
+    if (pr > 16 && !p.plain) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const fs = Math.round(clamp(pr * 0.24, 12, 18)); ctx.font = '800 ' + fs + 'px system-ui, sans-serif';
       const tw = ctx.measureText(p.name).width + 26, ty = py + hh2 + FM * k * 0.5 + 14; ctx.fillStyle = 'rgba(9,20,33,0.85)'; G.roundRect(ctx, px - tw / 2, ty - fs * 0.85, tw, fs * 1.7, fs * 0.85); ctx.fill(); ctx.strokeStyle = col(20, 90, 75, 0.7); ctx.lineWidth = 1.2; ctx.stroke();
       ctx.fillStyle = '#fff'; ctx.fillText(p.name, px, ty + 0.5);
-      ctx.font = '700 10px system-ui, sans-serif'; ctx.fillStyle = col(20, 80, 80, 0.9); ctx.fillText(p.kinds + (p.kinds === 1 ? ' KIND LIVES HERE' : ' KINDS LIVE HERE'), px, ty + fs * 1.5);
+      ctx.font = '700 10px system-ui, sans-serif'; ctx.fillStyle = col(20, 80, 80, 0.9); { const rec = p.home ? null : F.book[p.i + ',' + p.j]; if (p.home || (rec && rec.mine)) ctx.fillStyle = '#f6d365'; ctx.fillText(p.home ? '\u2691 YOUR OWN POND \u00b7 HOME' : rec && rec.mine ? '\u2691 YOUR PEOPLE HERE: ' + rec.mine : rec ? 'YOU HAVE BEEN HERE' : p.kinds + (p.kinds === 1 ? ' KIND LIVES HERE' : ' KINDS LIVE HERE'), px, ty + fs * 1.5); }
     }
   }
 
@@ -212,7 +205,7 @@
     const v = G.view, s = v.scale * v.dpr, t = G.rt || 0, ww = W.ww, wh = W.wh, m = Math.min(ww, wh), R = m * 0.14, IN = m * 0.1, MG = m * 0.34;      /* the mist takes the outer sixth or so of the pond, and thins away over a third of a pond beyond it */
     const x0 = -v.ox / v.scale, y0 = -v.oy / v.scale, x1 = x0 + v.w / v.scale, y1 = y0 + v.h / v.scale;
     hud(x0, y0, x1, y1);
-    let showSnap = false;
+    let showSnap = false, standIn = false;
     { const seen = x1 > 0 && x0 < ww && y1 > 0 && y0 < wh;
       if (!asleep) { snap = null; skip = false; }
       else if (!skip) {      /* it has just fallen still (this frame was still drawn in full): keep its picture if all of it is on the screen, and stop drawing it */
@@ -220,7 +213,7 @@
         if (!seen) { snap = null; skip = true; }
         else if (sx >= 0 && sy >= 0 && sx + sw <= cv.width && sy + sh <= cv.height && sw >= 2 && sh >= 2) { try { const c2 = document.createElement('canvas'); c2.width = Math.max(2, Math.round(sw)); c2.height = Math.max(2, Math.round(sh)); c2.getContext('2d').drawImage(cv, sx, sy, sw, sh, 0, 0, c2.width, c2.height); snap = c2; skip = true; } catch (e) { console.error(e); } }
       }
-      if (skip) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = 'rgb(' + SPACE + ')'; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); showSnap = !!(snap && seen); } }
+      if (skip) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = 'rgb(' + SPACE + ')'; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); showSnap = !!(snap && seen); standIn = !snap && seen; } }
     if (!asleep) { const wx = document.getElementById('wxfx'); if (wx) { const q = function (n) { return Math.round(n / 8) * 8; }, cx = q(ww / 2 * v.scale + v.ox), cy = q(wh / 2 * v.scale + v.oy), rx = q(ww * v.scale * 0.56), ry = q(wh * v.scale * 0.6), all = v.ox <= 0 && v.oy <= 0 && ww * v.scale + v.ox >= v.w && wh * v.scale + v.oy >= v.h, mk = all ? '' : 'radial-gradient(ellipse ' + rx + 'px ' + ry + 'px at ' + cx + 'px ' + cy + 'px, #000 55%, transparent 96%)'; if (wx._mk !== mk) { wx._mk = mk; wx.style.clipPath = ''; wx.style.maskImage = mk; wx.style.webkitMaskImage = mk; } } }      // the pond's weather (snow, bubbles, embers) is the pond's: it thins out towards the edge, softly, and does not fall in space
     if (x0 > IN && y0 > IN && x1 < ww - IN && y1 < wh - IN) return;      // looking at the middle of the pond: nothing of the outside is in view
     const main = ctx;
@@ -275,10 +268,10 @@
     // the other ponds, and the lanes between neighbours: a map of where one could travel
     builtNow = 0; stamp++;
     const P = visiblePonds();
-    { const byCell = {}; for (let k = 0; k < P.length; k++) byCell[P[k].i + ',' + P[k].j] = P[k]; byCell['0,0'] = { i: 0, j: 0, x: ww / 2, y: wh / 2, r: wh * 0.5 };
+    { const byCell = {}; for (let k = 0; k < P.length; k++) byCell[P[k].li + ',' + P[k].lj] = P[k]; byCell['0,0'] = { li: 0, lj: 0, i: 0, j: 0, x: ww / 2, y: wh / 2, r: wh * 0.5 };
       ctx.lineCap = 'round'; ctx.setLineDash([2, 9]); ctx.lineDashOffset = -t * 6; ctx.lineWidth = 1.3;
-      for (const key in byCell) { const a = byCell[key]; for (let d = 0; d < 4; d++) { const b = byCell[(a.i + [1, 0, 1, 1][d]) + ',' + (a.j + [0, 1, 1, -1][d])]; if (!b) continue; const ax = a.x * v.scale + v.ox, ay = a.y * v.scale + v.oy, bx = b.x * v.scale + v.ox, by = b.y * v.scale + v.oy, len = Math.hypot(bx - ax, by - ay); if (len < 60) continue; const ux = (bx - ax) / len, uy = (by - ay) / len, ra = a.r * v.scale * 2.3 + 8, rb = b.r * v.scale * 2.3 + 8; if (len < ra + rb + 10) continue;
-        if (a.free || b.free) continue; const mine = (!a.i && !a.j) || (!b.i && !b.j); ctx.strokeStyle = mine ? 'rgba(246,211,101,0.42)' : 'rgba(150,190,235,0.2)'; ctx.beginPath(); ctx.moveTo(ax + ux * ra, ay + uy * ra); ctx.lineTo(bx - ux * rb, by - uy * rb); ctx.stroke(); } }
+      for (const key in byCell) { const a = byCell[key]; for (let d = 0; d < 4; d++) { const b = byCell[(a.li + [1, 0, 1, 1][d]) + ',' + (a.lj + [0, 1, 1, -1][d])]; if (!b) continue; const ax = a.x * v.scale + v.ox, ay = a.y * v.scale + v.oy, bx = b.x * v.scale + v.ox, by = b.y * v.scale + v.oy, len = Math.hypot(bx - ax, by - ay); if (len < 60) continue; const ux = (bx - ax) / len, uy = (by - ay) / len, ra = a.r * v.scale * 2.3 + 8, rb = b.r * v.scale * 2.3 + 8; if (len < ra + rb + 10) continue;
+        if (a.free || b.free) continue; const mine = (!a.li && !a.lj) || (!b.li && !b.lj) || a.home || b.home; ctx.strokeStyle = mine ? 'rgba(246,211,101,0.42)' : 'rgba(150,190,235,0.2)'; ctx.beginPath(); ctx.moveTo(ax + ux * ra, ay + uy * ra); ctx.lineTo(bx - ux * rb, by - uy * rb); ctx.stroke(); } }
       ctx.setLineDash([]); }
     for (let k = 0; k < P.length; k++) { const p = P[k], px = p.x * v.scale + v.ox, py = p.y * v.scale + v.oy, pr = p.r * v.scale;
       if (px + pr * 4 < 0 || py + pr * 4 < 0 || px - pr * 4 > v.w || py - pr * 5 > v.h) continue;
@@ -291,11 +284,12 @@
         ctx.fillStyle = 'rgba(240,252,255,' + fade + ')'; ctx.beginPath(); ctx.arc(hx, hy, 4.5, 0, TAU); ctx.fill(); } }
     if (own) { ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); ctx.globalCompositeOperation = 'destination-out'; ctx.imageSmoothingEnabled = true; ctx.drawImage(EDGE.inv, -MG, -MG, ww + 2 * MG, wh + 2 * MG); ctx.globalCompositeOperation = 'source-over'; }
     };
-    if (skip) { spacePart(main, false, null); if (showSnap) { main.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); main.imageSmoothingEnabled = true; main.drawImage(snap, 0, 0, ww, wh); edgePart(); } }
+    if (skip && standIn) { spacePart(main, false, null); main.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); farPondDraw(main, { i: 0, j: 0, hue: 186, kinds: 0, name: '', plain: true }, ww / 2 * v.scale + v.ox, wh / 2 * v.scale + v.oy, wh / 2 * v.scale, t); }      /* it fell still while out of sight, so there is no picture of it: coming back into view small, it is drawn as the other ponds are */
+    else if (skip) { spacePart(main, false, null); if (showSnap) { main.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); main.imageSmoothingEnabled = true; main.drawImage(snap, 0, 0, ww, wh); edgePart(); } }
     else { edgePart(); const O = sheet(main.canvas.width, main.canvas.height); spacePart(O.getContext('2d'), true, O); main.setTransform(1, 0, 0, 1, 0, 0); main.drawImage(O, 0, 0); }
     // seen from afar, our own is named
     if (G.cam.z < 0.45) { ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); const px = ww / 2 * v.scale + v.ox, py = (wh + MG * 0.55) * v.scale + v.oy + 14; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = '800 14px system-ui, sans-serif'; ctx.fillStyle = '#f6d365'; ctx.fillText('YOUR POND', px, py); ctx.font = '600 11px system-ui, sans-serif'; ctx.fillStyle = 'rgba(207,232,255,0.85)'; ctx.fillText('generation ' + W.gen + ' · ' + W.cre.length + ' alive' + (asleep ? ' · waiting for you' : ''), px, py + 17); ctx.restore(); }
+      ctx.font = '800 14px system-ui, sans-serif'; ctx.fillStyle = '#f6d365'; ctx.fillText(F.there() ? F.there().name.toUpperCase() : 'YOUR POND', px, py); ctx.font = '600 11px system-ui, sans-serif'; ctx.fillStyle = 'rgba(207,232,255,0.85)'; ctx.fillText('generation ' + W.gen + ' · ' + W.cre.length + ' alive' + (F.there() ? ' · you are visiting' : '') + (F.there() ? '' : asleep ? ' · waiting for you' : ''), px, py + 17); ctx.restore(); }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
   // the camera's flight is stepped BEFORE the pond is drawn, so the pond and the space round it are always drawn from the same place
@@ -319,11 +313,13 @@
   G.pondAsleep = function () { return asleep; };
 
   // ── the way home, and a word about a far pond ──
+  let cardPond = null;
+  G.farCardHide = function () { hideCard(); };
   let home = null, card = null, shown = '', wasAsleep = null, wasAway = null, lastRot = '', lastTxt = '';
   function ui() {
     if (home) return;
     const st = document.createElement('style');
-    st.textContent = '#ui.exploring > *:not(#gohome):not(#farcard):not(#zoom){opacity:0 !important;pointer-events:none !important;transition:opacity .35s}#ui > *{transition:opacity .35s}#gohome{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:7;display:flex;align-items:center;gap:9px;padding:9px 18px 9px 12px;border-radius:999px;cursor:pointer;font:800 11px system-ui,sans-serif;letter-spacing:.16em;color:#1a2433;background:#f6d365;border:1px solid #f6d365;box-shadow:0 6px 24px rgba(0,0,0,.5)}#gohome i{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;font-style:normal;font-size:15px;transition:transform .2s}#gohome small{font:700 11px system-ui,sans-serif;letter-spacing:.02em;color:#1a2433;opacity:.8;text-transform:none;white-space:nowrap}#gohome small:empty{display:none}#gohome small:before{content:"· "}' +
+    st.textContent = '#ui.exploring > *:not(#gohome):not(#farcard):not(#zoom):not(#voypick){opacity:0 !important;pointer-events:none !important;transition:opacity .35s}#ui > *{transition:opacity .35s}#gohome{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:7;display:flex;align-items:center;gap:9px;padding:9px 18px 9px 12px;border-radius:999px;cursor:pointer;font:800 11px system-ui,sans-serif;letter-spacing:.16em;color:#1a2433;background:#f6d365;border:1px solid #f6d365;box-shadow:0 6px 24px rgba(0,0,0,.5)}#gohome i{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;font-style:normal;font-size:15px;transition:transform .2s}#gohome small{font:700 11px system-ui,sans-serif;letter-spacing:.02em;color:#1a2433;opacity:.8;text-transform:none;white-space:nowrap}#gohome small:empty{display:none}#gohome small:before{content:"· "}' +
       '#farcard{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:8;width:min(440px,calc(100vw - 28px));padding:13px 16px 14px;border-radius:18px;font:500 12.5px/1.45 system-ui,sans-serif;color:#cfe8ff;text-align:center}#farcard b{display:block;font:800 18px system-ui,sans-serif;color:#fff;margin:2px 0 4px}#farcard .k{font:700 9.5px system-ui,sans-serif;letter-spacing:.2em;color:#f6d365;text-transform:uppercase}#farcard .ks{display:flex;justify-content:center;gap:6px;margin:4px 0 6px}#farcard .ks img{width:76px;height:76px}#farcard .r{display:flex;gap:8px;margin-top:10px}#farcard .r .btn{flex:1;min-height:34px}';
     document.head.appendChild(st);
     const host = document.getElementById('ui') || document.body;
@@ -332,7 +328,7 @@
     home.addEventListener('click', function (e) { e.stopPropagation(); if (G.sfx) G.sfx('click'); G.goHome(); });
     card = document.createElement('div'); card.id = 'farcard'; card.className = 'glass hide'; host.appendChild(card);
     card.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
-    card.addEventListener('click', function (e) { const id = e.target && e.target.id; if (id === 'farHome') { if (G.sfx) G.sfx('click'); G.goHome(); } else if (id === 'farClose') hideCard(); });
+    card.addEventListener('click', function (e) { const id = e.target && e.target.id; if (id === 'farHome') { if (G.sfx) G.sfx('click'); G.goHome(); } else if (id === 'farClose') hideCard(); else if (id === 'farSail' && G.voyageGo && cardPond) { const p = cardPond; hideCard(); G.voyageGo(p); } else if (id === 'farSailHome' && G.voyageHome) { hideCard(); G.voyageHome(); } else if ((id === 'farWatch' || id === 'farWatchHome') && G.voyageLook) { hideCard(); G.voyageLook(id === 'farWatch' ? 'far' : 'home'); } });
   }
   function hideCard() { if (card) card.classList.add('hide'); shown = ''; }
   function hud(x0, y0, x1, y1) {
@@ -358,7 +354,9 @@
     G.flyTo(hit.x, hit.y + hit.r * 0.7, clamp(v.h * 0.17 / (hit.r * v.base), ZMIN, 1.2), 1.0);
     shown = hit.name;
     if (hit.free) { card.innerHTML = '<div class="k">An empty place</div><b>Nobody lives here yet</b>This is what a free place in space looks like. Someone with no pond yet will be able to choose a place like this one and start their pond here, next to whoever is already nearby. For now it is only shown: placing a pond is not open yet.<div class="r"><button class="btn sm" id="farHome">BACK TO MY POND</button><button class="btn sm" id="farClose">CLOSE</button></div>'; card.classList.remove('hide'); return; }
+    cardPond = hit;
     const K = kindsOf(hit); let pics = ''; for (let k = 0; k < K.length; k++) { try { pics += '<img alt="" src="' + K[k].toDataURL('image/png') + '">'; } catch (e) { /* no picture */ } }
+    if (G.farCardHtml) { card.innerHTML = G.farCardHtml(hit, pics, K.length); card.classList.remove('hide'); return; }
     card.innerHTML = '<div class="k">A far pond</div><b>' + G.escapeHtml(hit.name) + '</b>' + (pics ? '<div class="ks">' + pics + '</div>' : '') + K.length + (K.length === 1 ? ' kind lives' : ' kinds live') + ' here. One day this will be somebody else\'s living pond, and you will be able to go in, look around and meet them. For now it is only a place on the map: visiting is not open yet.<div class="r"><button class="btn sm" id="farHome">BACK TO MY POND</button><button class="btn sm" id="farClose">CLOSE</button></div>';
     card.classList.remove('hide');
   });

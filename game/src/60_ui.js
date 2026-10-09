@@ -249,11 +249,12 @@
       const making = function (text) { let m = $('making'); if (!text) { if (m) m.classList.add('hide'); return; } if (!m) { m = el('div', 'glass', '', $('ui')); m.id = 'making'; m.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:124px;z-index:7;padding:8px 14px;border-radius:999px;font-size:12px;pointer-events:none;white-space:nowrap;max-width:calc(100vw - 28px);overflow:hidden;text-overflow:ellipsis'; } m.classList.remove('hide'); m.innerHTML = dots + text; };
       if (open()) $('thing').innerHTML = '<div class="thingcard">' + dots + 'Imagining <b>' + escapeHtml(w) + '</b>…</div>';
       making('Imagining <b>' + escapeHtml(w) + '</b>…');
+      if (G.figurePre) G.figurePre(w);      // its picture is begun at once, while it is being imagined
       G.ai.ask('thing', w).then(function (info) {
         const by = info.source === 'ai' || info.source === 'cache' ? (G.ai.labelOf(info.model) || 'the server') : '';
         const card = function (state) { const pic = (G.figurePic && G.figurePic(info.name)) || info.svg; return '<div class="thingcard">' + (pic ? '<img alt="" width="64" height="72" style="float:right;margin-left:8px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pic) + '">' : '') + '<b>' + escapeHtml(info.name) + '</b><br>' + escapeHtml(info.note) + (by ? '<br><small>imagined by ' + escapeHtml(by) + '</small>' : '') + (state ? '<br><small style="color:var(--gold)">' + dots + state + '</small>' : '') + '</div>'; };
         // its picture is drawn before it can be placed: what goes into the pond is the real thing, never a stand-in
-        if (open()) $('thing').innerHTML = card('Drawing it… this takes up to a minute the first time.');
+        if (open()) $('thing').innerHTML = card('Drawing it… a few seconds more the first time; at once after that.');
         making('Drawing <b>' + escapeHtml(info.name) + '</b>… you can close this window, it will be ready in a moment.');
         const fin = function () {
           making('');
@@ -411,6 +412,7 @@
   G.on('zone-bud', function (child, z) { if (G.mode === 'play') G.log('sp', z.word + ' spread', 'A new patch grew nearby, a little different.'); });
 
   let bannerTimer = 0, bannerQ = [];
+  G.on('new-pond', function () { bannerQ.length = 0; });      // what was waiting to be said was about the pond you have left
   G.banner = function (kicker, text, ms) {
     if (bannerQ.length > 1) bannerQ.shift();
     bannerQ.push([kicker, text, ms]);
@@ -420,7 +422,7 @@
     const b = bannerQ.shift();
     if (!b) { bannerTimer = 0; return; }
     refs.banner.innerHTML = '<small>' + escapeHtml(b[0]) + '</small>' + escapeHtml(b[1]);
-    { let y = 78; ['wish', 'wxnow'].forEach(function (id) { const e = document.getElementById(id); if (e && !e.classList.contains('hide') && e.offsetHeight && window.innerWidth > 720) y = Math.max(y, e.getBoundingClientRect().bottom + 10 - 14); });
+    { let y = 78; ['wish', 'wxnow', 'voybar', 'voypick'].forEach(function (id) { const e = document.getElementById(id); if (e && !e.classList.contains('hide') && e.offsetHeight && window.innerWidth > 720) y = Math.max(y, e.getBoundingClientRect().bottom + 10 - 14); });
       refs.banner.style.setProperty('transform', 'translate(-50%,' + Math.round(y) + 'px)', 'important'); }      /* just below the wish and the weather, never on them */
     refs.banner.classList.add('show');
     G.sfx('discovery');
@@ -654,7 +656,9 @@
         UI.followed = null;
       }
       $('iPar').textContent = par;
-      $('isub').textContent = (sp ? G.describeSpecies(sp) : 'A newborn: its species is sorted out in autumn.') + (G.lifeText && G.lifeText(c) ? ' ' + G.lifeText(c) : '');
+      // one line of what it is, and its life as a row of short tags (G.cardTags, 60b_genes.js); the whole of it in words is in ABOUT THIS CREATURE
+      $('isub').textContent = G.cardLine ? G.cardLine(c, sp) : (sp ? G.describeSpecies(sp) : 'A newborn: its species is sorted out in autumn.');
+      if (G.cardTags) G.cardTags(c);
       { const mb = $('imarvel'), mv = c.ph.mv, key = mv ? 'm' + mv.id : ''; if (mb && mb._k !== key) { mb._k = key; mb.classList.toggle('hide', !mv); mb.innerHTML = mv && G.marvelCard ? G.marvelCard(mv) : ''; } }
       G.R.selPrev = G.preview(c.g, c.id);
     }

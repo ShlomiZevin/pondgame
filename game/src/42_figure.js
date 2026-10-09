@@ -9,7 +9,7 @@
 (function () {
   'use strict';
   const IDS = ['back', 'tail', 'leg-far', 'arm-far', 'body', 'leg-near', 'head', 'arm-near'];
-  if (G.ai) { G.ai.gaps.figure = 1500; G.ai.caps.figure = 40; G.ai.LABEL.figure = 'Drawing the beings you typed'; }
+  if (G.ai) { G.ai.gaps.figure = 1500; G.ai.caps.figure = 80; G.ai.LABEL.figure = 'Drawing the beings you typed'; }
   const ready = {};          // word → figure, shared by every thing of that word in this session
   // the player's own words for a thing ("a human knight with a sword"), kept beside the short name the pond gave it ("Knight")
   const typed = {};
@@ -43,8 +43,12 @@
 
   /** the whole drawing of a thing by its name, once it has arrived (for menus and cards) */
   G.figurePic = function (name) { const f = ready[String(name || '').toLowerCase()]; return f ? f.svg : ''; };
+  const started = {};      // words whose drawing was begun at typing
   const none = {}, pending = {};      // names that have no shape of their own; drawings on their way
   const can = function () { return !!(G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.provider === 'server'); };
+  /** The drawing is begun the moment the words are typed, while the thing itself is still being imagined: the server keeps it, and hands it over when the
+   *  thing's name is known (see figureFor, which says which words it came from). The two waits overlap instead of following one another. */
+  G.figurePre = function (typedText) { const w = String(typedText || '').trim().slice(0, 80); if (!w || !can() || !G.ai.allow('figure')) return; started[w.toLowerCase()] = 1; G.host.call('ai.figure', { word: w, typed: w, note: '' }, 75000).then(function (r) { G.ai.tally('figure', r && r.source, r && r.usd); }, function () {}); };
   /** The drawing of a thing by its name: a promise of the cut-up figure, or of null when it has no shape of its own or cannot be drawn.
    *  Asked once per name; whoever asks again while it is on its way gets the same promise. info: { name, note, hue, wall } */
   G.figureFor = function (info, typedText) {
@@ -53,9 +57,9 @@
     if (ready[key]) return Promise.resolve(ready[key]);
     if (none[key] || !can()) return Promise.resolve(null);
     if (pending[key]) return pending[key];
-    if (!G.ai.allow('figure')) return Promise.resolve(null);
     if (typedText) typed[key] = String(typedText).slice(0, 120);
-    const p = pending[key] = G.host.call('ai.figure', { word: info.name, typed: typed[key] || info.name, note: info.note || '', hue: Math.round(info.hue || 200), kind: info.wall ? 'wall' : '' }, 260000).then(function (r) {
+    if (!(typed[key] && started[typed[key].toLowerCase()]) && !G.ai.allow('figure')) return Promise.resolve(null);      // (one begun at typing is already paid for: it is only fetched)
+    const p = pending[key] = G.host.call('ai.figure', { word: info.name, typed: typed[key] || info.name, note: info.note || '', hue: Math.round(info.hue || 200), kind: info.wall ? 'wall' : '', from: info.wall ? '' : (typed[key] || '') }, 750000).then(function (r) {
       G.ai.tally('figure', r && r.source, r && r.usd);
       if (!r || !r.figure || typeof r.figure.svg !== 'string' || !r.figure.svg || r.figure.svg.length > 46000) { delete pending[key]; if (r && r.source !== 'none') none[key] = 1; return null; }
       return new Promise(function (res) { build(r.figure, function (f) { delete pending[key]; if (f) { ready[key] = f; G.emit('figure', key); } else none[key] = 1; res(f); }); });

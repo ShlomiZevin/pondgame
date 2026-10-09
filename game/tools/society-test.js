@@ -60,7 +60,7 @@ check(shares > 20 && dances > 20, '4. they share and dance: ' + shares + ' gifts
   if (A.top && A.low) for (let t = 0; t < 4; t++) {
     G.newWorld({ seed: Bseed + t * 101 }); G.founderPond(); G.mode = 'play'; while (G.W.gen <= 12 && !G.W.extinct) G.step(0.1);
     const W = G.W, al = W.cre.filter((c) => !c.dead); if (al.length < 12) continue; const cx = mean(al.map((c) => c.x)), cy = mean(al.map((c) => c.y));
-    const gl = G.unpackGenome(A.top), go = G.unpackGenome(t < 2 ? A.low : A.top); if (t >= 2) { gl.s[0] = 0.95; go.s[0] = 0.05; }      // two ponds as nature made them, two with strangers alike in all but Leading
+    const gl = G.unpackGenome(A.top), go = G.unpackGenome(t < 2 ? A.low : A.top); if (t >= 2) { gl.s[0] = 0.95; go.s[0] = 0.05; gl.s[1] = go.s[1] = 0.1; }      // two ponds as nature made them, two with strangers alike in all but Leading
     const L = G.dropCreature(gl, cx - 60, cy), O = G.dropCreature(go, cx + 60, cy); let l = 0, o = 0, n = 0;
     for (let i = 0; i < 400; i++) { L.E = L.ph.Emax * 0.8; O.E = O.ph.Emax * 0.8; G.step(0.1); if (L.dead || O.dead) break; if (i > 50 && i % 10 === 0) { l += L.fol || 0; o += O.fol || 0; n++; } }
     if (n) { if (t < 2) { nat[0] += l / n; nat[1] += o / n; nat[2]++; } else { lead += l / n; nobody += o / n; trials++; } }
@@ -68,7 +68,7 @@ check(shares > 20 && dances > 20, '4. they share and dance: ' + shares + ' gifts
   console.log('   as nature made them: the strongest leader of the first pond (Leading ' + A.topLead.toFixed(2) + ') was followed in ' + nat[2] + ' strange ponds by ' + (nat[0] / Math.max(1, nat[2])).toFixed(1) + ' on average, a nobody of its pond (Leading ' + A.lowLead.toFixed(2) + ') by ' + (nat[1] / Math.max(1, nat[2])).toFixed(1));
   check(trials > 0 && lead > nobody && lead / trials >= 2, '6. of two strangers alike in all but Leading (0.95 and 0.05), the leader is followed in a strange pond (by ' + (lead / Math.max(1, trials)).toFixed(1) + ' on average) and the other is not (' + (nobody / Math.max(1, trials)).toFixed(1) + ')'); }
 { const said = {}; met.forEach((m) => { said[m.end] = (said[m.end] || 0) + 1; }); console.log('   what the ponds made of their strangers: ' + JSON.stringify(said)); met.slice(0, 3).forEach((m) => console.log('      ' + m.text));
-  check(met.length >= 4 && met.every((m) => ['led', 'few', 'looked', 'shunned', 'dead'].indexOf(m.end) >= 0), '6. ... and every pond says what it made of its stranger (' + met.length + ' verdicts)'); }
+  check(met.length >= 4 && met.every((m) => ['led', 'few', 'looked', 'shunned', 'dead', 'left'].indexOf(m.end) >= 0), '6. ... and every pond says what it made of its stranger (' + met.length + ' verdicts)'); }
 // 8. carried by hand: a creature KEPT in one pond is SET DOWN ALONE in another, with its character, as a stranger
 { G.newWorld({ seed: 77 }); G.founderPond(); G.mode = 'play'; while (G.W.gen <= 6 && !G.W.extinct) G.step(0.1);
   const src = G.W.cre.filter((c) => !c.dead)[0], it = G.keep(src), sA = src.g.s.slice(), n0 = G.collection.length;

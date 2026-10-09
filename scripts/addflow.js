@@ -13,7 +13,7 @@ const word = process.argv[2] || 'a snowman with a carrot nose', event = process.
   const fr = page.frames().find((f) => f !== page.mainFrame());
   await fr.locator('#tBegin').click(); await fr.evaluate(() => G.setSpeed(16)); await page.waitForTimeout(6000); await fr.evaluate(() => G.setSpeed(1));
   // 1. add a thing, and close the window straight away
-  await fr.evaluate(() => document.querySelector('#toolbar button').click()); await page.waitForTimeout(500);
+  await fr.evaluate(() => document.getElementById('tb-add').click()); await page.waitForTimeout(500);
   await fr.locator('#popup input, .pop input').first().fill(word);
   await fr.locator('#wordGo').click(); await page.waitForTimeout(900);
   await page.screenshot({ path: path.join(__dirname, 'addflow-1-imagining.png') });

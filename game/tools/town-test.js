@@ -31,7 +31,7 @@ for (const seed of seeds) {
   Wk.forEach((w, i) => {
     const n = G.buildCount(w), c = G.designCheck(w.bp); whole.push((n[0] + n[1]) / (2 * n[2])); loose += c.loose;
     let nb = false, row = false;
-    Wk.forEach((o, j) => { if (i === j) return; const gap = Math.abs(o.x - w.x) - (o.bp.hw + w.bp.hw), dy = Math.abs(o.y - w.y); if (gap < 0 && dy < 120) overlaps++; if (Math.hypot(o.x - w.x, o.y - w.y) < 700) { nb = true; if (dy < 10) row = true; } });
+    Wk.forEach((o, j) => { if (i === j) return; if ((o.bp.type === 'ship' && w.bp.type === 'port') || (o.bp.type === 'port' && w.bp.type === 'ship')) return;      /* (a spaceship stands on its port: that is where it belongs) */ const gap = Math.abs(o.x - w.x) - (o.bp.hw + w.bp.hw), dy = Math.abs(o.y - w.y); if (gap < 0 && dy < 120) overlaps++; if (Math.hypot(o.x - w.x, o.y - w.y) < 700 && !/ship|port/.test(o.bp.type + w.bp.type)) { nb = true; if (dy < 10) row = true; } });      /* (a port stands at the border of the pond and its ship upon it: they have their own place, not a place in a row) */
     if (nb) { withNb++; if (row) rowed++; }
   });
   console.log('seed ' + seed + (W.extinct ? ' EXTINCT at ' + W.gen : '') + ': generation ' + W.gen + ', ' + W.cre.length + ' alive, ' + Wk.length + ' buildings standing (' + at60 + ' at generation ' + Math.round(gens * 0.4) + '), ' + gone + ' fallen');

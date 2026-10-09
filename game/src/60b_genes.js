@@ -47,6 +47,39 @@
   };
   window.addEventListener('keydown', function (e) { if (win && e.key === 'Escape') { e.stopPropagation(); close(); } else if (about && e.key === 'Escape') { e.stopPropagation(); closeAbout(); } }, true);
   // ── About this creature: its marks explained, how it is doing, its family, what is new in it. A window like the one above; the card itself stays short. ──
+  // ── its life, as short tags ──
+  // (what it eats, where it lives, what it has learned, where it came from: each a word or two, with the full sentence when you rest on it)
+  function tagList(c) {
+    const L = G.lifeOf ? G.lifeOf(c) : { diet: -1 }, ph = c.ph || {}, T = [], add = function (t, tip, cls) { T.push([t, tip, cls || '']); };
+    if (ph.photo > 0.3) add('feeds on light', 'It lives partly on light.');
+    if ((ph.aggro || 0) > 0.38) add('a hunter', 'It attacks and eats other creatures.', 'r');
+    if (L.diet >= 0) add('eats ' + FOOD[L.diet], 'It has lived mostly on ' + FOOD[L.diet] + ' food.');
+    if (ph.love > 0.3) add('\u2665 ' + FOOD[ph.fav], 'Its body is made for ' + FOOD[ph.fav] + ' food: it gets more from it.', 'g');
+    if (ph.love > 0.3 && ph.bane >= 0) add('\u2715 ' + FOOD[ph.bane] + (c.ill ? ' \u00d7' + c.ill : ''), FOOD[ph.bane] + ' food makes it ill' + (c.ill ? ' (it has found that out ' + c.ill + (c.ill === 1 ? ' time)' : ' times)') : '') + '.', 'r');
+    if (L.land > 0.3) add('on the shore', 'It spends its days on the land.'); else if (L.shore > 0.3) add('by the shore', 'It keeps to the water by the shore.'); else if (L.deep > 0.5) add('the dark deep', 'It lives in the dark deep.'); else if ((c.liveT || 0) > 3) add('open water', 'It lives in open water.');
+    if (c.lessons > 3 && c.learned > 0.05) add('learned \u00d7' + c.lessons, 'It has learned from ' + c.lessons + ' meals and mishaps in its own life.', 'v');
+    if (c.bornKnowing > 0.05) add('born knowing', 'It was born knowing some of what its parents had learned.', 'v');
+    if (c.taught > 2) add('taught by elders', 'It has been learning from its elders.', 'v');
+    if (c.judged) add((c.judged > 0 ? 'GOOD' : 'BAD') + ' \u00d7' + Math.abs(c.judged), 'You have told it ' + (c.judged > 0 ? 'GOOD' : 'BAD') + ' ' + Math.abs(c.judged) + (Math.abs(c.judged) === 1 ? ' time.' : ' times.'), c.judged > 0 ? 'g' : 'r');
+    if (c.gave) add('shared \u00d7' + c.gave, 'It has given of its own food ' + c.gave + (c.gave === 1 ? ' time.' : ' times.'), 'g');
+    if (c.danced) add('danced \u00d7' + c.danced, 'It has danced ' + c.danced + (c.danced === 1 ? ' time.' : ' times.'));
+    if (c.builtShip) add('built the ship', 'It set pieces of the ' + c.builtShip + ' with its own hands: it is among the first to go in it.', 'g');
+    if (c.stranger !== undefined) add('from another pond', c.fromPond === 0 ? 'You set it down here yourself.' : 'It came here from another pond.', 'g'); else if (c.line) add('a stranger\'s line', 'It is descended from one who came here from another pond.', 'g');
+    return T;
+  }
+  const tags = function (c) { return tagList(c).map(function (t) { return '<span' + (t[2] ? ' class="' + t[2] + '"' : '') + ' title="' + esc(t[1]) + '">' + esc(t[0]) + '</span>'; }).join(''); };
+  /** the one line under a creature's name on its card: what its body is, in a few words */
+  G.cardLine = function (c, sp) { if (!sp) return 'A newborn: its kind is sorted out in autumn.'; const f = G.form.facts ? G.form.facts(c.g.f) : []; return (sp.judge && sp.judge.why ? cap1(sp.judge.why) : cap1(f.slice(0, 2).join(', '))).replace(/\.$/, '') + '.'; };
+  const cap1 = function (s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); };
+  G.cardTags = function (c) {
+    const sub = $('isub'); if (!sub) return; let el = $('itags');
+    if (!el) { const st = document.createElement('style'); st.textContent = '#inspector #isub{display:-webkit-box !important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-align:center;opacity:.9}#inspector #isub.open{display:block !important}' +
+        '#itags{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin:7px 0 2px}#itags span,#gbwin .gtags span{font:700 10.5px system-ui,sans-serif;padding:3px 8px;border-radius:999px;background:rgba(207,232,255,.09);border:1px solid rgba(207,232,255,.2);color:#dbeaff;white-space:nowrap;cursor:default}' +
+        '#itags span.g,#gbwin .gtags span.g{border-color:rgba(51,214,166,.55);color:#c9f7e6}#itags span.r,#gbwin .gtags span.r{border-color:rgba(255,126,182,.55);color:#ffd3e2}#itags span.v,#gbwin .gtags span.v{border-color:rgba(167,139,250,.6);color:#e3d9ff}' +
+        '#gbwin .gtags{margin-top:6px;gap:5px}#gbwin .gsoc{margin-top:6px;font-size:12px;line-height:1.4;opacity:.8}'; document.head.appendChild(st);
+      el = document.createElement('div'); el.id = 'itags'; const hd = sub.closest ? sub.closest('.ihead') : null; if (hd && hd.parentNode) hd.parentNode.insertBefore(el, hd.nextSibling); else sub.parentNode.appendChild(el); }
+    const h = tags(c); if (el._h !== h) { el._h = h; el.innerHTML = h; } el.style.display = h ? '' : 'none';
+  };
   let about = null, aboutT = 0, aboutSig = '';
   function closeAbout() { if (about) { about.remove(); about = null; } if (aboutT) { clearInterval(aboutT); aboutT = 0; } aboutSig = ''; }
   function fillAbout() {
@@ -55,6 +88,7 @@
     const bar = function (m) { const v = G.markOf(c, m.id); return '<div class="arow"><b>' + m.label + '</b><span class="gbar"><u style="width:' + Math.round(v * 100) + '%;background:#f6d365"></u></span><i>' + (v * 10).toFixed(1) + '</i><small>' + esc(String(m.note).replace(/^[A-Za-z]+: /, '').replace(/, out of 10.?/, '.')) + '</small></div>'; };
     const h = '<div class="gtop"><div><b>' + esc((sp ? sp.name : 'Blob') + ' #' + c.id) + '</b><small>' + esc(G.kindOf(c.g).full) + '</small></div><button class="btn sm" id="abclose">' + (G.ICON.close || '') + 'CLOSE</button></div>' +
       '<h3>ITS MARKS · OUT OF 10</h3>' + (G.MARKS || []).map(bar).join('') + '<div class="arow"><b>Appeal</b><span></span><i>' + (G.charmOf(c) * 10).toFixed(1) + '</i><small>All its marks together. Appeal, with having fed well, is its fitness: who breeds and who fades.</small></div>' +
+      '<h3>ITS KIND AND ITS LIFE</h3><div class="atext"><p>' + esc(sp ? G.describeSpecies(sp) : 'A newborn: its kind is sorted out in autumn.') + '</p><p>' + esc((G.lifeText ? G.lifeText(c) : '') + (G.societyText ? ' ' + G.societyText(c) : '')) + '</p></div>' +
       '<h3>WHAT IS SAID OF IT</h3><div class="atext">' + says.map(function (t) { return '<p>' + t + '</p>'; }).join('') + '</div>' +
       '<h3>HOW IT IS DOING</h3><div class="atext"><p>' + txt('iE') + '</p><p>' + txt('iAge') + '</p><p>' + txt('iPar') + '</p></div>' +
       '<h3>WHAT IS NEW IN IT</h3><div class="atext"><p>' + txt('imut') + '</p></div>';
@@ -188,7 +222,7 @@
       shownId = c.id;
       const sp = G.speciesById(c.sp);
       $('gbname').textContent = (sp ? sp.name : 'Blob') + ' #' + c.id + ' · ' + G.kindOf(c.g).full;
-      $('gbsub').textContent = 'Born in generation ' + c.born + '. ' + (G.lifeText ? G.lifeText(c) : '') + (G.societyText ? ' ' + G.societyText(c) : '');
+      $('gbsub').innerHTML = '<div class="gchips gtags"><span>born in generation ' + c.born + '</span>' + tags(c) + '</div>' + (G.societyText ? '<div class="gsoc">' + esc(G.societyText(c)) + '</div>' : '');
       $('gbgenes').innerHTML = genes(c);
       lastSay = 0;
     }

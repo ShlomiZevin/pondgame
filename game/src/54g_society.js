@@ -15,11 +15,13 @@
   const clamp = G.clamp, NAMES = ['lead', 'shy', 'kind', 'wit', 'play', 'sway'];
   G.SOC = NAMES;
   G.SOC_LABEL = ['Leading', 'Shyness', 'Kindness', 'Wit', 'Playfulness', 'Persuasion'];
-  const HIGH = ['a leader', 'shy', 'kind', 'clever', 'playful', 'a talker'], LOW = ['a follower', 'bold', 'selfish', 'simple', 'earnest', 'quiet'];
+  const HIGH = ['commanding', 'shy', 'kind', 'clever', 'playful', 'persuasive'], LOW = ['meek', 'bold', 'selfish', 'simple', 'earnest', 'quiet'];
+  /** how much others are drawn to it: its Leading, less for the shy (one that keeps out of crowds does not command them) */
+  const sway0 = G.leadOf = function (c) { const s = soc(c); return s[0] * (1 - 0.6 * s[1]); };
   const soc = G.soc = function (c) { const g = c.g || c; return g.s || (g.s = [0.3, 0.3, 0.3, 0.3, 0.3, 0.3]); };
   /** a creature's character in a few words */
   G.characterOf = function (c) {
-    const s = soc(c), hi = [], lo = []; s.forEach(function (v, i) { if (v > 0.62) hi.push([v, HIGH[i]]); else if (v < 0.16) lo.push([v, LOW[i]]); });
+    const s0 = soc(c), s = s0.slice(), hi = [], lo = []; s[0] = sway0(c) / 0.82; s.forEach(function (v, i) { if (v > 0.62) hi.push([v, HIGH[i]]); else if (v < 0.16 && !(i === 0 && s0[0] >= 0.16)) lo.push([v, LOW[i]]); });      /* (a shy one is never called commanding, however strong its Leading gene) */
     hi.sort(function (a, b) { return b[0] - a[0]; }); lo.sort(function (a, b) { return a[0] - b[0]; });
     const w = hi.slice(0, 2).map(function (q) { return q[1]; }).concat(lo.slice(0, hi.length ? 1 : 2).map(function (q) { return q[1]; }));
     return w.length ? w.join(', ') : 'of no marked character';
@@ -30,10 +32,10 @@
   let acc = 0;
   /** what one creature sees of those round it, and what it does about it (looked at a few times a second) */
   function look(W, c) {
-    const s = soc(c), R2 = 270 * 270; let best = null, bs = s[0] + 0.15, n = 0, cx = 0, cy = 0, needy = null, nd = 0.28, elder = null, talked = null, ts = s[5] + 0.2;
+    const s = soc(c), R2 = 270 * 270; let best = null, bs = sway0(c) + 0.15, n = 0, cx = 0, cy = 0, needy = null, nd = 0.28, elder = null, talked = null, ts = s[5] + 0.2;
     const mine = c.E / c.ph.Emax;
     for (let i = 0; i < W.cre.length; i++) { const o = W.cre[i]; if (o === c || o.dead) continue; const dx = o.x - c.x, dy = o.y - c.y, d2 = dx * dx + dy * dy; if (d2 > R2) continue;
-      const same = c.sp && o.sp === c.sp, os = soc(o), pull = os[0] * (same ? 1 : 0.85 - 0.6 * s[1]) * (1 + 0.05 * Math.min(8, o.fol || 0));      // the shy will not follow a stranger; the bold will, nearly as readily as one of their own
+      const same = c.sp && o.sp === c.sp, os = soc(o), pull = sway0(o) * (same ? 1 : 0.85 - 0.6 * s[1]) * (1 + 0.05 * Math.min(8, o.fol || 0));      // the shy will not follow a stranger; the bold will, nearly as readily as one of their own
       if (pull > bs) { bs = pull; best = o; }
       if (!same) continue;
       n++; cx += o.x; cy += o.y;
@@ -84,8 +86,19 @@
           else if (sh > 0.5 && d < 240) { const p = (sh - 0.4) * 110 * dt; c.vx -= dx / d * p; c.vy -= dy / d * p; g.fled = (g.fled || 0) + dt; } }      // the shy keep off
         if (near > (g.looked || 0)) g.looked = near; }
       else if (!g.told && age > VERDICT) tell(W, g, 'stay');
-      else if (g.told && age > 900) Gs.splice(k, 1);
+      else if (g.told) { g.chk = (g.chk || 0) + dt; if (g.chk >= 5) { g.chk = 0; again(W, g); } }      /* its standing may change: a following gathers, or leaves */
     }
+  }
+  function again(W, g) {
+    const S = g.c, fol = S.fol || 0, cur = fol >= 3 ? 'led' : fol >= 1 ? 'few' : 'alone', was = g.end === 'led' ? 'led' : g.end === 'few' ? 'few' : 'alone';
+    if (cur === was || (cur === 'few' && was === 'led') || (cur === 'alone' && was === 'few' && g.end !== 'few')) { g.diff = 0; if (cur === 'few' && was === 'alone') { g.end = 'few'; S.met = 'few'; } return; }
+    if ((g.diff = (g.diff || 0) + 1) < 3) return; g.diff = 0;      // (it has to last a while before it is news)
+    const id = '#' + S.id, who = G.characterOf(S); let kicker = '', text = '';
+    if (cur === 'led') { kicker = 'THE STRANGER NOW LEADS'; text = id + ' (' + who + ') is followed by ' + fol + ' now.'; g.end = 'led'; S.met = 'led'; }
+    else if (cur === 'alone') { kicker = 'THE STRANGER HAS LOST ITS FOLLOWING'; text = 'Nobody follows ' + id + ' (' + who + ') any more.'; g.end = 'left'; S.met = 'left'; }
+    else { g.end = 'few'; S.met = 'few'; return; }
+    g.kicker = kicker; g.text = text; g.toldAt = Date.now(); G.emit('stranger-met', S, g.end, text);
+    if (G.mode === 'play') { if (G.log) G.log('sp', kicker.charAt(0) + kicker.slice(1).toLowerCase(), text); if (G.note) G.note(kicker, text); }
   }
   function tell(W, g, how) {
     g.told = 1; const S = g.c, id = '#' + S.id, who = G.characterOf(S), fol = Math.max(g.ft ? Math.round(g.fs / g.ft) : 0, how === 'gone' ? 0 : S.fol || 0); let kicker, text;
@@ -94,7 +107,7 @@
     if (how === 'gone') { kicker = 'THE STRANGER DID NOT LAST'; text = id + ' (' + who + ') is dead: ' + ({ starved: 'it starved here', eaten: 'it was eaten', fought: 'it was killed in a fight', selected: 'it faded in its first winter' }[S.cause] || 'this pond was too hard for it') + '.'; g.end = 'dead'; }
     else if (fol >= 3) { kicker = 'THEY TOOK TO THE STRANGER'; text = id + ' (' + who + ') is followed by ' + fol + (names ? ' of ' + names : '') + '. What it has learned will pass to them, and they will build where it is.'; g.end = 'led'; }
     else if (fol >= 1) { kicker = 'A FEW TOOK TO THE STRANGER'; text = fol + (names ? ' of ' + names : '') + (fol === 1 ? ' follows ' : ' follow ') + id + ' (' + who + '). The rest keep to their own.'; g.end = 'few'; }
-    else if ((g.looked || 0) >= 2) { kicker = 'THEY LOOKED, AND WENT BACK TO THEIR OWN'; text = (g.looked) + ' came up to look at ' + id + ' (' + who + '), and none follows it: ' + (soc(S)[0] < 0.45 ? 'it is no leader.' : 'they would sooner follow their own.'); g.end = 'looked'; }
+    else if ((g.looked || 0) >= 2) { kicker = 'THEY LOOKED, AND WENT BACK TO THEIR OWN'; text = (g.looked) + ' came up to look at ' + id + ' (' + who + '), and none follows it: ' + (sway0(S) < 0.4 ? 'it is no leader.' : 'they would sooner follow their own.'); g.end = 'looked'; }
     else { kicker = 'THEY KEPT AWAY FROM THE STRANGER'; text = 'Nobody went near ' + id + ' (' + who + ')' + ((g.fled || 0) > 3 ? ': a shy people, they drew back from it.' : ': there was nobody about to meet it.'); g.end = 'shunned'; }
     S.met = g.end; W.stats.guest = g.end; G.emit('stranger-met', S, g.end, text);
     if (G.mode === 'play') { if (G.log) G.log('sp', kicker.charAt(0) + kicker.slice(1).toLowerCase(), text); if (G.banner) G.banner(kicker, text, 9000); }
@@ -120,6 +133,10 @@
   });
   /** a creature set down in this pond from somewhere else (a ship's passenger, a test): it keeps its genes and its character, and is a stranger here */
   G.dropCreature = function (genome, x, y) { const W = G.W, c = G.makeCreature(G.cloneGenome(genome), null, null, []); c.x = c.px = clamp(x, 20, W.ww - 20); c.y = c.py = clamp(y, 20, W.wh - 20); c.E = c.ph.Emax * 0.8; c.P = c.ph.Emax * 0.4; c.stranger = W.gen; c.snap = G.snapOf ? G.snapOf(c) : null; W.cre.push(c); (W.guests = W.guests || []).push({ c: c, t: W.t }); G.emit('stranger', c); return c; };
+  G.on('scored', function () { const W = G.W; if (!W || G.mode !== 'play') return; let n = 0; for (let i = 0; i < W.cre.length; i++) if (!W.cre[i].dead && W.cre[i].line) n++;
+    const away = G.far && G.far.visiting, who = away ? 'Your people at ' + away.name : 'The line of those who came from another pond';
+    if (n >= 8 && !W.lineHeld) { W.lineHeld = 1; if (G.log) G.log('sp', away ? 'Your people have taken hold' : "The line of the strangers has taken hold", who + ' now number' + (away ? ' ' : 's ') + n + '.'); if (G.note) G.note(away ? 'Your people have taken hold' : "The line of the strangers has taken hold", who + ' now number' + (away ? ' ' : 's ') + n + '.'); }
+    if (n > 0) W.lineSeen = 1; else if (W.lineSeen) { W.lineSeen = 0; W.lineHeld = 0; if (G.log) G.log('sp', away ? 'None of yours are left here' : "The line of the strangers has ended", who + ' has died out.'); if (G.note) G.note(away ? 'None of yours are left here' : "The line of the strangers has ended", who + ' has died out.'); } });
   // A guest that came this year has not been through the year's test, so its first winter does not judge it; from the next one it is judged like anyone.
   G.on('winter', function () { const W = G.W; if (!W) return; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.stranger === W.gen && c.doomed && !c.dead) { c.doomed = false; c.spared = 1; } } });
   // 1. carrying one creature from a pond to another: what you KEEP remembers its pond, and can be set down ALONE in any pond (BOOK, then COLLECTION)
@@ -140,7 +157,7 @@
   /** whom it follows or who follows it, what it has given and danced, and what its people are like */
   G.societyText = function (c) { const L = c.leader && !c.leader.dead ? c.leader : null, so = c.sp ? G.societyOf(c.sp) : null;
     return ((c.fol || 0) >= 3 ? c.fol + ' follow it. ' : L ? 'It follows #' + L.id + (L.sp !== c.sp ? ', one of another kind' : '') + (c.swayed ? ' (talked into it by #' + c.swayed + ')' : '') + '. ' : 'It follows nobody. ') + (c.gave ? 'It has shared its food ' + c.gave + (c.gave === 1 ? ' time. ' : ' times. ') : '') + (c.danced ? 'It has danced ' + c.danced + (c.danced === 1 ? ' time. ' : ' times. ') : '') + (so ? 'Its people: ' + so.text : ''); };
-  if (G.lifeText) { const t0 = G.lifeText; G.lifeText = function (c) { return t0(c) + ' Character: ' + G.characterOf(c) + '.' + (c.stranger !== undefined ? (c.fromPond === 0 ? ' You set it down here yourself.' : ' It came here from another pond.') + ({ led: ' They took to it.', few: ' A few took to it.', looked: ' They looked at it and went back to their own.', shunned: ' They kept away from it.' }[c.met] || '') : ''); }; }
+  if (G.lifeText) { const t0 = G.lifeText; G.lifeText = function (c) { return t0(c) + ' Character: ' + G.characterOf(c) + '.' + (c.stranger !== undefined ? (c.fromPond === 0 ? ' You set it down here yourself.' : ' It came here from another pond.') + ({ led: ' They follow it.', few: ' A few follow it.', looked: ' They looked at it and went back to their own.', shunned: ' They kept away from it.', left: ' Its following has left it.' }[c.met] || '') : c.line ? ' It is descended from one who came here from another pond.' : ''); }; }
   // The stranger's own strip, above the moments: who came, how many are looking and following right now, and then what the pond made of it. It stays on
   // screen for a while after the verdict (banners are often busy with other news), and a click on it goes to the stranger.
   if (typeof document !== 'undefined') setInterval(function () {
@@ -156,12 +173,30 @@
     const t = g.told ? K + '⚑ ' + g.kicker + '</b><br>' + g.text.replace(/[<>&]/g, '') : K + '⚑ A STRANGER AMONG THEM</b> ' + nm.replace(/[<>&]/g, '') + ', ' + G.characterOf(S) + '<br>' + near + ' near it now · ' + (g.looked || 0) + ' came to look · ' + (S.fol || 0) + ' follow it · they are making up their minds';
     if (el._t !== t) { el._t = t; el.innerHTML = t; }
   }, 400);
+  // ── in the NOW panel: strangers and how they stand; under PEOPLE, what each kind's society is like ──
+  setTimeout(function () { if (!G.hub) return;      /* (the panel is made after this file is read) */
+    G.hub.add(function (W) {
+      const out = { sig: '', now: [], people: [], news: [] }, Gs = (W.guests || []).filter(function (g) { return g.c && !g.c.dead; });
+      const WORD = { led: 'they follow it', few: 'a few follow it', looked: 'looked at, and left be', shunned: 'kept away from', left: 'its following has left it' };
+      Gs.slice(-4).forEach(function (g) { const S = g.c, nm = S.guestName ? S.guestName + ' (now #' + S.id + ')' : 'Stranger #' + S.id;
+        const row = G.hub.row({ icon: '\u2691', title: nm, tag: g.told ? WORD[g.end] || 'a stranger' : 'they are making up their minds', sub: G.characterOf(S) + ' \u00b7 ' + (S.fol || 0) + ' follow it' + (g.told ? '' : ' \u00b7 ' + (g.looked || 0) + ' came to look'), act: 'cre', arg: S.id, live: !g.told });
+        out.sig += S.id + ':' + (g.end || '') + ':' + (S.fol || 0) + ':' + (g.looked || 0) + '|'; out.people.push(row); if (!g.told || Date.now() - (g.toldAt || 0) < 90000) out.now.push(row); out.news.push('g' + S.id + (g.end || '')); });
+      let line = 0; for (let i = 0; i < W.cre.length; i++) if (!W.cre[i].dead && W.cre[i].line && W.cre[i].stranger === undefined) line++;
+      if (line) { out.sig += 'ln' + line; out.people.push(G.hub.row({ icon: '\u2691', title: (G.far && G.far.visiting ? 'Born here of your people' : 'Born of strangers') + ': ' + line, sub: 'Descended from those who came from another pond. They carry their character on.' })); }
+      W.species.filter(function (s) { return !s.extinct && s.n >= 3; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 7).forEach(function (s) { const so = G.societyOf(s.id); if (!so) return; const top = so.top;
+        out.sig += s.id + ':' + so.heads + ':' + (top ? top.id + '.' + top.fol : '') + '|';
+        out.people.push(G.hub.row({ icon: so.heads ? '\u2691' : '\u2022', title: 'The ' + s.name, tag: so.n + ' alive', sub: so.text, act: top ? 'cre' : 'kind', arg: top ? top.id : s.id }));
+        if (top && top.fol >= 5) out.news.push('L' + s.id + ':' + top.id); });
+      return out;
+    });
+    G.hub.act('kind', function (id) { const W = G.W; let x = 0, y = 0, n = 0; W.cre.forEach(function (c) { if (!c.dead && c.sp === +id) { x += c.x; y += c.y; n++; } }); if (n && G.focusOn) G.focusOn(x / n, y / n, 1.3); });
+  }, 0);
   // on its card, a line of its own: its character, and whom it follows or who follows it (click it for the genes)
   if (typeof document !== 'undefined') setInterval(function () {
     const at = document.getElementById('idoing'); if (!at) return; let el = document.getElementById('isoc');
     if (!el) { el = document.createElement('div'); el.id = 'isoc'; el.style.cssText = 'font-size:11.5px;line-height:1.45;margin-top:8px;padding:6px 9px;border-radius:10px;background:rgba(246,211,101,.08);border:1px solid rgba(246,211,101,.25);color:rgba(207,232,255,.9);cursor:pointer'; el.title = 'Its character is in its genes, and its children inherit it. Click for its genes.'; el.onclick = function () { if (G.openGenes) G.openGenes(); }; at.parentNode.insertBefore(el, at); }
     const c = G.R && G.R.sel; if (!c || c.dead || !c.g) return; const L = c.leader && !c.leader.dead ? c.leader : null;
-    const t = '<b style="color:#f6d365;letter-spacing:.06em;font-size:10.5px">CHARACTER</b> ' + G.characterOf(c) + '<br>' + ((c.fol || 0) >= 3 ? '\u2691 A leader: ' + c.fol + ' follow it' : L ? 'Follows #' + L.id + (L.sp !== c.sp ? ', one of another kind' : '') : 'Follows nobody') + (c.stranger !== undefined ? '<br>A stranger here' + ({ led: ': they took to it', few: ': a few took to it', looked: ': they looked, and left it be', shunned: ': they keep away from it' }[c.met] || ': they are making up their minds') : '');
+    const t = '<b style="color:#f6d365;letter-spacing:.06em;font-size:10.5px">CHARACTER</b> ' + G.characterOf(c) + '<br>' + ((c.fol || 0) >= 3 ? '\u2691 A leader: ' + c.fol + ' follow it' : L ? 'Follows #' + L.id + (L.sp !== c.sp ? ', one of another kind' : '') : 'Follows nobody') + (c.stranger !== undefined ? '<br>A stranger here' + ({ led: ': they follow it', few: ': a few follow it', looked: ': they looked, and left it be', shunned: ': they keep away from it', left: ': its following has left it' }[c.met] || ': they are making up their minds') : c.line ? '<br>Descended from one who came from another pond' : '');
     if (el._t !== t) { el._t = t; el.innerHTML = t; }
   }, 500);
 })();

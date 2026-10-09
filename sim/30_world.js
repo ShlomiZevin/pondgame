@@ -574,7 +574,8 @@
       if (c.x < ph.r) { c.x = ph.r; c.vx = Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; }
       else if (c.x > ww - ph.r) { c.x = ww - ph.r; c.vx = -Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; }
       // a creature of the water stops at the shore; a creature of the land only paddles in the shallows; one at home in both goes where it likes
-      const top = landTop + ph.r, bot = botLim;
+      const crew = c.deedId && W.deed && W.deed.id === c.deedId && (W.deed.voyage || (W.deed.result && (W.deed.result.port || W.deed.result.ship)));      // (those building a spaceport or its ship, and the crew of a mission, walk to the port wherever it is: up the beach, or down to the water's edge)
+      const top = (crew ? 0 : landTop) + ph.r, bot = crew ? wh - ph.r : botLim;
       if (c.y < top) { c.y = top; c.vy = Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
       else if (c.y > bot) { c.y = bot; c.vy = -Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
       c.land = c.y < G.shoreY(W);

@@ -719,6 +719,7 @@ function drawCreatures() {
     const c = cre[i];
     let x = c.px + (c.x - c.px) * a, y = c.py + (c.y - c.py) * a;
     c.rx = x; c.ry = y;
+    if (c.inShip) continue;      // it has gone aboard a ship: it is inside it
     let alpha = 1;
     if (c.doomed && season === 3) {
       const left = c.doomAt - W.st;
@@ -766,7 +767,7 @@ function drawCreatures() {
   // energy bars: the score
   if (showBars) {
     for (let i = 0; i < cre.length; i++) {
-      const c = cre[i];
+      const c = cre[i]; if (c.inShip) continue;
       const f = clamp01(c.E / c.ph.Emax);
       const w = Math.max(14, c.ph.r * 2.2), x = c.rx - w / 2, y = c.ry - c.ph.r * R.VIS * 3.75 - 8;
       ctx.fillStyle = G.rgba(PAL.deep, 0.65); roundRect(ctx, x - 1, y - 1, w + 2, 6, 3); ctx.fill();

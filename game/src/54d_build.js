@@ -38,7 +38,8 @@
   function plan(o) {
     const r = G.rng ? G.rng((o.seed >>> 0) + 17) : Math.random, S = o.S, P = [], sp = o.spiky > 0.5, rich = o.brain;
     const add = function (s, x, y, w, h, m, c) { P.push({ s: s, x: x, y: y, w: w, h: h, m: m, c: c, st: 0 }); };
-    const roof = function (x, y, w, h) { if (sp) add('tri', x, y, w, h * 1.5, 1, [20, 60, 52]); else add('dome', x, y, w, h, 2, [20, 62, 58]); };
+    const dry = o.wet === false;      // it stands on land, in the air: built as land things are (under water: domes and shells; on land: pitched roofs of reed)
+    const roof = function (x, y, w, h) { if (dry) { add('tri', x, y, w * 1.06, h * 1.7, 1, [34, 52, 50]); add('beam', x, y, w * 1.16, Math.max(4, h * 0.16), 1, [30, 40, 34]); } else if (sp) add('tri', x, y, w, h * 1.5, 1, [20, 60, 52]); else { add('dome', x, y, w, h, 2, [20, 62, 58]); if (o.wet && w > S * 0.5) add('circ', x, y - h, w * 0.16, w * 0.16, 2, [45, 80, 78]); } };
     if (o.type === 'wall') {
       const N = 10 + Math.round(4 * rich), rx = S * 1.05, ry = S * 0.62, posts = [];
       for (let i = 0; i < N; i++) { const a = -Math.PI / 2 + (i + 0.5) / N * TAU, gate = Math.abs(a - Math.PI / 2) < 0.36; posts.push([Math.cos(a) * rx, Math.sin(a) * ry, gate]); }
@@ -58,6 +59,22 @@
       for (let i = 0; i < N; i++) { const h = S * 0.24; add('rect', 0, y, w, h, 0, [0, 24, 48 + 3 * i]); if (i % 2) add('circ', 0, y - h * 0.5, w * 0.24, w * 0.24, 2, [45, 80, 68]); y -= h; w *= 0.88; }
       roof(0, y, w * 1.3, w * 0.7); add('lamp', 0, y - (sp ? w * 1.2 : w * 0.75), S * 0.16, S * 0.16, 2, [50, 95, 72]);
       for (let i = 0; i < 4; i++) add('rect', (i - 1.5) * S * 0.42, S * 0.1, S * 0.14, S * 0.12, 0, [0, 18, 44]);
+    } else if (o.type === 'port') {      // a spaceport: a wide flat pad on the shore (its middle clear, for a ship to stand on), marked at its edges, with a gantry tower at one side and lights
+      const Wd = S * 2.3, ph = S * 0.16, tx = -Wd * 0.4, th = S * (1.25 + 0.5 * rich), n = 3 + Math.round(2 * rich);
+      P.push({ s: 'rect', x: 0, y: 0, w: Wd, h: ph, m: 0, c: [0, 12, 40], st: 0, rr: 0.1 });
+      [-0.46, -0.3, 0.3, 0.46].forEach(function (u) { add('rect', u * Wd, -ph, Wd * 0.07, ph * 0.3, 1, [45, 85, 62]); });
+      for (let i = 0; i < n; i++) add('rect', tx, -ph * 1.3 - i * th / n, S * 0.2, th / n, 1, [0, 18, 38 + 4 * i]);
+      add('beam', tx + S * 0.2, -ph * 1.3 - th, S * 0.62, S * 0.08, 1, [35, 60, 56]); add('lamp', tx, -ph * 1.3 - th - S * 0.08, S * 0.16, S * 0.16, 2, [50, 95, 72]);
+      add('lamp', Wd * 0.44, -ph * 1.3, S * 0.12, S * 0.12, 2, [50, 95, 72]);
+    } else if (o.type === 'ship') {      // a spaceship, standing nose up on its fins: an engine, a body with windows, a nose, a light at the tip; and boosters at its sides for the cleverer
+      const bw = S * (0.5 + 0.1 * r()), bh = S * (1.0 + 0.5 * rich), eh = S * 0.16;
+      add('wing', -bw * 0.72, 0, S * 0.36, S * 0.5, 2, [20, 60, 56]); add('wing', bw * 0.72, 0, S * 0.36, S * 0.5, 2, [20, 60, 56]);
+      add('rect', 0, 0, bw * 0.6, eh, 0, [0, 18, 30]);
+      P.push({ s: 'rect', x: 0, y: -eh, w: bw, h: bh, m: 0, c: [0, 30, 58], st: 0, rr: 0.34 });
+      if (rich > 0.5) [-1, 1].forEach(function (sd) { const x = sd * (bw * 0.5 + S * 0.11); P.push({ s: 'rect', x: x, y: 0, w: S * 0.17, h: bh * 0.55, m: 1, c: [38, 50, 54], st: 0, rr: 0.4 }); add('tri', x, -bh * 0.55, S * 0.19, S * 0.16, 2, [20, 60, 52]); });
+      add('circ', 0, -eh - bh * 0.62, bw * 0.4, bw * 0.4, 2, [45, 80, 72]); if (rich > 0.3) add('circ', 0, -eh - bh * 0.3, bw * 0.3, bw * 0.3, 2, [45, 80, 72]);
+      if (sp) add('tri', 0, -eh - bh, bw * 1.04, bw * 0.95, 1, [20, 60, 52]); else add('dome', 0, -eh - bh, bw * 1.04, bw * 0.62, 2, [20, 62, 58]);
+      add('lamp', 0, -eh - bh - (sp ? bw * 0.95 : bw * 0.62), S * 0.13, S * 0.13, 2, [50, 95, 72]);
     } else if (o.type === 'house') {      // a small house: walls, a door, a roof, and, for the cleverer, a window and a smoke-hole
       const w = S * (1.2 + 0.3 * r()), h = S * 0.62; add('rect', 0, 0, w, h, 0, [0, 24, 50]); add('door', -w * 0.18, 0, w * 0.24, h * 0.7, 1, [0, 30, 16]); if (rich > 0.3) add('circ', w * 0.24, -h * 0.3, w * 0.18, w * 0.18, 2, [45, 80, 68]); roof(0, -h, w * 1.2, w * 0.42); if (rich > 0.6) add('rect', w * 0.3, -h - w * 0.1, w * 0.12, w * 0.3, 0, [0, 20, 40]);
     } else {      // a hall
@@ -79,10 +96,11 @@
   /** where it will stand. Their common sense about a place: build beside what your own kind has built; stand on the same ground line as your neighbours, so
    *  that buildings make a row and not a scatter; leave a gap; never build on top of another. */
   function site(W, d) {
+    if (d.result && d.result.at) { d.bp.hw = halfW(d.bp); d.x = d.result.at.x; d.y = d.result.at.y - d.bp.S * 0.45; return; }      // (a spaceship: its foot stands on the pad of its port)
     const bp = d.bp, hw = bp.hw = halfW(bp), Wk = (W.works || []).filter(function (w) { return w.bp && !w.fall; }), sy = G.shoreY ? G.shoreY(W) : 0, onLand = d.y < sy;
-    let x = d.x, y = d.y; const mine = Wk.filter(function (w) { return w.sp === d.sp; });
+    let x = d.x, y = d.y; const own = function (w) { return w.bp.type !== 'ship' && w.bp.type !== 'port'; }, mine = Wk.filter(function (w) { return w.sp === d.sp && own(w); });      /* (a port and its ship stand at the border: nothing is lined up on them) */
     if (mine.length) { x = mine[mine.length - 1].x; y = mine[0].y; d.beside = mine[0].name; }
-    else { let nb = null, nd = 460; Wk.forEach(function (w) { const dd = Math.hypot(w.x - x, w.y - y); if (dd < nd && (w.y < sy) === onLand) { nd = dd; nb = w; } }); if (nb) y = nb.y; }
+    else { let nb = null, nd = 460; Wk.forEach(function (w) { const dd = Math.hypot(w.x - x, w.y - y); if (dd < nd && own(w) && (w.y < sy) === onLand) { nd = dd; nb = w; } }); if (nb) y = nb.y; }
     const free = function (px) { for (let i = 0; i < Wk.length; i++) { const w = Wk[i], gap = (w.bp.hw || halfW(w.bp)) + hw + 26; if (Math.abs(w.x - px) < gap && Math.abs(w.y - y) < 150) return false; } return px > hw + 40 && px < W.ww - hw - 40; };
     const step = hw * 0.8 + 40, y0 = y, x0 = x, lo = onLand ? 70 : sy + 110, hi = onLand ? Math.max(80, sy - 40) : W.wh - 90; let ok = false;
     for (let row = 0; row < 7 && !ok; row++) { y = y0 + (row % 2 ? 1 : -1) * Math.ceil(row / 2) * 190; if (row && (y < lo || y > hi)) continue; y = clamp(y, lo, hi); x = x0; ok = free(x); for (let k = 1; k < 40 && !ok; k++) { const px = x0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * step; if (free(px)) { x = px; ok = true; } } }      /* when a row is full, a new one is begun behind it: a second street */
@@ -104,27 +122,31 @@
   };
   const live = function () { return G.mode === 'play' && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai && G.ai.provider === 'server' && G.ai.hasFuel(); };
   /** the design a kind's houses follow: its own if it has one, else that of the kind it came from */
-  function houseStyle(W, spId) { const H = W.houseStyle || {}; let id = spId; for (let k = 0; k < 6 && id; k++) { if (H[id]) return H[id]; const s = G.speciesById(id); id = s ? s.parent : 0; } return null; }
+  const styleKey = function (spId, wet) { return wet === false ? spId + 0.5 : spId; };      // (a kind that lives on both sides of the waterline has two kinds of house)
+  function houseStyle(W, spId, wet) { const H = W.houseStyle || {}; let id = spId; if (wet === false) { for (let k = 0; k < 6 && id; k++) { if (H[id + 0.5]) return H[id + 0.5]; const s = G.speciesById(id); id = s ? s.parent : 0; } return null; } for (let k = 0; k < 6 && id; k++) { if (H[id]) return H[id]; const s = G.speciesById(id); id = s ? s.parent : 0; } return null; }
   function askDesign(W, d) {
-    if (d.result && d.result.house) { const st = houseStyle(W, d.sp); if (st) { const base = blueprint(d), P = G.designFrom(st, base.S, 14); if (P) { base.P = P; base.designed = true; base.about = st.about || ''; settle(base, true); d.design = base; return; } } }      /* (a village: every house of a kind is the same house) */
+    if (d.result && d.result.house) { const b0 = blueprint(d), st = houseStyle(W, d.sp, b0.wet); if (st) { const base = b0, P = G.designFrom(st, base.S, 14); if (P) { base.P = P; base.designed = true; base.about = st.about || ''; settle(base, true); d.design = base; return; } } }      /* (a village: every house of a kind is the same house) */
     if (typeof document === 'undefined' || !live() || !G.ai.allow('deed')) { d.design = false; return; }
     const base = blueprint(d), sp = G.speciesById(d.sp), f = sp && sp.rep ? sp.rep.f : null, r = d.result || {}, house = !!(r.house), maxN = house ? Math.round(6 + 5 * base.brain) : Math.round(12 + 26 * base.brain);
     const near = (W.works || []).filter(function (w) { return w.bp && !w.fall && Math.hypot(w.x - d.x, w.y - d.y) < 900; }).slice(-5).map(function (w) { return { name: w.name, by: w.by, what: w.bp.about || w.looks || '' }; });
-    const info = { builders: d.kind, body: f && G.form.kind ? G.form.kind(f).full + (G.form.facts ? ': ' + G.form.facts(f).slice(0, 6).join('; ') : '') : '', name: r.name || '', looks: r.looks || '', why: d.why || '', what: d.what || '', purpose: house ? 'a small house for one family of them to sleep in and raise their young: every house of this kind will be built to this same design, side by side, so keep it simple and their own' : r.solid ? 'it shuts others out: only they may pass' : r.feed > 0.05 ? 'it feeds them' : r.pull > 0.1 ? 'it draws them together' : r.hurt > 0.05 ? 'it harms what comes near' : 'a place of their own', where: d.y < (G.shoreY ? G.shoreY(W) : 0) ? 'on the land' : 'under water, on the pond floor', pieces: [Math.round(maxN * 0.55), maxN], near: near, model: G.ai.model || undefined };
+    const wet = base.wet !== false, where = r.ship || r.port ? '' : wet ? ' WHERE IT STANDS: UNDER WATER, on the floor of the pond. Build it as underwater things are built: shell, coral and stone; rounded domes and bubbles, arches, fronds and fins that sway in the current; low, wide and anchored to the floor. Nothing that belongs in dry air: no thatch, no chimney, no flag on a pole.' : ' WHERE IT STANDS: ON DRY LAND, in the open air above the water. Build it as land things are built: reed, wood and stone; walls and posts under a pitched or pointed roof that sheds rain, steps, a smoke-hole, a flag. Taller and lighter than what is built under water; no bubbles, no fronds.';
+    const info = { builders: d.kind, body: f && G.form.kind ? G.form.kind(f).full + (G.form.facts ? ': ' + G.form.facts(f).slice(0, 6).join('; ') : '') : '', name: r.name || '', looks: r.looks || '', why: d.why || '', what: d.what || '', purpose: r.port ? 'a SPACEPORT, on dry land at the very edge of the pond: the place their spaceship will be built on and lift off from. The rest is yours to design, but it must have: a wide, low, flat launch PAD lying on the ground (one "slab" about 2 wide and 0.15 high, at x 0, y 0), whose MIDDLE IS LEFT CLEAR (nothing taller than a marking between x -0.65 and x 0.65: the ship will stand there); and whatever else you give it (towers, gantries, masts, lamps, fuel tanks, flags) standing at its SIDES, outside that middle. Open to the sky: no roof over the pad' : r.ship ? 'a SPACESHIP, to fly a few of them through outer space to another pond: a rocket, a saucer or a pod of their own making. It stands in the clear middle of their launch pad, centred on x 0, its foot (legs, fins or engines) flat on the ground at y 0, no wider than 1.1 in all, nose up, ready to lift off: a body they can sit in with round windows, a nose or a dome on top, fins or wings at its sides, engines at the bottom, a light at its tip. It must read at a glance as a spacecraft (NOT a sailing ship: no mast, no sail, no hull on water; and not a house)' : house ? 'a small house for one family of them to sleep in and raise their young: every house of this kind will be built to this same design, side by side, so keep it simple and their own' : r.solid ? 'it shuts others out: only they may pass' : r.feed > 0.05 ? 'it feeds them' : r.pull > 0.1 ? 'it draws them together' : r.hurt > 0.05 ? 'it harms what comes near' : 'a place of their own', where: d.y < (G.shoreY ? G.shoreY(W) : 0) ? 'on the land' : 'under water, on the pond floor', pieces: [Math.round(maxN * 0.55), maxN], near: near, model: G.ai.model || undefined }; info.purpose = String(info.purpose || '') + where;
     d.design = null;
-    G.host.call('ai.build', info, 60000).then(function (res) { G.ai.tally('deed', res && res.source, res && res.usd); if (G.W !== W || W.deed !== d || d.bp) return; const P = res && res.build ? G.designFrom(res.build, base.S, maxN) : null; if (!P) { d.design = false; return; } if (house) { (W.houseStyle = W.houseStyle || {})[d.sp] = { about: String(res.build.about || '').slice(0, 120), pieces: res.build.pieces.slice(0, 14) }; } base.P = P; base.designed = true; settle(base, true); base.about = String(res.build.about || '').replace(/[<>]/g, '').slice(0, 120); d.design = base; }, function () { if (W.deed === d) d.design = false; });
+    G.host.call('ai.build', info, 60000).then(function (res) { G.ai.tally('deed', res && res.source, res && res.usd); if (G.W !== W || W.deed !== d || d.bp) return; const P = res && res.build ? G.designFrom(res.build, base.S, maxN) : null; if (!P) { d.design = false; return; } if (house) { (W.houseStyle = W.houseStyle || {})[styleKey(d.sp, base.wet)] = { about: String(res.build.about || '').slice(0, 120), pieces: res.build.pieces.slice(0, 14) }; } base.P = P; base.designed = true; fit(base, W); settle(base, true); base.about = String(res.build.about || '').replace(/[<>]/g, '').slice(0, 120); d.design = base; }, function () { if (W.deed === d) d.design = false; });
   }
+  /** a port gets its pad and its clear middle; a ship is made to fit the port it will stand on */
+  function fit(bp, W) { if (bp.type === 'port') portRules(bp); else if (bp.type === 'ship') { const port = (W.works || []).filter(function (w) { return w.bp && w.bp.type === 'port' && !w.fall; })[0]; shipRules(bp, port ? G.dockOf(port).half : bp.S * 0.6); } }
   /** the plan of what a kind is about to build */
   function blueprint(d) {
     const W = G.W, r = d.result || {}, m = Math.min(W.ww, W.wh), sp = G.speciesById(d.sp), f = sp && sp.rep ? sp.rep.f : null;
     let spiky = 0; if (f) { (f.rules || []).forEach(function (q) { if (q.k === 2 || q.k === 7) spiky = 1; }); if (f.crest > 0.25) spiky = 1; }
     let h = 0, n = 0; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].sp === d.sp) { h += W.cre[i].g.h; n++; }
-    const o = { seed: (G.hash ? G.hash(String(d.title) + d.id) : d.id * 7919) >>> 0, type: r.house ? 'house' : r.solid ? 'wall' : r.feed > 0.05 ? 'huts' : r.pull > 0.15 ? 'spire' : 'hall', S: r.house ? clamp((r.size || 0.04) * m, 36, 58) : clamp((r.size || 0.08) * m, 55, 118), hue: d.hue || 50, spiky: spiky, brain: clamp((n ? h / n : 0) / 7, 0, 1) };
-    o.P = plan(o); settle(o, true); return o;      // (the fallback shape: used when the kind's own design cannot be had)
+    const o = { wet: !(r.port || r.ship) && d.y > (G.shoreY ? G.shoreY(W) : 0), seed: (G.hash ? G.hash(String(d.title) + d.id) : d.id * 7919) >>> 0, type: r.port ? 'port' : r.ship ? 'ship' : r.house ? 'house' : r.solid ? 'wall' : r.feed > 0.05 ? 'huts' : r.pull > 0.15 ? 'spire' : 'hall', S: r.port ? clamp((r.size || 0.085) * m, 84, 124) : r.ship ? clamp((r.size || 0.06) * m, 52, 84) : r.house ? clamp((r.size || 0.04) * m, 36, 58) : clamp((r.size || 0.08) * m, 55, 118), hue: d.hue || 50, spiky: spiky, brain: clamp((n ? h / n : 0) / 7, 0, 1) };
+    o.P = plan(o); fit(o, W); settle(o, true); return o;      // (the fallback shape: used when the kind's own design cannot be had)
   }
   G.blueprintPack = function (bp) { return bp.designed ? { about: bp.about || '', P: bp.P.map(function (p) { return [p.s, Math.round(p.x), Math.round(p.y), Math.round(p.w), Math.round(p.h), p.m, p.c[0], p.c[1], p.c[2], p.rr || 0]; }) } : null; };
   G.blueprintUnpack = function (bp, pk, states) { if (!pk || !Array.isArray(pk.P)) return bp; const ok = ['rect', 'tri', 'dome', 'circ', 'door', 'beam', 'wing', 'lamp', 'flag']; const P = pk.P.slice(0, 60).filter(function (q) { return Array.isArray(q) && ok.indexOf(q[0]) >= 0; }).map(function (q, i) { return { s: q[0], x: clamp(+q[1] || 0, -400, 400), y: clamp(+q[2] || 0, -600, 0), w: clamp(+q[3] || 10, 2, 500), h: clamp(+q[4] || 10, 2, 400), m: clamp(q[5] | 0, 0, 2), c: [+q[6] || 0, clamp(+q[7] || 50, 0, 100), clamp(+q[8] || 50, 0, 100)], rr: +q[9] || 0, st: clamp(+String(states || '').charAt(i) || 0, 0, 2) }; }); if (P.length >= 4) { bp.P = P; bp.dep = null; bp.designed = true; bp.about = String(pk.about || '').replace(/[<>]/g, '').slice(0, 120); } return bp; };
-  G.blueprintFrom = function (o, states) { const bp = { seed: o.seed, type: o.type, S: o.S, hue: o.hue, spiky: o.spiky, brain: o.brain }; bp.P = plan(bp); settle(bp, true); if (typeof states === 'string') for (let i = 0; i < bp.P.length; i++) bp.P[i].st = clamp(+states.charAt(i) || 0, 0, 2); return bp; };
+  G.blueprintFrom = function (o, states) { const bp = { seed: o.seed, type: o.type, S: o.S, hue: o.hue, spiky: o.spiky, brain: o.brain, wet: o.wet }; bp.P = plan(bp); settle(bp, true); if (typeof states === 'string') for (let i = 0; i < bp.P.length; i++) bp.P[i].st = clamp(+states.charAt(i) || 0, 0, 2); return bp; };
   // what the creatures build is drawn by the game, so no picture is asked of the AI for it
   if (G.figureFor) { const f0 = G.figureFor; G.figureFor = function (info, typed) { if (info && /Built by small pond creatures/.test(String(info.note || ''))) return Promise.resolve(null); return f0(info, typed); }; }
 
@@ -217,9 +239,12 @@
   // what stands: kept up while its builders' kind lives, crumbling when it is gone or when nature strikes it down
   function worksStep(W, dt) {
     const Wk = W.works; if (!Wk || !Wk.length) return;
+    // a ship stays made fast to its port: wherever the port is (the pond grows, and everything in it moves apart), the ship stands in the middle of its pad
+    { let port = null, ship = null; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.bp || w.fall) continue; if (w.bp.type === 'port') port = w; else if (w.bp.type === 'ship' && !w.visitor) ship = w; } if (port && ship && !ship.lifting) { const dk = G.dockOf(port); ship.x = dk.x; ship.y = dk.y - ship.bp.S * 0.45; } }
     for (let i = Wk.length - 1; i >= 0; i--) {
       const w = Wk[i]; if (!w.bp) continue;
       w.until = W.t + 9999;      // it does not run out by the clock
+      if (w.visitor) continue;      // (a ship come from another pond: it is its crew's, and leaves with them)
       w.upT = (w.upT || 0) - dt; if (w.upT > 0) continue; w.upT = w.fall ? 0.12 : 5;
       let kin = 0; for (let k = 0; k < W.cre.length; k++) if (W.cre[k].sp === w.sp && !W.cre[k].dead) kin++;
       const P = w.bp.P;
@@ -260,24 +285,56 @@
   }
   { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (!W || W.title) return; matsStep(W, dt); const d = W.deed; if (d && d.result && d.steps[d.i] && d.steps[d.i].do === 'build') buildStep(W, d, dt); worksStep(W, dt); if (W.works && W.works.length) homeStep(W, dt); }; }
 
+  // ── a port and its ship: the shape is theirs, the fit is plain sense ──
+  // A spaceport and a spaceship are designed like everything else they build (by the kind's own mind when the AI is there, a plain shape when it is not).
+  // Whatever the design, three things are then made sure of, as a floating piece is let down onto what it rests on:
+  //   · a port has a PAD: a wide, low, flat piece on the ground (one is laid under it if the design has none);
+  //   · the middle of the pad is CLEAR: anything standing there (a tower, a spire) is moved out to the side, so there is a place to stand a ship;
+  //   · a ship FITS that place and stands in the middle of it, its foot on the pad: a design too wide is made smaller, one off-centre is centred.
+  const DOCK = 0.62;      // half the width of the clear middle of a pad, in the port's own measure
+  const padOf = function (bp) { let pad = null; for (let i = 0; i < bp.P.length; i++) { const p = bp.P[i]; if (p.y > -3 && (p.s === 'rect' || p.s === 'beam') && (!pad || p.w > pad.w)) pad = p; } return pad; };
+  function portRules(bp) {
+    const S = bp.S, Pc = bp.P; let pad = padOf(bp);
+    if (!pad || pad.w < S * 1.5 || pad.h > S * 0.34) { const h = S * 0.15; let wide = S * 1.9; Pc.forEach(function (p) { p.y -= h; wide = Math.max(wide, 2 * (Math.abs(p.x) + p.w / 2)); }); pad = { s: 'rect', x: 0, y: 0, w: Math.min(wide, S * 2.8), h: h, m: 0, c: [0, 12, 40], st: 0, rr: 0.1 }; Pc.unshift(pad); bp.padAdded = 1; }
+    const dx = pad.x, zone = S * DOCK;
+    for (let i = 0; i < Pc.length; i++) { const p = Pc[i]; if (p === pad || -p.y + p.h <= pad.h + S * 0.1) continue;      /* (the pad itself, and low marks and lights lying on it, stay) */
+      if (p.x + p.w / 2 > dx - zone && p.x - p.w / 2 < dx + zone) { p.x = dx + (p.x >= dx ? 1 : -1) * (zone + p.w / 2 + 3); bp.cleared = (bp.cleared || 0) + 1; } }
+    return bp;
+  }
+  function shipRules(bp, room) {
+    const Pc = bp.P; let lo = 1e9, hi = -1e9; Pc.forEach(function (p) { lo = Math.min(lo, p.x - p.w / 2); hi = Math.max(hi, p.x + p.w / 2); }); if (!(hi > lo)) return bp;
+    const mid = (lo + hi) / 2, k = Math.min(1, 2 * room / (hi - lo));
+    Pc.forEach(function (p) { p.x = (p.x - mid) * k; p.y *= k; p.w *= k; p.h *= k; }); if (k < 1) { bp.S *= k; bp.fitted = k; }
+    return bp;
+  }
+  G.portFit = function (bp) { portRules(bp); return settle(bp, true); }; G.shipFit = function (bp, room) { shipRules(bp, room); return settle(bp, true); };      // (for the tests)
+  /** where a ship stands on a port: the middle of its pad (x), the top of the pad (y), and how wide a ship it has room for (half) */
+  G.dockOf = function (port) { const bp = port.bp, pad = padOf(bp), base = port.y + bp.S * 0.45; return { x: port.x + (pad ? pad.x : 0), y: base - (pad ? pad.h : bp.S * 0.16), half: bp.S * DOCK - 4 }; };
+  G.padTop = function (port) { return G.dockOf(port).y; };
+  /** is the middle of this port's pad clear, and does this ship stand in it? (for the tests) */
+  G.dockCheck = function (port, ship) { const dk = G.dockOf(port), bp = port.bp, pad = padOf(bp); let blocked = 0; bp.P.forEach(function (p) { if (p === pad || -p.y + p.h <= (pad ? pad.h : 0) + bp.S * 0.1) return; if (port.x + p.x + p.w / 2 > dk.x - dk.half + 2 && port.x + p.x - p.w / 2 < dk.x + dk.half - 2) blocked++; });
+    const out = { pad: !!pad && pad.w >= bp.S * 1.5, blocked: blocked }; if (ship) { let lo = 1e9, hi = -1e9; ship.bp.P.forEach(function (p) { lo = Math.min(lo, p.x - p.w / 2); hi = Math.max(hi, p.x + p.w / 2); }); out.centred = Math.abs(ship.x + (lo + hi) / 2 - dk.x) < 3; out.fits = (hi - lo) / 2 <= dk.half + 5; out.onPad = Math.abs(ship.y + ship.bp.S * 0.45 - dk.y) < 3; } return out; };
   // ── a kind makes itself a home ──
   // Besides what a kind may take into its head (the plans the AI imagines for it), an established kind builds for itself, with nobody asked: the first thing is
   // a place of its own, and what it builds follows from how it is faring: hungry, it builds huts round a store; among fierce strangers or armed things, a
   // wall; otherwise a hall, and later a tower beside it. One more for every forty generations the kind has lasted, up to four. So a pond fills, slowly, with
   // what its creatures made, and each kind's quarter is its own. (It costs nothing: the plan of pieces is worked out by the game.)
   G.on('scored', function () {
-    const W = G.W; if (!W || W.title || W.deed || G.mode !== 'play' || W.gen < 12 || (W.works || []).length >= 22 || G.rand() > 0.45) return;
+    const W = G.W; if (!W || W.title || W.deed || G.mode !== 'play' || W.gen < 12 || (W.works || []).length >= 22) return;
+    { const Wk0 = W.works || [], hasPort = Wk0.some(function (w) { return w.bp && w.bp.type === 'port'; }), hasShip = Wk0.some(function (w) { return w.bp && w.bp.type === 'ship'; }); if (!(hasPort && !hasShip) && G.rand() > 0.45) return; }
     const kinds = W.species.filter(function (s) { return !s.extinct && s.n >= 10 && W.gen - s.born >= 6; }); if (!kinds.length) return;
+    const shipAny = (W.works || []).some(function (w) { return w.bp && w.bp.type === 'ship'; }), port = (W.works || []).filter(function (w) { return w.bp && w.bp.type === 'port' && !w.fall && !w.ruin; })[0], away = !!(G.far && G.far.visiting);
     let fierce = 0, armed = 0; for (let i = 0; i < W.cre.length; i++) if ((W.cre[i].ph.aggro || 0) > 0.38) fierce++; for (let i = 0; i < W.zones.length; i++) if (W.zones[i].act && W.zones[i].foe) armed++;
-    for (let k = 0; k < kinds.length; k++) { const s = kinds[(k + W.gen) % kinds.length], all = (W.works || []).filter(function (w) { return w.bp && w.sp === s.id; }), mine = all.filter(function (w) { return w.bp.type !== 'house'; }), houses = all.length - mine.length, may = Math.min(4, 1 + Math.floor((W.gen - s.born) / 40));
-      const allH = (W.works || []).filter(function (w) { return w.bp && w.bp.type === 'house'; }).length, wantH = mine.length && allH < 8 ? Math.min(3, Math.floor(s.n / 9)) : 0;      /* a house for every nine or so of them, three at most to a kind, eight in the pond */ if (mine.length >= may && houses >= wantH) continue;
+    if (port && !shipAny) kinds.sort(function (a, b) { return (b.id === port.sp ? 1 : 0) - (a.id === port.sp ? 1 : 0); });      /* the kind whose port stands empty is asked first */
+    for (let k = 0; k < kinds.length; k++) { const s = port && !shipAny ? kinds[k] : kinds[(k + W.gen) % kinds.length], all = (W.works || []).filter(function (w) { return w.bp && w.sp === s.id; }), ships = all.filter(function (w) { return w.bp.type === 'ship' || w.bp.type === 'port'; }).length, mine = all.filter(function (w) { return w.bp.type !== 'house' && w.bp.type !== 'ship' && w.bp.type !== 'port'; }), houses = all.length - mine.length - ships, may = Math.min(4, 1 + Math.floor((W.gen - s.born) / 40));
+      const allH = (W.works || []).filter(function (w) { return w.bp && w.bp.type === 'house'; }).length, wantH = mine.length && allH < 8 ? Math.min(3, Math.floor(s.n / 9)) : 0;      /* a house for every nine or so of them, three at most to a kind, eight in the pond */ const wantPort = !port && !shipAny && !away && W.gen >= 14 && mine.length >= 1 && s.n >= 10, wantShip = !!port && !shipAny && !away && s.n >= 8 && (port.sp === s.id || !W.species.some(function (q) { return q.id === port.sp && !q.extinct && q.n >= 8; })) && count(port.bp)[0] >= count(port.bp)[2];      /* once a kind has a place of its own it looks further: a port on the shore, then a ship upon it; one of each to a pond */ if (!wantPort && !wantShip && mine.length >= may && houses >= wantH) continue;
       let e = 0, n = 0, x = 0, y = 0, own = 0; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.sp !== s.id) continue; e += c.E / c.ph.Emax; x += c.x; y += c.y; n++; if ((c.ph.aggro || 0) > 0.38) own++; } if (n < 8) continue;
       const has = function (t) { return mine.some(function (w) { return w.bp.type === t; }); }, threatened = armed > 0 || fierce - own > W.cre.length * 0.3, hungry = e / n < 0.5;
-      const type = houses < wantH && (mine.length >= may || houses < mine.length * 2) ? 'house' : !mine.length ? (hungry ? 'huts' : 'hall') : threatened && !has('wall') ? 'wall' : hungry && !has('huts') ? 'huts' : !has('spire') ? 'spire' : !has('huts') ? 'huts' : !has('hall') ? 'hall' : 'wall', nw = String(s.name).split(' '), first = nw.length >= 3 ? nw[nw.length - 2] : nw[0];      /* first a place of their own; then what they are short of */
-      const name = first + ' ' + { wall: 'Ring', huts: 'Huts', hall: 'Hall', spire: 'Tower', house: 'House' }[type] + (type === 'house' && houses ? ' ' + (houses + 1) : ''), why = type === 'house' ? 'there are more of them than there are roofs' : type === 'wall' ? (armed ? 'something armed is loose in the pond' : 'fierce strangers are all about them') : type === 'huts' ? 'they are going hungry' : mine.length ? 'their place has room for more' : 'they have no place of their own';
-      G.deedStart({ kind: s.name, title: name, say: '', what: 'build ' + (type === 'house' ? 'a house for a family, beside the others' : type === 'wall' ? 'a ring of posts to live inside' : type === 'huts' ? 'huts round a store of food' : type === 'hall' ? 'a hall to gather in' : 'a tower to be seen from afar'), why: why, share: 0.6, own: true,
-        steps: [{ do: 'gather', secs: 5, cry: '' }, { do: 'build', secs: 34, cry: '' }], place: (function () { const L = G.leaderOf ? G.leaderOf(s.id) : null; return L ? { x: clamp(L.x / W.ww, 0.12, 0.88), y: clamp(L.y / W.wh, 0.3, 0.85) } : { x: clamp(x / n / W.ww, 0.12, 0.88), y: clamp(y / n / W.wh, 0.3, 0.85) }; })(),      /* where their leader is, if they have one; else in the midst of them */
-        result: { name: name, looks: 'made of what lay about the pond', stuff: 'rock', shape: 'circle', size: type === 'house' ? 0.04 : 0.075, house: type === 'house', solid: type === 'wall', feed: type === 'huts' ? 0.25 : 0, slow: 0, hurt: 0, pull: type === 'spire' ? 0.22 : type === 'hall' ? 0.08 : 0, life: 240 } });
+      const type = wantPort ? 'port' : wantShip ? 'ship' : houses < wantH && (mine.length >= may || houses < mine.length * 2) ? 'house' : !mine.length ? (hungry ? 'huts' : 'hall') : threatened && !has('wall') ? 'wall' : hungry && !has('huts') ? 'huts' : !has('spire') ? 'spire' : !has('huts') ? 'huts' : !has('hall') ? 'hall' : 'wall', nw = String(s.name).split(' '), first = nw.length >= 3 ? nw[nw.length - 2] : nw[0];      /* first a place of their own; then what they are short of */
+      const name = first + ' ' + { wall: 'Ring', huts: 'Huts', hall: 'Hall', spire: 'Tower', house: 'House', ship: 'Starship', port: 'Spaceport' }[type] + (type === 'house' && houses ? ' ' + (houses + 1) : ''), why = type === 'port' ? 'they have seen the lights of other ponds, far off in space' : type === 'ship' ? 'their spaceport stands ready' : type === 'house' ? 'there are more of them than there are roofs' : type === 'wall' ? (armed ? 'something armed is loose in the pond' : 'fierce strangers are all about them') : type === 'huts' ? 'they are going hungry' : mine.length ? 'their place has room for more' : 'they have no place of their own';
+      G.deedStart({ kind: s.name, title: name, say: '', what: 'build ' + (type === 'port' ? 'a spaceport on the shore, to build a spaceship on' : type === 'ship' ? 'a spaceship on their spaceport, to fly to another pond' : type === 'house' ? 'a house for a family, beside the others' : type === 'wall' ? 'a ring of posts to live inside' : type === 'huts' ? 'huts round a store of food' : type === 'hall' ? 'a hall to gather in' : 'a tower to be seen from afar'), why: why, share: 0.6, own: true,
+        steps: [{ do: 'gather', secs: 5, cry: '' }, { do: 'build', secs: 34, cry: '' }], place: (function () { const L = G.leaderOf ? G.leaderOf(s.id) : null; if (type === 'port') return { x: x / n < W.ww / 2 ? 0.13 : 0.87, y: ((G.shoreY ? G.shoreY(W) : W.wh * 0.25) - 46) / W.wh };      /* on the land, at the border of the pond, just above the waterline: in plain sight, and within reach of those in the shallows */ if (type === 'ship') return { x: G.dockOf(port).x / W.ww, y: port.y / W.wh }; return L ? { x: clamp(L.x / W.ww, 0.12, 0.88), y: clamp(L.y / W.wh, 0.3, 0.85) } : { x: clamp(x / n / W.ww, 0.12, 0.88), y: clamp(y / n / W.wh, 0.3, 0.85) }; })(),      /* where their leader is, if they have one; else in the midst of them */
+        result: { name: name, looks: 'made of what lay about the pond', stuff: 'rock', shape: 'circle', size: type === 'house' ? 0.04 : type === 'ship' ? 0.06 : type === 'port' ? 0.085 : 0.075, ship: type === 'ship', port: type === 'port', at: type === 'ship' ? { x: G.dockOf(port).x, y: G.dockOf(port).y } : type === 'port' ? (function () { const sy = G.shoreY ? G.shoreY(W) : W.wh * 0.25, busy = function (px) { return (W.works || []).some(function (w) { return w.bp && Math.abs(w.x - px) < 330 && w.y < sy + 60; }); }, L = W.ww * 0.13, R = W.ww * 0.87, first = x / n < W.ww / 2 ? L : R, other = first === L ? R : L; return { x: busy(first) && !busy(other) ? other : first, y: sy - 10 }; })() : undefined,      /* a port stands on the land at the border of the pond, its foot just above the waterline, on whichever side is free; a ship stands on its port */ house: type === 'house', solid: type === 'wall', feed: type === 'huts' ? 0.25 : 0, slow: 0, hurt: 0, pull: type === 'spire' ? 0.22 : type === 'hall' ? 0.08 : 0, life: 240 } });
       return; }
   });
   // ── seen ──
@@ -311,7 +368,7 @@
   };
   G.on('scored', function () { try { G.placeLook(false); } catch (e) { console.error(e); } });
   function piece(ctx, p, hue, t) {
-    const age = t - (p.t0 || -9), pop = age < 0.3 ? 0.6 + 0.4 * (age / 0.3) + 0.15 * Math.sin(age * 10.5) : 1, mc = MAT[p.um === undefined ? p.m : p.um].col;
+    const age0 = t - (p.t0 || -9), age = age0 < 0 ? 9 : age0, pop = age < 0.3 ? 0.6 + 0.4 * (age / 0.3) + 0.15 * Math.sin(age * 10.5) : 1, mc = MAT[p.um === undefined ? p.m : p.um].col;
     const raw = hsl(mc[0], mc[1], mc[2]), fin = p.c[2] < 20 ? hsl(hue, 30, p.c[2]) : hsl(hue + p.c[0], p.c[1], p.c[2]), fill = p.st > 1 ? fin : raw, w = p.w * pop, h = p.h * pop;
     ctx.fillStyle = fill; ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.beginPath();
     if (p.s === 'rect') { G.roundRect(ctx, p.x - w / 2, p.y - h, w, h, Math.min(w, h) * (p.rr || 0.16)); }
@@ -327,6 +384,13 @@
     if (p.st > 1 && (p.s === 'rect' || p.s === 'dome') && w > 14) { ctx.fillStyle = 'rgba(255,255,255,0.13)'; ctx.beginPath(); if (p.s === 'rect') ctx.rect(p.x - w / 2 + 2.5, p.y - h + 2.5, w * 0.3, h - 5); else ctx.ellipse(p.x - w * 0.16, p.y - h * 0.5, w * 0.12, h * 0.3, 0, 0, TAU); ctx.fill(); }
   }
   /** a building (being raised, or standing): the ground it stands on, and every piece that is there */
+  /** a small picture of something built (or being built), as it stands now: for its card */
+  G.buildPic = function (o, px) {
+    const bp = o && o.bp; if (!bp) return ''; const sig = count(bp).join('.') + (o.fall ? 'f' : ''); if (o._pic && o._pic.sig === sig) return o._pic.url;
+    try { const N = (px || 96) * 2, cv = document.createElement('canvas'); cv.width = cv.height = N; const x = cv.getContext('2d'), hw = (bp.hw || (bp.hw = halfW(bp))) + 8, top = Math.max(30, bp.top || bp.S * 1.4) + 10, k = Math.min(N * 0.94 / (2 * hw), N * 0.86 / top);
+      x.translate(N / 2, N * 0.93); x.scale(k, k); G.drawBlueprint(x, { x: 0, y: -bp.S * 0.45, bp: bp }, !!o.steps);
+      o._pic = { sig: sig, url: cv.toDataURL('image/png') }; return o._pic.url; } catch (e) { console.error(e); return ''; }
+  };
   G.drawBlueprint = function (ctx, o, building) {
     const bp = o.bp; if (!bp) return; const b = baseOf(o), t = G.W.t, P = bp.P, S = bp.S;
     ctx.save(); ctx.translate(b[0], b[1]);

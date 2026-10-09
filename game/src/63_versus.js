@@ -26,8 +26,26 @@
 
   let shut = null;
   function toggle(e) { if (e) e.stopPropagation(); shut = !shut; try { localStorage.setItem('primordia.versusShut', shut ? '1' : ''); } catch (er) {} if (G.sfx) G.sfx('click'); render(); }
+  // The dangers are shown in the NOW panel (56_rarebox.js), under DANGERS, and the most pressing of them under NOW; this box of its own is no longer used.
+  if (G.hub) {
+    G.hub.add(function (W) {
+      const bad = W.zones.filter(G.isBad).sort(function (a, b) { return a.born - b.born; }), kinds = {}, order = [];
+      bad.forEach(function (z) { const k = z.word.toLowerCase(); if (!kinds[k]) { kinds[k] = { z: z, n: 0, left: 0, ate: 0 }; order.push(k); } const v = G.versus(z); kinds[k].n++; kinds[k].left = Math.max(kinds[k].left, v.left); kinds[k].ate += (z.ate || 0) + (z.deaths || 0); });
+      if (!order.length) return null;
+      const out = { sig: '', dangers: [], now: [], alarm: [], alarmRows: [] };
+      order.forEach(function (k, i) { const q = kinds[k], z = q.z, v = G.versus(z), lock = z.p.vault > 0.2 ? 'It locks the food away. ' : z.p.deadly > 0.3 ? 'It kills with one touch. ' : '';
+        const mood = lock + (v.carry > 0.5 ? 'They have the answer: <b>' + v.weak + '</b>.' : v.carry > 0.15 ? 'They are learning: <b>' + v.weak + '</b> hurt it.' : 'It is weak to <b>' + v.weak + '</b>. Few have them yet.');
+        out.sig += k + q.n + ':' + q.ate + ':' + Math.round(v.carry * 20) + ':' + Math.round(v.adapt * 20) + ':' + Math.round(q.left * 20) + '|'; out.alarm.push('z' + k);
+        const tag = q.ate ? 'has killed ' + q.ate : 'since generation ' + z.born, title = z.word + (q.n > 1 ? ' \u00d7' + q.n : '');
+        out.dangers.push(G.hub.row({ icon: '\u26a0', title: title, tag: tag, bad: true, sub: mood, act: 'zone', arg: z.id, extra: bar('have ' + v.weak, v.carry, PAL.algae) + (z.p.vault > 0.2 ? '' : bar('can bear it', v.adapt, PAL.gold)) + bar('its life left', q.left, PAL.rose) }));
+        if (i < 2) out.alarmRows.push(G.hub.row({ icon: '\u26a0', title: title, tag: tag, bad: true, sub: mood, act: 'zone', arg: z.id })); });
+      return out;
+    });
+    G.hub.act('zone', function (id) { const z = G.W.zones.filter(function (q) { return q.id === +id; })[0]; if (z) { G.select(null); G.selectZone(z); G.focusOn(z.x, z.y, Math.max(1.5, G.cam.z)); } });
+  }
   function render() {
     const W = G.W;
+    if (G.hub) { if (box && !box.classList.contains('hide')) box.classList.add('hide'); return; }
     const bad = W.zones.filter(G.isBad).sort(function (a, b) { return a.born - b.born; });
     // one row per kind of thing (a spreading thing counts once, with all its patches)
     const kinds = {}; const order = [];
@@ -80,7 +98,7 @@
         G.R.ring(z.x, z.y, PAL.gold, z.r0 * 2.2, 1.6); G.R.ring(z.x, z.y, PAL.algae, z.r0 * 1.5, 1.2); G.R.sparkle(z.x, z.y, PAL.gold, 40, 160);
         G.sfx('discovery');
       });
-      G.on('zone', function (z) { if (G.mode === 'play' && G.isBad(z) && !z.genNote && z.genN === 1) G.hint('vs' + z.id, z.word + ' is dangerous. Watch DANGERS IN THE POND (right): life will look for its weakness.', 9000); });
+      G.on('zone', function (z) { if (G.mode === 'play' && G.isBad(z) && !z.genNote && z.genN === 1) G.hint('vs' + z.id, z.word + ' is dangerous. Open NOW (bottom left) and look under DANGERS: life will look for its weakness.', 9000); });
     },
     update: function () {
       if (G.mode !== 'play' || !G.W) return;
