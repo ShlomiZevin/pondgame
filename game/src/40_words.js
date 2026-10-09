@@ -307,7 +307,7 @@
     // a server on the site can answer through Plaxzy.ai.ask(task, input, schema); until then this is never used
     server: function (task, input, schema) {
       if (G.host && G.host.ready && G.host.caps.ai) {
-        if (task === 'thing') return G.host.call('ai.thing', { word: input, model: G.ai.model || undefined }, 45000).then(function (r) { G.ai.tally('thing', r.thing && r.thing.source, r.usd); return r.thing; });
+        if (task === 'thing') return G.host.call('ai.thing', { word: input, model: G.ai.model || undefined, pond: G.thingsBrief ? G.thingsBrief() : undefined }, 45000).then(function (r) { G.ai.tally('thing', r.thing && r.thing.source, r.usd); return r.thing; });
         if (task === 'mutation-ideas') return G.host.call('ai.ideas', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('ideas', r.source, r.usd); return r.ideas; });
         if (task === 'event') return G.host.call('ai.event', { text: input, model: G.ai.model || undefined }, 45000).then(function (r) { G.ai.tally('event', r.source, r.usd); return r.event; });
         if (task === 'story') return G.host.call('ai.story', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('story', r.source, r.usd); return r.story; });

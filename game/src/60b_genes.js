@@ -62,6 +62,13 @@
   }
   G.openAbout = function () { if (about) { closeAbout(); return; } if (!G.R.sel) return; about = el('div', '', '', $('ui')); about.id = 'gbwin'; about.classList.add('about'); about.addEventListener('pointerdown', function (e) { e.stopPropagation(); }); about.addEventListener('wheel', function (e) { e.stopPropagation(); }, { passive: true }); fillAbout(); aboutT = setInterval(function () { try { fillAbout(); } catch (e) { console.error(e); closeAbout(); } }, 500); };
   G.on('new-pond', closeAbout);
+  // ── good and bad: nature's own voice ──
+  // The player never tells a creature what to do. They can only say GOOD or BAD of what it is doing right now, and that goes straight into its brain as the
+  // strongest reward or punishment it knows (G.learn): the wires that were just in use grow stronger or weaker. What it makes of that is its own affair.
+  G.judge = function (c, good) { if (!c || c.dead || !G.learn) return; G.learn(c, good ? 1 : -1); G.learn(c, good ? 1 : -1); c.judged = (c.judged || 0) + (good ? 1 : -1); c.flash = 1; if (good) c.mend = 1; else c.startle = 1; G.emit('judged-by-god', c, good); };
+  { const t = setInterval(function () { const b = $('iwhy'); if (!b) return; clearInterval(t); const row = document.createElement('div'); row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px';
+      row.innerHTML = '<button class="btn sm" id="igood" title="Tell it that what it is doing right now is good. It will do more of it. It learns; you do not command." style="border-color:rgba(51,214,166,.7);color:#dffbf1">\u2665 GOOD</button><button class="btn sm" id="ibad" title="Tell it that what it is doing right now is bad. It will do less of it." style="border-color:rgba(255,126,182,.7);color:#ffd3e2">\u2715 BAD</button>';
+      b.parentNode.insertBefore(row, b); $('igood').onclick = function () { G.sfx('click'); G.judge(G.R.sel, true); }; $('ibad').onclick = function () { G.sfx('click'); G.judge(G.R.sel, false); }; }, 400); }
   G.on('new-pond', close);
 
   const pct = function (v) { return Math.round(100 * Math.max(0, Math.min(1, v))) + '%'; };

@@ -182,12 +182,12 @@ function createApp(opts = {}) {
       return send(res, r.error ? (r.error === 'no_sound' || r.error === 'no_line_yet' ? 404 : 503) : 200, r);
     }
     if (route === 'POST /api/ai/thing') {
-      const body = await readJson(req, 2000);
+      const body = await readJson(req, 5000);
       const word = String(body.word || '').trim().slice(0, 80);
       if (!word) return send(res, 400, { error: 'empty' });
       if (ai.refused(word)) return send(res, 422, { error: 'refused' });
       // only a real model call costs, so only a real model call is counted against the caller
-      const r = await ai.thing(word, { model: body.model, canGenerate: () => limiter.take(who), onError: logErr });
+      const r = await ai.thing(word, { model: body.model, things: body.pond && Array.isArray(body.pond.things) ? body.pond.things : null, canGenerate: () => limiter.take(who), onError: logErr });
       if (r.error === 'refused') return send(res, 422, r);
       if (r.error) return send(res, 503, r);
       return send(res, 200, r);

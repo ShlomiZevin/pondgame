@@ -28,7 +28,7 @@
       acts.push({ do: q.do, power: num(q.power, 0.05, 1, 0.5), every: num(q.every, 0.4, 12, q.do === 'spawn' ? 9 : 2), reach: num(q.reach, 0.05, 1, 0.4), with: String(q.with || '').replace(/[<>"]/g, '').slice(0, 24), shot: SHOTS.indexOf(q.shot) >= 0 ? q.shot : 'bolt', hue: num(q.hue, 0, 360, 40) });
     }
     if (!acts.length) return null;
-    return { way: WAYS.indexOf(src.way) >= 0 ? src.way : 'guards', side: SIDES.indexOf(src.side) >= 0 ? src.side : 'foe', acts: acts };
+    return { way: WAYS.indexOf(src.way) >= 0 ? src.way : 'guards', side: SIDES.indexOf(src.side) >= 0 ? src.side : 'foe', acts: acts, prey: typeof src.prey === 'string' && src.prey ? src.prey.replace(/[<>"]/g, '').slice(0, 28) : '' };
   };
   /** with no AI to ask, the plainest words are read for what they do (a fallback only) */
   const WORDS = [
@@ -43,12 +43,15 @@
     [/\b(queen|hive|nest|egg|mother|factory|swarm)\b/, { way: 'stays', side: 'foe', acts: [{ do: 'spawn', power: 0.5, every: 10, reach: 0.4, with: 'its young' }, { do: 'strike', power: 0.4, every: 1.6, reach: 0.25, with: 'its sting' }] }],
   ];
   G.actsFromWord = function (word) { const low = String(word || '').toLowerCase(); for (let i = 0; i < WORDS.length; i++) if (WORDS[i][0].test(low)) return G.cleanActs(JSON.parse(JSON.stringify(WORDS[i][1]))); return null; };
+  /** what already stands in the pond, for whoever imagines the next thing: so that "a knight killer" can be made to go for the knight that is there */
+  G.thingsBrief = function () { const W = G.W; if (!W) return undefined; const L = W.zones.filter(function (z) { return !z.haven; }).slice(-6).map(function (z) { return { name: z.word, does: z.act ? z.act.way + ', ' + (z.act.side === 'foe' ? 'against the creatures' : z.act.side === 'friend' ? 'defends the creatures' : 'against all') + ': ' + z.act.acts.map(function (q) { return q.do + (q.with ? ' with ' + q.with : ''); }).join(', ') : String(z.note || '').slice(0, 70) }; }); return L.length ? { things: L } : undefined; };
   const VERB = { strike: 'strikes', shoot: 'shoots', blast: 'blasts everything round it', heal: 'heals those near it', shield: 'shields those near it', spawn: 'makes more of itself' };
   /** what it does, in plain words, for its card */
   G.actWords = function (z) {
     const a = z && z.act; if (!a) return [];
     const who = a.side === 'friend' ? 'On the creatures\' side: it goes for whatever attacks them.' : a.side === 'wild' ? 'On nobody\'s side: it goes for creatures and for other things alike.' : 'Against the creatures of the pond.';
-    const how = a.way === 'hunts' ? 'It hunts: it goes after them.' : a.way === 'guards' ? 'It guards its place and goes for whatever comes near.' : a.way === 'wanders' ? 'It wanders.' : 'It stays where it is.';
+    const prey = a.prey ? ' It is after <b>' + G.escapeHtml(a.prey) + '</b> above all.' : '';
+    const how = prey + ' ' + (a.way === 'hunts' ? 'It hunts: it goes after them.' : a.way === 'guards' ? 'It guards its place and goes for whatever comes near.' : a.way === 'wanders' ? 'It wanders.' : 'It stays where it is.');
     const L = a.acts.map(function (q) { return 'It <b>' + VERB[q.do] + '</b>' + (q.with && (q.do === 'strike' || q.do === 'shoot' || q.do === 'blast') ? ' with ' + G.escapeHtml(q.with) : '') + ' (' + (q.power > 0.66 ? 'hard' : q.power > 0.33 ? 'firmly' : 'lightly') + ', every ' + q.every.toFixed(1) + ' s' + (z.actN && z.actN[q.do] ? '; ' + z.actN[q.do] + ' times so far' : '') + ').'; });
     return [who + ' ' + how].concat(L);
   };
@@ -61,6 +64,7 @@
   /** whom this thing goes for: the nearest it may attack within `far` */
   function target(z, far) {
     const W = G.W, a = z.act; let best = null, bd = far;
+    if (a.prey) { const low = a.prey.toLowerCase(); for (let i = 0; i < W.zones.length; i++) { const o = W.zones[i]; if (o !== z && String(o.word).toLowerCase() === low) return o; } if (a.only) return null; }      /* the one it came for, wherever it is */
     if (a.side !== 'friend' || true) for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue; if (a.side === 'friend' && !((c.ph.aggro || 0) > 0.38 || c.cool > 0.6)) continue; const d = dist(c, z) - c.ph.r; if (d < bd) { bd = d; best = c; } }
     if (a.side !== 'foe') for (let i = 0; i < W.zones.length; i++) { const o = W.zones[i]; if (o === z || o.haven) continue; if (a.side === 'friend' ? !G.isBad(o) : !o.act) continue; const d = dist(o, z) - o.r * 0.5; if (d < bd) { bd = d; best = o; } }
     return best;
@@ -78,6 +82,7 @@
       if (o.E <= 0) { z.deaths = (z.deaths || 0) + 1; W.stats.killed = (W.stats.killed || 0) + 1; if (G.zoneEvent && z.deaths === 1) G.zoneEvent(z, 'It struck down its first creature'); G.killCreature(o, 'fought', null); }
     } else {         // another thing
       if (o.alive > 0.25) o.health = Math.max(0, (o.health || 0) - dmg * 0.012); else o.life -= dmg * 0.5;
+      if ((o.alive > 0.25 ? o.health <= 0 : o.life <= 0) && !o.felled) { o.felled = z.word; if (G.zoneEvent) G.zoneEvent(z, 'It brought down ' + o.word); if (G.mode === 'play' && G.log) G.log('disc', z.word + ' brought down ' + o.word, 'One thing you added has destroyed another.'); if (G.note) G.note('It happened in the pond', z.word + ' brought down ' + o.word + '.'); }
       o.struck = 1; o.bite = 1;
     }
     G.emit('act-hit', z, o, why);
@@ -105,10 +110,10 @@
     for (let k = 0; k < W.zones.length; k++) {
       const z = W.zones[k], a = z.act; if (!a) continue;
       // how it carries itself
-      const sp = 26 + 30 * (z.small ? 1.3 : 1), far = a.way === 'hunts' ? 900 : a.way === 'guards' ? 150 + z.r0 * 2.2 : 0;
+      const sp = 26 + 30 * (z.small ? 1.3 : 1), far = a.prey || a.way === 'hunts' ? 1e5 : a.way === 'guards' ? 150 + z.r0 * 2.2 : 0;
       const o = far ? target(z, far) : null; let tx = z.x, ty = z.y, go = 0;
       const near = function (q) { return q.do === 'strike' ? z.r * 0.4 + 30 : q.do === 'shoot' ? 140 + 400 * q.reach : 60; };
-      if (o) { const want = Math.min.apply(null, a.acts.filter(function (q) { return q.do === 'strike' || q.do === 'shoot' || q.do === 'blast'; }).map(near).concat([400])), d = dist(o, z); if (d > want) { tx = o.x; ty = o.y; go = 1; } if (a.way === 'guards' && Math.hypot(z.x - z.hx, z.y - z.hy) > 200 + z.r0 * 2.5) { tx = z.hx; ty = z.hy; go = 1; } }
+      if (o) { const want = Math.min.apply(null, a.acts.filter(function (q) { return q.do === 'strike' || q.do === 'shoot' || q.do === 'blast'; }).map(near).concat([400])), d = dist(o, z); if (d > want) { tx = o.x; ty = o.y; go = 1; } if (a.way === 'guards' && !a.prey && Math.hypot(z.x - z.hx, z.y - z.hy) > 200 + z.r0 * 2.5) { tx = z.hx; ty = z.hy; go = 1; } }
       else if (a.way === 'guards') { if (Math.hypot(z.x - z.hx, z.y - z.hy) > 30) { tx = z.hx; ty = z.hy; go = 0.6; } }
       else if (a.way === 'wanders' || a.way === 'hunts') { z.ma = (z.ma || 0) + (G.rand() - 0.5) * 1.2 * dt; tx = z.x + Math.cos(z.ma) * 100; ty = z.y + Math.sin(z.ma) * 100; go = 0.45; }
       if (go) { const dx = tx - z.x, dy = ty - z.y, d = Math.hypot(dx, dy) + 0.01; z.x = clamp(z.x + dx / d * sp * go * dt, 50, W.ww - 50); z.y = clamp(z.y + dy / d * sp * go * dt, 50, W.wh - 50); if (z.x <= 50 || z.x >= W.ww - 50 || z.y <= 50 || z.y >= W.wh - 50) z.ma = (z.ma || 0) + 2; z.face = dx < 0 ? -1 : 1; }

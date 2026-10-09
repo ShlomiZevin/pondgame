@@ -66,6 +66,8 @@
     if (G.deedAsk()) W.lastDeedGen = W.gen;
   });
 
+  /** a plan given from outside (a test, or later a ship's crew): it is taken up as if they had thought of it */
+  G.deedStart = function (raw) { if (G.W && !G.W.deed) begin(raw); return G.W && G.W.deed; };
   function begin(raw) {
     const W = G.W, sp = spByName(raw.kind) || W.species.filter(function (s) { return !s.extinct && s.n > 0; }).sort(function (a, b) { return b.n - a.n; })[0];
     if (!sp) return;
@@ -163,17 +165,18 @@
     const label = function (x, y, a, b, hue) { ctx.save(); ctx.translate(x, y); ctx.scale(inv, inv); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 12.5px system-ui, sans-serif'; const w1 = ctx.measureText(a).width; ctx.font = '600 10.5px system-ui, sans-serif'; const tw = Math.max(w1, ctx.measureText(b).width) + 22; ctx.fillStyle = 'rgba(9,28,40,0.9)'; ctx.beginPath(); ctx.rect(-tw / 2, -21, tw, 42); ctx.fill(); ctx.strokeStyle = G.hsl(hue, 85, 68, 0.9); ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = '700 12.5px system-ui, sans-serif'; ctx.fillText(a, 0, -8); ctx.fillStyle = '#f6d365'; ctx.font = '600 10.5px system-ui, sans-serif'; ctx.fillText(b, 0, 9); ctx.restore(); };
     // what they have built
     const Wk = W.works || [];
-    for (let i = 0; i < Wk.length; i++) { const w = Wk[i], fade = clamp((w.until - W.t) / 12, 0, 1); ctx.globalAlpha = fade; if (w.fig && G.drawFigure) { const mw = Math.min(w.r * 1.5, 190), k = mw / 200; ctx.save(); ctx.translate(w.x, w.y + mw * 0.55); ctx.scale(k, k); G.drawFigure(ctx, w.fig, { p: {}, bite: 0, _fc: 1 }, 0); ctx.restore(); } else mound(ctx, w.x, w.y + w.r * 0.5, w.r, w.hue, 1); ctx.globalAlpha = 1; label(w.x, w.y - Math.min(w.r * 1.5, 190) * 0.7 - 34, w.name, 'built by the ' + w.by, w.hue); }
+    for (let i = 0; i < Wk.length; i++) { const w = Wk[i], fade = clamp((w.until - W.t) / 12, 0, 1); ctx.globalAlpha = fade; if (w.bp && G.drawBlueprint) G.drawBlueprint(ctx, w, false); else if (w.fig && G.drawFigure) { const mw = Math.min(w.r * 1.5, 190), k = mw / 200; ctx.save(); ctx.translate(w.x, w.y + mw * 0.55); ctx.scale(k, k); G.drawFigure(ctx, w.fig, { p: {}, bite: 0, _fc: 1 }, 0); ctx.restore(); } else mound(ctx, w.x, w.y + w.r * 0.5, w.r, w.hue, 1); ctx.globalAlpha = 1; label(w.x, w.y - Math.min(w.r * 1.5, 190) * 0.7 - 34, w.name, 'built by the ' + w.by, w.hue); }
     const d = W.deed;
     if (d) {
       const st = d.steps[d.i], M = members(d), R = d.result ? d.result.size * Math.min(W.ww, W.wh) : 60;
       ctx.beginPath(); ctx.arc(d.x, d.y, R + 10, 0, TAU); ctx.strokeStyle = G.hsl(d.hue, 85, 70, 0.5 + 0.25 * Math.sin(t * 3)); ctx.lineWidth = 2.5; ctx.setLineDash([9, 8]); ctx.lineDashOffset = -t * 18; ctx.stroke(); ctx.setLineDash([]);
-      if (d.progress > 0.02) mound(ctx, d.x, d.y + R * 0.4, R * 0.8, d.hue, d.progress);
+      if (d.bp && G.drawBlueprint) G.drawBlueprint(ctx, d, true); else if (d.progress > 0.02) mound(ctx, d.x, d.y + R * 0.4, R * 0.8, d.hue, d.progress);
+      if (G.drawHauls) G.drawHauls(ctx);
       for (let k = 0; k < M.length; k++) {
         const c = M[k], top = c.y - c.ph.r * 3.4;
         ctx.strokeStyle = '#14202e'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(c.x + c.ph.r * 0.9, c.y - c.ph.r * 1.2); ctx.lineTo(c.x + c.ph.r * 0.9, top); ctx.stroke();      // each carries a little flag
         ctx.beginPath(); ctx.moveTo(c.x + c.ph.r * 0.9, top); ctx.lineTo(c.x + c.ph.r * 0.9 + 9 + Math.sin(t * 6 + k) * 1.5, top + 4); ctx.lineTo(c.x + c.ph.r * 0.9, top + 8); ctx.closePath(); ctx.fillStyle = G.hsl(d.hue, 90, 62, 1); ctx.fill(); ctx.stroke();
-        if (c.carry) { ctx.beginPath(); ctx.arc(c.x - c.ph.r * 0.8, c.y - c.ph.r * 2.6, 4, 0, TAU); ctx.fillStyle = '#f6d365'; ctx.fill(); ctx.stroke(); }
+        if (c.carry && !(c.haul >= 0)) { ctx.beginPath(); ctx.arc(c.x - c.ph.r * 0.8, c.y - c.ph.r * 2.6, 4, 0, TAU); ctx.fillStyle = '#f6d365'; ctx.fill(); ctx.stroke(); }
         if (c.cryT > 0 && G.speed <= 16) { ctx.save(); ctx.translate(c.x, top - 12); ctx.scale(inv, inv); ctx.font = '700 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const tw = ctx.measureText(c.cryW).width + 14; ctx.globalAlpha = Math.min(1, c.cryT / 0.4); ctx.fillStyle = 'rgba(255,255,255,0.96)'; ctx.strokeStyle = 'rgba(8,14,28,0.85)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.rect(-tw / 2, -10, tw, 20); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#16233a'; ctx.fillText(c.cryW, 0, 1); ctx.restore(); }
       }
       let lx = d.x, ly = d.y - R - 36; if (st.do === 'charge' || st.do === 'line' || st.do === 'scatter') { let sx = 0, sy = 1e9; for (let k = 0; k < M.length; k++) { sx += M[k].x; sy = Math.min(sy, M[k].y); } if (M.length) { lx = sx / M.length; ly = sy - 70; } }

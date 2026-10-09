@@ -4720,7 +4720,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     // a server on the site can answer through Plaxzy.ai.ask(task, input, schema); until then this is never used
     server: function (task, input, schema) {
       if (G.host && G.host.ready && G.host.caps.ai) {
-        if (task === 'thing') return G.host.call('ai.thing', { word: input, model: G.ai.model || undefined }, 45000).then(function (r) { G.ai.tally('thing', r.thing && r.thing.source, r.usd); return r.thing; });
+        if (task === 'thing') return G.host.call('ai.thing', { word: input, model: G.ai.model || undefined, pond: G.thingsBrief ? G.thingsBrief() : undefined }, 45000).then(function (r) { G.ai.tally('thing', r.thing && r.thing.source, r.usd); return r.thing; });
         if (task === 'mutation-ideas') return G.host.call('ai.ideas', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('ideas', r.source, r.usd); return r.ideas; });
         if (task === 'event') return G.host.call('ai.event', { text: input, model: G.ai.model || undefined }, 45000).then(function (r) { G.ai.tally('event', r.source, r.usd); return r.event; });
         if (task === 'story') return G.host.call('ai.story', Object.assign({}, input, { model: G.ai.model || undefined }), 45000).then(function (r) { G.ai.tally('story', r.source, r.usd); return r.story; });
@@ -8550,6 +8550,8 @@ G.addSystem({
     if (G.deedAsk()) W.lastDeedGen = W.gen;
   });
 
+  /** a plan given from outside (a test, or later a ship's crew): it is taken up as if they had thought of it */
+  G.deedStart = function (raw) { if (G.W && !G.W.deed) begin(raw); return G.W && G.W.deed; };
   function begin(raw) {
     const W = G.W, sp = spByName(raw.kind) || W.species.filter(function (s) { return !s.extinct && s.n > 0; }).sort(function (a, b) { return b.n - a.n; })[0];
     if (!sp) return;
@@ -8647,17 +8649,18 @@ G.addSystem({
     const label = function (x, y, a, b, hue) { ctx.save(); ctx.translate(x, y); ctx.scale(inv, inv); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 12.5px system-ui, sans-serif'; const w1 = ctx.measureText(a).width; ctx.font = '600 10.5px system-ui, sans-serif'; const tw = Math.max(w1, ctx.measureText(b).width) + 22; ctx.fillStyle = 'rgba(9,28,40,0.9)'; ctx.beginPath(); ctx.rect(-tw / 2, -21, tw, 42); ctx.fill(); ctx.strokeStyle = G.hsl(hue, 85, 68, 0.9); ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = '700 12.5px system-ui, sans-serif'; ctx.fillText(a, 0, -8); ctx.fillStyle = '#f6d365'; ctx.font = '600 10.5px system-ui, sans-serif'; ctx.fillText(b, 0, 9); ctx.restore(); };
     // what they have built
     const Wk = W.works || [];
-    for (let i = 0; i < Wk.length; i++) { const w = Wk[i], fade = clamp((w.until - W.t) / 12, 0, 1); ctx.globalAlpha = fade; if (w.fig && G.drawFigure) { const mw = Math.min(w.r * 1.5, 190), k = mw / 200; ctx.save(); ctx.translate(w.x, w.y + mw * 0.55); ctx.scale(k, k); G.drawFigure(ctx, w.fig, { p: {}, bite: 0, _fc: 1 }, 0); ctx.restore(); } else mound(ctx, w.x, w.y + w.r * 0.5, w.r, w.hue, 1); ctx.globalAlpha = 1; label(w.x, w.y - Math.min(w.r * 1.5, 190) * 0.7 - 34, w.name, 'built by the ' + w.by, w.hue); }
+    for (let i = 0; i < Wk.length; i++) { const w = Wk[i], fade = clamp((w.until - W.t) / 12, 0, 1); ctx.globalAlpha = fade; if (w.bp && G.drawBlueprint) G.drawBlueprint(ctx, w, false); else if (w.fig && G.drawFigure) { const mw = Math.min(w.r * 1.5, 190), k = mw / 200; ctx.save(); ctx.translate(w.x, w.y + mw * 0.55); ctx.scale(k, k); G.drawFigure(ctx, w.fig, { p: {}, bite: 0, _fc: 1 }, 0); ctx.restore(); } else mound(ctx, w.x, w.y + w.r * 0.5, w.r, w.hue, 1); ctx.globalAlpha = 1; label(w.x, w.y - Math.min(w.r * 1.5, 190) * 0.7 - 34, w.name, 'built by the ' + w.by, w.hue); }
     const d = W.deed;
     if (d) {
       const st = d.steps[d.i], M = members(d), R = d.result ? d.result.size * Math.min(W.ww, W.wh) : 60;
       ctx.beginPath(); ctx.arc(d.x, d.y, R + 10, 0, TAU); ctx.strokeStyle = G.hsl(d.hue, 85, 70, 0.5 + 0.25 * Math.sin(t * 3)); ctx.lineWidth = 2.5; ctx.setLineDash([9, 8]); ctx.lineDashOffset = -t * 18; ctx.stroke(); ctx.setLineDash([]);
-      if (d.progress > 0.02) mound(ctx, d.x, d.y + R * 0.4, R * 0.8, d.hue, d.progress);
+      if (d.bp && G.drawBlueprint) G.drawBlueprint(ctx, d, true); else if (d.progress > 0.02) mound(ctx, d.x, d.y + R * 0.4, R * 0.8, d.hue, d.progress);
+      if (G.drawHauls) G.drawHauls(ctx);
       for (let k = 0; k < M.length; k++) {
         const c = M[k], top = c.y - c.ph.r * 3.4;
         ctx.strokeStyle = '#14202e'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(c.x + c.ph.r * 0.9, c.y - c.ph.r * 1.2); ctx.lineTo(c.x + c.ph.r * 0.9, top); ctx.stroke();      // each carries a little flag
         ctx.beginPath(); ctx.moveTo(c.x + c.ph.r * 0.9, top); ctx.lineTo(c.x + c.ph.r * 0.9 + 9 + Math.sin(t * 6 + k) * 1.5, top + 4); ctx.lineTo(c.x + c.ph.r * 0.9, top + 8); ctx.closePath(); ctx.fillStyle = G.hsl(d.hue, 90, 62, 1); ctx.fill(); ctx.stroke();
-        if (c.carry) { ctx.beginPath(); ctx.arc(c.x - c.ph.r * 0.8, c.y - c.ph.r * 2.6, 4, 0, TAU); ctx.fillStyle = '#f6d365'; ctx.fill(); ctx.stroke(); }
+        if (c.carry && !(c.haul >= 0)) { ctx.beginPath(); ctx.arc(c.x - c.ph.r * 0.8, c.y - c.ph.r * 2.6, 4, 0, TAU); ctx.fillStyle = '#f6d365'; ctx.fill(); ctx.stroke(); }
         if (c.cryT > 0 && G.speed <= 16) { ctx.save(); ctx.translate(c.x, top - 12); ctx.scale(inv, inv); ctx.font = '700 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const tw = ctx.measureText(c.cryW).width + 14; ctx.globalAlpha = Math.min(1, c.cryT / 0.4); ctx.fillStyle = 'rgba(255,255,255,0.96)'; ctx.strokeStyle = 'rgba(8,14,28,0.85)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.rect(-tw / 2, -10, tw, 20); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#16233a'; ctx.fillText(c.cryW, 0, 1); ctx.restore(); }
       }
       let lx = d.x, ly = d.y - R - 36; if (st.do === 'charge' || st.do === 'line' || st.do === 'scatter') { let sx = 0, sy = 1e9; for (let k = 0; k < M.length; k++) { sx += M[k].x; sy = Math.min(sy, M[k].y); } if (M.length) { lx = sx / M.length; ly = sy - 70; } }
@@ -8709,7 +8712,7 @@ G.addSystem({
       acts.push({ do: q.do, power: num(q.power, 0.05, 1, 0.5), every: num(q.every, 0.4, 12, q.do === 'spawn' ? 9 : 2), reach: num(q.reach, 0.05, 1, 0.4), with: String(q.with || '').replace(/[<>"]/g, '').slice(0, 24), shot: SHOTS.indexOf(q.shot) >= 0 ? q.shot : 'bolt', hue: num(q.hue, 0, 360, 40) });
     }
     if (!acts.length) return null;
-    return { way: WAYS.indexOf(src.way) >= 0 ? src.way : 'guards', side: SIDES.indexOf(src.side) >= 0 ? src.side : 'foe', acts: acts };
+    return { way: WAYS.indexOf(src.way) >= 0 ? src.way : 'guards', side: SIDES.indexOf(src.side) >= 0 ? src.side : 'foe', acts: acts, prey: typeof src.prey === 'string' && src.prey ? src.prey.replace(/[<>"]/g, '').slice(0, 28) : '' };
   };
   /** with no AI to ask, the plainest words are read for what they do (a fallback only) */
   const WORDS = [
@@ -8724,12 +8727,15 @@ G.addSystem({
     [/\b(queen|hive|nest|egg|mother|factory|swarm)\b/, { way: 'stays', side: 'foe', acts: [{ do: 'spawn', power: 0.5, every: 10, reach: 0.4, with: 'its young' }, { do: 'strike', power: 0.4, every: 1.6, reach: 0.25, with: 'its sting' }] }],
   ];
   G.actsFromWord = function (word) { const low = String(word || '').toLowerCase(); for (let i = 0; i < WORDS.length; i++) if (WORDS[i][0].test(low)) return G.cleanActs(JSON.parse(JSON.stringify(WORDS[i][1]))); return null; };
+  /** what already stands in the pond, for whoever imagines the next thing: so that "a knight killer" can be made to go for the knight that is there */
+  G.thingsBrief = function () { const W = G.W; if (!W) return undefined; const L = W.zones.filter(function (z) { return !z.haven; }).slice(-6).map(function (z) { return { name: z.word, does: z.act ? z.act.way + ', ' + (z.act.side === 'foe' ? 'against the creatures' : z.act.side === 'friend' ? 'defends the creatures' : 'against all') + ': ' + z.act.acts.map(function (q) { return q.do + (q.with ? ' with ' + q.with : ''); }).join(', ') : String(z.note || '').slice(0, 70) }; }); return L.length ? { things: L } : undefined; };
   const VERB = { strike: 'strikes', shoot: 'shoots', blast: 'blasts everything round it', heal: 'heals those near it', shield: 'shields those near it', spawn: 'makes more of itself' };
   /** what it does, in plain words, for its card */
   G.actWords = function (z) {
     const a = z && z.act; if (!a) return [];
     const who = a.side === 'friend' ? 'On the creatures\' side: it goes for whatever attacks them.' : a.side === 'wild' ? 'On nobody\'s side: it goes for creatures and for other things alike.' : 'Against the creatures of the pond.';
-    const how = a.way === 'hunts' ? 'It hunts: it goes after them.' : a.way === 'guards' ? 'It guards its place and goes for whatever comes near.' : a.way === 'wanders' ? 'It wanders.' : 'It stays where it is.';
+    const prey = a.prey ? ' It is after <b>' + G.escapeHtml(a.prey) + '</b> above all.' : '';
+    const how = prey + ' ' + (a.way === 'hunts' ? 'It hunts: it goes after them.' : a.way === 'guards' ? 'It guards its place and goes for whatever comes near.' : a.way === 'wanders' ? 'It wanders.' : 'It stays where it is.');
     const L = a.acts.map(function (q) { return 'It <b>' + VERB[q.do] + '</b>' + (q.with && (q.do === 'strike' || q.do === 'shoot' || q.do === 'blast') ? ' with ' + G.escapeHtml(q.with) : '') + ' (' + (q.power > 0.66 ? 'hard' : q.power > 0.33 ? 'firmly' : 'lightly') + ', every ' + q.every.toFixed(1) + ' s' + (z.actN && z.actN[q.do] ? '; ' + z.actN[q.do] + ' times so far' : '') + ').'; });
     return [who + ' ' + how].concat(L);
   };
@@ -8742,6 +8748,7 @@ G.addSystem({
   /** whom this thing goes for: the nearest it may attack within `far` */
   function target(z, far) {
     const W = G.W, a = z.act; let best = null, bd = far;
+    if (a.prey) { const low = a.prey.toLowerCase(); for (let i = 0; i < W.zones.length; i++) { const o = W.zones[i]; if (o !== z && String(o.word).toLowerCase() === low) return o; } if (a.only) return null; }      /* the one it came for, wherever it is */
     if (a.side !== 'friend' || true) for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue; if (a.side === 'friend' && !((c.ph.aggro || 0) > 0.38 || c.cool > 0.6)) continue; const d = dist(c, z) - c.ph.r; if (d < bd) { bd = d; best = c; } }
     if (a.side !== 'foe') for (let i = 0; i < W.zones.length; i++) { const o = W.zones[i]; if (o === z || o.haven) continue; if (a.side === 'friend' ? !G.isBad(o) : !o.act) continue; const d = dist(o, z) - o.r * 0.5; if (d < bd) { bd = d; best = o; } }
     return best;
@@ -8759,6 +8766,7 @@ G.addSystem({
       if (o.E <= 0) { z.deaths = (z.deaths || 0) + 1; W.stats.killed = (W.stats.killed || 0) + 1; if (G.zoneEvent && z.deaths === 1) G.zoneEvent(z, 'It struck down its first creature'); G.killCreature(o, 'fought', null); }
     } else {         // another thing
       if (o.alive > 0.25) o.health = Math.max(0, (o.health || 0) - dmg * 0.012); else o.life -= dmg * 0.5;
+      if ((o.alive > 0.25 ? o.health <= 0 : o.life <= 0) && !o.felled) { o.felled = z.word; if (G.zoneEvent) G.zoneEvent(z, 'It brought down ' + o.word); if (G.mode === 'play' && G.log) G.log('disc', z.word + ' brought down ' + o.word, 'One thing you added has destroyed another.'); if (G.note) G.note('It happened in the pond', z.word + ' brought down ' + o.word + '.'); }
       o.struck = 1; o.bite = 1;
     }
     G.emit('act-hit', z, o, why);
@@ -8786,10 +8794,10 @@ G.addSystem({
     for (let k = 0; k < W.zones.length; k++) {
       const z = W.zones[k], a = z.act; if (!a) continue;
       // how it carries itself
-      const sp = 26 + 30 * (z.small ? 1.3 : 1), far = a.way === 'hunts' ? 900 : a.way === 'guards' ? 150 + z.r0 * 2.2 : 0;
+      const sp = 26 + 30 * (z.small ? 1.3 : 1), far = a.prey || a.way === 'hunts' ? 1e5 : a.way === 'guards' ? 150 + z.r0 * 2.2 : 0;
       const o = far ? target(z, far) : null; let tx = z.x, ty = z.y, go = 0;
       const near = function (q) { return q.do === 'strike' ? z.r * 0.4 + 30 : q.do === 'shoot' ? 140 + 400 * q.reach : 60; };
-      if (o) { const want = Math.min.apply(null, a.acts.filter(function (q) { return q.do === 'strike' || q.do === 'shoot' || q.do === 'blast'; }).map(near).concat([400])), d = dist(o, z); if (d > want) { tx = o.x; ty = o.y; go = 1; } if (a.way === 'guards' && Math.hypot(z.x - z.hx, z.y - z.hy) > 200 + z.r0 * 2.5) { tx = z.hx; ty = z.hy; go = 1; } }
+      if (o) { const want = Math.min.apply(null, a.acts.filter(function (q) { return q.do === 'strike' || q.do === 'shoot' || q.do === 'blast'; }).map(near).concat([400])), d = dist(o, z); if (d > want) { tx = o.x; ty = o.y; go = 1; } if (a.way === 'guards' && !a.prey && Math.hypot(z.x - z.hx, z.y - z.hy) > 200 + z.r0 * 2.5) { tx = z.hx; ty = z.hy; go = 1; } }
       else if (a.way === 'guards') { if (Math.hypot(z.x - z.hx, z.y - z.hy) > 30) { tx = z.hx; ty = z.hy; go = 0.6; } }
       else if (a.way === 'wanders' || a.way === 'hunts') { z.ma = (z.ma || 0) + (G.rand() - 0.5) * 1.2 * dt; tx = z.x + Math.cos(z.ma) * 100; ty = z.y + Math.sin(z.ma) * 100; go = 0.45; }
       if (go) { const dx = tx - z.x, dy = ty - z.y, d = Math.hypot(dx, dy) + 0.01; z.x = clamp(z.x + dx / d * sp * go * dt, 50, W.ww - 50); z.y = clamp(z.y + dy / d * sp * go * dt, 50, W.wh - 50); if (z.x <= 50 || z.x >= W.ww - 50 || z.y <= 50 || z.y >= W.wh - 50) z.ma = (z.ma || 0) + 2; z.face = dx < 0 ? -1 : 1; }
@@ -8807,6 +8815,190 @@ G.addSystem({
   }
   { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (W && !W.title && W.zones && W.zones.length) { let any = W.shots && W.shots.length; for (let i = 0; i < W.zones.length && !any; i++) if (W.zones[i].act) any = true; if (any) stepActs(dt); } }; }
   if (G.on) G.on('new-pond', function () { if (G.W) G.W.shots = []; });
+})();
+
+</script>
+<script data-part="54d_build">
+// ── Building, piece by piece ──
+// When a kind sets out to build, nothing appears by itself. There are MATERIALS lying about the pond, each where the pond's own nature puts it:
+//     stone  on the floor of the pond, where it has sunk          reed  growing on the land and along the waterline          shell  where a creature has died
+// and what is to be built is a PLAN OF PIECES (blocks, posts, a roof, a door, a banner), worked out from who is building: what the thing is for decides
+// its sort (a walled ring, a cluster of huts, a tall beacon, a hall), the kind's own body decides its style (a spiny kind builds spires, a round one domes)
+// and its brain how elaborate it dares to be. Each builder goes and fetches the material the next piece needs, hauls it back (slowly, and slower still
+// with nothing to grip it with) and sets it in place, from the ground up; when the frame stands they go round it again and colour it in their own colours.
+// So a building is watched being made, by many hands, and a half-built one shows exactly how far they got.
+// What they build stays while their kind lives to keep it up; when the kind is gone it crumbles from the top, piece by piece, into a ruin. The player,
+// as nature, can strike it down. It is drawn by the game itself, in the pond's own style: no picture is asked of the AI for it.
+(function () {
+  'use strict';
+  const clamp = G.clamp, TAU = 6.2832, INK = '#14202e';
+  const MAT = [{ id: 'stone', cap: 44, col: [205, 12, 62] }, { id: 'reed', cap: 40, col: [78, 38, 58] }, { id: 'shell', cap: 26, col: [32, 55, 84] }];
+  G.MATS = MAT;
+  const hsl = function (h, s, l, a) { return 'hsla(' + ((h % 360) + 360) % 360 + ',' + s + '%,' + l + '%,' + (a === undefined ? 1 : a) + ')'; };
+
+  // ── materials in the pond ──
+  function scatter(W, k) {
+    const sy = G.shoreY ? G.shoreY(W) : W.wh * 0.2; let x = 30 + G.rand() * (W.ww - 60), y;
+    if (k === 0) y = W.wh - 26 - G.rand() * G.rand() * (W.wh - sy) * 0.5;                    // stone: sunk to the floor, thinning upward
+    else if (k === 1) y = G.rand() < 0.7 ? 18 + G.rand() * Math.max(10, sy - 30) : sy + G.rand() * 40;      // reed: on the land, some at the waterline
+    else return;                                                                           // shell: only where something died
+    W.mats.push({ x: x, y: y, k: k, s: G.rand() });
+  }
+  function matsStep(W, dt) {
+    if (!W.mats) { W.mats = []; for (let i = 0; i < 26; i++) scatter(W, 0); for (let i = 0; i < 22; i++) scatter(W, 1); }
+    W.matT = (W.matT || 0) - dt; if (W.matT > 0) return; W.matT = 2.5;
+    const n = [0, 0, 0], area = Math.sqrt(W.ww * W.wh / 3.3e6); for (let i = 0; i < W.mats.length; i++) n[W.mats[i].k]++;
+    for (let k = 0; k < 2; k++) if (n[k] < MAT[k].cap * area) scatter(W, k);
+  }
+  if (G.on) G.on('death', function (c) { const W = G.W; if (!W || !W.mats || !c || G.rand() > 0.4) return; let n = 0; for (let i = 0; i < W.mats.length; i++) if (W.mats[i].k === 2) n++; if (n < MAT[2].cap * Math.sqrt(W.ww * W.wh / 3.3e6)) W.mats.push({ x: clamp(c.x, 20, W.ww - 20), y: clamp(c.y, 20, W.wh - 20), k: 2, s: G.rand() }); });
+
+  // ── the plan of pieces ──
+  // a piece: { s: shape, x, y (the middle of its foot; y grows upward as it goes more negative), w, h, m: material, c: [hue shift, sat, light], st: 0 not there · 1 set · 2 coloured }
+  function plan(o) {
+    const r = G.rng ? G.rng((o.seed >>> 0) + 17) : Math.random, S = o.S, P = [], sp = o.spiky > 0.5, rich = o.brain;
+    const add = function (s, x, y, w, h, m, c) { P.push({ s: s, x: x, y: y, w: w, h: h, m: m, c: c, st: 0 }); };
+    const roof = function (x, y, w, h) { if (sp) add('tri', x, y, w, h * 1.5, 1, [20, 60, 52]); else add('dome', x, y, w, h, 2, [20, 62, 58]); };
+    if (o.type === 'wall') {
+      const N = 10 + Math.round(4 * rich), rx = S * 1.05, ry = S * 0.62, posts = [];
+      for (let i = 0; i < N; i++) { const a = -Math.PI / 2 + (i + 0.5) / N * TAU, gate = Math.abs(a - Math.PI / 2) < 0.36; posts.push([Math.cos(a) * rx, Math.sin(a) * ry, gate]); }
+      posts.sort(function (p, q) { return p[1] - q[1]; });      // the far side first
+      posts.forEach(function (p) { const h = S * (p[2] ? 0.62 : 0.44) * (0.9 + 0.2 * r()), w = S * 0.2; add('rect', p[0], p[1], w, h, 0, [0, 22, 46]); if (sp) add('tri', p[0], p[1] - h, w * 1.1, w * 0.9, 1, [20, 60, 52]); else add('dome', p[0], p[1] - h, w * 1.15, w * 0.6, 2, [20, 62, 60]); });
+      add('beam', 0, ry - S * 0.6, S * 0.74, S * 0.08, 1, [35, 65, 58]); add('flag', 0, ry - S * 0.68, S * 0.2, S * 0.3, 1, [0, 85, 60]);
+    } else if (o.type === 'huts') {
+      const N = 3 + Math.round(2 * rich), huts = [];
+      for (let i = 0; i < N; i++) { const a = Math.PI * (0.15 + 0.7 * i / (N - 1)); huts.push([Math.cos(a) * S * 0.95, -Math.sin(a) * S * 0.32 * (i % 2 ? 0.4 : 1)]); }
+      huts.sort(function (p, q) { return p[1] - q[1]; });
+      huts.forEach(function (p) { const w = S * (0.36 + 0.1 * r()), h = w * 0.62; add('rect', p[0], p[1], w, h, 0, [0, 24, 50]); roof(p[0], p[1] - h, w * 1.25, w * 0.6); add('door', p[0], p[1], w * 0.3, h * 0.62, 1, [0, 30, 16]); });
+      add('circ', 0, S * 0.14, S * 0.28, S * 0.28, 2, [40, 75, 62]);      // the store in the middle
+      if (rich > 0.5) add('flag', 0, -S * 0.14, S * 0.16, S * 0.26, 1, [0, 85, 60]);
+    } else if (o.type === 'spire') {
+      const N = 4 + Math.round(3 * rich); let y = 0, w = S * 0.5;
+      add('rect', 0, 0, w * 1.5, S * 0.14, 0, [0, 20, 40]); y -= S * 0.14;
+      for (let i = 0; i < N; i++) { const h = S * 0.24; add('rect', 0, y, w, h, 0, [0, 24, 48 + 3 * i]); if (i % 2) add('circ', 0, y - h * 0.5, w * 0.24, w * 0.24, 2, [45, 80, 68]); y -= h; w *= 0.88; }
+      roof(0, y, w * 1.3, w * 0.7); add('lamp', 0, y - (sp ? w * 1.2 : w * 0.75), S * 0.16, S * 0.16, 2, [50, 95, 72]);
+      for (let i = 0; i < 4; i++) add('rect', (i - 1.5) * S * 0.42, S * 0.1, S * 0.14, S * 0.12, 0, [0, 18, 44]);
+    } else {      // a hall
+      const tiers = 2 + Math.round(2 * rich), bh = S * 0.25, W0 = S * 1.15;
+      for (let i = 0; i < tiers; i++) { const n = Math.max(1, 4 - i), tw = W0 * (1 - 0.2 * i), bw = tw / n; for (let k = 0; k < n; k++) add('rect', -tw / 2 + bw * (k + 0.5), -i * bh, bw * 0.96, bh, 0, [0, 24, 46 + 4 * i + 3 * (k % 2)]); }
+      add('door', 0, 0, W0 * 0.2, bh * 0.82, 1, [0, 30, 16]);
+      for (let i = 1; i < tiers; i++) { const tw = W0 * (1 - 0.2 * i); add('circ', -tw * 0.25, -i * bh - bh * 0.5, bh * 0.3, bh * 0.3, 2, [45, 80, 68]); add('circ', tw * 0.25, -i * bh - bh * 0.5, bh * 0.3, bh * 0.3, 2, [45, 80, 68]); }
+      const topW = W0 * (1 - 0.2 * (tiers - 1)); roof(0, -tiers * bh, topW * 1.12, topW * 0.42);
+      if (rich > 0.45) [-1, 1].forEach(function (sd) { const x = sd * W0 * 0.62; add('rect', x, 0, S * 0.2, bh * 1.5, 0, [0, 22, 44]); roof(x, -bh * 1.5, S * 0.26, S * 0.16); });
+      add('flag', 0, -tiers * bh - (sp ? topW * 0.6 : topW * 0.42), S * 0.18, S * 0.3, 1, [0, 85, 60]);
+    }
+    return P;
+  }
+  const count = function (bp) { let a = 0, b = 0; for (let i = 0; i < bp.P.length; i++) { if (bp.P[i].st > 0) a++; if (bp.P[i].st > 1) b++; } return [a, b, bp.P.length]; };
+  G.buildCount = function (o) { return o && o.bp ? count(o.bp) : null; };
+  /** the plan of what a kind is about to build */
+  function blueprint(d) {
+    const W = G.W, r = d.result || {}, m = Math.min(W.ww, W.wh), sp = G.speciesById(d.sp), f = sp && sp.rep ? sp.rep.f : null;
+    let spiky = 0; if (f) { (f.rules || []).forEach(function (q) { if (q.k === 2 || q.k === 7) spiky = 1; }); if (f.crest > 0.25) spiky = 1; }
+    let h = 0, n = 0; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].sp === d.sp) { h += W.cre[i].g.h; n++; }
+    const o = { seed: (G.hash ? G.hash(String(d.title) + d.id) : d.id * 7919) >>> 0, type: r.solid ? 'wall' : r.feed > 0.05 ? 'huts' : r.pull > 0.1 ? 'spire' : 'hall', S: clamp((r.size || 0.08) * m, 55, 118), hue: d.hue || 50, spiky: spiky, brain: clamp((n ? h / n : 0) / 7, 0, 1) };
+    o.P = plan(o); return o;
+  }
+  G.blueprintFrom = function (o, states) { const bp = { seed: o.seed, type: o.type, S: o.S, hue: o.hue, spiky: o.spiky, brain: o.brain }; bp.P = plan(bp); if (typeof states === 'string') for (let i = 0; i < bp.P.length; i++) bp.P[i].st = clamp(+states.charAt(i) || 0, 0, 2); return bp; };
+  // what the creatures build is drawn by the game, so no picture is asked of the AI for it
+  if (G.figureFor) { const f0 = G.figureFor; G.figureFor = function (info, typed) { if (info && /Built by small pond creatures/.test(String(info.note || ''))) return Promise.resolve(null); return f0(info, typed); }; }
+
+  // ── the work of building ──
+  const baseOf = function (o) { return [o.x, o.y + (o.bp ? o.bp.S * 0.45 : 30)]; };
+  function buildStep(W, d, dt) {
+    if (!d.bp) d.bp = blueprint(d);
+    const bp = d.bp, P = bp.P, base = baseOf(d), M = []; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].deedId === d.id && !W.cre[i].dead) M.push(W.cre[i]);
+    const busyP = {}, busyM = new Set(); M.forEach(function (c) { const j = c.bj; if (j && j.d === d.id) { if (j.p >= 0) busyP[j.p] = 1; if (j.mat) busyM.add(j.mat); } });
+    d.wait = '';
+    for (let k = 0; k < M.length; k++) {
+      const c = M[k]; let j = c.bj && c.bj.d === d.id ? c.bj : null;
+      if (j && j.ph === 'fetch' && W.mats.indexOf(j.mat) < 0) j = null;                       // somebody else took it
+      if (j && j.p >= 0 && P[j.p].st >= (j.ph === 'paint' ? 2 : 1)) j = null;                   // already done
+      if (!j) {
+        let pi = -1; for (let i = 0; i < P.length; i++) if (P[i].st === 0 && !busyP[i]) { pi = i; break; }      // from the ground up
+        if (pi >= 0) {
+          let best = null, bd = 1e12, any = null, ad = 1e12; for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (busyM.has(q)) continue; const dd = (q.x - c.x) * (q.x - c.x) + (q.y - c.y) * (q.y - c.y); if (dd < ad) { ad = dd; any = q; } if (q.k === P[pi].m && dd < bd) { bd = dd; best = q; } }
+          const mat = best || any;      // the right stuff if there is any; else they make do with what there is
+          if (mat) { j = { d: d.id, ph: 'fetch', p: pi, mat: mat }; busyP[pi] = 1; busyM.add(mat); } else d.wait = MAT[P[pi].m].id;
+        } else { for (let i = 0; i < P.length; i++) if (P[i].st === 1 && !busyP[i]) { pi = i; break; } if (pi >= 0) { j = { d: d.id, ph: 'paint', p: pi, t: 0 }; busyP[pi] = 1; } }
+        c.bj = j;
+      }
+      c.carry = false; c.haul = j && j.ph === 'bring' ? j.k : -1;
+      if (!j) continue;      // nothing for this one just now: it stands by, as the plan has it
+      const pc = P[j.p], tx = j.ph === 'fetch' ? j.mat.x : base[0] + pc.x + (c.id % 2 ? 1 : -1) * (pc.w * 0.5 + c.ph.r + 6), ty = j.ph === 'fetch' ? j.mat.y : base[1] + Math.min(0, pc.y * 0.25) + 4;
+      const dx = tx - c.x, dy = ty - c.y, dist = Math.hypot(dx, dy) || 1, grip = c.ph.hands || c.ph.limbs > 0 ? 0.8 : 0.5, sp = Math.min(c.ph.speed * 2.4 * (j.ph === 'bring' ? grip : 1), dist * 2.4)      /* they go about it with a will */, k2 = Math.min(1, dt * 5);
+      c.vx += (dx / dist * sp - c.vx) * k2; c.vy += (dy / dist * sp - c.vy) * k2; if (dist > 8) c.ang = Math.atan2(dy, dx);
+      if (j.ph === 'fetch' && dist < c.ph.r + 12) { const at = W.mats.indexOf(j.mat); if (at >= 0) W.mats.splice(at, 1); j.k = j.mat.k; j.mat = null; j.ph = 'bring'; }
+      else if (j.ph === 'bring' && (dist < 46 || (j.bt = (j.bt || 0) + dt) > 14)) { pc.st = 1; pc.um = j.k; pc.t0 = W.t; c.bj = null; c.haul = -1; d.placed = (d.placed || 0) + 1; G.emit('build-piece', d, pc, c); }
+      else if (j.ph === 'paint' && dist < 50) { j.t += dt; c.vx *= 0.6; c.vy *= 0.6; if (j.t > 0.7) { pc.st = 2; pc.t0 = W.t; c.bj = null; G.emit('build-piece', d, pc, c); } }
+    }
+    const n = count(bp); d.progress = (n[0] + n[1]) / (2 * n[2]);
+    // the plan gives the building so long; they are given as long again and more to finish what they began
+    const st = d.steps[d.i]; if (d.progress < 1 && d.t > st.secs - 1 && (d.over = (d.over || 0) + dt) < st.secs * 3 + 60) d.t = st.secs - 1;
+  }
+  // what stands: kept up while its builders' kind lives, crumbling when it is gone or when nature strikes it down
+  function worksStep(W, dt) {
+    const Wk = W.works; if (!Wk || !Wk.length) return;
+    for (let i = Wk.length - 1; i >= 0; i--) {
+      const w = Wk[i]; if (!w.bp) continue;
+      w.until = W.t + 9999;      // it does not run out by the clock
+      w.upT = (w.upT || 0) - dt; if (w.upT > 0) continue; w.upT = w.fall ? 0.12 : 5;
+      let kin = 0; for (let k = 0; k < W.cre.length; k++) if (W.cre[k].sp === w.sp && !W.cre[k].dead) kin++;
+      const P = w.bp.P;
+      w.lone = kin < 3 ? (w.lone || 0) + 1 : 0;      /* (kinds are sorted afresh each autumn: a short gap in the count is not the end of them) */
+      if (w.fall || w.lone > 8) { let top = -1; for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { top = k; break; } if (top >= 0) { P[top].st = 0; G.emit('build-fall', w, P[top]); if (!w.fall && !w.ruin) { w.ruin = true; G.emit('work-ruin', w); } } }
+      else { for (let k = 0; k < P.length; k++) if (P[k].st < 2) { P[k].st++; P[k].t0 = W.t; break; } }      // its keepers mend and colour it
+      const n = count(w.bp);
+      if (n[0] === 0) { Wk.splice(i, 1); G.emit('work-gone', w); continue; }
+      const F = W.fields || []; for (let k = 0; k < F.length; k++) if (F[k].id === w.field) { if (n[0] >= n[2] * 0.6 && !w.fall) F[k].life = Math.max(F[k].life, 30); else F[k].life = Math.min(F[k].life, 6); }      // it does what it was built for while most of it stands
+    }
+  }
+  /** nature strikes a building down: it falls piece by piece */
+  G.razeWork = function (w) { if (w && w.bp) { w.fall = true; w.upT = 0; } };
+  if (G.on) {
+    G.on('deed-end', function (d, how, made) { if (made && d.bp) { made.bp = d.bp; made.sp = d.sp; made.until = (G.W ? G.W.t : 0) + 9999; } });
+    G.on('new-pond', function () { if (G.W) G.W.mats = null; });
+  }
+  { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (!W || W.title) return; matsStep(W, dt); const d = W.deed; if (d && d.result && d.steps[d.i] && d.steps[d.i].do === 'build') buildStep(W, d, dt); worksStep(W, dt); }; }
+
+  // ── seen ──
+  if (typeof document === 'undefined') return;
+  function piece(ctx, p, hue, t) {
+    const age = t - (p.t0 || -9), pop = age < 0.3 ? 0.6 + 0.4 * (age / 0.3) + 0.15 * Math.sin(age * 10.5) : 1, mc = MAT[p.um === undefined ? p.m : p.um].col;
+    const raw = hsl(mc[0], mc[1], mc[2]), fin = p.c[2] < 20 ? hsl(hue, 30, p.c[2]) : hsl(hue + p.c[0], p.c[1], p.c[2]), fill = p.st > 1 ? fin : raw, w = p.w * pop, h = p.h * pop;
+    ctx.fillStyle = fill; ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.beginPath();
+    if (p.s === 'rect') { G.roundRect(ctx, p.x - w / 2, p.y - h, w, h, Math.min(w, h) * 0.16); }
+    else if (p.s === 'tri') { ctx.moveTo(p.x - w / 2, p.y); ctx.lineTo(p.x, p.y - h); ctx.lineTo(p.x + w / 2, p.y); ctx.closePath(); }
+    else if (p.s === 'dome') { ctx.moveTo(p.x - w / 2, p.y); ctx.ellipse(p.x, p.y, w / 2, h, 0, Math.PI, TAU); ctx.closePath(); }
+    else if (p.s === 'circ') { ctx.arc(p.x, p.y - h / 2, w / 2, 0, TAU); }
+    else if (p.s === 'door') { ctx.moveTo(p.x - w / 2, p.y); ctx.lineTo(p.x - w / 2, p.y - h + w / 2); ctx.arc(p.x, p.y - h + w / 2, w / 2, Math.PI, TAU); ctx.lineTo(p.x + w / 2, p.y); ctx.closePath(); }
+    else if (p.s === 'beam') { G.roundRect(ctx, p.x - w / 2, p.y - h, w, h, h * 0.4); }
+    else if (p.s === 'lamp') { if (p.st > 1) { const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, w * 3); g.addColorStop(0, hsl(hue + 50, 95, 75, 0.5 + 0.2 * Math.sin(t * 3))); g.addColorStop(1, hsl(hue + 50, 95, 75, 0)); ctx.fillStyle = g; ctx.arc(p.x, p.y, w * 3, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.fillStyle = fill; } ctx.arc(p.x, p.y, w / 2, 0, TAU); }
+    else if (p.s === 'flag') { ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, p.y - h); ctx.stroke(); ctx.beginPath(); const fl = Math.sin(t * 5 + p.x) * w * 0.12; ctx.moveTo(p.x, p.y - h); ctx.lineTo(p.x + w + fl, p.y - h + w * 0.3); ctx.lineTo(p.x, p.y - h + w * 0.6); ctx.closePath(); }
+    ctx.fill(); ctx.stroke();
+    if (p.st > 1 && (p.s === 'rect' || p.s === 'dome') && w > 14) { ctx.fillStyle = 'rgba(255,255,255,0.13)'; ctx.beginPath(); if (p.s === 'rect') ctx.rect(p.x - w / 2 + 2.5, p.y - h + 2.5, w * 0.3, h - 5); else ctx.ellipse(p.x - w * 0.16, p.y - h * 0.5, w * 0.12, h * 0.3, 0, 0, TAU); ctx.fill(); }
+  }
+  /** a building (being raised, or standing): the ground it stands on, and every piece that is there */
+  G.drawBlueprint = function (ctx, o, building) {
+    const bp = o.bp; if (!bp) return; const b = baseOf(o), t = G.W.t, P = bp.P, S = bp.S;
+    ctx.save(); ctx.translate(b[0], b[1]);
+    ctx.fillStyle = 'rgba(8,16,26,0.28)'; ctx.beginPath(); ctx.ellipse(0, S * 0.1, S * (bp.type === 'wall' ? 1.25 : 0.95), S * (bp.type === 'wall' ? 0.74 : 0.22), 0, 0, TAU); ctx.fill();
+    if (building) { ctx.setLineDash([4, 5]); ctx.lineWidth = 1.2; ctx.strokeStyle = hsl(bp.hue, 70, 78, 0.4); for (let i = 0; i < P.length; i++) if (P[i].st === 0) { const p = P[i]; ctx.beginPath(); if (p.s === 'circ' || p.s === 'lamp') ctx.arc(p.x, p.y - (p.s === 'circ' ? p.h / 2 : 0), p.w / 2, 0, TAU); else ctx.rect(p.x - p.w / 2, p.y - p.h, p.w, p.h); ctx.stroke(); } ctx.setLineDash([]); }      // where the pieces still to come will go
+    for (let i = 0; i < P.length; i++) if (P[i].st > 0) piece(ctx, P[i], bp.hue, t);
+    ctx.restore();
+  };
+  function matDraw(ctx, q, t) {
+    const c = MAT[q.k].col; ctx.strokeStyle = INK; ctx.lineWidth = 1.3;
+    if (q.k === 0) { ctx.fillStyle = hsl(c[0], c[1], c[2] - 8 + 16 * q.s); ctx.beginPath(); ctx.ellipse(q.x, q.y, 6.5 + 2 * q.s, 4.6 + 1.5 * q.s, q.s * 3, 0, TAU); ctx.fill(); ctx.stroke(); }
+    else if (q.k === 1) { ctx.strokeStyle = hsl(c[0], c[1] + 10, c[2] - 14); ctx.lineWidth = 2; ctx.lineCap = 'round'; for (let k = -1; k <= 1; k++) { const sw = Math.sin(t * 1.3 + q.s * 9 + k) * 1.8; ctx.beginPath(); ctx.moveTo(q.x + k * 3, q.y + 6); ctx.quadraticCurveTo(q.x + k * 3.5, q.y - 3, q.x + k * 5 + sw, q.y - 10 - 3 * q.s); ctx.stroke(); } }
+    else { ctx.fillStyle = hsl(c[0], c[1], c[2]); ctx.beginPath(); ctx.arc(q.x, q.y, 5.5, Math.PI, TAU); ctx.lineTo(q.x - 5.5, q.y); ctx.fill(); ctx.stroke(); ctx.beginPath(); for (let k = -1; k <= 1; k++) { ctx.moveTo(q.x, q.y); ctx.lineTo(q.x + k * 3.4, q.y - 4.6); } ctx.stroke(); }
+  }
+  // the materials lie under everything else that is drawn in the water; what a builder hauls rides above its head
+  { const f0 = G.drawFields; G.drawFields = function (ctx) {
+      const W = G.W;
+      if (W && !W.title && W.mats && G.mode === 'play') { const v = G.view, s = v.scale * v.dpr; if (v.scale > 0.22) { const x0 = -v.ox / v.scale - 20, y0 = -v.oy / v.scale - 20, x1 = x0 + v.w / v.scale + 40, y1 = y0 + v.h / v.scale + 40, t = G.rt || 0; ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (q.x > x0 && q.x < x1 && q.y > y0 && q.y < y1) matDraw(ctx, q, t); } ctx.restore(); } }
+      if (f0) f0(ctx);
+    }; }
+  G.drawHauls = function (ctx) { const W = G.W, d = W && W.deed; if (!d) return; const t = G.rt || 0; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.deedId !== d.id || !(c.haul >= 0) || c.dead) continue; matDraw(ctx, { x: c.x, y: c.y - c.ph.r * 2.9 - 5 + Math.sin(t * 7 + c.id) * 1.2, k: c.haul, s: (c.id % 10) / 10 }, t); } };
 })();
 
 </script>
@@ -8986,7 +9178,7 @@ G.addSystem({
     // it sits under the "pond versus" card when that is showing
     const vs = document.getElementById('versus');
     // on the left, at mid height: between the season card above and the zoom buttons below (it never covers either)
-    { const se = document.getElementById('season'), zm = document.getElementById('zoom'), top = Math.max(se && !se.classList.contains('hide') ? se.getBoundingClientRect().bottom + 10 : 240, vs && !vs.classList.contains('hide') && vs.offsetHeight ? vs.getBoundingClientRect().bottom + 10 : 0),      /* below the 'pond versus' card when that is showing */ bot = zm ? zm.getBoundingClientRect().top - 10 : window.innerHeight - 240;
+    { const se = document.getElementById('season'), zm = document.getElementById('zoom'), top = Math.max(se && !se.classList.contains('hide') ? se.getBoundingClientRect().bottom + 10 : 240, 0),      /* below the 'pond versus' card when that is showing */ bot = zm ? zm.getBoundingClientRect().top - 10 : window.innerHeight - 240;
       if (window.innerWidth > 720) { box.style.top = 'auto'; box.style.bottom = Math.round(window.innerHeight - bot) + 'px'; box.style.transform = 'none'; box.style.maxHeight = Math.max(120, Math.round(bot - top)) + 'px';      /* it hangs from its top edge: opening and folding it does not move it */ } else { box.style.top = ''; box.style.bottom = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
     box.style.zIndex = shut ? '2' : '9';
     const by = {}, order = [];
@@ -10243,6 +10435,13 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   }
   G.openAbout = function () { if (about) { closeAbout(); return; } if (!G.R.sel) return; about = el('div', '', '', $('ui')); about.id = 'gbwin'; about.classList.add('about'); about.addEventListener('pointerdown', function (e) { e.stopPropagation(); }); about.addEventListener('wheel', function (e) { e.stopPropagation(); }, { passive: true }); fillAbout(); aboutT = setInterval(function () { try { fillAbout(); } catch (e) { console.error(e); closeAbout(); } }, 500); };
   G.on('new-pond', closeAbout);
+  // ── good and bad: nature's own voice ──
+  // The player never tells a creature what to do. They can only say GOOD or BAD of what it is doing right now, and that goes straight into its brain as the
+  // strongest reward or punishment it knows (G.learn): the wires that were just in use grow stronger or weaker. What it makes of that is its own affair.
+  G.judge = function (c, good) { if (!c || c.dead || !G.learn) return; G.learn(c, good ? 1 : -1); G.learn(c, good ? 1 : -1); c.judged = (c.judged || 0) + (good ? 1 : -1); c.flash = 1; if (good) c.mend = 1; else c.startle = 1; G.emit('judged-by-god', c, good); };
+  { const t = setInterval(function () { const b = $('iwhy'); if (!b) return; clearInterval(t); const row = document.createElement('div'); row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px';
+      row.innerHTML = '<button class="btn sm" id="igood" title="Tell it that what it is doing right now is good. It will do more of it. It learns; you do not command." style="border-color:rgba(51,214,166,.7);color:#dffbf1">\u2665 GOOD</button><button class="btn sm" id="ibad" title="Tell it that what it is doing right now is bad. It will do less of it." style="border-color:rgba(255,126,182,.7);color:#ffd3e2">\u2715 BAD</button>';
+      b.parentNode.insertBefore(row, b); $('igood').onclick = function () { G.sfx('click'); G.judge(G.R.sel, true); }; $('ibad').onclick = function () { G.sfx('click'); G.judge(G.R.sel, false); }; }, 400); }
   G.on('new-pond', close);
 
   const pct = function (v) { return Math.round(100 * Math.max(0, Math.min(1, v))) + '%'; };
@@ -10584,21 +10783,21 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     if (cur.k === 'work') {
       if ((W.works || []).indexOf(o) < 0) { G.selectThing(null); return; }
       const left = Math.max(0, o.until - W.t), f = fieldOf(o.field), does = f && G.fieldWords ? G.fieldWords(f) : '', fp = G.figurePic ? G.figurePic(o.name) : '';
-      sig = 'w' + o.name + Math.round(left / 2) + (fp ? 1 : 0);
+      sig = 'w' + o.name + (o.bp ? G.buildCount(o).join('.') + (o.fall ? 'f' : '') + (o.ruin ? 'r' : '') : Math.round(left / 2)) + (fp ? 1 : 0);
       if (sig === lastSig) return;
       h = head(fp ? '<img alt="" width="64" height="64" style="flex:none;border-radius:14px;background:rgba(7,18,31,.55);padding:4px" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(fp) + '">' : blob(o.hue || 50), o.name, cap(dot(o.looks)), 'Built by the ' + o.by + ' in generation ' + o.gen) +
         '<div class="ilabel">What it does</div><small>' + (does ? esc(cap(does)) + '. It does not harm those who built it.' : 'It stands as their mark.') + '</small>' +
-        meter('Time left', left / Math.max(1, (f && f.life0) || 120)) +
-        facts([o.plan ? '<b>The plan:</b> ' + esc(o.plan) + '.' : '', o.what ? esc(cap(dot(o.what))) : '', o.why ? '<span style="color:var(--gold)">Why:</span> ' + esc(dot(o.why)) : '', 'It stands for about <b>' + Math.round(left) + '</b> more seconds of pond time.']);
+        (o.bp ? (function () { const n = G.buildCount(o); return meter('How much of it stands', n[0] / n[2]) + '<small>' + n[0] + ' of ' + n[2] + ' pieces stand, ' + n[1] + ' coloured.' + (o.ruin ? ' <span style="color:var(--rose)">Its builders are gone: it is crumbling.</span>' : ' Its builders keep it up for as long as their kind lives.') + '</small>'; })() : meter('Time left', left / Math.max(1, (f && f.life0) || 120))) +
+        facts([o.plan ? '<b>The plan:</b> ' + esc(o.plan) + '.' : '', o.what ? esc(cap(dot(o.what))) : '', o.why ? '<span style="color:var(--gold)">Why:</span> ' + esc(dot(o.why)) : '', o.bp ? '' : 'It stands for about <b>' + Math.round(left) + '</b> more seconds of pond time.']) + (o.bp && !o.fall ? '<button class="btn sm" id="zraze" style="width:100%;margin-top:8px">STRIKE IT DOWN</button>' : '');
     } else if (cur.k === 'deed') {
       if (W.deed !== o) { G.selectThing(null); return; }
       const st = o.steps[o.i] || {}, n = W.cre.filter(function (x) { return x.deedId === o.id && !x.dead; }).length, togo = Math.max(1, Math.ceil(o.steps.slice(o.i).reduce(function (a, q) { return a + q.secs; }, 0) - o.t));
-      sig = 'd' + o.id + o.i + n + Math.round(togo / 2) + Math.round((o.progress || 0) * 20);
+      sig = 'd' + o.id + o.i + n + Math.round(togo / 2) + Math.round((o.progress || 0) * 20) + (o.bp ? G.buildCount(o).join('.') + (o.wait || '') : '');
       if (sig === lastSig) return;
       h = head(blob(o.hue || 50), o.title, o.say ? '“' + o.say + '”' : '', 'A plan of the ' + o.kind + ', begun in generation ' + o.gen) +
         '<div class="ilabel">Now</div><small><b style="color:var(--gold)">' + esc(cap(STEP[st.do] || st.do || '')) + (st.do === 'build' ? ' ' + Math.round((o.progress || 0) * 100) + '%' : '') + '</b> · step ' + (o.i + 1) + ' of ' + o.steps.length + ' · ' + n + ' of them · about ' + togo + ' s to go</small>' +
         meter('How far along', (o.i + Math.min(1, o.t / Math.max(1, st.secs || 1))) / Math.max(1, o.steps.length)) +
-        facts([o.what ? esc(cap(dot(o.what))) : '', o.why ? '<span style="color:var(--gold)">Why:</span> ' + esc(dot(o.why)) : '', o.result && o.result.name ? 'If they finish, they will have built <b>' + esc(o.result.name) + '</b>.' : '']);
+        facts([o.bp ? (function () { const n = G.buildCount(o); return '<b>' + n[0] + '</b> of ' + n[2] + ' pieces are in place, <b>' + n[1] + '</b> coloured.' + (o.wait ? ' <span style="color:var(--rose)">They are waiting for ' + o.wait + ': there is none lying about.</span>' : ' Each is fetched from the pond (stone from the floor, reed from the land, shell from where something died) and carried here.'); })() : '', o.what ? esc(cap(dot(o.what))) : '', o.why ? '<span style="color:var(--gold)">Why:</span> ' + esc(dot(o.why)) : '', o.result && o.result.name ? 'If they finish, they will have built <b>' + esc(o.result.name) + '</b>.' : '']);
     } else {
       if ((W.fields || []).indexOf(o) < 0) { G.selectThing(null); return; }
       const does = G.fieldWords ? G.fieldWords(o) : '', mine = (W.works || []).filter(function (w) { return w.field === o.id; })[0];
@@ -10611,6 +10810,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     }
     lastSig = sig; c.innerHTML = h; c.classList.remove('hide');
     const x = document.getElementById('zclose'); if (x) x.onclick = function () { G.selectThing(null); };
+    const rz = document.getElementById('zraze'); if (rz) rz.onclick = function () { if (G.sfx) G.sfx('meteor'); G.razeWork(o); lastSig = ''; };
   }
   setInterval(function () { try { if (cur) draw(); } catch (e) { console.error(e); cur = null; } }, 500);
   G.on('select', function (c) { if (c) G.selectThing(null); });
@@ -10656,7 +10856,8 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const s = order.join('|');
     if (!order.length) { if (!box.classList.contains('hide')) box.classList.add('hide'); sig = ''; return; }
     box.classList.remove('hide');
-    { const se = document.getElementById('season'); if (se && !se.classList.contains('hide') && window.innerWidth > 720) box.style.top = Math.round(se.getBoundingClientRect().bottom + 16) + 'px'; else box.style.top = ''; }      /* a clear gap under the seasons */
+    // it sits on the right, under the evolution panel (the left side is the rare box's): the two no longer share a column
+    { const pn = document.getElementById('panel'), ins = document.getElementById('inspector'), wide = window.innerWidth > 720; if (wide) { const top = pn && !pn.classList.contains('hide') ? pn.getBoundingClientRect().bottom + 10 : 14, bot = ins && !ins.classList.contains('hide') ? ins.getBoundingClientRect().top - 10 : window.innerHeight - 14; box.style.left = 'auto'; box.style.right = '14px'; box.style.top = Math.round(top) + 'px'; box.style.maxHeight = Math.max(44, Math.round(bot - top)) + 'px'; box.style.overflowY = 'auto'; box.style.zIndex = '3'; } else { box.style.left = ''; box.style.right = ''; box.style.top = ''; box.style.maxHeight = ''; } }
     // the heading folds the card away; under it, one line says what the card is
     if (shut === null) { try { shut = !!localStorage.getItem('primordia.versusShut'); } catch (e) { shut = false; } }
     let html = '<div id="vsHead" title="' + (shut ? 'Open' : 'Fold away') + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer"><span class="ilabel" style="margin:0;color:var(--gold)">' + (shut ? 'DANGERS' : 'DANGERS IN THE POND') + '</span><span style="display:flex;align-items:center;gap:6px">' + (shut ? '<small style="padding:1px 8px;border-radius:999px;border:1px solid rgba(255,126,182,.6);color:#ffd3e2">' + order.length + '</small>' : '') + '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;background:rgba(7,18,31,.55);border:1px solid rgba(207,232,255,.25)">' + (shut ? '▸' : '▾') + '</span></span></div>';
@@ -10700,7 +10901,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
         G.R.ring(z.x, z.y, PAL.gold, z.r0 * 2.2, 1.6); G.R.ring(z.x, z.y, PAL.algae, z.r0 * 1.5, 1.2); G.R.sparkle(z.x, z.y, PAL.gold, 40, 160);
         G.sfx('discovery');
       });
-      G.on('zone', function (z) { if (G.mode === 'play' && G.isBad(z) && !z.genNote && z.genN === 1) G.hint('vs' + z.id, z.word + ' is dangerous. Watch DANGERS IN THE POND (left): life will look for its weakness.', 9000); });
+      G.on('zone', function (z) { if (G.mode === 'play' && G.isBad(z) && !z.genNote && z.genN === 1) G.hint('vs' + z.id, z.word + ' is dangerous. Watch DANGERS IN THE POND (right): life will look for its weakness.', 9000); });
     },
     update: function () {
       if (G.mode !== 'play' || !G.W) return;
@@ -11872,7 +12073,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const W = G.W;
     if (!W || W.title) return null;
     const out = {
-      v: 1, at: Date.now(), room: +(W.room || 0).toFixed(1), shore: +(W.shore || G.SHORE0).toFixed(3), rich: +(W.richS || 1).toFixed(3), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
+      v: 1, at: Date.now(), works: (W.works || []).filter(function (w) { return w.bp; }).slice(-6).map(function (w) { const b = w.bp; return { n: w.name, l: w.looks, x: Math.round(w.x), y: Math.round(w.y), r: Math.round(w.r), by: w.by, hue: Math.round(w.hue || 0), sp: w.sp || 0, plan: w.plan, what: w.what, why: w.why, gen: w.gen, b: [b.seed, b.type, Math.round(b.S), Math.round(b.hue), b.spiky, +b.brain.toFixed(2)], st: b.P.map(function (p) { return p.st; }).join('') }; }), room: +(W.room || 0).toFixed(1), shore: +(W.shore || G.SHORE0).toFixed(3), rich: +(W.richS || 1).toFixed(3), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
       set: W.set, disc: W.disc, nextSp: W.nextSp, ai: G.ai && G.ai.model ? G.ai.model : '', drawn: G.ai && G.ai.drawn ? 1 : 0, spend: G.ai ? G.ai.life : {},
       hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species, +(h.look || 0).toFixed(3), +(h.lookTop || 0).toFixed(2), +(h.whole || 0).toFixed(3), +(h.wholeTop || 0).toFixed(2), +(h.body || 0).toFixed(1), +(h.bodyTop || 0).toFixed(1), +(h.size || 0).toFixed(1), +(h.sizeTop || 0).toFixed(1), (G.MARKS_X || []).map(function (m) { const q = h.mx && h.mx[m.id]; return q ? [+q[0].toFixed(3), +q[1].toFixed(2)] : 0; }), +(h.room || 0).toFixed(1)]; }),
       discLog: W.discLog.slice(-40),
@@ -12024,6 +12225,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     G.newWorld({ seed: num(d.seed, 1, 4e9, 1) });
     const W = G.W;
     W.gen = Math.floor(num(d.gen, 1, 1e6, 1));
+    if (Array.isArray(d.works) && G.blueprintFrom) W.works = d.works.slice(0, 6).filter(function (q) { return q && Array.isArray(q.b) && ['wall', 'huts', 'spire', 'hall'].indexOf(q.b[1]) >= 0; }).map(function (q) { const t = function (s, n) { return String(s || '').replace(/[<>]/g, '').slice(0, n); }; return { name: t(q.n, 40), looks: t(q.l, 200), x: num(q.x, 0, 1e5, 500), y: num(q.y, 0, 1e5, 500), r: num(q.r, 20, 200, 80), by: t(q.by, 40), hue: num(q.hue, 0, 360, 50), sp: num(q.sp, 0, 1e6, 0), plan: t(q.plan, 80), what: t(q.what, 200), why: t(q.why, 200), gen: num(q.gen, 0, 1e6, 0), until: 1e9, field: 0, bp: G.blueprintFrom({ seed: num(q.b[0], 0, 4294967295, 1), type: q.b[1], S: num(q.b[2], 40, 130, 80), hue: num(q.b[3], 0, 360, 50), spiky: q.b[4] ? 1 : 0, brain: num(q.b[5], 0, 1, 0.3) }, String(q.st || '')) }; });
     W.room = num(d.room, 0, G.ROOM_MAX || 10, 0);
     W.richS = num(d.rich, 1, 5000, num(d.gen, 0, 1e6, 0) > 50 ? 3.8 : 1); W.rich = W.richS;      /* (a pond saved before richness was kept: an old one is taken to be rich enough for the bodies it has) */ W.sizeCap = Math.min(G.sizeCapOf(W.richS), Math.max(14, 1.2 * Math.sqrt(0.03 * (+d.ww || W.ww) * (+d.wh || W.wh) / (125 * 11.34))));      // before any creature is rebuilt: how big a body may be depends on it
     W.shore = num(d.shore, G.SHORE0, 0.5, G.SHORE0);      // a pond saved when the land began smaller comes back with the bigger land

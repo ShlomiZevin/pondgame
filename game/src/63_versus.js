@@ -35,7 +35,8 @@
     const s = order.join('|');
     if (!order.length) { if (!box.classList.contains('hide')) box.classList.add('hide'); sig = ''; return; }
     box.classList.remove('hide');
-    { const se = document.getElementById('season'); if (se && !se.classList.contains('hide') && window.innerWidth > 720) box.style.top = Math.round(se.getBoundingClientRect().bottom + 16) + 'px'; else box.style.top = ''; }      /* a clear gap under the seasons */
+    // it sits on the right, under the evolution panel (the left side is the rare box's): the two no longer share a column
+    { const pn = document.getElementById('panel'), ins = document.getElementById('inspector'), wide = window.innerWidth > 720; if (wide) { const top = pn && !pn.classList.contains('hide') ? pn.getBoundingClientRect().bottom + 10 : 14, bot = ins && !ins.classList.contains('hide') ? ins.getBoundingClientRect().top - 10 : window.innerHeight - 14; box.style.left = 'auto'; box.style.right = '14px'; box.style.top = Math.round(top) + 'px'; box.style.maxHeight = Math.max(44, Math.round(bot - top)) + 'px'; box.style.overflowY = 'auto'; box.style.zIndex = '3'; } else { box.style.left = ''; box.style.right = ''; box.style.top = ''; box.style.maxHeight = ''; } }
     // the heading folds the card away; under it, one line says what the card is
     if (shut === null) { try { shut = !!localStorage.getItem('primordia.versusShut'); } catch (e) { shut = false; } }
     let html = '<div id="vsHead" title="' + (shut ? 'Open' : 'Fold away') + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer"><span class="ilabel" style="margin:0;color:var(--gold)">' + (shut ? 'DANGERS' : 'DANGERS IN THE POND') + '</span><span style="display:flex;align-items:center;gap:6px">' + (shut ? '<small style="padding:1px 8px;border-radius:999px;border:1px solid rgba(255,126,182,.6);color:#ffd3e2">' + order.length + '</small>' : '') + '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;background:rgba(7,18,31,.55);border:1px solid rgba(207,232,255,.25)">' + (shut ? '▸' : '▾') + '</span></span></div>';
@@ -79,7 +80,7 @@
         G.R.ring(z.x, z.y, PAL.gold, z.r0 * 2.2, 1.6); G.R.ring(z.x, z.y, PAL.algae, z.r0 * 1.5, 1.2); G.R.sparkle(z.x, z.y, PAL.gold, 40, 160);
         G.sfx('discovery');
       });
-      G.on('zone', function (z) { if (G.mode === 'play' && G.isBad(z) && !z.genNote && z.genN === 1) G.hint('vs' + z.id, z.word + ' is dangerous. Watch DANGERS IN THE POND (left): life will look for its weakness.', 9000); });
+      G.on('zone', function (z) { if (G.mode === 'play' && G.isBad(z) && !z.genNote && z.genN === 1) G.hint('vs' + z.id, z.word + ' is dangerous. Watch DANGERS IN THE POND (right): life will look for its weakness.', 9000); });
     },
     update: function () {
       if (G.mode !== 'play' || !G.W) return;
