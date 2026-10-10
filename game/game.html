@@ -9567,7 +9567,7 @@ G.addSystem({
     const H = []; for (let i = 0; i < W.works.length; i++) { const w = W.works[i]; if (w.bp && w.bp.type === 'house' && !w.fall) { w.inN = 0; H.push(w); } } if (!H.length) return;
     const ours = !!(G.colonyPlans && G.colonyPlans(W));      // (in your colony a home is anyone's of yours: there is room for eight)
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.deedId || !(c.asleep || c.tired > 0.4)) { c.atHome = 0; continue; }
-      let best = null, bd = 800; for (let k = 0; k < H.length; k++) { const w = H[k]; if (ours ? (c.team || w.enemy || w.inN >= 8) : (w.sp !== c.sp || w.inN >= 5)) continue; const dd = Math.hypot(w.x - c.x, w.y - c.y); if (dd < bd) { bd = dd; best = w; } } if (!best) { c.atHome = 0; continue; }
+      let best = null, bd = 800; for (let k = 0; k < H.length; k++) { const w = H[k]; if (ours ? (c.team || w.enemy || w.inN >= 8) : (w.sp !== c.sp || w.inN >= 5)) continue; const dd = Math.hypot(w.x - c.x, w.y - c.y) * (ours && c.homeW === w.name ? 0.3 : 1);      /* (its own home before any other) */ if (dd < bd) { bd = dd; best = w; } } if (!best) { c.atHome = 0; continue; }
       const hw = best.bp.hw || 40, bx = best.x + ((c.id % 5) - 2) * hw * 0.3, by = best.y + best.bp.S * 0.45 + 6, dx = bx - c.x, dy = by - c.y, dist = Math.hypot(dx, dy) || 1;
       if (dist < hw + 26) { best.inN++; c.atHome = best.sp; if (c.asleep) { c.tired -= 0.085 * dt; c.E = Math.min(c.ph.Emax, c.E + 0.05 * dt); c.vx *= 0.8; c.vy *= 0.8; } else if (c.tired > 0.5) { c.asleep = true; W.stats.sleptHome = (W.stats.sleptHome || 0) + 1; } }
       else if (!c.asleep) { c.tired = Math.min(c.tired, 0.92); const sp = Math.min(c.ph.speed * 1.5, dist), k2 = Math.min(1, dt * 3); c.vx += (dx / dist * sp - c.vx) * k2; c.vy += (dy / dist * sp - c.vy) * k2; c.atHome = 0; }
@@ -10619,7 +10619,7 @@ G.addSystem({
   };
   G.buildCancel = function (id) { const col = colony(); const i = col.queue.findIndex(function (q) { return q.id === id; }); if (i >= 0) { const K = KINDS[col.queue[i].type]; if (K && K.cost) for (let q = 0; q < 4; q++) col.stock[q] += K.cost[q] || 0; col.queue.splice(i, 1); G.emit('build-cancelled', id); } };
   function startBuild(W, col) {
-    const o = col.queue[0]; if (!o || W.deed || !G.deedStart) return; const B = W.cre.filter(function (c) { return !c.dead && mine(c) && c.job === 'b' && !c.deedId && !c.hungry; }); if (B.length < 2) return;
+    const o = col.queue[0]; if (!o || W.deed || !G.deedStart || (G.missionWaits && G.missionWaits())) return;      /* (a mission that is waiting to begin goes first: the builders do not start something new in front of it) */ const B = W.cre.filter(function (c) { return !c.dead && mine(c) && c.job === 'b' && !c.deedId && !c.hungry; }); if (B.length < 2) return;
     if (o.type === 'ship') { const Wk = W.works || [], ships = Wk.filter(function (w) { return w.bp && w.bp.type === 'ship' && !w.visitor; }), ports = Wk.filter(function (w) { return w.bp && w.bp.type === 'port' && !w.fall && !w.enemy; });
       const free = ports.filter(function (pt) { const dk = G.dockOf(pt); return !ships.some(function (s) { return Math.abs(s.x - dk.x) < 80 && Math.abs(s.y + s.bp.S * 0.45 - dk.y) < 110; }); }), port = free.filter(function (pt) { return G.buildCount(pt)[0] >= G.buildCount(pt)[2]; })[0];      /* (a ship is built on a spaceport that stands whole and empty) */
       if (!port) { if (!ports.length || (!free.length && !ports.some(function (pt) { return G.buildCount(pt)[0] < G.buildCount(pt)[2]; }))) col.queue.shift(); return; } const dk = G.dockOf(port); o.x = dk.x; o.y = dk.y; o.at = { x: dk.x, y: dk.y }; }
@@ -10678,7 +10678,7 @@ G.addSystem({
     planT += dt; if (planT < 14) return; planT = 0;
     if (col.auto === false || !G.colonyPlans(W) || W.gen < 10 || G.mode === 'title') return; const h = G.heartOf(W); if (!h || h.ruin) return;
     const nd = G.colonyNeeds(W), N = nd.N;
-    if (col.queue.length || W.deed || (W.works || []).length >= 40 || N < 9) return;
+    if (col.queue.length || W.deed || (W.works || []).length >= 40 || N < 9 || (G.missionWaits && G.missionWaits())) return;
     const L = nd.list.filter(function (q) { return q.need > q.have; }).sort(function (a, b) { return (b.need - b.have) / b.need - (a.need - a.have) / a.need; });      // (what it is shortest of comes first; equal, in the order above)
     for (let i = 0; i < L.length; i++) { const q = L[i], at = placeFor(W, col, q.t, q.have); if (!at) continue; const o = G.buildOrder(q.t, at.x, at.y); if (!o || o.error) continue;
       o.auto = true; o.why = q.why; G.emit('colony-plans', o, q); if (G.log) G.log('disc', 'The colony decided: ' + o.name, 'Why: ' + q.why + '. Its builders will raise it.'); return; }
@@ -10831,15 +10831,30 @@ G.addSystem({
   // of going home to sleep: hungry, it makes for the nearest feeding ground; fed, and with no work, it drifts back to the COMMONS round the Heart.
   // So the life of a star has a shape that can be followed: out along the roads to feed, and home again.
   function steer(c, tx, ty, dt, haste, pull) { const dx = tx - c.x, dy = ty - c.y, d = Math.hypot(dx, dy) || 1, sp = Math.min(c.ph.speed * haste, d * 2), k = Math.min(1, dt * pull); c.vx += (dx / d * sp - c.vx) * k; c.vy += (dy / d * sp - c.vy) * k; if (d > 20) c.ang += (Math.atan2(dy, dx) - c.ang) * Math.min(1, dt * 2) * (Math.abs(Math.atan2(dy, dx) - c.ang) > 3.1416 ? 0 : 1); return d; }
-  /** where a free creature idles: its own spot on the commons, round the Heart */
-  G.commonsSpot = function (W, c) { const H = hub(W); if (!H) return null; const a = fr(c.id * 0.6180339) * 6.2832, r = 120 + fr(c.id * 0.4142135) * 150; return { x: clamp(H.x + Math.cos(a) * r * 1.5, 60, W.ww - 60), y: clamp(H.y - 20 + Math.sin(a) * r * 0.85, 40, W.wh - 40) }; };
+  // ── where the free belong ──
+  // One with no role is not left to drift. Once the colony has homes, each of them HAS one (the nearest with room: eight to a home, and it keeps it while the home
+  // stands): fed, it comes back to its own place before that home's door; and by turns, each in its own rhythm, it goes to the meeting place and stands with the
+  // others before it. So the free are seen in households round their homes, in a gathering before the meeting place, and on the ways between those and the feeding
+  // grounds, which wear into paths. (Before there are homes they keep to the commons round the Heart, as they did.)
+  function places(W) { const P0 = W._places; if (P0 && W.t >= P0.t && W.t - P0.t < 2) return P0; const homes = [], halls = [], by = {}, Wk = W.works || [];
+    for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.bp || w.enemy || w.fall || w.visitor || (w.bp.type !== 'house' && w.bp.type !== 'hall')) continue; const n = G.buildCount ? G.buildCount(w) : [1, 1, 1]; if (n[0] < n[2] * 0.6) continue; const o = { name: w.name, x: w.x, y: w.y + w.bp.S * 0.45, n: 0 }; if (w.bp.type === 'house') { homes.push(o); by[w.name] = o; } else halls.push(o); }
+    if (homes.length) for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.team || !c.homeW) continue; if (by[c.homeW]) by[c.homeW].n++; else c.homeW = ''; }
+    return (W._places = { t: W.t, homes: homes, halls: halls, by: by }); }
+  /** the home a creature of yours belongs to: { name, x, y (its door) } or null (no homes yet, or no room in any) */
+  G.homeOf = function (W, c) { const P = places(W); if (!P.homes.length || c.team) return null; let hm = c.homeW ? P.by[c.homeW] : null; if (hm) return hm; let bd = 1e18; for (let i = 0; i < P.homes.length; i++) { const q = P.homes[i]; if (q.n >= 8) continue; const d = (q.x - c.x) * (q.x - c.x) + (q.y - c.y) * (q.y - c.y); if (d < bd) { bd = d; hm = q; } } if (!hm) return null; hm.n++; c.homeW = hm.name; return hm; };
+  /** where a free creature idles: before its own home, by turns before the meeting place; with no home, its own spot on the commons round the Heart */
+  G.commonsSpot = function (W, c) { const H = hub(W); if (!H) return null; const hm = G.homeOf(W, c);
+    if (hm) { const P = places(W), k = fr(c.id * 0.4142135), aa = 0.32 + fr(c.id * 0.3137) * 2.5, turn = fr(W.t / 52 + fr(c.id * 0.7548777));      /* (a place in the half-ring before a door; about a third of its time at the meeting place) */
+      if (P.halls.length && turn < 0.34) { let m = P.halls[0], bd = 1e18; for (let i = 0; i < P.halls.length; i++) { const q = P.halls[i], d = Math.hypot(q.x - hm.x, q.y - hm.y); if (d < bd) { bd = d; m = q; } } const r = 56 + 62 * k; return { x: clamp(m.x + Math.cos(aa) * r * 1.5, 60, W.ww - 60), y: clamp(m.y + 30 + Math.sin(aa) * r * 0.62, 40, W.wh - 40), at: 'meeting' }; }
+      const r = 40 + 36 * k; return { x: clamp(hm.x + Math.cos(aa) * r * 1.45, 60, W.ww - 60), y: clamp(hm.y + 22 + Math.sin(aa) * r * 0.6, 40, W.wh - 40), at: 'home' }; }
+    const a = fr(c.id * 0.6180339) * 6.2832, r = 120 + fr(c.id * 0.4142135) * 150; return { x: clamp(H.x + Math.cos(a) * r * 1.5, 60, W.ww - 60), y: clamp(H.y - 20 + Math.sin(a) * r * 0.85, 40, W.wh - 40) }; };
   function habits(W, dt) {
     if (!G.FLAT) return; const S = G.sitesOf(W).filter(function (s) { return s.k === 'grove'; }); if (!S.length) return; const str = 1, H = W.gen < 5 ? null : hub(W);      // (a young star's first life stays where it began; later, those who have fed drift home to the colony)
     const crowd = S.map(function () { return 0; }); for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue; for (let q = 0; q < S.length; q++) if (Math.hypot(c.x - S[q].x, (c.y - S[q].y) / 0.8) < S[q].r) { crowd[q]++; break; } }      // (a full feeding ground sends the hungry on to the next)      // (the habits come with the feeding grounds: while food still comes up everywhere, everyone forages where it is)
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.inShip || c.asleep || c.goTo || c.deedId || c.team === 1 || c.outAt !== undefined) continue; if (c.job && !c.hungry) { c.feedGo = 0; continue; }
-      const fed = c.E / c.ph.Emax; if (c.feedGo) { if (fed > 0.74) c.feedGo = 0; } else if (fed < (W.gen < 5 ? 0.7 : 0.44) || c.hungry) c.feedGo = 1;      /* (a young star's first life keeps to where the food is) */
+      const fed = c.E / c.ph.Emax; if (c.feedGo) { if (fed > (c.homeW && !c.job ? 0.66 : 0.74)) c.feedGo = 0; }      /* (one with a home to go back to leaves the feeding ground a little sooner) */ else if (fed < (W.gen < 5 ? 0.7 : 0.44) || c.hungry) c.feedGo = 1;      /* (a young star's first life keeps to where the food is) */
       if (c.feedGo) { let g = S[0], bd = 1e18; for (let q = 0; q < S.length; q++) { const d = Math.hypot(S[q].x - c.x, S[q].y - c.y) * (1 + Math.max(0, crowd[q] - 14) / 16) * (c.grove === q ? 0.7 : 1); if (d < bd) { bd = d; g = S[q]; c.groveN = q; } } c.grove = c.groveN; if (Math.hypot(c.x - g.x, (c.y - g.y) / 0.8) > g.r * 0.78) steer(c, g.x + Math.cos(c.id) * g.r * 0.4, g.y + Math.sin(c.id) * g.r * 0.3, dt, 1.6, 3.2 * str); }
-      else if (!c.job && !c.team && H && c.stranger === undefined) { const p = G.commonsSpot(W, c); if (p && Math.hypot(c.x - p.x, c.y - p.y) > 70) steer(c, p.x, p.y, dt, 1.1, 1.6 * str); } }
+      else if (!c.job && !c.team && H && c.stranger === undefined) { const p = G.commonsSpot(W, c); if (p && Math.hypot(c.x - p.x, c.y - p.y) > (p.at ? 40 : 70)) steer(c, p.x, p.y, dt, 1.15, 1.8 * str); } }
   }
   { const s0 = G.step; let acc = 9; G.step = function (dt) { s0(dt); const W = G.W; if (!W || W.title) return; habits(W, dt); if (!W.col) return; acc += dt; if (acc >= 1) { acc = 0; G.formUp(W); } }; }
 
@@ -12076,6 +12091,8 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     return h;
   };
   /** FLY HERE: the pond is chosen; back to the pond, where the mission is carried out */
+  /** is a mission decided on and waiting for the star to be free to begin it? */
+  G.missionWaits = function () { return !!want; };
   G.voyageGo = function (p) {
     const ship = picking || F.shipOf(); if (!ship || F.visiting || flight || plan() || !p || p.free || p.home) return;
     if (G.FUEL && G.colony && !G.W.farOf && G.colony().stock[3] < G.FUEL) { tip('<b>The ship needs ' + G.FUEL + ' lumen to fly out.</b><br>There is ' + G.colony().stock[3] + ' in the store. Gatherers bring lumen in from the crystals: choose some and right-click a crystal.'); return; }
@@ -12228,7 +12245,8 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       if (u < 0.6) { const g = ctx.createRadialGradient(px, py, 0, px, py, 16); g.addColorStop(0, 'rgba(255,245,200,0.95)'); g.addColorStop(1, 'rgba(246,211,101,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, 16, 0, TAU); ctx.fill(); ctx.fillStyle = '#fff3c8'; ctx.beginPath(); ctx.arc(px, py, 4, 0, TAU); ctx.fill(); }
       const a = Math.min(1, (1 - u) * 3), ty = (k.in ? hy : ay) - 34 - u * 22, txt = '#' + k.id + (k.in ? '  aboard ✓' : '  steps out'); ctx.font = '800 12px system-ui, sans-serif'; const tw = ctx.measureText(txt).width + 18, tx = k.in ? hx : ax; ctx.fillStyle = 'rgba(9,18,30,' + 0.88 * a + ')'; G.roundRect(ctx, tx - tw / 2, ty - 11, tw, 22, 11); ctx.fill(); ctx.fillStyle = 'rgba(' + (k.in ? '154,240,208' : '246,211,101') + ',' + a + ')'; ctx.fillText(txt, tx, ty + 0.5); }
     // coming down: its fire under it
-    if (landing && (G.W.works || []).indexOf(landing.ship) >= 0) { const sh = landing.ship, S = sh.bp.S || 70, x = sx(sh.x), y = sy(sh.y + S * 0.5), Lf = (70 + 150 * (1 - (landing.u || 0))) * v.scale * (0.8 + 0.25 * Math.sin(t * 29)), w = S * 0.28 * v.scale, fg = ctx.createLinearGradient(0, y, 0, y + Lf); fg.addColorStop(0, 'rgba(255,250,220,0.95)'); fg.addColorStop(0.3, 'rgba(255,190,90,0.85)'); fg.addColorStop(1, 'rgba(255,110,60,0)'); ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(x - w, y - 4); ctx.quadraticCurveTo(x, y + Lf * 1.5, x + w, y - 4); ctx.closePath(); ctx.fill();
+    if (landing && (G.W.works || []).indexOf(landing.ship) >= 0 && G.rocketFx) { const sh = landing.ship, S = sh.bp.S || 70; G.rocketFx.feed({ id: 'land', x: sh.x, y: sh.y + S * 0.34, ground: landing.y0 + S * 0.45 + 4, power: 0.6 + 0.4 * (1 - (landing.u || 0)), size: 26 }); }
+    else if (landing && (G.W.works || []).indexOf(landing.ship) >= 0) { const sh = landing.ship, S = sh.bp.S || 70, x = sx(sh.x), y = sy(sh.y + S * 0.5), Lf = (70 + 150 * (1 - (landing.u || 0))) * v.scale * (0.8 + 0.25 * Math.sin(t * 29)), w = S * 0.28 * v.scale, fg = ctx.createLinearGradient(0, y, 0, y + Lf); fg.addColorStop(0, 'rgba(255,250,220,0.95)'); fg.addColorStop(0.3, 'rgba(255,190,90,0.85)'); fg.addColorStop(1, 'rgba(255,110,60,0)'); ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(x - w, y - 4); ctx.quadraticCurveTo(x, y + Lf * 1.5, x + w, y - 4); ctx.closePath(); ctx.fill();
       const gy = sy(landing.y0 + S * 0.55); for (let i = 0; i < 12; i++) { const q = (t * 0.9 + i / 12) % 1, side = i % 2 ? 1 : -1; ctx.fillStyle = 'rgba(232,238,248,' + 0.3 * (1 - q) * (landing.u || 0) + ')'; ctx.beginPath(); ctx.arc(x + side * (10 + 120 * q) * v.scale, gy - q * 14 * v.scale, (12 + 30 * q) * v.scale, 0, TAU); ctx.fill(); } }
     ctx.restore();
   }
@@ -12246,10 +12264,16 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const ship = shipOfPlan(d); if (!ship) return; const S = ship.bp.S || 70, lift = d.voyage.lift || 0, left = st.do === 'countdown' ? st.secs - d.t : 0, heat = st.do === 'liftoff' ? 1 : clamp(1 - left / 4, 0, 1);
     const sx = ship.x * v.scale + v.ox, sy = (ship.y + S * 0.5) * v.scale + v.oy, gy = (d.voyage.y0 + S * 0.55) * v.scale + v.oy;
     ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
+    // its fire, smoke and dust (59b_rocketfx.js): the engines come up over the last four seconds of the count, then burn at full power; the ships that fly with it burn too
+    if (G.rocketFx) { const lit = st.do === 'liftoff', gnd = function (w, y0) { return y0 + (w.bp.S || 70) * 0.45 + 4; }, mouth = function (w) { return w.y + (w.bp.S || 70) * 0.34; };
+      G.rocketFx.feed({ id: 'lead', x: ship.x, y: mouth(ship), ground: gnd(ship, d.voyage.y0), power: lit ? 1 : heat * 0.5, size: 26 });
+      if (F.mates && !F.visiting) F.mates(ship).forEach(function (m, k) { G.rocketFx.feed({ id: 'mate' + k, x: m.x, y: mouth(m), ground: gnd(m, m.y0v === undefined ? m.y : m.y0v), power: m.lifting ? 1 : lit ? 0.6 : heat * 0.5, size: 26 }); }); }
+    else {
     // smoke rolling out along the ground, more as the count runs down
     { const n = st.do === 'liftoff' ? 16 : Math.round(4 + 10 * clamp(1 - left / st.secs, 0, 1)); for (let i = 0; i < n; i++) { const q = (t * 0.9 + i / n) % 1, side = i % 2 ? 1 : -1, r = (12 + 34 * q) * v.scale * (st.do === 'liftoff' ? 1.4 : 1); ctx.fillStyle = 'rgba(232,238,248,' + 0.34 * (1 - q) + ')'; ctx.beginPath(); ctx.arc(sx + side * (10 + (60 + 80 * heat) * q + Math.sin(i * 12.9) * 14) * v.scale, gy - q * 16 * v.scale + Math.sin(i * 3.1) * 6, r, 0, TAU); ctx.fill(); } }
     // the engine's fire
     if (heat > 0) { const L = ((st.do === 'liftoff' ? 90 + 190 * lift : 34 * heat)) * v.scale * (0.8 + 0.25 * Math.sin(t * 29)), w = S * 0.3 * v.scale * (0.5 + 0.5 * heat), fg = ctx.createLinearGradient(0, sy, 0, sy + L); fg.addColorStop(0, 'rgba(255,250,220,0.95)'); fg.addColorStop(0.3, 'rgba(255,190,90,0.85)'); fg.addColorStop(1, 'rgba(255,110,60,0)'); ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(sx - w, sy - 4); ctx.quadraticCurveTo(sx, sy + L * 1.5, sx + w, sy - 4); ctx.closePath(); ctx.fill(); }
+    }
     // T minus ...
     { const n = st.do === 'countdown' ? Math.max(1, Math.ceil(left)) : 0, txt = n ? String(n) : 'LIFT-OFF!', frac = st.do === 'countdown' ? left - Math.floor(left - 1e-6) : 1 - lift, pop = 1 + 0.25 * Math.max(0, frac - 0.75) * 4, cx = v.w / 2, cy = Math.max(262, v.h * 0.34);
       if (n !== lastCount) { lastCount = n; if (G.sfx) G.sfx(n ? 'click' : 'discovery'); }
@@ -12380,6 +12404,103 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   G.on('deed-end', function (d, how, made) { if (G.mode === 'play' && made && made.bp && made.bp.type === 'ship' && !F.visiting) setTimeout(function () { if (G.note) G.note('They have a spaceship', 'Open NOW (bottom left) or click the ' + made.name + ', and PLAN A VOYAGE to another star.'); if (G.log) G.log('sp', 'A spaceship', 'The ' + made.by + ' built the ' + made.name + '. It can fly to another star.'); }, 5000); });
   G.on('extinct', function () { const V = F.there(); if (!V || G.mode !== 'play') return; setTimeout(function () { if (F.visiting !== V) return; say('NOTHING LIVES AT ' + V.name.toUpperCase() + ' NOW', 'The star has fallen still. The ship turns for home.', 8000); G.voyageHome(true); }, 1500); });
   G.on('new-pond', function (opts) { if (opts && opts.voyage) return; picking = null; flight = null; want = null; R = null; crewNow = []; mineNow = []; if (pickEl) pickEl.classList.add('hide'); if (bar) bar.classList.add('hide'); });
+})();
+
+</script>
+<script data-part="59b_rocketfx">
+// ── Fire, smoke and dust under a ship ──
+// Whatever rises or comes down on its engine (your starships, each ship of a fleet, a raiders' ship) is given its exhaust here, so that it looks the same
+// and looks like the real thing:
+//     the FLAME    three bodies of light one inside the other (a wide orange plume, a yellow body, a white-blue core) with shock diamonds down the core;
+//                  it flickers, lengthens with the engine's power, and where it reaches the ground it is cut short and splashes sideways
+//     the SMOKE    while the ship is low the blast strikes the ground and is driven out to both sides along it, fast, then slows, swells and rises; once the
+//                  ship is up, smoke is left in a column under it. Near the fire it is lit orange from below; it greys as it cools
+//     the DUST     the ground's own colour, thrown out low and fast under the smoke, and a ring of it at the moment the engine comes to full power
+//     SPARKS       bits of the pad, flung out and bouncing
+//     the LIGHT    a pool of orange light on the ground under and round the ship, fading as it climbs
+// A caller says only where the engine is and how hard it burns, every frame it burns: G.rocketFx.feed({ id, x, y, ground, power, size }).
+// Nothing here changes the star: it only draws.
+(function () {
+  'use strict';
+  if (typeof document === 'undefined') return;
+  const TAU = 6.2832, P = [], MAX = 460, FEED = [], LAST = {};
+  const rnd = Math.random, clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
+  const SPR = {};
+  /** a soft, lumpy puff of one colour (drawn once): lighter on top, shaded underneath */
+  function puff(rgb) {
+    if (SPR[rgb]) return SPR[rgb]; const c = document.createElement('canvas'); c.width = c.height = 96; const x = c.getContext('2d');
+    for (let i = 0; i < 9; i++) { const a = i * 2.4, d = i ? 13 + (i % 3) * 5 : 0, px = 48 + Math.cos(a) * d, py = 50 + Math.sin(a) * d * 0.8, r = i ? 19 + (i % 4) * 4 : 30, g = x.createRadialGradient(px, py - r * 0.2, r * 0.1, px, py, r); g.addColorStop(0, 'rgba(' + rgb + ',0.62)'); g.addColorStop(0.6, 'rgba(' + rgb + ',0.30)'); g.addColorStop(1, 'rgba(' + rgb + ',0)'); x.fillStyle = g; x.beginPath(); x.arc(px, py, r, 0, TAU); x.fill(); }
+    x.globalCompositeOperation = 'source-atop'; const sh = x.createLinearGradient(0, 18, 0, 92); sh.addColorStop(0, 'rgba(255,255,255,0.16)'); sh.addColorStop(0.55, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(30,34,52,0.42)'); x.fillStyle = sh; x.fillRect(0, 0, 96, 96);
+    return (SPR[rgb] = c);
+  }
+  const dustRgb = function () { const L = G.terrainLook && G.W ? G.terrainLook(G.W) : null, q = L ? L.lite.split(',').map(Number) : [214, 190, 160]; return Math.round(q[0] * 0.62 + 70) + ',' + Math.round(q[1] * 0.62 + 62) + ',' + Math.round(q[2] * 0.62 + 54); };
+  const add = function (p) { if (P.length >= MAX) P.splice(0, 12); P.push(p); };
+
+  function emit(f, dt) {
+    const pw = f.power, h = Math.max(0, f.ground - f.y), s = f.size, near = clamp(1 - h / 300, 0, 1), was = LAST[f.id] || { pw: 0, acc: [0, 0, 0, 0] }, A = was.acc;
+    // full power for the first time: a ring of dust goes out along the ground
+    if (pw >= 0.95 && was.pw < 0.95 && near > 0.5) for (let i = 0; i < 26; i++) { const a = i / 26 * TAU, sp = 300 + 180 * rnd(); add({ k: 1, x: f.x + Math.cos(a) * 14, y: f.ground - 2 + Math.sin(a) * 5, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.34, r: 12 + 8 * rnd(), gr: 34 + 20 * rnd(), t: 0, life: 1.5 + 0.9 * rnd(), g: f.ground + 26, rot: rnd() * TAU }); }
+    if (near > 0) {      // the blast on the ground: out to both sides
+      A[0] += dt * 54 * pw * pw * near; while (A[0] >= 1) { A[0]--; const sd = rnd() < 0.5 ? -1 : 1, sp = (90 + 290 * rnd()) * (0.45 + 0.55 * pw); add({ k: 0, x: f.x + sd * (4 + 18 * rnd()), y: f.ground - 4 - 10 * rnd(), vx: sd * sp, vy: -(4 + 34 * rnd()), r: (10 + 9 * rnd()) * (0.7 + s / 60), gr: 20 + 30 * rnd(), t: 0, life: 2.8 + 2.6 * rnd(), hot: 0.95 * near * pw, g: f.ground + 8 + 14 * rnd(), rot: rnd() * TAU }); }
+      A[1] += dt * 24 * pw * near; while (A[1] >= 1) { A[1]--; const sd = rnd() < 0.5 ? -1 : 1; add({ k: 1, x: f.x + sd * 10 * rnd(), y: f.ground - 2, vx: sd * (200 + 300 * rnd()) * (0.4 + 0.6 * pw), vy: -(2 + 16 * rnd()), r: 8 + 7 * rnd(), gr: 26 + 22 * rnd(), t: 0, life: 1.3 + 1.2 * rnd(), g: f.ground + 10 + 16 * rnd(), rot: rnd() * TAU }); }
+      if (pw > 0.55 && h < 130) { A[2] += dt * 30 * pw; while (A[2] >= 1) { A[2]--; const sd = rnd() < 0.5 ? -1 : 1; add({ k: 2, x: f.x + sd * 8 * rnd(), y: f.ground - 3, vx: sd * (160 + 420 * rnd()), vy: -(30 + 230 * rnd()), t: 0, life: 0.45 + 0.7 * rnd(), g: f.ground + 12 }); } }
+    }
+    if (h > 50 && pw > 0.3) {      // up in the air: a column of smoke is left under it
+      A[3] += dt * 30 * pw; while (A[3] >= 1) { A[3]--; add({ k: 0, x: f.x + (rnd() - 0.5) * s * 0.4, y: f.y + s * (1.6 + 2.4 * rnd()), vx: (rnd() - 0.5) * 34, vy: 60 + 110 * rnd(), r: s * (0.34 + 0.2 * rnd()), gr: 24 + 22 * rnd(), t: 0, life: 2.2 + 1.8 * rnd(), hot: 0.75, g: f.ground + 10, rot: rnd() * TAU }); }
+    }
+    LAST[f.id] = { pw: pw, acc: A, at: performance.now() };
+  }
+  function step(dt) {
+    for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; p.t += dt; if (p.t >= p.life) { P.splice(i, 1); continue; }
+      if (p.k === 2) { p.vy += 380 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= Math.exp(-1.1 * dt); if (p.y > p.g) { p.y = p.g; p.vy *= -0.38; p.vx *= 0.7; } continue; }
+      const drag = Math.exp(-(p.k === 1 ? 2.1 : 1.5) * dt); p.vx *= drag; p.vy *= drag; if (p.t > (p.k === 1 ? 0.5 : 0.35)) p.vy -= (p.k === 1 ? 7 : 20) * dt;      // (it slows, then it rises)
+      p.x += p.vx * dt; p.y += p.vy * dt; if (p.y > p.g) { p.y = p.g; if (p.vy > 0) p.vy = 0; } p.r += p.gr * dt; p.rot += dt * 0.25 * (p.vx > 0 ? 1 : -1); }
+  }
+  function flame(ctx, f, t) {
+    const pw = f.power, s = f.size, h = Math.max(0, f.ground - f.y), fl = 0.86 + 0.1 * Math.sin(t * 43 + f.x) + 0.08 * Math.sin(t * 71) + 0.06 * Math.sin(t * 23.7), L0 = s * (1.6 + 5.4 * pw) * fl, L = Math.min(L0, h + s * 0.35), cut = L < L0 - 1, w = s * (0.34 + 0.2 * pw);
+    const body = function (len, wd, c0, c1) { if (len < 2) return; const g = ctx.createLinearGradient(0, f.y, 0, f.y + len); g.addColorStop(0, c0); g.addColorStop(1, c1); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(f.x - wd * 0.55, f.y - 2); ctx.bezierCurveTo(f.x - wd * 1.25, f.y + len * 0.28, f.x - wd * 0.5, f.y + len * 0.74, f.x + Math.sin(t * 31 + len) * wd * 0.12, f.y + len); ctx.bezierCurveTo(f.x + wd * 0.5, f.y + len * 0.74, f.x + wd * 1.25, f.y + len * 0.28, f.x + wd * 0.55, f.y - 2); ctx.closePath(); ctx.fill(); };
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    // the light it throws: on the ground, and round its mouth
+    { const fall = clamp(1 - h / 460, 0, 1) * pw; if (fall > 0.02) { const rx = (150 + 190 * pw) * (0.6 + 0.4 * fall); ctx.save(); ctx.translate(f.x, f.ground + 6); ctx.scale(1, 0.36); const g = ctx.createRadialGradient(0, 0, 4, 0, 0, rx); g.addColorStop(0, 'rgba(255,196,120,' + 0.38 * fall + ')'); g.addColorStop(0.45, 'rgba(255,140,60,' + 0.17 * fall + ')'); g.addColorStop(1, 'rgba(255,110,40,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, TAU); ctx.fill(); ctx.restore(); }
+      const g2 = ctx.createRadialGradient(f.x, f.y + s * 0.4, 1, f.x, f.y + s * 0.4, s * (2 + 2.6 * pw)); g2.addColorStop(0, 'rgba(255,190,110,' + 0.3 * pw + ')'); g2.addColorStop(1, 'rgba(255,120,50,0)'); ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(f.x, f.y + s * 0.4, s * (2 + 2.6 * pw), 0, TAU); ctx.fill(); }
+    body(L, w * 1.5, 'rgba(255,170,70,' + 0.62 * pw + ')', 'rgba(255,70,20,0)');
+    body(L * 0.74, w * 0.95, 'rgba(255,232,160,' + 0.85 * pw + ')', 'rgba(255,150,50,0)');
+    body(L * 0.46, w * 0.5, 'rgba(255,255,255,0.96)', 'rgba(170,215,255,0)');
+    // shock diamonds down the core
+    for (let i = 0; i < 4; i++) { const d = L0 * (0.1 + 0.105 * i); if (d > L * 0.9) break; const a = (0.55 - 0.12 * i) * pw * (0.8 + 0.2 * Math.sin(t * 50 + i * 2)); ctx.fillStyle = 'rgba(255,250,235,' + a + ')'; ctx.beginPath(); ctx.ellipse(f.x, f.y + d, w * (0.34 - 0.05 * i), w * (0.2 - 0.025 * i), 0, 0, TAU); ctx.fill(); }
+    // where it strikes the ground it splashes out to both sides
+    if (cut && pw > 0.25) { const gy = f.ground + 2, sp = s * (2.2 + 5 * pw) * fl; for (let sd = -1; sd <= 1; sd += 2) { const g = ctx.createLinearGradient(f.x, 0, f.x + sd * sp, 0); g.addColorStop(0, 'rgba(255,240,200,' + 0.8 * pw + ')'); g.addColorStop(0.4, 'rgba(255,160,60,' + 0.5 * pw + ')'); g.addColorStop(1, 'rgba(255,80,20,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(f.x, gy - s * 0.3); ctx.quadraticCurveTo(f.x + sd * sp * 0.5, gy - s * (0.5 + 0.2 * Math.sin(t * 37 + sd)), f.x + sd * sp, gy - 1); ctx.quadraticCurveTo(f.x + sd * sp * 0.5, gy + s * 0.22, f.x, gy + s * 0.14); ctx.closePath(); ctx.fill(); } }
+    ctx.restore();
+  }
+  function draw() {
+    const ctx = G.ctx, v = G.view; if (!ctx) return; const dt = Math.min(0.05, G.frameDt || 0.016), t = (G.rt || 0), now = performance.now();
+    if (!FEED.length && !P.length) return;
+    if (G.mode !== 'play') { FEED.length = 0; P.length = 0; return; }
+    for (let i = 0; i < FEED.length; i++) emit(FEED[i], dt);
+    for (const k in LAST) if (now - LAST[k].at > 600) delete LAST[k];
+    step(dt);
+    const s = v.scale * v.dpr; ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); ctx.imageSmoothingEnabled = true;
+    const grey = puff('224,226,234'), dark = puff('122,124,138'), hot = puff('255,170,90'), dust = puff(dustRgb());
+    // dust lowest, then smoke (the oldest first), then the fire, then the sparks
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < P.length; i++) { const p = P[i]; if (p.k === 2 || (p.k === 1) !== (pass === 0)) continue; const u = p.t / p.life, a = Math.min(1, u * 9) * (u < 0.45 ? 1 : (1 - u) / 0.55), d = p.r * 2;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot || 0);
+      if (p.k === 1) { ctx.globalAlpha = 0.6 * a; ctx.drawImage(dust, -d / 2, -d * 0.36, d, d * 0.72); }
+      else { const hh = (p.hot || 0) * Math.max(0, 1 - p.t / 0.9); ctx.globalAlpha = 0.8 * a; ctx.drawImage(u > 0.5 ? dark : grey, -d / 2, -d / 2, d, d); if (u > 0.3 && u <= 0.5) { ctx.globalAlpha = 0.8 * a * (u - 0.3) / 0.2; ctx.drawImage(dark, -d / 2, -d / 2, d, d); } if (hh > 0.02) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.4 * hh * a; ctx.drawImage(hot, -d / 2, -d / 2, d, d); } }
+      ctx.restore(); }
+    for (let i = 0; i < FEED.length; i++) flame(ctx, FEED[i], t);
+    ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    for (let i = 0; i < P.length; i++) { const p = P[i]; if (p.k !== 2) continue; const u = p.t / p.life; ctx.strokeStyle = 'rgba(255,' + Math.round(230 - 110 * u) + ',' + Math.round(150 - 120 * u) + ',' + (1 - u) + ')'; ctx.lineWidth = 2.2 * (1 - u * 0.5); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * 0.035, p.y - p.vy * 0.035); ctx.stroke(); }
+    ctx.restore();
+    FEED.length = 0;
+  }
+  G.rocketFx = {
+    /** an engine burns this frame: at x, y (its mouth, in the star's own measure), over ground at `ground`, at `power` 0..1; `size` is how wide the ship's body is */
+    feed: function (o) { if (!o || !(o.power > 0.01) || FEED.length > 12) return; FEED.push({ id: String(o.id || 'ship'), x: o.x, y: o.y, ground: o.ground === undefined ? o.y + 4000 : o.ground, power: clamp(o.power, 0, 1), size: o.size || 24 }); },
+    /** how much smoke, dust and sparks are in the air (for the tests) */
+    count: function () { return P.length; },
+  };
+  G.on('new-pond', function () { P.length = 0; FEED.length = 0; });
+  G.addSystem({ name: 'rocketfx', draw: function () { try { draw(); } catch (e) { if (!draw.err) { draw.err = 1; console.error(e); } FEED.length = 0; } } });
 })();
 
 </script>
@@ -15128,7 +15249,8 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     // a raid: the ship it came in
     { const r = col.raid; if (r && r.state !== 'warn') { const bp = raidShip(r), tt = W.t - r.t0, S = bp.S; let off = 0; if (r.state === 'land' && tt < 3) { const u = 1 - tt / 3; off = -720 * u * u; } else if (r.state === 'leave' && tt > 1.5) { const u = (tt - 1.5) / 4; off = -900 * u * u; }
         ctx.fillStyle = 'rgba(4,12,20,' + 0.32 * Math.max(0, 1 + off / 500) + ')'; ctx.beginPath(); ctx.ellipse(r.x, r.y + 4, S * 0.7, 8, 0, 0, 6.2832); ctx.fill();
-        if (off < -4) { const g = ctx.createLinearGradient(0, r.y + off, 0, r.y + off + 70); g.addColorStop(0, 'rgba(255,220,140,0.9)'); g.addColorStop(1, 'rgba(255,110,60,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(r.x - 12, r.y + off); ctx.lineTo(r.x + 12, r.y + off); ctx.lineTo(r.x + Math.sin(t * 30) * 4, r.y + off + 50 + Math.sin(t * 23) * 12); ctx.closePath(); ctx.fill(); }
+        if (off < -4 && G.rocketFx) G.rocketFx.feed({ id: 'raid' + r.id, x: r.x, y: r.y + off - 6, ground: r.y + 8, power: 0.9, size: 26 });      /* (its fire, smoke and dust: 59b_rocketfx.js) */
+        else if (off < -4) { const g = ctx.createLinearGradient(0, r.y + off, 0, r.y + off + 70); g.addColorStop(0, 'rgba(255,220,140,0.9)'); g.addColorStop(1, 'rgba(255,110,60,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(r.x - 12, r.y + off); ctx.lineTo(r.x + 12, r.y + off); ctx.lineTo(r.x + Math.sin(t * 30) * 4, r.y + off + 50 + Math.sin(t * 23) * 12); ctx.closePath(); ctx.fill(); }
         if (off < -4) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const near = Math.max(0, 1 + off / 720), g = ctx.createRadialGradient(r.x, r.y + 4, 4, r.x, r.y + 4, 150); g.addColorStop(0, 'rgba(255,170,90,' + 0.5 * near + ')'); g.addColorStop(1, 'rgba(255,120,60,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(r.x, r.y + 4, 150, 60, 0, 0, 6.2832); ctx.fill(); ctx.restore(); }
         if (r.state === 'land' && tt >= 2.6 && tt < 5.2) { const u = (tt - 2.6) / 2.6; ctx.strokeStyle = 'rgba(230,210,190,' + 0.55 * (1 - u) + ')'; ctx.lineWidth = 7 * (1 - u) + 1; ctx.beginPath(); ctx.ellipse(r.x, r.y + 6, 40 + 190 * u, 12 + 48 * u, 0, 0, 6.2832); ctx.stroke(); for (let q = 0; q < 10; q++) { const a = q * 0.628, d = 30 + 170 * u; ctx.fillStyle = 'rgba(200,180,160,' + 0.3 * (1 - u) + ')'; ctx.beginPath(); ctx.arc(r.x + Math.cos(a) * d, r.y + 6 + Math.sin(a) * d * 0.28 - 14 * Math.sin(u * 3.14), 9 + 10 * u, 0, 6.2832); ctx.fill(); } }
         if (r.state === 'on') { const a = 1.5708 + Math.sin(t * 0.7) * 0.9, L0 = 330; ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createLinearGradient(r.x, r.y - S, r.x + Math.cos(a) * L0, r.y - S + Math.sin(a) * L0 * 0.6 + S); g.addColorStop(0, 'rgba(255,90,110,0.30)'); g.addColorStop(1, 'rgba(255,90,110,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(r.x, r.y - S * 1.1); ctx.lineTo(r.x + Math.cos(a - 0.16) * L0, r.y + Math.sin(a - 0.16) * L0 * 0.6); ctx.lineTo(r.x + Math.cos(a + 0.16) * L0, r.y + Math.sin(a + 0.16) * L0 * 0.6); ctx.closePath(); ctx.fill(); ctx.restore(); }

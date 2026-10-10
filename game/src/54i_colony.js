@@ -230,7 +230,7 @@
   };
   G.buildCancel = function (id) { const col = colony(); const i = col.queue.findIndex(function (q) { return q.id === id; }); if (i >= 0) { const K = KINDS[col.queue[i].type]; if (K && K.cost) for (let q = 0; q < 4; q++) col.stock[q] += K.cost[q] || 0; col.queue.splice(i, 1); G.emit('build-cancelled', id); } };
   function startBuild(W, col) {
-    const o = col.queue[0]; if (!o || W.deed || !G.deedStart) return; const B = W.cre.filter(function (c) { return !c.dead && mine(c) && c.job === 'b' && !c.deedId && !c.hungry; }); if (B.length < 2) return;
+    const o = col.queue[0]; if (!o || W.deed || !G.deedStart || (G.missionWaits && G.missionWaits())) return;      /* (a mission that is waiting to begin goes first: the builders do not start something new in front of it) */ const B = W.cre.filter(function (c) { return !c.dead && mine(c) && c.job === 'b' && !c.deedId && !c.hungry; }); if (B.length < 2) return;
     if (o.type === 'ship') { const Wk = W.works || [], ships = Wk.filter(function (w) { return w.bp && w.bp.type === 'ship' && !w.visitor; }), ports = Wk.filter(function (w) { return w.bp && w.bp.type === 'port' && !w.fall && !w.enemy; });
       const free = ports.filter(function (pt) { const dk = G.dockOf(pt); return !ships.some(function (s) { return Math.abs(s.x - dk.x) < 80 && Math.abs(s.y + s.bp.S * 0.45 - dk.y) < 110; }); }), port = free.filter(function (pt) { return G.buildCount(pt)[0] >= G.buildCount(pt)[2]; })[0];      /* (a ship is built on a spaceport that stands whole and empty) */
       if (!port) { if (!ports.length || (!free.length && !ports.some(function (pt) { return G.buildCount(pt)[0] < G.buildCount(pt)[2]; }))) col.queue.shift(); return; } const dk = G.dockOf(port); o.x = dk.x; o.y = dk.y; o.at = { x: dk.x, y: dk.y }; }
@@ -289,7 +289,7 @@
     planT += dt; if (planT < 14) return; planT = 0;
     if (col.auto === false || !G.colonyPlans(W) || W.gen < 10 || G.mode === 'title') return; const h = G.heartOf(W); if (!h || h.ruin) return;
     const nd = G.colonyNeeds(W), N = nd.N;
-    if (col.queue.length || W.deed || (W.works || []).length >= 40 || N < 9) return;
+    if (col.queue.length || W.deed || (W.works || []).length >= 40 || N < 9 || (G.missionWaits && G.missionWaits())) return;
     const L = nd.list.filter(function (q) { return q.need > q.have; }).sort(function (a, b) { return (b.need - b.have) / b.need - (a.need - a.have) / a.need; });      // (what it is shortest of comes first; equal, in the order above)
     for (let i = 0; i < L.length; i++) { const q = L[i], at = placeFor(W, col, q.t, q.have); if (!at) continue; const o = G.buildOrder(q.t, at.x, at.y); if (!o || o.error) continue;
       o.auto = true; o.why = q.why; G.emit('colony-plans', o, q); if (G.log) G.log('disc', 'The colony decided: ' + o.name, 'Why: ' + q.why + '. Its builders will raise it.'); return; }

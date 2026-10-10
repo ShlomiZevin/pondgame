@@ -108,6 +108,8 @@
     return h;
   };
   /** FLY HERE: the pond is chosen; back to the pond, where the mission is carried out */
+  /** is a mission decided on and waiting for the star to be free to begin it? */
+  G.missionWaits = function () { return !!want; };
   G.voyageGo = function (p) {
     const ship = picking || F.shipOf(); if (!ship || F.visiting || flight || plan() || !p || p.free || p.home) return;
     if (G.FUEL && G.colony && !G.W.farOf && G.colony().stock[3] < G.FUEL) { tip('<b>The ship needs ' + G.FUEL + ' lumen to fly out.</b><br>There is ' + G.colony().stock[3] + ' in the store. Gatherers bring lumen in from the crystals: choose some and right-click a crystal.'); return; }
@@ -260,7 +262,8 @@
       if (u < 0.6) { const g = ctx.createRadialGradient(px, py, 0, px, py, 16); g.addColorStop(0, 'rgba(255,245,200,0.95)'); g.addColorStop(1, 'rgba(246,211,101,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, 16, 0, TAU); ctx.fill(); ctx.fillStyle = '#fff3c8'; ctx.beginPath(); ctx.arc(px, py, 4, 0, TAU); ctx.fill(); }
       const a = Math.min(1, (1 - u) * 3), ty = (k.in ? hy : ay) - 34 - u * 22, txt = '#' + k.id + (k.in ? '  aboard ✓' : '  steps out'); ctx.font = '800 12px system-ui, sans-serif'; const tw = ctx.measureText(txt).width + 18, tx = k.in ? hx : ax; ctx.fillStyle = 'rgba(9,18,30,' + 0.88 * a + ')'; G.roundRect(ctx, tx - tw / 2, ty - 11, tw, 22, 11); ctx.fill(); ctx.fillStyle = 'rgba(' + (k.in ? '154,240,208' : '246,211,101') + ',' + a + ')'; ctx.fillText(txt, tx, ty + 0.5); }
     // coming down: its fire under it
-    if (landing && (G.W.works || []).indexOf(landing.ship) >= 0) { const sh = landing.ship, S = sh.bp.S || 70, x = sx(sh.x), y = sy(sh.y + S * 0.5), Lf = (70 + 150 * (1 - (landing.u || 0))) * v.scale * (0.8 + 0.25 * Math.sin(t * 29)), w = S * 0.28 * v.scale, fg = ctx.createLinearGradient(0, y, 0, y + Lf); fg.addColorStop(0, 'rgba(255,250,220,0.95)'); fg.addColorStop(0.3, 'rgba(255,190,90,0.85)'); fg.addColorStop(1, 'rgba(255,110,60,0)'); ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(x - w, y - 4); ctx.quadraticCurveTo(x, y + Lf * 1.5, x + w, y - 4); ctx.closePath(); ctx.fill();
+    if (landing && (G.W.works || []).indexOf(landing.ship) >= 0 && G.rocketFx) { const sh = landing.ship, S = sh.bp.S || 70; G.rocketFx.feed({ id: 'land', x: sh.x, y: sh.y + S * 0.34, ground: landing.y0 + S * 0.45 + 4, power: 0.6 + 0.4 * (1 - (landing.u || 0)), size: 26 }); }
+    else if (landing && (G.W.works || []).indexOf(landing.ship) >= 0) { const sh = landing.ship, S = sh.bp.S || 70, x = sx(sh.x), y = sy(sh.y + S * 0.5), Lf = (70 + 150 * (1 - (landing.u || 0))) * v.scale * (0.8 + 0.25 * Math.sin(t * 29)), w = S * 0.28 * v.scale, fg = ctx.createLinearGradient(0, y, 0, y + Lf); fg.addColorStop(0, 'rgba(255,250,220,0.95)'); fg.addColorStop(0.3, 'rgba(255,190,90,0.85)'); fg.addColorStop(1, 'rgba(255,110,60,0)'); ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(x - w, y - 4); ctx.quadraticCurveTo(x, y + Lf * 1.5, x + w, y - 4); ctx.closePath(); ctx.fill();
       const gy = sy(landing.y0 + S * 0.55); for (let i = 0; i < 12; i++) { const q = (t * 0.9 + i / 12) % 1, side = i % 2 ? 1 : -1; ctx.fillStyle = 'rgba(232,238,248,' + 0.3 * (1 - q) * (landing.u || 0) + ')'; ctx.beginPath(); ctx.arc(x + side * (10 + 120 * q) * v.scale, gy - q * 14 * v.scale, (12 + 30 * q) * v.scale, 0, TAU); ctx.fill(); } }
     ctx.restore();
   }
@@ -278,10 +281,16 @@
     const ship = shipOfPlan(d); if (!ship) return; const S = ship.bp.S || 70, lift = d.voyage.lift || 0, left = st.do === 'countdown' ? st.secs - d.t : 0, heat = st.do === 'liftoff' ? 1 : clamp(1 - left / 4, 0, 1);
     const sx = ship.x * v.scale + v.ox, sy = (ship.y + S * 0.5) * v.scale + v.oy, gy = (d.voyage.y0 + S * 0.55) * v.scale + v.oy;
     ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
+    // its fire, smoke and dust (59b_rocketfx.js): the engines come up over the last four seconds of the count, then burn at full power; the ships that fly with it burn too
+    if (G.rocketFx) { const lit = st.do === 'liftoff', gnd = function (w, y0) { return y0 + (w.bp.S || 70) * 0.45 + 4; }, mouth = function (w) { return w.y + (w.bp.S || 70) * 0.34; };
+      G.rocketFx.feed({ id: 'lead', x: ship.x, y: mouth(ship), ground: gnd(ship, d.voyage.y0), power: lit ? 1 : heat * 0.5, size: 26 });
+      if (F.mates && !F.visiting) F.mates(ship).forEach(function (m, k) { G.rocketFx.feed({ id: 'mate' + k, x: m.x, y: mouth(m), ground: gnd(m, m.y0v === undefined ? m.y : m.y0v), power: m.lifting ? 1 : lit ? 0.6 : heat * 0.5, size: 26 }); }); }
+    else {
     // smoke rolling out along the ground, more as the count runs down
     { const n = st.do === 'liftoff' ? 16 : Math.round(4 + 10 * clamp(1 - left / st.secs, 0, 1)); for (let i = 0; i < n; i++) { const q = (t * 0.9 + i / n) % 1, side = i % 2 ? 1 : -1, r = (12 + 34 * q) * v.scale * (st.do === 'liftoff' ? 1.4 : 1); ctx.fillStyle = 'rgba(232,238,248,' + 0.34 * (1 - q) + ')'; ctx.beginPath(); ctx.arc(sx + side * (10 + (60 + 80 * heat) * q + Math.sin(i * 12.9) * 14) * v.scale, gy - q * 16 * v.scale + Math.sin(i * 3.1) * 6, r, 0, TAU); ctx.fill(); } }
     // the engine's fire
     if (heat > 0) { const L = ((st.do === 'liftoff' ? 90 + 190 * lift : 34 * heat)) * v.scale * (0.8 + 0.25 * Math.sin(t * 29)), w = S * 0.3 * v.scale * (0.5 + 0.5 * heat), fg = ctx.createLinearGradient(0, sy, 0, sy + L); fg.addColorStop(0, 'rgba(255,250,220,0.95)'); fg.addColorStop(0.3, 'rgba(255,190,90,0.85)'); fg.addColorStop(1, 'rgba(255,110,60,0)'); ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(sx - w, sy - 4); ctx.quadraticCurveTo(sx, sy + L * 1.5, sx + w, sy - 4); ctx.closePath(); ctx.fill(); }
+    }
     // T minus ...
     { const n = st.do === 'countdown' ? Math.max(1, Math.ceil(left)) : 0, txt = n ? String(n) : 'LIFT-OFF!', frac = st.do === 'countdown' ? left - Math.floor(left - 1e-6) : 1 - lift, pop = 1 + 0.25 * Math.max(0, frac - 0.75) * 4, cx = v.w / 2, cy = Math.max(262, v.h * 0.34);
       if (n !== lastCount) { lastCount = n; if (G.sfx) G.sfx(n ? 'click' : 'discovery'); }
