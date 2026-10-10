@@ -31,6 +31,7 @@
   /** a bigger pond holds more food */
   function foodCap(W) { return Math.round(K.foodMax * Math.max(1, W.ww * W.wh / 1.6e6 / Math.pow(G.view.grow || 1, 1.5))); }      // a wider world holds more food (as much more as it is wider), so it can hold more life      // (a pond that GREW for room has the food it had: more water, not more mouths)
   /** the shore is the top strip of the pond: land. Only what can breathe air may go there. */
+  G.FLAT = true;        // A star is ONE ground: there is no shore, and nothing is kept to one part of the map. (Air-breathers and the rest are still two ways of living, each with its own room on the star; they are no longer two places.)
   G.SHORE0 = 0.24;      // how much of the map is land to begin with (it was 0.16): the one number for it, used wherever the land's first size matters
   /** the biggest body a pond of this richness can carry (the first ponds: about 24) */
   G.sizeCapOf = function (richS) { return 6 + 17.6 * Math.pow(Math.max(1, richS || 1), 0.49); };
@@ -99,7 +100,8 @@
     for (let i = 0; i < 44; i++) {
       const c = G.makeCreature(G.founder(), null, null);
       c.E = c.ph.Emax * 0.40;
-      W.births.push({ at: G.rr(0.1, 3.5), c: c, x: W.ww * 0.5 + G.randn() * 160, y: W.wh * 0.5 + G.randn() * 110, from: null });
+      const fg = G.FLAT && G.firstGrove ? G.firstGrove(W) : null;      // (on a star, life begins in a feeding ground)
+      W.births.push({ at: G.rr(0.1, 3.5), c: c, x: fg ? fg.x + G.randn() * fg.r * 0.4 : W.ww * 0.5 + G.randn() * 160, y: fg ? fg.y + G.randn() * fg.r * 0.3 : W.wh * 0.5 + G.randn() * 110, from: null });
     }
     W.stats.founders = 44;
   };
@@ -167,7 +169,7 @@
   /** oxygen in the water here: less in the deep, less when it is hot, plenty in the air of the shore */
   G.o2At = function (x, y) {
     const W = G.W, e = W.env;
-    if (y < G.shoreY(W)) return 1.4;
+    if (!G.FLAT && y < G.shoreY(W)) return 1.4;
     return (e ? e.o2 : 1) * (1.1 - 0.25 * clamp(x / W.ww, 0, 1)) * (env.temp > 0.35 ? 0.85 : 1);
   };
   G.envText = function (W) {
@@ -184,7 +186,7 @@
 
   G.tempAt = function (x, y) {
     const W = G.W;
-    let t = W.set.temp + (W.env ? W.env.warm : 0) + SEASON_TEMP[W.season] + (W.drought > 0 ? 0.2 : 0) + (y < G.shoreY(W) ? 0.08 : (y / W.wh - 0.5) * 0.3) + (W.mods.length ? G.modSum('temp') : 0);
+    let t = W.set.temp + (W.env ? W.env.warm : 0) + SEASON_TEMP[W.season] + (W.drought > 0 ? 0.2 : 0) + (!G.FLAT && y < G.shoreY(W) ? 0.08 : (y / W.wh - 0.5) * 0.3) + (W.mods.length ? G.modSum('temp') : 0);
     for (let i = 0; i < W.zones.length; i++) {
       const z = W.zones[i];
       if (z.p.heat) {
@@ -203,7 +205,7 @@
       // light-dependent: try a few places and keep a bright one
       let bx = 0, by = 0, bl = -1;
       for (let i = 0; i < 3; i++) {
-        const tx = G.rand() * W.ww, ty = G.shoreY(W) + G.rand() * (W.wh - G.shoreY(W)), l = any ? 1 : G.lightAt(tx, ty) * G.rand();
+        const fs0 = G.FLAT && G.foodSpot ? G.foodSpot(W) : null, tx = fs0 ? fs0.x : G.rand() * W.ww, ty = fs0 ? fs0.y : G.shoreY(W) + G.rand() * (W.wh - G.shoreY(W)), l = any ? 1 : G.lightAt(tx, ty) * G.rand();      // (on a star, food comes up in its feeding grounds: 54j_order.js)
         if (l > bl) { bl = l; bx = tx; by = ty; }
       }
       x = bx; y = by;
@@ -271,7 +273,7 @@
     W.deepAcc = (W.deepAcc || 0) + rate * 0.42 * dt;
     while (W.deepAcc >= 1) {
       W.deepAcc -= 1;
-      const f = G.spawnFood(W, W.ww * (0.5 + 0.5 * G.rand()), G.shoreY(W) + G.rand() * (W.wh - G.shoreY(W)));
+      const fs1 = G.FLAT && G.foodSpot ? G.foodSpot(W) : null, f = fs1 ? G.spawnFood(W, fs1.x, fs1.y) : G.spawnFood(W, W.ww * (0.5 + 0.5 * G.rand()), G.shoreY(W) + G.rand() * (W.wh - G.shoreY(W)));
       // big prey of the deep: only jaws can take it
       if (f && W.gen > 12 && G.rand() < 0.3) { f.big = 1; f.v = 60; f.tag = 3; }
     }
@@ -280,7 +282,7 @@
     while (W.landAcc >= 1) {
       W.landAcc -= 1;
       // the land grows plants of several colours (so whatever the pond's first life eats, something up there is food for it), and more of them as the land widens
-      if ((W.landFood || 0) < Math.max(170, 0.24 * foodCap(W)) * Math.pow((W.shore || G.SHORE0) / 0.16, 0.7)) {      /* the land keeps its share of the world's food as the world widens */ const f = G.spawnFood(W, G.rand() * W.ww, 14 + G.rand() * (G.shoreY(W) - 28), (function () { const rc = W.cre.length && G.rand() < 0.7 ? W.cre[(G.rand() * W.cre.length) | 0] : null; return rc && rc.ph && rc.ph.fav >= 0 ? rc.ph.fav : [1, 5, 2, 0][(G.rand() * 4) | 0]; })(), false, true);      /* plants grow thickest by the water: the first step out of it is a short one */ if (f) { f.land = 1; f.v = 34 + G.rand() * 14 + 34 * (1 - f.y / G.shoreY(W));      /* the further from the water, the richer: fewer mouths have ever reached it */ W.landFood = (W.landFood || 0) + 1; } }
+      if ((W.landFood || 0) < Math.max(170, 0.24 * foodCap(W)) * Math.pow((W.shore || G.SHORE0) / 0.16, 0.7)) {      /* the land keeps its share of the world's food as the world widens */ const fs2 = G.FLAT && G.foodSpot ? G.foodSpot(W) : null, f = G.spawnFood(W, fs2 ? fs2.x : G.rand() * W.ww, fs2 ? fs2.y : 14 + G.rand() * (G.shoreY(W) - 28), (function () { const rc = W.cre.length && G.rand() < 0.7 ? W.cre[(G.rand() * W.cre.length) | 0] : null; return rc && rc.ph && rc.ph.fav >= 0 ? rc.ph.fav : [1, 5, 2, 0][(G.rand() * 4) | 0]; })(), false, true);      /* plants grow thickest by the water: the first step out of it is a short one */ if (f) { f.land = 1; f.v = 34 + G.rand() * 14 + 34 * (1 - f.y / G.shoreY(W));      /* the further from the water, the richer: fewer mouths have ever reached it */ W.landFood = (W.landFood || 0) + 1; } }
     }
   }
 
@@ -426,7 +428,7 @@
       if (c.dead) continue;
       const ph = c.ph, g = c.g;
       // how far up the land it can go: a breath of air lets it onto the wet edge, more takes it further inland, and only a body made wholly for air reaches the far side
-      const shoreNow = G.shoreY(W), landTop = ph.home ? 0 : shoreNow, botLim = ph.home ? Math.min(wh - ph.r, shoreNow + (wh - shoreNow) * 0.06) : wh - ph.r;
+      const shoreNow = G.shoreY(W), landTop = G.FLAT || ph.home ? 0 : shoreNow, botLim = !G.FLAT && ph.home ? Math.min(wh - ph.r, shoreNow + (wh - shoreNow) * 0.06) : wh - ph.r;
       c.px = c.x; c.py = c.y; c.pang = c.ang;
       // doomed by selection
       if (c.doomed && W.st >= c.doomAt && season === 3) { kill(c, 'selected'); continue; }
@@ -582,7 +584,7 @@
       const top = (crew ? 0 : landTop) + ph.r, bot = crew ? wh - ph.r : botLim;
       if (c.y < top) { c.y = top; c.vy = Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
       else if (c.y > bot) { c.y = bot; c.vy = -Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
-      c.land = c.y < G.shoreY(W);
+      c.land = G.FLAT ? !!ph.home : c.y < G.shoreY(W);      // (on a star an air-breather lives as one wherever it is)
       c.liveT = (c.liveT || 0) + dt; if (c.land) c.landT = (c.landT || 0) + dt; else if (c.y < G.shoreY(W) + W.wh * 0.14) c.shoreT = (c.shoreT || 0) + dt; else if (c.x > W.ww * 0.62) c.deepT = (c.deepT || 0) + dt;      // where it lived
       c.thrust = thrust * (sprint ? 1.7 : 1);
       c.squash = 0.82 * c.squash + 0.18 * clamp(Math.hypot(c.vx, c.vy) / (ph.speed + 1), 0, 1.4);
@@ -1404,6 +1406,7 @@
     if (s.kills > 3) bits.push('A hunter: it has eaten ' + s.kills + ' other creatures.');
     else if (g.c[best[0]] > 0.6 && g.c[best[1]] > 0.5) bits.push('Eats ' + names[best[0]] + ' and ' + names[best[1]] + ' food.');
     else bits.push('Eats ' + names[best[0]] + ' food.');
+    if (G.FLAT) bits.push(ph.home ? 'It breathes air and walks.' : (ph.air || 0) > 0.3 ? 'It is half-way to breathing air.' : 'It breathes as the first life of the star did.'); else
     bits.push(ph.home ? 'A creature of the land: it lives, feeds and breeds out of the water, and only paddles in the shallows.' : (ph.air || 0) > 0.3 ? 'A creature of the water that comes out onto the wet edge of the shore.' : 'A creature of the water.');
     if (ph.jaws) bits.push('Its bite can take the big prey of the deep.');
     if (g.h >= 2) bits.push('A thinking brain with ' + g.h + ' hidden cells.');

@@ -176,8 +176,8 @@
         const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
         if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 7) drag.moved = true;
         if (drag.moved && !G.ui.placing && !G.ui.meteor) {
-          // the left button drags a box round creatures to choose them (where there is a colony to command); the right or the middle one moves the view
-          if (!drag.touch && drag.btn === 0 && (drag.box || (G.cmd && G.cmd.boxOk && G.cmd.boxOk()))) { drag.box = true; G.ui.box = { x0: drag.x0, y0: drag.y0, x1: e.clientX, y1: e.clientY }; }
+          // one button drags a box round creatures to choose them (where there is a colony to command: the right one, unless the buttons are swapped); any other moves the view
+          if (!drag.touch && drag.btn === (G.cmd && G.cmd.boxBtn ? G.cmd.boxBtn() : 0) && (drag.box || (G.cmd && G.cmd.boxOk && G.cmd.boxOk()))) { drag.box = true; G.ui.box = { x0: drag.x0, y0: drag.y0, x1: e.clientX, y1: e.clientY }; }
           else { G.cam.x -= dx / G.view.scale; G.cam.y -= dy / G.view.scale; G.applyCam(); } }
         drag.x = e.clientX; drag.y = e.clientY;
       }
@@ -198,7 +198,7 @@
       if (drag && drag.box) { const b = G.ui.box, v = G.view; G.ui.box = null; if (b) G.emit('box-select', { x0: (Math.min(b.x0, b.x1) - v.ox) / v.scale, y0: (Math.min(b.y0, b.y1) - v.oy) / v.scale, x1: (Math.max(b.x0, b.x1) - v.ox) / v.scale, y1: (Math.max(b.y0, b.y1) - v.oy) / v.scale }, e.shiftKey); }
       else if (drag && !drag.moved && touches.size <= 1) {
         const c = { x: inp.ptr.wx, y: inp.ptr.wy, sx: e.clientX, sy: e.clientY, touch: drag.touch, shift: e.shiftKey };
-        if (drag.btn === 2) G.emit('pond-order', c);      // a right click is an order to those you have chosen
+        if (drag.btn === 2) G.emit('pond-order', c);      // the second button: it chooses (68_command.js)
         else { inp.clicks.push(c); G.emit('pond-click', c); }
       }
     });

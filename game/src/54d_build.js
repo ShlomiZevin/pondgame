@@ -21,6 +21,7 @@
   function scatter(W, k) {
     const sy = G.shoreY ? G.shoreY(W) : W.wh * 0.2; let x = 30 + G.rand() * (W.ww - 60), y;
     { const e = (G.sideEdge ? G.sideEdge(W) : 30) + 16; x = e + G.rand() * (W.ww - 2 * e); }      // (not in the dark at the sides)
+    if (G.FLAT && G.matSpot) { const p = G.matSpot(W, k); if (!p) return; W.mats.push({ x: p.x, y: p.y, k: k, s: G.rand() }); return; }      // (on a star each lies in its own deposit: the quarry, the reed bed, the shell bed)
     if (k === 0) y = W.wh - 26 - G.rand() * G.rand() * (W.wh - sy) * 0.5;                    // stone: sunk to the floor, thinning upward
     else if (k === 1) y = G.rand() < 0.7 ? 18 + G.rand() * Math.max(10, sy - 30) : sy + G.rand() * 40;      // reed: on the land, some at the waterline
     else if (k === 2 && G.terrainOf && G.terrainOf(W).res === 2) y = sy + 24 + G.rand() * (W.wh - sy) * 0.4;      // (on a shell star they wash up in the shallows)
@@ -33,7 +34,7 @@
     const n = [0, 0, 0], area = Math.sqrt(W.ww * W.wh / 3.3e6); for (let i = 0; i < W.mats.length; i++) n[W.mats[i].k]++;
     const rich = G.terrainOf ? G.terrainOf(W).res : -1;      // (what this star is rich in: it lies thicker here, and comes back faster)
     for (let k = 0; k < 2; k++) { const f = rich === k ? 1.9 : rich < 0 ? 1 : 0.75; if (n[k] < MAT[k].cap * area * f) { scatter(W, k); if (rich === k) scatter(W, k); } }
-    if (rich === 2 && n[2] < MAT[2].cap * area * 1.6) scatter(W, 2);      /* (a shell star: shells wash up by themselves) */
+    if (G.FLAT ? n[2] < MAT[2].cap * area * (rich === 2 ? 1.6 : 0.7) && (rich === 2 || G.rand() < 0.4) : rich === 2 && n[2] < MAT[2].cap * area * 1.6) scatter(W, 2);      /* (a shell star: shells wash up by themselves) */
   }
   if (G.on) G.on('death', function (c) { const W = G.W; if (!W || !W.mats || !c || G.rand() > 0.4) return; let n = 0; for (let i = 0; i < W.mats.length; i++) if (W.mats[i].k === 2) n++; if (n < MAT[2].cap * Math.sqrt(W.ww * W.wh / 3.3e6)) W.mats.push({ x: clamp(c.x, 20, W.ww - 20), y: clamp(c.y, 20, W.wh - 20), k: 2, s: G.rand() }); });
 
@@ -117,6 +118,8 @@
    *  that buildings make a row and not a scatter; leave a gap; never build on top of another. */
   function site(W, d) {
     if (d.result && d.result.at) { d.bp.hw = halfW(d.bp); d.x = d.result.at.x; d.y = d.result.at.y - d.bp.S * 0.45; return; }      // (a spaceship: its foot stands on the pad of its port)
+    if (G.FLAT && G.lotPick && !(d.result && (d.result.port || d.result.ship))) { d.bp.hw = halfW(d.bp); const mine0 = (W.works || []).filter(function (w) { return w.bp && !w.fall && w.sp === d.sp && w.bp.type !== 'ship' && w.bp.type !== 'port' && w.bp.type !== 'heart'; }), near = mine0.length ? mine0[mine0.length - 1] : null;
+      const p = G.lotPick(W, near ? near.x : d.x, near ? near.y + near.bp.S * 0.45 : d.y, d.bp.type); if (near) d.beside = near.name; if (p) { d.x = p.x; d.y = p.y - d.bp.S * 0.45; return; } d.noRoom = true; }      // (their own next to their own, on the lots: 54j_order.js)
     const bp = d.bp, hw = bp.hw = halfW(bp), Wk = (W.works || []).filter(function (w) { return w.bp && !w.fall; }), sy = G.shoreY ? G.shoreY(W) : 0, onLand = d.y < sy;
     let x = d.x, y = d.y; const own = function (w) { return w.bp.type !== 'ship' && w.bp.type !== 'port'; }, mine = Wk.filter(function (w) { return w.sp === d.sp && own(w); });      /* (a port and its ship stand at the border: nothing is lined up on them) */
     if (mine.length) { x = mine[mine.length - 1].x; y = mine[0].y; d.beside = mine[0].name; }
@@ -168,7 +171,7 @@
     let spiky = 0; if (f) { (f.rules || []).forEach(function (q) { if (q.k === 2 || q.k === 7) spiky = 1; }); if (f.crest > 0.25) spiky = 1; }
     let h = 0, n = 0; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].sp === d.sp) { h += W.cre[i].g.h; n++; }
     const craft = G.craftOf(d.sp);      // how many buildings their kind (and the kinds it came from) has raised: practice shows
-    const o = { wet: !(r.port || r.ship) && d.y > (G.shoreY ? G.shoreY(W) : 0), seed: (G.hash ? G.hash(String(d.title) + d.id) : d.id * 7919) >>> 0, type: r.type && r.type !== 'port' && r.type !== 'ship' ? r.type : r.port ? 'port' : r.ship ? 'ship' : r.house ? 'house' : r.solid ? 'wall' : r.feed > 0.05 ? 'huts' : r.pull > 0.15 ? 'spire' : 'hall', S: r.port ? clamp((r.size || 0.085) * m, 84, 124) : r.ship ? clamp((r.size || 0.06) * m, 52, 84) : r.house ? clamp((r.size || 0.04) * m, 36, 58) : clamp((r.size || 0.08) * m, 55, 118), hue: d.hue || 50, spiky: spiky, brain: clamp((n ? h / n : 0) / 7 + 0.09 * craft, 0, 1), craft: craft };
+    const o = { wet: !(r.port || r.ship) && (G.FLAT ? !(function () { const sp0 = G.speciesById ? G.speciesById(d.sp) : null; try { return sp0 && sp0.rep ? G.derive(sp0.rep).home : 0; } catch (e) { return 0; } })() : d.y > (G.shoreY ? G.shoreY(W) : 0)),      /* (on a star, the two ways of building go with the two ways of living: air-breathers build the dry way) */ seed: (G.hash ? G.hash(String(d.title) + d.id) : d.id * 7919) >>> 0, type: r.type && r.type !== 'port' && r.type !== 'ship' ? r.type : r.port ? 'port' : r.ship ? 'ship' : r.house ? 'house' : r.solid ? 'wall' : r.feed > 0.05 ? 'huts' : r.pull > 0.15 ? 'spire' : 'hall', S: r.port ? clamp((r.size || 0.085) * m, 84, 124) : r.ship ? clamp((r.size || 0.06) * m, 52, 84) : r.house ? clamp((r.size || 0.04) * m, 36, 58) : clamp((r.size || 0.08) * m, 55, 118), hue: d.hue || 50, spiky: spiky, brain: clamp((n ? h / n : 0) / 7 + 0.09 * craft, 0, 1), craft: craft };
     o.P = plan(o); fit(o, W); settle(o, true); return o;      // (the fallback shape: used when the kind's own design cannot be had)
   }
   G.blueprintPack = function (bp) { return bp.designed ? { about: bp.about || '', P: bp.P.map(function (p) { return [p.s, Math.round(p.x), Math.round(p.y), Math.round(p.w), Math.round(p.h), p.m, p.c[0], p.c[1], p.c[2], p.rr || 0]; }) } : null; };
@@ -210,7 +213,7 @@
         if (nUnset > 0) {
           if (inPile > 0 && setters < maxSet) { let pi = -1, alt = -1; for (let i = 0; i < P.length; i++) { if (P[i].st !== 0 || busyP[i] || !ready(i)) continue; if (d.pile[P[i].m] > 0) { pi = i; break; } if (alt < 0) alt = i; } if (pi < 0) pi = alt; if (pi >= 0) { j = { d: d.id, ph: 'take', p: pi }; busyP[pi] = 1; setters++; inPile--; } }
           if (!j && nUnset - (d.pile[0] + d.pile[1] + d.pile[2]) - (transit[0] + transit[1] + transit[2]) > 0) {
-            let best = null, bd = 1e12, any = null, ad = 1e12; for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (busyM.has(q) || (!c.ph.lungs && q.y < sy + 6)) continue; const dd = (q.x - c.x) * (q.x - c.x) + (q.y - c.y) * (q.y - c.y) + (q.x - pileAt[0]) * (q.x - pileAt[0]) + (q.y - pileAt[1]) * (q.y - pileAt[1]); if (dd < ad) { ad = dd; any = q; } if (unset[q.k] - d.pile[q.k] - transit[q.k] > 0 && dd < bd) { bd = dd; best = q; } }      /* the shortest whole trip: there and back to the pile */
+            let best = null, bd = 1e12, any = null, ad = 1e12; for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (busyM.has(q) || (!G.FLAT && !c.ph.lungs && q.y < sy + 6)) continue; const dd = (q.x - c.x) * (q.x - c.x) + (q.y - c.y) * (q.y - c.y) + (q.x - pileAt[0]) * (q.x - pileAt[0]) + (q.y - pileAt[1]) * (q.y - pileAt[1]); if (dd < ad) { ad = dd; any = q; } if (unset[q.k] - d.pile[q.k] - transit[q.k] > 0 && dd < bd) { bd = dd; best = q; } }      /* the shortest whole trip: there and back to the pile */
             let mat = best || any;
             { const st = G.storeAt ? G.storeAt(W) : null, col = W.col; if (st && col) { let k0 = -1; for (let q = 0; q < 3; q++) if (unset[q] - d.pile[q] - transit[q] > 0 && col.stock[q] > 0) { k0 = q; break; } if (k0 < 0 && !mat) for (let q = 0; q < 3; q++) if (col.stock[q] > 0) { k0 = q; break; }
                 if (k0 >= 0) { const dd = (st.x - c.x) * (st.x - c.x) + (st.y - c.y) * (st.y - c.y) + (st.x - pileAt[0]) * (st.x - pileAt[0]) + (st.y - pileAt[1]) * (st.y - pileAt[1]); if (!best || dd < bd) { col.stock[k0]--; mat = { x: st.x, y: st.y, k: k0, s: 0.5, store: 1 }; } } } }      /* (from the colony's store, when that is the shorter trip or nothing lies about) */
@@ -274,7 +277,7 @@
     { let port = null, ship = null; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.bp || w.fall) continue; if (w.bp.type === 'port') port = w; else if (w.bp.type === 'ship' && !w.visitor) ship = w; } if (port && ship && !ship.lifting) { const dk = G.dockOf(port); ship.x = dk.x; ship.y = dk.y - ship.bp.S * 0.45; } }
     // The land widens with the generations. What was built under water must stay under it: when the waterline comes down on the highest of them, the whole
     // underwater town settles deeper together (so its rows and the room between its buildings stay as they were), never left half in the air.
-    W.sinkT = (W.sinkT || 0) - dt; if (W.sinkT <= 0) { W.sinkT = 3; const sy = G.shoreY ? G.shoreY(W) : 0, wetOf = function (w) { return w.bp && w.bp.type !== 'port' && w.bp.type !== 'ship' && w.bp.type !== 'heart' && w.bp.wet !== false && !w.visitor; }; let need = 0, low = 0;
+    W.sinkT = (W.sinkT || 0) - dt; if (!G.FLAT && W.sinkT <= 0) { W.sinkT = 3; const sy = G.shoreY ? G.shoreY(W) : 0, wetOf = function (w) { return w.bp && w.bp.type !== 'port' && w.bp.type !== 'ship' && w.bp.type !== 'heart' && w.bp.wet !== false && !w.visitor; }; let need = 0, low = 0;
       for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!wetOf(w)) continue; need = Math.max(need, sy + 40 - (w.y + w.bp.S * 0.45 - (w.bp.top || 60))); low = Math.max(low, w.y + w.bp.S * 0.45); }
       if (need > 0) { const sh = Math.min(need, 12, Math.max(0, W.wh - 60 - low)); if (sh > 0) for (let i = 0; i < Wk.length; i++) if (wetOf(Wk[i])) Wk[i].y += sh; } }
     for (let i = Wk.length - 1; i >= 0; i--) {

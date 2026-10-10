@@ -20,8 +20,8 @@
     return R.slice(0, 6);
   };
   /** how much there is to take on your star: what draws a raid, and sets its size */
-  const wealth = function (W) { const c = col(W); return c.stock[0] + c.stock[1] + c.stock[2] + 5 * c.stock[3] + 6 * (W.works || []).filter(function (w) { return w.bp && w.bp.type !== 'heart' && !w.visitor; }).length; };
-  G.raidSize = function (W) { W = W || G.W; const c = col(W); return Math.round(clamp(3 + (c.raidN || 0) * 1.3 + wealth(W) / 55, 3, 14)); };
+  const wealth = function (W) { const c = col(W); return c.stock[0] + c.stock[1] + c.stock[2] + 2 * c.stock[3] + 6 * (W.works || []).filter(function (w) { return w.bp && w.bp.type !== 'heart' && !w.visitor; }).length; };
+  G.raidSize = function (W) { W = W || G.W; const c = col(W); return Math.round(clamp(3 + (c.raidN || 0) * 0.8 + wealth(W) / 90, 3, 10)); };
 
   /** a raid is announced: it will land next spring. who: one of G.rivals() (the nearest, if none is given) */
   G.raidWarn = function (who, n) {
@@ -32,7 +32,7 @@
   function land(W, c) {
     const r = c.raid, sy = G.shoreY(W), hp = G.heartOf(W), e = (G.sideEdge ? G.sideEdge(W) : 40) + 110, port = (W.works || []).filter(function (w) { return w.bp && w.bp.type === 'port'; })[0];
     let x = G.rand() < 0.5 ? W.ww * 0.2 : W.ww * 0.8; if (port && Math.abs(port.x - x) < 260) x = W.ww - x; x = clamp(x, e, W.ww - e);
-    r.x = x; r.y = Math.max(70, sy - 34); r.state = 'land'; r.t0 = W.t; r.out = 0; r.landed = W.gen; G.emit('raid-land', r, hp);
+    r.x = x; r.y = G.FLAT ? 150 : Math.max(70, sy - 34); r.state = 'land';      /* (it comes down at the north edge of the star, to one side) */ r.t0 = W.t; r.out = 0; r.landed = W.gen; G.emit('raid-land', r, hp);
   }
   function raiders(W, r) { const out = []; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.team === 1 && c.raid === r.id && !c.dead && !c.gone) out.push(c); } return out; }
   function stepOut(W, r) {
@@ -40,7 +40,7 @@
     // of that star's kinds, the ones best made for fighting come; each a little its own
     const best = pool.slice().sort(function (a, b) { const pa = G.derive(a), pb = G.derive(b); return (pb.r * 0.04 + (pb.spike || 0) * 0.5 + (pb.aggro || 0)) - (pa.r * 0.04 + (pa.spike || 0) * 0.5 + (pa.aggro || 0)); });
     const g0 = best[r.out % Math.min(2, best.length)], g = r.out ? G.mutate(G.cloneGenome(g0), 0.4, null).g : G.cloneGenome(g0); g.mv = 0;
-    const c = G.foeDrop(g, r.x + (r.out % 2 ? 1 : -1) * (26 + (r.out % 3) * 9), r.y + 16, 1); c.raid = r.id; c.from = { x: r.x, y: r.y + 10 }; c.E = c.ph.Emax * 0.75; c.born = W.gen; c.vy = 30; r.out++; G.emit('raider-out', c, r);
+    const c = G.foeDrop(g, r.x + (r.out % 2 ? 1 : -1) * (26 + (r.out % 3) * 9), r.y + 16, 1); c.raid = r.id; c.raidK = r.out; c.from = { x: r.x, y: r.y + 10 }; c.E = c.ph.Emax * 0.75; c.born = W.gen; c.vy = 30; r.out++; G.emit('raider-out', c, r);
   }
   function over(W, c, how) { const r = c.raid; if (!r || r.state === 'leave') return; r.state = 'leave'; r.t0 = W.t; r.how = how; const f = (c.foes = c.foes || {}), e = f[r.key] || (f[r.key] = { name: r.name, hue: r.hue, raids: 0, beaten: 0, won: 0 }); e.raids++;
     if (how === 'beaten') { e.beaten++; r.loot = 2 + Math.round(r.n / 3); c.stock[3] += r.loot; c.got[3] += r.loot; } else if (how === 'won') e.won++;

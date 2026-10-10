@@ -148,7 +148,7 @@
     const g0 = G.unpackGenome(item.g); if (!g0) return null;
     for (let i = 0; i < g0.f.rules.length; i++) { const q = g0.f.rules[i]; if (q.k === 8 && q.t >= 100000 && !W.designs.some(function (d) { return d.id === q.t; })) { const d = G.designOf(q.t); if (d && W.designs.length < 12) W.designs.push(JSON.parse(JSON.stringify(d))); } }
     if (x === undefined) { const big = W.species.filter(function (s) { return !s.extinct; }).sort(function (a, b) { return b.n - a.n; })[0], mem = big ? W.cre.filter(function (c) { return !c.dead && c.sp === big.id; }) : []; const all = mem.length >= 3 ? mem : W.cre.filter(function (c) { return !c.dead; });
-      if (all.length) { x = 0; y = 0; all.forEach(function (c) { x += c.x / all.length; y += c.y / all.length; }); x += 70; } else { x = W.ww / 2; y = W.wh * 0.6; } }
+      if (all.length) { x = 0; y = 0; all.forEach(function (c) { x += c.x / all.length; y += c.y / all.length; }); { let nb = all[0], nd = 1e18; all.forEach(function (c) { const near = all.filter(function (o) { return Math.hypot(o.x - c.x, o.y - c.y) < 260; }).length, d = Math.hypot(c.x - x, c.y - y) - near * 60; if (d < nd) { nd = d; nb = c; } }); x = nb.x; y = nb.y; }      /* (beside one of them who has others round it: where they are, not the empty middle between their grounds) */ x += 70; } else { x = W.ww / 2; y = W.wh * 0.6; } }
     const c = G.dropCreature(g0, x, y); c.E = c.ph.Emax; c.P = c.ph.Emax * 0.4; c.fromPond = item.pond && item.pond !== W.seed ? 1 : 0; c.guestName = item.name;
     if (W.discLog) W.discLog.push({ key: 'guest' + c.id, text: 'You set ' + item.name + ' (' + G.characterOf(c) + ') down alone' + (c.fromPond ? ', a stranger from another star.' : ' among them.'), gen: W.gen });
     G.emit('set-down', item, c); return c;

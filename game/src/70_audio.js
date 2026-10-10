@@ -13,9 +13,10 @@
     predator: 'animal/creature_monster',
     meteor: 'fight/explosion',
     extinct: 'music/happy_and_sad_tuba_fanfare',
+    swing: 'fight/sword_swing', clash: 'fight/sword_clash', block: 'fight/shield_block', zap: 'fight/blaster', thud: 'fight/punch', horn: 'fight/whoosh',      // a fight: a blade swung, a blade met, a shield taking it, a tower's stroke, a wall struck, a ship coming down
   };
   // quiet things must not turn into noise: each sound has its own breathing space (ms)
-  const GAP = { click: 40, birth: 130, mutation: 400, death: 260, season: 800, drip: 200, discovery: 600, squeak: 900, predator: 2500, meteor: 600, extinct: 3000 };
+  const GAP = { swing: 150, clash: 230, block: 260, zap: 300, thud: 240, horn: 2000, click: 40, birth: 130, mutation: 400, death: 260, season: 800, drip: 200, discovery: 600, squeak: 900, predator: 2500, meteor: 600, extinct: 3000 };
   const last = {};
   let ambient = null, started = false;
   G.sfx = function (name, opts) {

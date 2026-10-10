@@ -11,12 +11,12 @@
   'use strict';
   const F = G.far, clamp = G.clamp; if (!F) return;
   const TERR = G.TERRAINS = [
-    { id: 'reef', name: 'Reef star', res: 2, words: 'warm shallows and shell banks' },
-    { id: 'crag', name: 'Crag star', res: 0, words: 'broken rock and deep trenches' },
-    { id: 'marsh', name: 'Marsh star', res: 1, words: 'reed beds as far as can be seen' },
-    { id: 'crystal', name: 'Crystal star', res: 3, words: 'fields of lumen crystal' },
+    { id: 'reef', name: 'Rust star', res: 2, words: 'red dust, old craters and shell beds' },
+    { id: 'crag', name: 'Crag star', res: 0, words: 'grey broken rock and deep craters' },
+    { id: 'marsh', name: 'Moss star', res: 1, words: 'moss fields, black pools and reed beds' },
+    { id: 'crystal', name: 'Crystal star', res: 3, words: 'violet rock and fields of lumen crystal' },
     { id: 'ember', name: 'Ember star', res: 0, words: 'black glass and glowing vents' },
-    { id: 'frost', name: 'Frost star', res: 2, words: 'ice shelves over a cold sea' }];
+    { id: 'frost', name: 'Frost star', res: 2, words: 'blue ice, crevasses and snow on the heights' }];
   const FUEL = G.FUEL = 4, TRIBUTE = [5, 5, 4, 2];
   F.owed = [0, 0, 0, 0]; F.won = false;
   const cell0 = F.cell; let fallback = null;
@@ -36,7 +36,7 @@
   G.foeHeart = function (W) { W = W || G.W; const Wk = (W && W.works) || []; for (let i = 0; i < Wk.length; i++) if (Wk[i].enemy && Wk[i].bp && Wk[i].bp.type === 'heart') return Wk[i]; return null; };
   function raiseFoeHeart(W, p, s) {
     const sy = G.shoreY(W), S = 74, bp = G.blueprintFrom({ seed: 7 + ((F.hash(p.i, p.j, 82) * 9000) | 0), type: 'heart', S: S, hue: p.hue, spiky: 1, brain: 0.6, wet: true }, '2222222222222222222222222222');
-    (W.works = W.works || []).unshift({ name: 'Heart of ' + p.name, looks: 'the middle of the colony of ' + p.name, x: W.ww * 0.5, y: sy + (W.wh - sy) * 0.03 + 6 - S * 0.45, r: 80, until: W.t + 1e7, by: 'colony of ' + p.name, hue: p.hue, sp: 0, field: 0, plan: 'Their Heart', gen: W.gen, bp: bp, enemy: 1 });
+    (W.works = W.works || []).unshift({ name: 'Heart of ' + p.name, looks: 'the middle of the colony of ' + p.name, x: W.ww * 0.5, y: G.heartY ? G.heartY(W, S) : sy + (W.wh - sy) * 0.03 + 6 - S * 0.45, r: 80, until: W.t + 1e7, by: 'colony of ' + p.name, hue: p.hue, sp: 0, field: 0, plan: 'Their Heart', gen: W.gen, bp: bp, enemy: 1 });
     W.def = s.strength; W.defLeft = s.strength * 2;
   }
   const make0 = F.make;

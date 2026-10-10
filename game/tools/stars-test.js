@@ -11,7 +11,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 global.window = globalThis; globalThis.addEventListener = () => {};
 const src = path.join(__dirname, '..', 'src');
-for (const f of ['10_core.js', '20_genome.js', '21_form.js', '21b_body.js', '21c_taste.js', '30_world.js', '40_words.js', '41_look.js', '43_why.js', '44_pressure.js', '45_organs.js', '45_parts.js', '45_plans.js', '46_events.js', '53_fields.js', '47_story.js', '48_judge.js', '49_eras.js', '54_deeds.js', '54c_acts.js', '54d_build.js', '54e_teach.js', '54f_judge.js', '54g_society.js', '54i_colony.js', '57x_far.js', '57y_raids.js', '57ya_stars.js', '80_save.js'])
+for (const f of ['10_core.js', '20_genome.js', '21_form.js', '21b_body.js', '21c_taste.js', '30_world.js', '40_words.js', '41_look.js', '43_why.js', '44_pressure.js', '45_organs.js', '45_parts.js', '45_plans.js', '46_events.js', '53_fields.js', '47_story.js', '48_judge.js', '49_eras.js', '54_deeds.js', '54c_acts.js', '54d_build.js', '54e_teach.js', '54f_judge.js', '54g_society.js', '54i_colony.js', '54j_order.js', '57x_far.js', '57y_raids.js', '57ya_stars.js', '80_save.js'])
   vm.runInThisContext(fs.readFileSync(path.join(src, f), 'utf8'), { filename: f });
 G.hints = G.hints || {}; G.saveNow = function () {};
 const seed = +process.argv[2] || 11, F = G.far;

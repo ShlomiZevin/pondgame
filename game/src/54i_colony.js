@@ -23,11 +23,12 @@
   const hostile = function (c) { return c.team === 1; };
   const shoreOf = function (W) { return G.shoreY ? G.shoreY(W) : W.wh * 0.25; };
   /** may this creature go to that height of the star? (one of the water stops at the shore; one of the land only paddles in the shallows) */
-  const reach = G.canReach = function (W, c, y) { const sy = shoreOf(W); return c.ph.home ? y <= sy + (W.wh - sy) * 0.06 - c.ph.r : y >= sy + c.ph.r; };
+  const reach = G.canReach = function (W, c, y) { if (G.FLAT) return true; const sy = shoreOf(W); return c.ph.home ? y <= sy + (W.wh - sy) * 0.06 - c.ph.r : y >= sy + c.ph.r; };
 
   // ── the Heart: the middle of the colony, and its store. It stands in the shallows, where those of the land and those of the water can both come ──
   G.heartOf = function (W) { W = W || G.W; const Wk = W.works || []; for (let i = 0; i < Wk.length; i++) if (Wk[i].bp && Wk[i].bp.type === 'heart' && !Wk[i].enemy) return Wk[i]; return null; };
-  const heartY = function (W, S) { const sy = shoreOf(W); return sy + (W.wh - sy) * 0.03 + 6 - S * 0.45; };
+  const yLo = function (W, c) { return G.FLAT ? 20 + c.ph.r : c.ph.home ? 10 : shoreOf(W) + c.ph.r + 2; }, yHi = function (W, c) { return G.FLAT ? W.wh - 20 - c.ph.r : c.ph.home ? shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r : W.wh - 10; };      // (how far up and down a creature may go: on a star, anywhere)
+  const heartY = G.heartY = function (W, S) { if (G.FLAT) return W.wh / 2 + 30 - S * 0.45; const sy = shoreOf(W); return sy + (W.wh - sy) * 0.03 + 6 - S * 0.45; };      // (the Heart stands in the middle of the star)
   G.ensureHeart = function (W) {
     W = W || G.W; let h = G.heartOf(W); if (h || !G.blueprintFrom || W.title) return h;
     const sp = (W.species || []).filter(function (s) { return !s.extinct; }).sort(function (a, b) { return b.n - a.n; })[0], hue = sp ? sp.hue : 190, S = 74;
@@ -37,13 +38,14 @@
     return h;
   };
   /** where a carrier sets its load down (and a builder takes one up) */
-  const dropAt = G.storeAt = function (W) { const h = G.heartOf(W); if (!h) return null; const sy = shoreOf(W); return { x: h.x + (h.bp.hw || 60) + 34, y: sy + (W.wh - sy) * 0.03 + 4 }; };
+  const dropAt = G.storeAt = function (W) { const h = G.heartOf(W); if (!h) return null; const sy = shoreOf(W); return { x: h.x + (h.bp.hw || 60) + 34, y: G.FLAT ? h.y + h.bp.S * 0.45 - 2 : sy + (W.wh - sy) * 0.03 + 4 }; };
 
   // ── lumen: the rare thing every star wants. It grows as crystals in a few places; a gatherer breaks a piece off and carries it home ──
   function nodes(W) {
     const col = colony(W); if (col.nodes) return col.nodes; const sy = shoreOf(W), r = G.rng ? G.rng((W.seed >>> 0) + 77) : Math.random, rich = W.lumenRich === undefined ? 1 : W.lumenRich, e = (G.sideEdge ? G.sideEdge(W) : 40) + 60;
     col.nodes = [];
-    if (rich > 0) { col.nodes.push({ x: e + r() * (W.ww - 2 * e), y: W.wh - 80 - r() * 60, n: Math.round((14 + r() * 10) * rich), n0: 0, k: 3 }); if (sy > 150) col.nodes.push({ x: e + r() * (W.ww - 2 * e), y: 60 + r() * Math.max(10, sy - 130), n: Math.round((10 + r() * 8) * rich), n0: 0, k: 3 }); if (rich > 1.5) col.nodes.push({ x: e + r() * (W.ww - 2 * e), y: sy + (W.wh - sy) * (0.3 + 0.4 * r()), n: Math.round(30 * rich), n0: 0, k: 3 }); }
+    if (rich > 0 && G.FLAT && G.sitesOf) { G.sitesOf(W).filter(function (s) { return s.k === 'lumen'; }).forEach(function (s, i) { if (i === 1 && rich < 0.9 && r() < 0.35) return; col.nodes.push({ x: s.x, y: s.y + 14, n: Math.round((12 + r() * 10) * rich), n0: 0, k: 3 }); }); }      // (lumen stands where the star's lumen deposits are)
+    else if (rich > 0) { col.nodes.push({ x: e + r() * (W.ww - 2 * e), y: W.wh - 80 - r() * 60, n: Math.round((14 + r() * 10) * rich), n0: 0, k: 3 }); if (sy > 150) col.nodes.push({ x: e + r() * (W.ww - 2 * e), y: 60 + r() * Math.max(10, sy - 130), n: Math.round((10 + r() * 8) * rich), n0: 0, k: 3 }); if (rich > 1.5) col.nodes.push({ x: e + r() * (W.ww - 2 * e), y: sy + (W.wh - sy) * (0.3 + 0.4 * r()), n: Math.round(30 * rich), n0: 0, k: 3 }); }
     col.nodes.forEach(function (q) { q.n0 = q.n; });
     return col.nodes;
   }
@@ -53,11 +55,16 @@
   function go(c, tx, ty, dt, haste) { const dx = tx - c.x, dy = ty - c.y, dist = Math.hypot(dx, dy) || 1, grip = c.haul >= 0 ? (c.ph.hands || c.ph.limbs > 0 ? 0.85 : 0.6) : 1, sp = Math.min(c.ph.speed * (haste || 2) * grip, dist * 2.4), k = Math.min(1, dt * 5); c.vx += (dx / dist * sp - c.vx) * k; c.vy += (dy / dist * sp - c.vy) * k; if (dist > 8) c.ang = Math.atan2(dy, dx); return dist; }
 
   // ── gathering ──
+  /** what a gatherer goes for next: the sort the store is shortest of (each gatherer leaning its own way, so they do not all run to one deposit;
+   *  lumen for no more than a quarter of them unless you send them), and the nearest piece of that sort. One you sent for a sort keeps to it. */
   function source(W, c, col) {
-    const M = W.mats || [], N = nodes(W), k0 = c.gk === undefined ? -1 : c.gk, ax = c.area ? c.area.x : c.x, ay = c.area ? c.area.y : c.y, d0 = G.storeAt(W) || { x: c.x, y: c.y }; let best = null, bd = 1e18;
-    for (let i = 0; i < N.length; i++) { const q = N[i]; if (q.n <= 0 || (k0 >= 0 && k0 !== 3) || !reach(W, c, q.y)) continue; const dd = (q.x - ax) * (q.x - ax) + (q.y - ay) * (q.y - ay) * 1 - 250000; if (dd < bd) { bd = dd; best = q; } }      // (lumen is worth a longer walk)
-    for (let i = 0; i < M.length; i++) { const q = M[i]; if ((q.by && q.by !== c.id && W.t - q.byT < 14) || (k0 >= 0 && k0 !== q.k) || !reach(W, c, q.y)) continue; if ((q.x - d0.x) * (q.x - d0.x) + (q.y - d0.y) * (q.y - d0.y) < 70 * 70) continue;
-      const dd = (q.x - ax) * (q.x - ax) + (q.y - ay) * (q.y - ay); if (dd < bd) { bd = dd; best = q; } }
+    const M = W.mats || [], N = nodes(W), k0 = c.gk === undefined ? -1 : c.gk, ax = c.area ? c.area.x : c.x, ay = c.area ? c.area.y : c.y, d0 = G.storeAt(W) || { x: c.x, y: c.y };
+    const near = [null, null, null, null], nd = [1e18, 1e18, 1e18, 1e18];
+    for (let i = 0; i < N.length; i++) { const q = N[i]; if (q.n <= 0 || !reach(W, c, q.y)) continue; const dd = (q.x - ax) * (q.x - ax) + (q.y - ay) * (q.y - ay); if (dd < nd[3]) { nd[3] = dd; near[3] = q; } }
+    for (let i = 0; i < M.length; i++) { const q = M[i]; if ((q.by && q.by !== c.id && W.t - q.byT < 14) || !reach(W, c, q.y)) continue; if ((q.x - d0.x) * (q.x - d0.x) + (q.y - d0.y) * (q.y - d0.y) < 70 * 70) continue; const dd = (q.x - ax) * (q.x - ax) + (q.y - ay) * (q.y - ay); if (dd < nd[q.k]) { nd[q.k] = dd; near[q.k] = q; } }
+    if (k0 >= 0) return near[k0];
+    let onL = 0, ng = 0; for (let i = 0; i < W.cre.length; i++) { const o = W.cre[i]; if (o.dead || o.team || o.job !== 'g') continue; ng++; if ((o.gj && o.gj.k === 3) || o.haul === 3) onL++; }
+    let best = null, bw = -1; for (let k = 0; k < 4; k++) { if (!near[k]) continue; if (k === 3 && onL >= Math.max(1, Math.round(ng * 0.25))) continue; const lean = 0.6 + 0.8 * (((c.id * 2654435761 + k * 40503) >>> 0) % 1000) / 1000, w = (k === 3 ? 0.5 / (3 + col.stock[3]) : 1 / (4 + col.stock[k])) * lean / (1 + Math.sqrt(nd[k]) / 1500); if (w > bw) { bw = w; best = near[k]; } }
     return best;
   }
   function gather(W, c, col, dt) {
@@ -67,7 +74,7 @@
     if (j.ph === 0) { const s = j.s; if ((s.k === 3 ? s.n <= 0 : W.mats.indexOf(s) < 0) || j.t > 40) { c.gj = null; return; } if (s.k !== 3) s.byT = W.t;
       if (go(c, s.x, s.y, dt, 2.2) < c.ph.r + 14) { if (s.k === 3) s.n--; else W.mats.splice(W.mats.indexOf(s), 1); j.ph = 1; j.t = 0; c.haul = j.k; G.emit('picked', c, j.k); } }
     else { if (!reach(W, c, drop.y) && Math.abs(c.y - drop.y) < 60 && Math.abs(c.x - drop.x) < 60) j.t = 99;      /* as near as it can come */
-      if (go(c, drop.x, drop.y, dt, 2.2) < 36 || j.t > 45) { if (j.t <= 45 || j.t === 99) { col.stock[j.k]++; col.got[j.k]++; c.score = (c.score || 0) + (j.k === 3 ? 2 : 1); c.done = (c.done || 0) + 1; if (G.learn) G.learn(c, 0.3); G.emit('delivered', c, j.k); } c.haul = -1; c.gj = null; } }
+      if (go(c, drop.x, drop.y, dt, 2.2) < 36 || j.t > 45) { if (j.t <= 45 || j.t === 99) { col.stock[j.k]++; col.got[j.k]++; c.E = Math.min(c.ph.Emax, c.E + c.ph.Emax * 0.12);      /* (a load brought home earns a meal at the Heart) */ c.score = (c.score || 0) + (j.k === 3 ? 2 : 1); c.done = (c.done || 0) + 1; if (G.learn) G.learn(c, 0.3); G.emit('delivered', c, j.k); } c.haul = -1; c.gj = null; } }
   }
 
   // ── fighting ──
@@ -75,33 +82,41 @@
     const ph = a.ph, dmg = (5 + 4 * Math.min(2, ph.spike || 0) + 2.5 * Math.min(2, ph.cnt ? ph.cnt[0] : 0) + ph.r * 0.25) * (0.55 + (ph.aggro || 0)) * (1 - Math.min(0.9, b.ph.defense || 0) * 0.8) * (a.job === 'f' ? 1.3 : a.job === 'u' ? 1.15 : 1) * (b.job === 'u' ? 0.6 : b.job === 'f' ? 0.72 : 1);      // (trained for it: a fighter hits harder, and it and a guard take a blow better)
     a.cool2 = 1.0; a.strike = 0.7; b.E -= dmg; b.flash = 1; a.E -= 2 * (b.ph.spike || 0); a.score = (a.score || 0) + dmg / 14; a.dealt = (a.dealt || 0) + dmg; W.stats.fights = (W.stats.fights || 0) + 1;
     if (b.team && !a.team) { b.foe = a; if (b.team === 2 && G.foeHeart && G.foeHeart(W)) { b.team = 1; b.job = 'f'; } }      // (one of a rival's people who is struck takes up arms)
-    G.emit('fight', a, b);
+    { const kx = b.x - a.x, ky = b.y - a.y, kd = Math.hypot(kx, ky) || 1; b.vx += kx / kd * 46; b.vy += ky / kd * 46; a.swAng = Math.atan2(ky, kx); a.swT = W.t; b.hitT = W.t; }      // (the one struck is knocked back a little)
+    G.emit('fight', a, b, dmg);
     if (b.E <= 0) { a.score += 2; a.kills = (a.kills || 0) + 1; G.killCreature(b, 'fought', a); G.emit('slain', a, b); }
     if (a.E <= 0) G.killCreature(a, 'fought', b);
   };
+  /** close with an enemy: come at it from your own side, stop at arm's length, and strike when you can */
+  function engage(W, c, t, dt, haste) { const dx = c.x - t.x, dy = c.y - t.y, d = Math.hypot(dx, dy) || 1, a = Math.atan2(dy, dx) + ((c.id % 5) - 2) * 0.32 * Math.min(1, d / 70), R = c.ph.r + t.ph.r + 5, sy = shoreOf(W);
+    c.tired = Math.min(c.tired || 0, 0.6); c.eHold = undefined; c.atSlot = 0;
+    go(c, t.x + Math.cos(a) * R, clamp(t.y + Math.sin(a) * R, yLo(W, c), yHi(W, c)), dt, haste || 2.5);
+    if (d < R + 10) { c.ang = Math.atan2(-dy, -dx); if (!(c.cool2 > 0)) strike(W, c, t); } }
   /** the nearest of the other side within R of a point (foes: a list made once a moment) */
   function foeNear(foes, x, y, R) { let best = null, bd = R * R; for (let i = 0; i < foes.length; i++) { const o = foes[i]; if (o.dead || o.inShip) continue; const d = (o.x - x) * (o.x - x) + (o.y - y) * (o.y - y); if (d < bd) { bd = d; best = o; } } return best; }
   function fight(W, c, col, foes, dt, guard) {
-    const hp = G.heartOf(W), post = c.post || (guard ? null : col.rally) || (hp ? { x: hp.x + (guard ? 0 : 120), y: (G.storeAt(W) || hp).y + (c.ph.home ? -30 : 70) } : { x: c.x, y: c.y });
+    const hp = G.heartOf(W), post = c.slot || c.post || (guard ? null : col.rally) || (hp ? { x: hp.x + (guard ? 0 : 120), y: (G.storeAt(W) || hp).y + (c.ph.home ? -30 : 70) } : { x: c.x, y: c.y });
     let foe = c.foe && !c.foe.dead && W.cre.indexOf(c.foe) >= 0 ? c.foe : null; if (!foe) { c.foe = null; if (foes.length) foe = foeNear(foes, guard ? post.x : c.x, guard ? post.y : c.y, guard ? 230 : c.raze ? 150 : 330) || (guard || c.raze ? null : foeNear(foes, post.x, post.y, 520)); }
-    if (c.raze && !(foe && Math.hypot(foe.x - c.x, foe.y - c.y) < 150)) { const w = c.raze; if ((W.works || []).indexOf(w) < 0 || !w.enemy || !w.bp) c.raze = null; else { const sy = shoreOf(W), ty = clamp(w.y + w.bp.S * 0.45, c.ph.home ? 10 : sy + c.ph.r + 2, c.ph.home ? sy + (W.wh - sy) * 0.06 - c.ph.r : W.wh - 10);
-        c.tired = Math.min(c.tired || 0, 0.6); if (go(c, w.x + Math.cos(c.id * 1.7) * 46, ty, dt, 2.2) < 95 && !(c.cool2 > 0)) { c.cool2 = 1.2; c.strike = 0.7; c.score = (c.score || 0) + 0.3; G.damageWork(w, 2.4 + c.ph.r * 0.12 + 1.2 * Math.min(2, c.ph.spike || 0), c); } return; } }      /* (sent against a building of theirs: it is broken piece by piece) */
-    if (foe && reach(W, c, foe.y)) { const d = go(c, foe.x, foe.y, dt, 2.5); c.tired = Math.min(c.tired || 0, 0.6); if (d < c.ph.r + foe.ph.r + 10 && !(c.cool2 > 0)) strike(W, c, foe); return; }
-    const py = clamp(post.y, c.ph.home ? 10 : shoreOf(W) + c.ph.r + 2, c.ph.home ? shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r : W.wh - 10), d = Math.hypot(c.x - post.x, c.y - py), leash = guard ? 70 : 130;
+    if (c.raze && !(foe && Math.hypot(foe.x - c.x, foe.y - c.y) < 150)) { const w = c.raze; if ((W.works || []).indexOf(w) < 0 || !w.enemy || !w.bp) c.raze = null; else { const sy = shoreOf(W), ty = clamp(w.y + w.bp.S * 0.45, yLo(W, c), yHi(W, c));
+        c.tired = Math.min(c.tired || 0, 0.6); if (go(c, w.x + ((c.id % 7) - 3) * 26, ty, dt, 2.2) < 80 && !(c.cool2 > 0)) { c.cool2 = 1.2; c.strike = 0.7; c.ang = Math.atan2(w.y - c.y, w.x - c.x); c.swAng = c.ang; c.swT = W.t; c.score = (c.score || 0) + 0.3; G.damageWork(w, 2.4 + c.ph.r * 0.12 + 1.2 * Math.min(2, c.ph.spike || 0), c); } return; } }      /* (sent against a building of theirs: it is broken piece by piece) */
+    if (foe && reach(W, c, foe.y)) { engage(W, c, foe, dt); return; }
+    if (G.holdSlot && G.holdSlot(W, c, dt)) { if (guard && c.atSlot) c.score = (c.score || 0) + dt * 0.02; return; }      // (nobody to fight: it stands in its place on the muster ground, or at its post)
+    const py = clamp(post.y, yLo(W, c), yHi(W, c)), d = Math.hypot(c.x - post.x, c.y - py), leash = guard ? 70 : 130;
     if (d > leash) go(c, post.x + Math.cos(c.id * 2.4) * leash * 0.6, py + Math.sin(c.id * 2.4) * leash * 0.4, dt, d > 400 ? 2.4 : 1.4); else if (guard) c.score = (c.score || 0) + dt * 0.02;
   }
   /** one of the other side, come to raid: it goes for whoever of yours is near, and otherwise for the Heart, which it breaks piece by piece */
   function raid(W, c, col, yours, dt) {
     const back = c.foe && !c.foe.dead && !c.foe.inShip && Math.hypot(c.foe.x - c.x, c.foe.y - c.y) < 260 ? c.foe : null, near = back || foeNear(yours.filter(function (o) { return o.job === 'f' || o.job === 'u'; }), c.x, c.y, 120), hp = G.heartOf(W);      // (it fights back at whoever struck it, and goes for a fighter or a guard that comes near: it has come for the Heart, not for those who live round it)
-    if (near && reach(W, c, near.y)) { if (go(c, near.x, near.y, dt, 2.4) < c.ph.r + near.ph.r + 10 && !(c.cool2 > 0)) strike(W, c, near); return; }
-    const tgt = c.raidAt && (W.works || []).indexOf(c.raidAt) >= 0 ? c.raidAt : hp; if (!tgt) return; const ty = clamp(tgt.y + tgt.bp.S * 0.45, c.ph.home ? 10 : shoreOf(W) + c.ph.r + 2, c.ph.home ? shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r : W.wh - 10);
-    if (go(c, tgt.x + Math.cos(c.id) * 40, ty, dt, 2) < 90 && !(c.cool2 > 0)) { c.cool2 = 1.2; c.strike = 0.7; G.damageWork(tgt, 2 + c.ph.r * 0.1 + Math.min(2, c.ph.spike || 0), c); }
+    if (near && reach(W, c, near.y)) { engage(W, c, near, dt, 2.4); return; }
+    const tgt = c.raidAt && (W.works || []).indexOf(c.raidAt) >= 0 ? c.raidAt : hp; if (!tgt) return; const ty = clamp(tgt.y + tgt.bp.S * 0.45, yLo(W, c), yHi(W, c));
+    const rk = (c.raidK === undefined ? c.id : c.raidK) % 14;      // (they come at the Heart in a line, not a heap)
+    if (go(c, tgt.x + ((rk % 7) - 3) * 28, ty + (rk >= 7 ? (c.ph.home ? -24 : 24) : 0), dt, 2) < 70 && !(c.cool2 > 0)) { c.ang = Math.atan2(tgt.y - c.y, tgt.x - c.x); c.swAng = c.ang; c.swT = W.t; c.cool2 = 1.2; c.strike = 0.7; G.damageWork(tgt, 2 + c.ph.r * 0.1 + Math.min(2, c.ph.spike || 0), c); }
   }
   /** one of a rival colony at home: it goes for whoever struck it, and for any of yours that comes near its Heart; otherwise it lives as it likes */
   function defend(W, c, h, yours, dt) {
     let tgt = c.foe && !c.foe.dead && !c.foe.inShip && Math.hypot(c.foe.x - c.x, c.foe.y - c.y) < 300 ? c.foe : null; if (!tgt) { c.foe = null; const hy = h.y + h.bp.S * 0.45; if (Math.hypot(c.x - h.x, c.y - hy) < 520) tgt = foeNear(yours, h.x, hy, 270); }
-    if (tgt && reach(W, c, tgt.y)) { c.tired = Math.min(c.tired || 0, 0.6); if (go(c, tgt.x, tgt.y, dt, 2.4) < c.ph.r + tgt.ph.r + 10 && !(c.cool2 > 0)) strike(W, c, tgt); return; }
-    const hy = h.y + h.bp.S * 0.45, d = Math.hypot(c.x - h.x, c.y - hy); if (d > 240) go(c, h.x + Math.cos(c.id * 2.4) * 120, clamp(hy + Math.sin(c.id * 2.4) * 60, c.ph.home ? 10 : shoreOf(W) + c.ph.r + 2, c.ph.home ? shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r : W.wh - 10), dt, 1.4);      /* (it keeps near what it defends) */
+    if (tgt && reach(W, c, tgt.y)) { engage(W, c, tgt, dt, 2.4); return; }
+    const hy = h.y + h.bp.S * 0.45, d = Math.hypot(c.x - h.x, c.y - hy); if (d > 240) go(c, h.x + Math.cos(c.id * 2.4) * 120, clamp(hy + Math.sin(c.id * 2.4) * 60, yLo(W, c), yHi(W, c)), dt, 1.4);      /* (it keeps near what it defends) */
   }
   /** a building is struck: so much harm knocks a piece off it; one with no piece left is gone */
   G.damageWork = function (w, dmg, by) {
@@ -135,9 +150,10 @@
   G.jobCount = function (W) { W = W || G.W; const n = { g: 0, b: 0, f: 0, u: 0, free: 0, all: 0 }; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c)) continue; n.all++; if (c.job && n[c.job] !== undefined) n[c.job]++; else n.free++; } return n; };
   const setJob = G.setJob = function (c, job, pinned) { if (c.job === job) { if (pinned) c.pin = true; return; } c.job = job || ''; c.pin = !!pinned && !!job; c.gj = null; c.hungry = false; if (job !== 'f') c.raze = null; if (c.haul >= 0 && !c.deedId) c.haul = -1; c.foe = null; if (!job) { c.post = null; c.area = null; } c.score = 0; G.emit('job', c, job); };
   function staff(W, col) {
-    const n = G.jobCount(W), keys = ['f', 'u', 'b', 'g'];
-    for (let q = 0; q < keys.length; q++) { const k = keys[q], want = Math.min(col.want[k] | 0, Math.max(0, n.all - (n.all > 12 ? 2 : 0)));
-      if (n[k] < want) { let best = null, bs = -1e9; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c) || c.job || c.deedId || c.inShip || (c.stranger !== undefined && !W.farOf) || c.age < 0) continue; const s = APT[k](c) + (c.E / c.ph.Emax) * 0.2; if (s > bs) { bs = s; best = c; } } if (best) { setJob(best, k, false); return; } }
+    const n = G.jobCount(W), keys = ['f', 'u', 'b', 'g']; let room = W.gen < 5 ? 0 : Math.max(0, Math.floor(n.all * 0.6) - 4);      // (no more than six in ten work, and nobody in a star's first years: the rest must live and breed)
+    for (let q = 0; q < keys.length; q++) { const k = keys[q], want = W.farOf ? Math.min(col.want[k] | 0, n.all) : Math.min(col.want[k] | 0, room); room -= want;
+      if (n[k] < want && (k === 'f' || k === 'u') && W.t - (col.warT || -99) < 2.5 && W.cre.some(function (o) { return o.team === 1 && !o.dead; })) continue;      // (while enemies are on the star the ranks are made up slowly)
+      if (n[k] < want) { if (k === 'f' || k === 'u') col.warT = W.t; let best = null, bs = -1e9; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c) || c.job || c.deedId || c.inShip || (c.stranger !== undefined && !W.farOf) || c.age < 0) continue; const s = APT[k](c) + (c.E / c.ph.Emax) * 0.2; if (s > bs) { bs = s; best = c; } } if (best) { setJob(best, k, false); return; } }
       else if (n[k] > want) { let worst = null, ws = 1e9; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c) || c.job !== k || c.pin || c.deedId) continue; const s = (c.score || 0) + APT[k](c) * 0.3; if (s < ws) { ws = s; worst = c; } } if (worst) { setJob(worst, '', false); return; } }
     }
   }
@@ -161,15 +177,17 @@
     huts: { name: 'Farm', what: 'huts round a store of food', res: { feed: 0.25, size: 0.075 }, note: 'It feeds those who live round it.' },
     wall: { name: 'Wall', what: 'a ring of posts to live inside', res: { solid: true, size: 0.075 }, note: 'Only your own may pass it.' },
     tower: { name: 'Tower', what: 'a watchtower that strikes at enemies', res: { pull: 0.22, size: 0.07, tower: true }, cost: [0, 0, 0, 3], note: 'It strikes at any enemy that comes near. Its eye is cut from 3 lumen.' },
-    port: { name: 'Spaceport', what: 'a spaceport on the shore, to build a spaceship on', res: { port: true, size: 0.085 }, note: 'The pad a spaceship is built on. On land only.' },
+    port: { name: 'Spaceport', what: 'a spaceport on the shore, to build a spaceship on', res: { port: true, size: 0.085 }, note: 'The pad a spaceship is built on.' },
     ship: { name: 'Starship', what: 'a spaceship on the spaceport', res: { ship: true, size: 0.06 }, note: 'It carries a crew to another star. It needs a spaceport.' } };
   /** may this be built there? '' if so, else why not */
   G.buildOk = function (type, x, y) {
     const W = G.W, K = KINDS[type]; if (!W || !K) return 'unknown'; const sy = shoreOf(W), Wk = W.works || [], e = (G.sideEdge ? G.sideEdge(W) : 40) + 70;
     if (type === 'ship') { const port = Wk.filter(function (w) { return w.bp && w.bp.type === 'port' && !w.fall; })[0]; if (!port) return 'It needs a spaceport first.'; if (Wk.some(function (w) { return w.bp && w.bp.type === 'ship' && !w.visitor; })) return 'There is a ship already.'; return ''; }
-    if (type === 'port') { if (Wk.some(function (w) { return w.bp && w.bp.type === 'port'; })) return 'There is a spaceport already.'; if (y > sy - 30) return 'A spaceport stands on land.'; }
+    if (type === 'port') { if (Wk.some(function (w) { return w.bp && w.bp.type === 'port'; })) return 'There is a spaceport already.'; if (!G.FLAT && y > sy - 30) return 'A spaceport stands on the high ground.'; }
     if (x < e || x > W.ww - e) return 'Too near the edge.';
-    if (type !== 'port') { if (y > sy) { if (y < sy + 250) return 'Too near the waterline: under water, build deeper.'; if (y > W.wh - 70) return 'Too near the floor.'; } else { if (y > sy - 46) return 'Too near the waterline.'; if (y < 170) return 'Too near the top.'; } }
+    if (G.FLAT) { if (y < 150) return 'Too near the edge.'; if (y > W.wh - 60) return 'Too near the edge.'; { const N = colony(W).nodes || []; for (let q = 0; q < N.length; q++) if (Math.abs(N[q].x - x) < 130 && y > N[q].y - 90 && y < N[q].y + 190) return 'Lumen grows there: nothing is built on it.'; } const st = G.siteAt ? G.siteAt(W, x, y - 40, 70) : null; if (st) return 'That is ' + (st.k === 'grove' ? 'a feeding ground' : st.k === 'lumen' ? 'where lumen grows' : 'the ' + st.name.toLowerCase()) + ': nothing is built on it.'; }
+    else if (type !== 'port') { if (y > sy) { if (y < sy + 250) return 'Too near the rim: on the low ground, build further down.'; if (y > W.wh - 70) return 'Too near the edge.'; } else { if (y > sy - 46) return 'Too near the rim.'; if (y < 170) return 'Too near the top.'; } }
+    { const g = G.onGround ? G.onGround(W, x, y) : null; if (g) return 'That is the ' + g.name.toLowerCase() + ': nothing is built on it.'; }
     for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (w.bp && Math.abs(w.x - x) < (w.bp.hw || 60) + 90 && Math.abs(w.y - y) < 150) return 'Too near the ' + w.name + '.'; }
     if ((colony(W).queue || []).some(function (q) { return Math.abs(q.x - x) < 170 && Math.abs(q.y - y) < 150; })) return 'Something is already to be built there.';
     return '';
@@ -209,12 +227,13 @@
         if (c.team === 2) continue;      /* (the people of another star: they live as they like) */
         if (c.team && theirs && !c.raid) { if (!yours) yours = W.cre.filter(function (o) { return !o.dead && !o.team && !o.inShip; }); if (!c.asleep) defend(W, c, theirs, yours, dt); continue; }
         if (c.team) { if (c.eKeep !== undefined && c.E < c.eKeep && c.E > 0) c.E += (c.eKeep - c.E) * 0.8;      /* (raiders came provisioned: living costs them little while the raid lasts) */
-          if (c.leave) { const fx = c.from ? c.from.x : c.x < W.ww / 2 ? -40 : W.ww + 40, fy = c.from ? c.from.y : c.y; c.leave += dt; if (go(c, clamp(fx, 60, W.ww - 60), clamp(fy, c.ph.home ? 10 : shoreOf(W) + c.ph.r + 2, c.ph.home ? shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r : W.wh - 10), dt, 2.2) < 50 || c.leave > 22) { c.gone = 1; gone = true; } continue; }
+          if (c.leave) { const fx = c.from ? c.from.x : c.x < W.ww / 2 ? -40 : W.ww + 40, fy = c.from ? c.from.y : c.y; c.leave += dt; if (go(c, clamp(fx, 60, W.ww - 60), clamp(fy, yLo(W, c), yHi(W, c)), dt, 2.2) < 50 || c.leave > 22) { c.gone = 1; gone = true; } continue; }
           if (!yours) yours = W.cre.filter(function (o) { return !o.dead && !o.team && !o.inShip; }); if (!c.inShip && !c.asleep) raid(W, c, col, yours, dt); continue; }
         if (!c.job) continue;
         if (c.deedId || c.asleep || c.inShip || c.goTo) continue;
-        const fed = c.E / c.ph.Emax; if (c.hungry) { if (fed > (c.job === 'f' || c.job === 'u' ? 0.8 : 0.62) || ((c.job === 'f' || c.job === 'u') && (anyFoe || c.raze) && fed > 0.2)) c.hungry = false; else { if (c.job === 'g' && c.haul >= 0 && !c.gj) c.haul = -1; continue; } } else if (fed < (c.job === 'f' || c.job === 'u' ? 0.5 : 0.33) && !((c.job === 'f' || c.job === 'u') && (anyFoe || c.raze) && fed > 0.18)) { c.hungry = true; continue; }      /* (fighters and guards keep themselves better fed, to be fit when it comes to it; and nobody leaves a fight to eat) */
+        const fed = c.E / c.ph.Emax; if (c.slot && c.job !== 'g' && fed > 0.1) c.hungry = false; else if (c.hungry) { if (fed > (c.job === 'f' || c.job === 'u' ? 0.8 : 0.62) || ((c.job === 'f' || c.job === 'u') && (anyFoe || c.raze) && fed > 0.2)) c.hungry = false; else { if (c.job === 'g' && c.haul >= 0 && !c.gj) c.haul = -1; continue; } } else if (!(c.slot && c.job !== 'g') && fed < (c.job === 'f' || c.job === 'u' ? 0.5 : 0.33) && !((c.job === 'f' || c.job === 'u') && (anyFoe || c.raze) && fed > 0.18)) { c.hungry = true; continue; }      /* (fighters and guards keep themselves better fed, to be fit when it comes to it; and nobody leaves a fight to eat) */
         if (c.job === 'g') gather(W, c, col, dt);
+        else if (c.job === 'b') { if (G.holdSlot) G.holdSlot(W, c, dt); }      /* (nothing to build: it waits in the builders' yard) */
         else if (c.job === 'f' || c.job === 'u') { if (!foes) foes = W.cre.filter(function (o) { return !o.dead && o.team === 1; }); fight(W, c, col, foes, dt, c.job === 'u'); }
       }
       for (let i = W.cre.length - 1; i >= 0; i--) { const c = W.cre[i]; if (c.team === 1 && !theirs) { c.eKeep = c.E; if (gone && c.gone) { W.cre.splice(i, 1); G.emit('foe-left', c); } } }
@@ -233,7 +252,7 @@
       else if (c.job === 'g') { c.area = { x: o.x, y: o.y }; c.gk = undefined; c.gj = null; }
       else c.goTo = { x: o.x, y: reach(W, c, o.y) ? o.y : c.ph.home ? Math.min(o.y, shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r) : Math.max(o.y, shoreOf(W) + c.ph.r + 2), until: W.t + 25, order: 1 };      /* (as near as its body lets it come) */
     });
-    if (!o.foe && o.mat === undefined && !o.work && list.length && list.every(function (c) { return c.job === 'f'; }) && list.length >= G.jobCount(W).f) col.rally = { x: o.x, y: o.y };      /* all the fighters at once: that is where fighters rally from now on */
+    if (!o.foe && o.mat === undefined && !o.work && list.length && list.every(function (c) { return c.job === 'f'; }) && list.length >= G.jobCount(W).f) { col.rally = { x: o.x, y: o.y }; list.forEach(function (c) { c.post = null; }); }      /* all the fighters at once: that is where fighters rally from now on */
     G.emit('ordered', list, o); return n;
   };
   /** one of another side is set down on your star (team: which side) */

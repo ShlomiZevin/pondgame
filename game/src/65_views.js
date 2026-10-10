@@ -411,11 +411,11 @@
     UI.menuOpen = true;
     PXSpause(true);
     const m = el('div', 'overlay', '', $('ui')); m.id = 'menu';
-    m.innerHTML = '<div class="glass sheet" style="width:min(400px,100%)"><div class="top"><h2>SETTINGS</h2><button class="btn sm" id="mnClose">' + ICON.close + 'CLOSE</button></div><div class="body" id="mnBody"></div></div>';
+    m.innerHTML = '<style>#mnBody{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:4px 26px;align-items:start}@media (max-width:720px){#mnBody{grid-template-columns:minmax(0,1fr)}}</style><div class="glass sheet" style="width:min(820px,100%)"><div class="top"><h2>SETTINGS</h2><button class="btn sm" id="mnClose">' + ICON.close + 'CLOSE</button></div><div class="body" id="mnBody"><div id="mnL"></div><div id="mnR"></div></div></div>';      // (two columns: sound and who imagines on the left, what the AI was used for on the right; nothing squeezed, nothing to scroll)
     m.addEventListener('pointerdown', function (e) { if (e.target === m) G.closeMenu(); });
     UI.menuEl = m;
-    buildSoundControls($('mnBody'), true);
-    { const nb = el('button', 'btn', (ICON.drop || '') + 'START A NEW STAR', $('mnBody')); nb.style.cssText = 'width:100%;margin-top:14px'; nb.title = 'Leave this star and begin another (you are asked first)'; nb.onclick = function () { G.sfx('click'); G.closeMenu(); G.confirmNew(); }; }
+    buildSoundControls($('mnL'), true, $('mnR'));
+    { const nb = el('button', 'btn', (ICON.drop || '') + 'START A NEW STAR', $('mnL')); nb.style.cssText = 'width:100%;margin-top:14px'; nb.title = 'Leave this star and begin another (you are asked first)'; nb.onclick = function () { G.sfx('click'); G.closeMenu(); G.confirmNew(); }; }
     $('mnClose').onclick = function () { G.closeMenu(); };
   };
   G.closeMenu = function () {
@@ -424,8 +424,8 @@
     if (!UI.modal) PXSpause(false);
   };
 
-  function buildSoundControls(root, withStart) {
-    const has = !!window.PXS;
+  function buildSoundControls(root, withStart, side) {
+    const has = !!window.PXS; side = side || root;
     const mk = function (label, isMusic) {
       const row = el('div', 'tog', '', root);
       const b = el('button', 'btn sm', '', row);
@@ -453,12 +453,12 @@
     if (has && !touchy()) el('div', 'desc', 'Press M to mute everything.', root).style.marginTop = '10px';
     if (G.ai.models.length > 1 && G.ai.provider === 'server') {
       const t = G.ai.totals(), cnt = G.ai.count, used = G.ai.used, caps = G.ai.caps;
-      const one = function (k, label) { const c = cnt[k] || { asked: 0, fresh: 0 }; return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span>' + label + '</span><span>' + (c.usd ? G.ai.money(c.usd) + ' · ' : '') + '<b>' + c.fresh + '</b> new' + (c.asked > c.fresh ? ' · ' + (c.asked - c.fresh) + ' reused' : '') + '</span></div>'; };
-      el('h3', '', 'AI USED THIS SESSION', root).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:14px 0 4px;color:var(--gold)';
+      const one = function (k, label) { const c = cnt[k] || { asked: 0, fresh: 0 }; return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:12px;line-height:1.3;padding:3px 0"><span style="min-width:0">' + label + '</span><span style="white-space:nowrap;flex:none;text-align:right">' + (c.usd ? G.ai.money(c.usd) + ' · ' : '') + '<b>' + c.fresh + '</b> new' + (c.asked > c.fresh ? ' · ' + (c.asked - c.fresh) + ' reused' : '') + '</span></div>'; };
+      el('h3', '', 'AI USED THIS SESSION', side).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:' + (side === root ? '14px' : '2px') + ' 0 4px;color:var(--gold)';
       el('div', '', one('thing', 'Words you added') + one('event', 'Events you typed') + one('organ', 'New organs (at most ' + caps.organ + ', one per 40 s)') + one('story', 'Story chapters (at most ' + caps.story + ', one per 45 s)') + one('ideas', 'Mutation ideas (at most ' + caps['mutation-ideas'] + ', one per 2 min)') + (G.ai.sound ? one('sound', 'Sounds (one per new word, at most ' + caps.sound + ')') : '') +
         one('judge', 'The eye for beauty: grading creatures (at most ' + caps.judge + ')') + one('check', 'The eye for beauty: looking over new ideas (at most ' + caps.check + ')') + one('plan', 'New shapes of body (at most ' + caps.plan + ')') + one('design', 'New kinds of body part (at most ' + caps.design + ')') +
-        '<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0 0;margin-top:4px;border-top:1px solid rgba(207,232,255,.15)"><span>Total</span><span><b style="color:var(--gold)">' + G.ai.money(t.usd) + '</b> · <b>' + t.fresh + '</b> new answers · ' + (t.asked - t.fresh) + ' reused for free' + (t.unpriced ? ' · ' + t.unpriced + ' with no price set' : '') + '</span></div>', root);
-      el('div', 'desc', 'Breeding and selection never ask the AI: they run every generation on their own, using the learned guess the star keeps of what the watcher likes. The watcher looks by the clock (so at fast-forward more generations pass between looks); plans and marvels come by the generation (so a faster star asks for those sooner). Each kind has a budget you can set in the costs sheet.', root).style.marginTop = '6px';
+        '<div style="display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:4px 0 0;margin-top:4px;border-top:1px solid rgba(207,232,255,.15)"><span>Total</span><span style="text-align:right"><b style="color:var(--gold)">' + G.ai.money(t.usd) + '</b> · <b>' + t.fresh + '</b> new answers · ' + (t.asked - t.fresh) + ' reused for free' + (t.unpriced ? ' · ' + t.unpriced + ' with no price set' : '') + '</span></div>', side);
+      el('div', 'desc', 'Breeding and selection never ask the AI: they run every generation on their own, using the learned guess the star keeps of what the watcher likes. The watcher looks by the clock (so at fast-forward more generations pass between looks); plans and marvels come by the generation (so a faster star asks for those sooner). Each kind has a budget you can set in the costs sheet.', side).style.marginTop = '6px';
       el('h3', '', 'WHO IMAGINES', root).style.cssText = 'font-size:12px;letter-spacing:.2em;margin:14px 0 4px;color:var(--gold)';
       el('div', 'desc', 'The AI that decides what your words become, and suggests mutations. Each one imagines differently.', root);
       const row = el('div', 'chips', '', root);
@@ -483,7 +483,7 @@
       ['T', 'ADD', 'Add a thing'], ['', 'WORLD', 'Weather and disasters'], ['1 2 3 4', 'SPEED', 'Fast-forward'], ['Space', 'PAUSE', 'Pause time'],
       ['F', 'BOOK', 'Book of Life'], ['G', 'TREE', 'Family tree'], ['Click', 'TAP', 'Inspect a creature'], ['N', 'NEW', 'A new star'],
     ];
-    t.innerHTML = '<h1>PRIMORDIA</h1><div class="tag">Be nature. Watch life invent itself.</div>' +
+    t.innerHTML = '<h1>PRIMORDIA</h1><div class="tag">Command a living star. Breed it, build it, hold it against the others.</div>' +
       '<div class="actions"><button class="btn big pulse" id="tBegin">BEGIN</button><button class="btn big hide" id="tCont">CONTINUE</button></div>' +
       '<div class="nature">you are nature · nothing here is scripted</div>' +
       '<div class="glass keys">' + keys.map(function (k) { return '<div>' + (tc ? '<span class="kc">' + k[1] + '</span>' : '<span class="kc">' + (k[0] || k[1]) + '</span>') + '<span>' + k[2] + '</span></div>'; }).join('') + '</div>' +

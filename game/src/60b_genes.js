@@ -63,12 +63,14 @@
   // (what it eats, where it lives, what it has learned, where it came from: each a word or two, with the full sentence when you rest on it)
   function tagList(c) {
     const L = G.lifeOf ? G.lifeOf(c) : { diet: -1 }, ph = c.ph || {}, T = [], add = function (t, tip, cls) { T.push([t, tip, cls || '']); };
+    if (G.unitTags) G.unitTags(c, add);      // whose side it is on, and its trade (68c_cards.js)
     if (ph.photo > 0.3) add('feeds on light', 'It lives partly on light.');
     if ((ph.aggro || 0) > 0.38) add('a hunter', 'It attacks and eats other creatures.', 'r');
     if (L.diet >= 0) add('eats ' + FOOD[L.diet], 'It has lived mostly on ' + FOOD[L.diet] + ' food.');
     if (ph.love > 0.3) add('\u2665 ' + FOOD[ph.fav], 'Its body is made for ' + FOOD[ph.fav] + ' food: it gets more from it.', 'g');
     if (ph.love > 0.3 && ph.bane >= 0) add('\u2715 ' + FOOD[ph.bane] + (c.ill ? ' \u00d7' + c.ill : ''), FOOD[ph.bane] + ' food makes it ill' + (c.ill ? ' (it has found that out ' + c.ill + (c.ill === 1 ? ' time)' : ' times)') : '') + '.', 'r');
-    if (L.land > 0.3) add('on the shore', 'It spends its days on the land.'); else if (L.shore > 0.3) add('by the shore', 'It keeps to the water by the shore.'); else if (L.deep > 0.5) add('the dark deep', 'It lives in the dark deep.'); else if ((c.liveT || 0) > 3) add('open water', 'It lives in open water.');
+    if (G.FLAT) { if (ph.home) add('breathes air', 'It breathes air and walks: one of the two ways of living on a star.'); }
+    else if (L.land > 0.3) add('on the shore', 'It spends its days on the land.'); else if (L.shore > 0.3) add('by the shore', 'It keeps to the water by the shore.'); else if (L.deep > 0.5) add('the dark deep', 'It lives in the dark deep.'); else if ((c.liveT || 0) > 3) add('open water', 'It lives in open water.');
     if (c.lessons > 3 && c.learned > 0.05) add('learned \u00d7' + c.lessons, 'It has learned from ' + c.lessons + ' meals and mishaps in its own life.', 'v');
     if (c.bornKnowing > 0.05) add('born knowing', 'It was born knowing some of what its parents had learned.', 'v');
     if (c.taught > 2) add('taught by elders', 'It has been learning from its elders.', 'v');

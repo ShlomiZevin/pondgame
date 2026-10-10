@@ -423,7 +423,7 @@
     const b = bannerQ.shift();
     if (!b) { bannerTimer = 0; return; }
     refs.banner.innerHTML = '<small>' + escapeHtml(b[0]) + '</small>' + escapeHtml(b[1]);
-    { let y = 78; ['wish', 'wxnow', 'voybar', 'voypick', 'resbar'].forEach(function (id) { const e = document.getElementById(id); if (e && !e.classList.contains('hide') && e.offsetHeight && window.innerWidth > 720) y = Math.max(y, e.getBoundingClientRect().bottom + 10 - 14); });
+    { let y = 78; ['wish', 'wxnow', 'voybar', 'voypick', 'resbar', 'battle'].forEach(function (id) { const e = document.getElementById(id); if (e && !e.classList.contains('hide') && e.offsetHeight && window.innerWidth > 720) y = Math.max(y, e.getBoundingClientRect().bottom + 10 - 14); });
       refs.banner.style.setProperty('transform', 'translate(-50%,' + Math.round(y) + 'px)', 'important'); }      /* just below the wish and the weather, never on them */
     refs.banner.classList.add('show');
     G.sfx('discovery');
@@ -544,7 +544,7 @@
       $('era').innerHTML = '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b style="font-size:12px;letter-spacing:.12em;color:var(--gold)">' + ageNow.name.toUpperCase() + '</b><span style="font-size:10px;color:rgba(207,232,255,.6);white-space:nowrap">since gen ' + ageNow.gen + '</span></div>' +
         '<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;margin:6px 0 4px;background:rgba(7,18,31,.5)">' + kinds.map(function (k, i) { return '<i title="' + k[0] + ': ' + Math.round(k[1] * 100) + '%" style="width:' + (k[1] * 100).toFixed(1) + '%;background:' + COL[i] + ';opacity:.85"></i>'; }).join('') + '</div>' +
         '<div style="font-size:10.5px;line-height:1.35;color:rgba(207,232,255,.85)">' + kinds.slice(0, 4).map(function (k, i) { return '<span style="white-space:nowrap"><i style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + COL[i] + ';margin-right:3px"></i>' + k[0] + ' ' + Math.round(k[1] * 100) + '%</span>'; }).join(' &nbsp;') + '</div>' +
-        '<div style="font-size:10.5px;color:rgba(207,232,255,.7);line-height:1.3;margin-top:4px">This water: <b style="color:#fff">' + G.envText(W) + '</b>.</div>' +
+        '<div style="font-size:10.5px;color:rgba(207,232,255,.7);line-height:1.3;margin-top:4px">This star: <b style="color:#fff">' + G.envText(W) + '</b>.</div>' +
         '<div style="font-size:10.5px;color:rgba(207,232,255,.7);line-height:1.3;margin-top:4px">Admired on this star: <b style="color:#fff">' + G.form.fashionText(W.fashion) + '</b>.</div>' +
         (past ? '<div style="font-size:10px;color:rgba(207,232,255,.5);line-height:1.3;margin-top:3px">Before: ' + past + '</div>' : '');
     }
