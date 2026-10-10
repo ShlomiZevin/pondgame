@@ -187,7 +187,7 @@
     ctx.restore();
   };
 
-  G.on('deed', function (d) { if (G.mode !== 'play') return; if (G.sfx) G.sfx('discovery'); if (G.banner) G.banner('The ' + d.kind + ' have decided', d.title + '. ' + (d.what ? 'They will ' + d.what + '. Why: ' + d.why + '.' : d.say), 12000); if (G.log) G.log('disc', 'They decided: ' + d.title, 'The ' + d.kind + '. ' + d.say); });
+  G.on('deed', function (d) { if (G.mode !== 'play') return; if (d.result && d.result.ordered) { if (G.log) G.log('disc', 'Building: ' + d.title, 'Your builders are raising it, as you ordered.'); return; }      /* (what you ordered is told by the colony panel) */ if (G.sfx) G.sfx('discovery'); if (G.banner) G.banner('The ' + d.kind + ' have decided', d.title + '. ' + (d.what ? 'They will ' + d.what + '. Why: ' + d.why + '.' : d.say), 12000); if (G.log) G.log('disc', 'They decided: ' + d.title, 'The ' + d.kind + '. ' + d.say); });
   G.on('deed-step', function (d) { if (G.mode !== 'play') return; const st = d.steps[d.i]; if (G.log) G.log('sel', d.title, 'Now they are ' + (WORDS[st.do] || st.do) + (st.cry ? ', crying "' + st.cry + '"' : '') + '.'); });
   G.on('deed-end', function (d, how, made) {
     const W = G.W; if (G.mode !== 'play' || !W) return;

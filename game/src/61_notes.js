@@ -7,7 +7,7 @@
 (function () {
   'use strict';
   if (typeof document === 'undefined' || !G.banner) return;
-  const BIG = /marvel|decided|did it|came to nothing|wish came true|new age|it happened|stranger|arrived|is home/i;
+  const BIG = /marvel|decided|did it|came to nothing|wish came true|new age|it happened|stranger|arrived|is home|raid|heart|enemy/i;
   const short = function (s, n) { s = String(s || ''); if (s.length <= n) return s; const cut = s.slice(0, n), dot = cut.lastIndexOf('. '); return dot > n * 0.5 ? cut.slice(0, dot + 1) : cut.replace(/\s+\S*$/, '') + '…'; };
   const esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   // notes: one line at a time, bottom right

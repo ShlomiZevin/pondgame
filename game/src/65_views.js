@@ -527,6 +527,7 @@
       else if (UI.modal && UI.modal !== 'still') closeModal();
       else if (UI.placing || UI.meteor) G.cancelPlacing();
       else if (UI.popName) G.closePop();
+      else if (G.cmd && G.cmd.escape && G.cmd.escape()) { /* (a place being chosen, or those you chose, let go) */ }
       else if (G.R.sel) G.select(null);
       else G.openMenu();
       return;

@@ -175,25 +175,31 @@
       } else if (drag && inp.ptr.down) {
         const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
         if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 7) drag.moved = true;
-        if (drag.moved && !G.ui.placing && !G.ui.meteor) { G.cam.x -= dx / G.view.scale; G.cam.y -= dy / G.view.scale; G.applyCam(); }
+        if (drag.moved && !G.ui.placing && !G.ui.meteor) {
+          // the left button drags a box round creatures to choose them (where there is a colony to command); the right or the middle one moves the view
+          if (!drag.touch && drag.btn === 0 && (drag.box || (G.cmd && G.cmd.boxOk && G.cmd.boxOk()))) { drag.box = true; G.ui.box = { x0: drag.x0, y0: drag.y0, x1: e.clientX, y1: e.clientY }; }
+          else { G.cam.x -= dx / G.view.scale; G.cam.y -= dy / G.view.scale; G.applyCam(); } }
         drag.x = e.clientX; drag.y = e.clientY;
       }
       toWorld(e); inp.ptr.inside = true;
     });
     cv.addEventListener('wheel', function (e) { e.preventDefault(); if (G.mode === 'play') G.zoomAt(Math.exp(-e.deltaY * 0.0016), e.clientX, e.clientY); }, { passive: false });
     cv.addEventListener('pointerleave', function () { inp.ptr.inside = false; });
+    cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     cv.addEventListener('pointerdown', function (e) {
       toWorld(e); inp.ptr.down = true; inp.ptr.inside = true;
       if (e.pointerType === 'touch') G.touch = true;
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY }); pinch = 0;
-      drag = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: touches.size > 1, touch: e.pointerType === 'touch' };
+      drag = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: touches.size > 1, touch: e.pointerType === 'touch', btn: e.button | 0 };
     });
     cv.addEventListener('pointerup', function (e) {
       toWorld(e);
       // a press that did not move is a click on the pond
-      if (drag && !drag.moved && touches.size <= 1) {
-        inp.clicks.push({ x: inp.ptr.wx, y: inp.ptr.wy, sx: e.clientX, sy: e.clientY, touch: drag.touch });
-        G.emit('pond-click', inp.clicks[inp.clicks.length - 1]);
+      if (drag && drag.box) { const b = G.ui.box, v = G.view; G.ui.box = null; if (b) G.emit('box-select', { x0: (Math.min(b.x0, b.x1) - v.ox) / v.scale, y0: (Math.min(b.y0, b.y1) - v.oy) / v.scale, x1: (Math.max(b.x0, b.x1) - v.ox) / v.scale, y1: (Math.max(b.y0, b.y1) - v.oy) / v.scale }, e.shiftKey); }
+      else if (drag && !drag.moved && touches.size <= 1) {
+        const c = { x: inp.ptr.wx, y: inp.ptr.wy, sx: e.clientX, sy: e.clientY, touch: drag.touch, shift: e.shiftKey };
+        if (drag.btn === 2) G.emit('pond-order', c);      // a right click is an order to those you have chosen
+        else { inp.clicks.push(c); G.emit('pond-click', c); }
       }
     });
     const lift = function (e) { inp.ptr.down = false; touches.delete(e.pointerId); pinch = 0; if (!touches.size) drag = null; };

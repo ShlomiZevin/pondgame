@@ -415,25 +415,31 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       } else if (drag && inp.ptr.down) {
         const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
         if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 7) drag.moved = true;
-        if (drag.moved && !G.ui.placing && !G.ui.meteor) { G.cam.x -= dx / G.view.scale; G.cam.y -= dy / G.view.scale; G.applyCam(); }
+        if (drag.moved && !G.ui.placing && !G.ui.meteor) {
+          // the left button drags a box round creatures to choose them (where there is a colony to command); the right or the middle one moves the view
+          if (!drag.touch && drag.btn === 0 && (drag.box || (G.cmd && G.cmd.boxOk && G.cmd.boxOk()))) { drag.box = true; G.ui.box = { x0: drag.x0, y0: drag.y0, x1: e.clientX, y1: e.clientY }; }
+          else { G.cam.x -= dx / G.view.scale; G.cam.y -= dy / G.view.scale; G.applyCam(); } }
         drag.x = e.clientX; drag.y = e.clientY;
       }
       toWorld(e); inp.ptr.inside = true;
     });
     cv.addEventListener('wheel', function (e) { e.preventDefault(); if (G.mode === 'play') G.zoomAt(Math.exp(-e.deltaY * 0.0016), e.clientX, e.clientY); }, { passive: false });
     cv.addEventListener('pointerleave', function () { inp.ptr.inside = false; });
+    cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     cv.addEventListener('pointerdown', function (e) {
       toWorld(e); inp.ptr.down = true; inp.ptr.inside = true;
       if (e.pointerType === 'touch') G.touch = true;
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY }); pinch = 0;
-      drag = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: touches.size > 1, touch: e.pointerType === 'touch' };
+      drag = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: touches.size > 1, touch: e.pointerType === 'touch', btn: e.button | 0 };
     });
     cv.addEventListener('pointerup', function (e) {
       toWorld(e);
       // a press that did not move is a click on the pond
-      if (drag && !drag.moved && touches.size <= 1) {
-        inp.clicks.push({ x: inp.ptr.wx, y: inp.ptr.wy, sx: e.clientX, sy: e.clientY, touch: drag.touch });
-        G.emit('pond-click', inp.clicks[inp.clicks.length - 1]);
+      if (drag && drag.box) { const b = G.ui.box, v = G.view; G.ui.box = null; if (b) G.emit('box-select', { x0: (Math.min(b.x0, b.x1) - v.ox) / v.scale, y0: (Math.min(b.y0, b.y1) - v.oy) / v.scale, x1: (Math.max(b.x0, b.x1) - v.ox) / v.scale, y1: (Math.max(b.y0, b.y1) - v.oy) / v.scale }, e.shiftKey); }
+      else if (drag && !drag.moved && touches.size <= 1) {
+        const c = { x: inp.ptr.wx, y: inp.ptr.wy, sx: e.clientX, sy: e.clientY, touch: drag.touch, shift: e.shiftKey };
+        if (drag.btn === 2) G.emit('pond-order', c);      // a right click is an order to those you have chosen
+        else { inp.clicks.push(c); G.emit('pond-click', c); }
       }
     });
     const lift = function (e) { inp.ptr.down = false; touches.delete(e.pointerId); pinch = 0; if (!touches.size) drag = null; };
@@ -3582,7 +3588,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       { const side = G.sideEdge(W) + ph.r; if (c.x < side) { c.x = side; c.vx = Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; }
         else if (c.x > ww - side) { c.x = ww - side; c.vx = -Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; } }
       // a creature of the water stops at the shore; a creature of the land only paddles in the shallows; one at home in both goes where it likes
-      const crew = c.goTo || c.inShip || (c.deedId && W.deed && W.deed.id === c.deedId && (W.deed.voyage || (W.deed.result && (W.deed.result.port || W.deed.result.ship))));      // (those building a spaceport or its ship, and the crew of a mission, walk to the port wherever it is: up the beach, or down to the water's edge)
+      const crew = c.goTo || c.inShip || (c.deedId && W.deed && W.deed.id === c.deedId && (W.deed.voyage || W.deed.ordered || (W.deed.result && (W.deed.result.port || W.deed.result.ship))));      // (those building a spaceport or its ship, and the crew of a mission, walk to the port wherever it is: up the beach, or down to the water's edge)
       const top = (crew ? 0 : landTop) + ph.r, bot = crew ? wh - ph.r : botLim;
       if (c.y < top) { c.y = top; c.vy = Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
       else if (c.y > bot) { c.y = bot; c.vy = -Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
@@ -3837,6 +3843,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       const byP = Math.floor(p.P / (cost * p.ph.pneed));
       if (byP < n) { W.stats.protShort += n - byP; n = byP > 0 ? byP : (G.rand() < 0.25 ? 1 : 0); }
       if (G.marvelBlessed && G.marvelBlessed(p) && n < 1 && p.E > cost * 0.6) n = 1;      // a new marvel is treasured: its carriers have a child if they at all can
+      if (p.team) n = 0;      // (raiders have come to break, not to settle)
+      if (p.jobF > 1.12 && n < 3) n++; else if (p.jobF < 0.9 && n > 1) n--;      // the colony sees its best workers fed: they have a child more, and its worst a child less
       if (n > 0) plan.push({ p: p, n: n });
     }
     {
@@ -4097,7 +4105,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
         cre[i].crowd = sw / (n - 1);
         if (sw > 0.5) cre[i].rk = 0.4 * cre[i].rk + 0.6 * win / sw; }
     }
-    for (let i = 0; i < cre.length; i++) cre[i].sel = clamp((cre[i].fed === undefined ? 0.5 : cre[i].fed) / 0.5, 0, 1) * (0.25 + 0.75 * cre[i].rk) * (cre[i].crowd === undefined ? 1 : Math.max(0.4, 1.2 - 1.6 * cre[i].crowd)) * (1.5 / (0.6 + 2 * shapes[cre[i].shp] / cre.length)) * (1.1 - 0.4 * hues[cre[i].hb] / cre.length) * (1 + (W.grow || 0) * 0.15 * clamp((cre[i].ph.r - meanR) / meanR, -0.5, 1)) * (function (c) { const lf = (c.liveT || 0) > 2 ? (c.landT || 0) / c.liveT : 0, sh = W.shore || 0.16, lu = W.landUse || 0; return 1 + 1.6 * lf * clamp(1 - lu / sh, 0, 1) + 1.6 * (1 - lf) * clamp(1 - (1 - lu) / (1 - sh), 0, 1); })(cre[i]);
+    for (let i = 0; i < cre.length; i++) cre[i].sel = (cre[i].jobF || 1) * clamp((cre[i].fed === undefined ? 0.5 : cre[i].fed) / 0.5, 0, 1) * (0.25 + 0.75 * cre[i].rk) * (cre[i].crowd === undefined ? 1 : Math.max(0.4, 1.2 - 1.6 * cre[i].crowd)) * (1.5 / (0.6 + 2 * shapes[cre[i].shp] / cre.length)) * (1.1 - 0.4 * hues[cre[i].hb] / cre.length) * (1 + (W.grow || 0) * 0.15 * clamp((cre[i].ph.r - meanR) / meanR, -0.5, 1)) * (function (c) { const lf = (c.liveT || 0) > 2 ? (c.landT || 0) / c.liveT : 0, sh = W.shore || 0.16, lu = W.landUse || 0; return 1 + 1.6 * lf * clamp(1 - lu / sh, 0, 1) + 1.6 * (1 - lf) * clamp(1 - (1 - lu) / (1 - sh), 0, 1); })(cre[i]);
     if (cre.length > 8) {
       // fitness sharing: a creature in a crowd of look-alikes counts for less, however it is measured, so no single look can take the whole pond
       for (let i = 0; i < cre.length; i++) if (!cre[i].fv) cre[i].fv = G.features(cre[i].g);
@@ -8708,7 +8716,7 @@ G.addSystem({
     ctx.restore();
   };
 
-  G.on('deed', function (d) { if (G.mode !== 'play') return; if (G.sfx) G.sfx('discovery'); if (G.banner) G.banner('The ' + d.kind + ' have decided', d.title + '. ' + (d.what ? 'They will ' + d.what + '. Why: ' + d.why + '.' : d.say), 12000); if (G.log) G.log('disc', 'They decided: ' + d.title, 'The ' + d.kind + '. ' + d.say); });
+  G.on('deed', function (d) { if (G.mode !== 'play') return; if (d.result && d.result.ordered) { if (G.log) G.log('disc', 'Building: ' + d.title, 'Your builders are raising it, as you ordered.'); return; }      /* (what you ordered is told by the colony panel) */ if (G.sfx) G.sfx('discovery'); if (G.banner) G.banner('The ' + d.kind + ' have decided', d.title + '. ' + (d.what ? 'They will ' + d.what + '. Why: ' + d.why + '.' : d.say), 12000); if (G.log) G.log('disc', 'They decided: ' + d.title, 'The ' + d.kind + '. ' + d.say); });
   G.on('deed-step', function (d) { if (G.mode !== 'play') return; const st = d.steps[d.i]; if (G.log) G.log('sel', d.title, 'Now they are ' + (WORDS[st.do] || st.do) + (st.cry ? ', crying "' + st.cry + '"' : '') + '.'); });
   G.on('deed-end', function (d, how, made) {
     const W = G.W; if (G.mode !== 'play' || !W) return;
@@ -8898,7 +8906,7 @@ G.addSystem({
 (function () {
   'use strict';
   const clamp = G.clamp, TAU = 6.2832, INK = '#14202e';
-  const MAT = [{ id: 'stone', cap: 44, col: [205, 12, 62] }, { id: 'reed', cap: 40, col: [78, 38, 58] }, { id: 'shell', cap: 26, col: [32, 55, 84] }];
+  const MAT = [{ id: 'stone', cap: 44, col: [205, 12, 62] }, { id: 'reed', cap: 40, col: [78, 38, 58] }, { id: 'shell', cap: 26, col: [32, 55, 84] }, { id: 'lumen', cap: 0, col: [178, 90, 66] }];
   G.MATS = MAT;
   const hsl = function (h, s, l, a) { return 'hsla(' + ((h % 360) + 360) % 360 + ',' + s + '%,' + l + '%,' + (a === undefined ? 1 : a) + ')'; };
 
@@ -8954,6 +8962,13 @@ G.addSystem({
       for (let i = 0; i < N; i++) { const h = S * 0.24; add('rect', 0, y, w, h, 0, [0, 24, 48 + 3 * i]); if (i % 2) win(0, y - h * 0.5, w * 0.3); y -= h; w *= 0.88; }
       roof(0, y, w * 1.3, w * 0.7); add('lamp', 0, y - (sp ? w * 1.2 : w * 0.75), S * 0.16, S * 0.16, 2, [50, 95, 72]);
       for (let i = 0; i < 4; i++) add('rect', (i - 1.5) * S * 0.42, S * 0.1, S * 0.14, S * 0.12, 0, [0, 18, 44]);
+    } else if (o.type === 'heart') {      // the Heart of the colony: a round keep with a great glowing eye, a crown, and their flag
+      const bw = S * 1.5, bh = S * 0.62; add('rect', 0, 0, bw * 1.12, S * 0.14, 0, [0, 14, 40]);
+      P.push({ s: 'vase', x: 0, y: -S * 0.14, w: bw, h: bh, m: 0, c: [0, 40, 54], st: 0 }); add('door', 0, -S * 0.14, bw * 0.2, bh * 0.52, 1, [0, 30, 16]);
+      add('window', -bw * 0.3, -S * 0.14 - bh * 0.34, bw * 0.15, bw * 0.2, 2, [14, 34, 82]); add('window', bw * 0.3, -S * 0.14 - bh * 0.34, bw * 0.15, bw * 0.2, 2, [14, 34, 82]);
+      add('onion', 0, -S * 0.14 - bh, bw * 0.78, S * 0.7, 2, [20, 62, 58]); add('circ', 0, -S * 0.14 - bh - S * 0.16, S * 0.26, S * 0.26, 2, [50, 95, 74]);
+      add('drop', -bw * 0.5, -S * 0.14 - bh * 0.92, S * 0.16, S * 0.22, 2, [14, 34, 82]); add('drop', bw * 0.5, -S * 0.14 - bh * 0.92, S * 0.16, S * 0.22, 2, [14, 34, 82]);
+      add('flag', 0, -S * 0.14 - bh - S * 0.7, S * 0.24, S * 0.34, 1, [0, 85, 60]);
     } else if (o.type === 'port') {      // a spaceport: a wide flat pad on the shore (its middle clear, for a ship to stand on), marked at its edges, with a gantry tower at one side and lights
       const Wd = S * 2.3, ph = S * 0.16, tx = -Wd * 0.4, th = S * (1.25 + 0.5 * rich), n = 3 + Math.round(2 * rich);
       P.push({ s: 'rect', x: 0, y: 0, w: Wd, h: ph, m: 0, c: [0, 12, 40], st: 0, rr: 0.1 });
@@ -9043,7 +9058,7 @@ G.addSystem({
     let spiky = 0; if (f) { (f.rules || []).forEach(function (q) { if (q.k === 2 || q.k === 7) spiky = 1; }); if (f.crest > 0.25) spiky = 1; }
     let h = 0, n = 0; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].sp === d.sp) { h += W.cre[i].g.h; n++; }
     const craft = G.craftOf(d.sp);      // how many buildings their kind (and the kinds it came from) has raised: practice shows
-    const o = { wet: !(r.port || r.ship) && d.y > (G.shoreY ? G.shoreY(W) : 0), seed: (G.hash ? G.hash(String(d.title) + d.id) : d.id * 7919) >>> 0, type: r.port ? 'port' : r.ship ? 'ship' : r.house ? 'house' : r.solid ? 'wall' : r.feed > 0.05 ? 'huts' : r.pull > 0.15 ? 'spire' : 'hall', S: r.port ? clamp((r.size || 0.085) * m, 84, 124) : r.ship ? clamp((r.size || 0.06) * m, 52, 84) : r.house ? clamp((r.size || 0.04) * m, 36, 58) : clamp((r.size || 0.08) * m, 55, 118), hue: d.hue || 50, spiky: spiky, brain: clamp((n ? h / n : 0) / 7 + 0.09 * craft, 0, 1), craft: craft };
+    const o = { wet: !(r.port || r.ship) && d.y > (G.shoreY ? G.shoreY(W) : 0), seed: (G.hash ? G.hash(String(d.title) + d.id) : d.id * 7919) >>> 0, type: r.type && r.type !== 'port' && r.type !== 'ship' ? r.type : r.port ? 'port' : r.ship ? 'ship' : r.house ? 'house' : r.solid ? 'wall' : r.feed > 0.05 ? 'huts' : r.pull > 0.15 ? 'spire' : 'hall', S: r.port ? clamp((r.size || 0.085) * m, 84, 124) : r.ship ? clamp((r.size || 0.06) * m, 52, 84) : r.house ? clamp((r.size || 0.04) * m, 36, 58) : clamp((r.size || 0.08) * m, 55, 118), hue: d.hue || 50, spiky: spiky, brain: clamp((n ? h / n : 0) / 7 + 0.09 * craft, 0, 1), craft: craft };
     o.P = plan(o); fit(o, W); settle(o, true); return o;      // (the fallback shape: used when the kind's own design cannot be had)
   }
   G.blueprintPack = function (bp) { return bp.designed ? { about: bp.about || '', P: bp.P.map(function (p) { return [p.s, Math.round(p.x), Math.round(p.y), Math.round(p.w), Math.round(p.h), p.m, p.c[0], p.c[1], p.c[2], p.rr || 0]; }) } : null; };
@@ -9074,7 +9089,7 @@ G.addSystem({
     //   · when every piece is set, all hands colour it.
     // There are never more setters than there is material and room for (about a third of the band); the rest haul. No more is fetched than is still needed.
     const busyP = {}, busyM = new Set(), transit = [0, 0, 0]; let setters = 0, held = 0;
-    M.forEach(function (c) { const j = c.bj && c.bj.d === d.id ? c.bj : null; if (!j) return; if (j.ph === 'fetch') { if (W.mats.indexOf(j.mat) < 0) { c.bj = null; return; } busyM.add(j.mat); transit[j.mat.k]++; } else if (j.ph === 'carry') transit[j.k]++; else if (j.ph === 'take' || j.ph === 'bring') { if (P[j.p].st > 0) { if (j.ph === 'bring') d.pile[j.k]++; c.bj = null; return; } busyP[j.p] = 1; setters++; if (j.ph === 'take') held++; } else if (j.ph === 'paint') { if (P[j.p].st > 1) { c.bj = null; return; } busyP[j.p] = 1; } });
+    M.forEach(function (c) { const j = c.bj && c.bj.d === d.id ? c.bj : null; if (!j) return; if (j.ph === 'fetch') { if (!j.mat.store && W.mats.indexOf(j.mat) < 0) { c.bj = null; return; } busyM.add(j.mat); transit[j.mat.k]++; } else if (j.ph === 'carry') transit[j.k]++; else if (j.ph === 'take' || j.ph === 'bring') { if (P[j.p].st > 0) { if (j.ph === 'bring') d.pile[j.k]++; c.bj = null; return; } busyP[j.p] = 1; setters++; if (j.ph === 'take') held++; } else if (j.ph === 'paint') { if (P[j.p].st > 1) { c.bj = null; return; } busyP[j.p] = 1; } });
     const unset = [0, 0, 0]; let nUnset = 0; for (let i = 0; i < P.length; i++) if (P[i].st === 0) { unset[P[i].m]++; nUnset++; }
     let inPile = d.pile[0] + d.pile[1] + d.pile[2] - held; const maxSet = Math.max(2, Math.ceil(M.length / 3));
     d.sizeT = (d.sizeT || 0) - dt; if (d.sizeT <= 0) { d.sizeT = 1.5; let toPaint = 0; for (let i = 0; i < P.length; i++) if (P[i].st < 2) toPaint++; const want = clamp(Math.ceil((nUnset * 1.6 + toPaint * 0.5) / 2) + 1, 2, P.length <= 4 ? 2 : 14);      /* (a little house of three or four pieces goes up one piece on another: two hands are all it can use) */ for (let k = M.length - 1; k >= 0 && M.length > Math.max(P.length < 9 ? 2 : 5, want); k--) { const c = M[k]; if (c.bj || !(c.idleT > (P.length < 9 ? 2.5 : 7))) continue; c.deedId = 0; c.idleT = 0; c.haul = -1; M.splice(k, 1); d.sent = (d.sent || 0) + 1; } d.n0 = Math.max(2, Math.min(d.n0, Math.max(want, M.length))); }      /* no more hands than the work needs: the others go back to feeding */
@@ -9086,7 +9101,10 @@ G.addSystem({
           if (inPile > 0 && setters < maxSet) { let pi = -1, alt = -1; for (let i = 0; i < P.length; i++) { if (P[i].st !== 0 || busyP[i] || !ready(i)) continue; if (d.pile[P[i].m] > 0) { pi = i; break; } if (alt < 0) alt = i; } if (pi < 0) pi = alt; if (pi >= 0) { j = { d: d.id, ph: 'take', p: pi }; busyP[pi] = 1; setters++; inPile--; } }
           if (!j && nUnset - (d.pile[0] + d.pile[1] + d.pile[2]) - (transit[0] + transit[1] + transit[2]) > 0) {
             let best = null, bd = 1e12, any = null, ad = 1e12; for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (busyM.has(q) || (!c.ph.lungs && q.y < sy + 6)) continue; const dd = (q.x - c.x) * (q.x - c.x) + (q.y - c.y) * (q.y - c.y) + (q.x - pileAt[0]) * (q.x - pileAt[0]) + (q.y - pileAt[1]) * (q.y - pileAt[1]); if (dd < ad) { ad = dd; any = q; } if (unset[q.k] - d.pile[q.k] - transit[q.k] > 0 && dd < bd) { bd = dd; best = q; } }      /* the shortest whole trip: there and back to the pile */
-            const mat = best || any; if (mat) { j = { d: d.id, ph: 'fetch', mat: mat }; busyM.add(mat); transit[mat.k]++; } else d.wait = MAT[unset[0] ? 0 : unset[1] ? 1 : 2].id;
+            let mat = best || any;
+            { const st = G.storeAt ? G.storeAt(W) : null, col = W.col; if (st && col) { let k0 = -1; for (let q = 0; q < 3; q++) if (unset[q] - d.pile[q] - transit[q] > 0 && col.stock[q] > 0) { k0 = q; break; } if (k0 < 0 && !mat) for (let q = 0; q < 3; q++) if (col.stock[q] > 0) { k0 = q; break; }
+                if (k0 >= 0) { const dd = (st.x - c.x) * (st.x - c.x) + (st.y - c.y) * (st.y - c.y) + (st.x - pileAt[0]) * (st.x - pileAt[0]) + (st.y - pileAt[1]) * (st.y - pileAt[1]); if (!best || dd < bd) { col.stock[k0]--; mat = { x: st.x, y: st.y, k: k0, s: 0.5, store: 1 }; } } } }      /* (from the colony's store, when that is the shorter trip or nothing lies about) */
+            if (mat) { j = { d: d.id, ph: 'fetch', mat: mat }; busyM.add(mat); transit[mat.k]++; } else d.wait = MAT[unset[0] ? 0 : unset[1] ? 1 : 2].id;
           }
         } else { let pi = -1; for (let i = 0; i < P.length; i++) if (P[i].st === 1 && !busyP[i]) { pi = i; break; } if (pi >= 0) { j = { d: d.id, ph: 'paint', p: pi, t: 0 }; busyP[pi] = 1; } }
         c.bj = j;
@@ -9146,13 +9164,13 @@ G.addSystem({
     { let port = null, ship = null; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.bp || w.fall) continue; if (w.bp.type === 'port') port = w; else if (w.bp.type === 'ship' && !w.visitor) ship = w; } if (port && ship && !ship.lifting) { const dk = G.dockOf(port); ship.x = dk.x; ship.y = dk.y - ship.bp.S * 0.45; } }
     // The land widens with the generations. What was built under water must stay under it: when the waterline comes down on the highest of them, the whole
     // underwater town settles deeper together (so its rows and the room between its buildings stay as they were), never left half in the air.
-    W.sinkT = (W.sinkT || 0) - dt; if (W.sinkT <= 0) { W.sinkT = 3; const sy = G.shoreY ? G.shoreY(W) : 0, wetOf = function (w) { return w.bp && w.bp.type !== 'port' && w.bp.type !== 'ship' && w.bp.wet !== false && !w.visitor; }; let need = 0, low = 0;
+    W.sinkT = (W.sinkT || 0) - dt; if (W.sinkT <= 0) { W.sinkT = 3; const sy = G.shoreY ? G.shoreY(W) : 0, wetOf = function (w) { return w.bp && w.bp.type !== 'port' && w.bp.type !== 'ship' && w.bp.type !== 'heart' && w.bp.wet !== false && !w.visitor; }; let need = 0, low = 0;
       for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!wetOf(w)) continue; need = Math.max(need, sy + 40 - (w.y + w.bp.S * 0.45 - (w.bp.top || 60))); low = Math.max(low, w.y + w.bp.S * 0.45); }
       if (need > 0) { const sh = Math.min(need, 12, Math.max(0, W.wh - 60 - low)); if (sh > 0) for (let i = 0; i < Wk.length; i++) if (wetOf(Wk[i])) Wk[i].y += sh; } }
     for (let i = Wk.length - 1; i >= 0; i--) {
       const w = Wk[i]; if (!w.bp) continue;
       w.until = W.t + 9999;      // it does not run out by the clock
-      if (w.visitor) continue;      // (a ship come from another pond: it is its crew's, and leaves with them)
+      if (w.visitor || w.bp.type === 'heart') continue;      // (a ship come from another pond is its crew's; the Heart is kept by the whole colony)
       w.upT = (w.upT || 0) - dt; if (w.upT > 0) continue; w.upT = w.fall ? 0.12 : 5;
       let kin = 0; for (let k = 0; k < W.cre.length; k++) if (W.cre[k].sp === w.sp && !W.cre[k].dead) kin++;
       const P = w.bp.P;
@@ -9189,7 +9207,7 @@ G.addSystem({
   if (G.on) {
     // when it stands, those of the kind who are near are glad: they are fed a little by it, it is a lesson worth keeping, and it shows
     G.on('deed-end', function (d, how, made) { const W = G.W; if (W && made && d.bp && how === 'done') for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.sp !== d.sp || Math.hypot(c.x - d.x, c.y - d.y) > 420) continue; c.E = Math.min(c.ph.Emax, c.E + 0.12 * c.ph.Emax); c.mend = 1; c.glad = 6; c.vy -= 60; if (G.learn) G.learn(c, 0.6); G.emit('glad', c); } });
-    G.on('deed-end', function (d, how, made) { if (made && d.bp) { made.bp = d.bp; made.sp = d.sp; made.built = d.built || null; { const F = (G.W && G.W.fields) || []; for (let k = 0; k < F.length; k++) if (F[k].id === made.field) F[k].hidden = true; } made.until = (G.W ? G.W.t : 0) + 9999; } });
+    G.on('deed-end', function (d, how, made) { if (made && d.result && d.result.tower) made.tower = 1; if (made && d.bp) { made.bp = d.bp; made.sp = d.sp; made.built = d.built || null; { const F = (G.W && G.W.fields) || []; for (let k = 0; k < F.length; k++) if (F[k].id === made.field) F[k].hidden = true; } made.until = (G.W ? G.W.t : 0) + 9999; } });
     G.on('new-pond', function () { if (G.W) G.W.mats = null; });
   }
   { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (!W || W.title) return; matsStep(W, dt); const d = W.deed; if (d && d.result && d.steps[d.i] && d.steps[d.i].do === 'build') buildStep(W, d, dt); worksStep(W, dt); if (W.works && W.works.length) homeStep(W, dt); }; }
@@ -9251,6 +9269,7 @@ G.addSystem({
   // wall; otherwise a hall, and later a tower beside it. One more for every forty generations the kind has lasted, up to four. So a pond fills, slowly, with
   // what its creatures made, and each kind's quarter is its own. (It costs nothing: the plan of pieces is worked out by the game.)
   G.on('scored', function () {
+    if (G.W && G.W.col && G.W.col.auto === false) return;      // (you have taken building into your own hands)
     const W = G.W; if (!W || W.title || W.deed || G.mode !== 'play' || W.gen < 12 || (W.works || []).length >= 22) return;
     { const Wk0 = W.works || [], hasPort = Wk0.some(function (w) { return w.bp && w.bp.type === 'port'; }), hasShip = Wk0.some(function (w) { return w.bp && w.bp.type === 'ship'; }); if (!(hasPort && !hasShip) && G.rand() > 0.45) return; }
     const kinds = W.species.filter(function (s) { return !s.extinct && s.n >= 10 && W.gen - s.born >= 6; }); if (!kinds.length) return;
@@ -9334,6 +9353,7 @@ G.addSystem({
     if (building && o.pile) { const hw = bp.hw || 60, px = clamp(b[0] + hw + 44, 30, G.W.ww - 30), py = b[1] + 6; let n = 0; for (let k = 0; k < 3; k++) for (let q = 0; q < Math.min(6, o.pile[k]); q++) { matDraw(ctx, { x: px + ((n % 4) - 1.5) * 9, y: py - Math.floor(n / 4) * 7, k: k, s: (n * 0.37) % 1 }, 0); n++; } }      // what has been brought, waiting to be set
   };
   function matDraw(ctx, q, t) {
+    if (q.k === 3) { const g = 0.75 + 0.25 * Math.sin(t * 3 + q.s * 9); ctx.fillStyle = 'hsla(178,95%,' + Math.round(62 + 14 * g) + '%,1)'; ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(q.x, q.y - 8); ctx.lineTo(q.x + 4.6, q.y - 1); ctx.lineTo(q.x, q.y + 6); ctx.lineTo(q.x - 4.6, q.y - 1); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.moveTo(q.x - 1, q.y - 5); ctx.lineTo(q.x + 1.6, q.y - 1.5); ctx.lineTo(q.x - 1.6, q.y - 0.5); ctx.closePath(); ctx.fill(); return; }
     const c = MAT[q.k].col; ctx.strokeStyle = INK; ctx.lineWidth = 1.3;
     if (q.k === 0) { ctx.fillStyle = hsl(c[0], c[1], c[2] - 8 + 16 * q.s); ctx.beginPath(); ctx.ellipse(q.x, q.y, 6.5 + 2 * q.s, 4.6 + 1.5 * q.s, q.s * 3, 0, TAU); ctx.fill(); ctx.stroke(); }
     else if (q.k === 1) { ctx.strokeStyle = hsl(c[0], c[1] + 10, c[2] - 14); ctx.lineWidth = 2; ctx.lineCap = 'round'; for (let k = -1; k <= 1; k++) { const sw = Math.sin(t * 1.3 + q.s * 9 + k) * 1.8; ctx.beginPath(); ctx.moveTo(q.x + k * 3, q.y + 6); ctx.quadraticCurveTo(q.x + k * 3.5, q.y - 3, q.x + k * 5 + sw, q.y - 10 - 3 * q.s); ctx.stroke(); } }
@@ -9346,7 +9366,8 @@ G.addSystem({
       if (W && !W.title && W.mats && G.mode === 'play') { const v = G.view, s = v.scale * v.dpr; if (v.scale > 0.22) { const x0 = -v.ox / v.scale - 20, y0 = -v.oy / v.scale - 20, x1 = x0 + v.w / v.scale + 40, y1 = y0 + v.h / v.scale + 40, t = G.rt || 0; ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (q.x > x0 && q.x < x1 && q.y > y0 && q.y < y1) matDraw(ctx, q, t); } ctx.restore(); } }
       if (f0) f0(ctx);
     }; }
-  G.drawHauls = function (ctx) { const W = G.W, d = W && W.deed; if (!d) return; const t = G.rt || 0; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.deedId !== d.id || !(c.haul >= 0) || c.dead) continue; matDraw(ctx, { x: c.x, y: c.y - c.ph.r * 2.9 - 5 + Math.sin(t * 7 + c.id) * 1.2, k: c.haul, s: (c.id % 10) / 10 }, t); } };
+  G.matDraw = matDraw;
+  G.drawHauls = function (ctx) { const W = G.W, d = W && W.deed; if (!W) return; const t = G.rt || 0; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (!(c.haul >= 0) || c.dead || c.inShip || !((d && c.deedId === d.id) || c.job === 'g')) continue;      /* what a builder or a gatherer carries rides above its head */ matDraw(ctx, { x: c.x, y: c.y - c.ph.r * 2.9 - 5 + Math.sin(t * 7 + c.id) * 1.2, k: c.haul, s: (c.id % 10) / 10 }, t); } };
 })();
 
 </script>
@@ -9908,6 +9929,241 @@ G.addSystem({
 })();
 
 </script>
+<script data-part="54i_colony">
+// ── The colony: work, orders, and what is gathered ──
+// The creatures of your star are a COLONY, and you command it. Nothing about what a creature IS has changed: it has its genes, its brain, its character,
+// it eats, tires, breeds and dies as before. What is new is that it can have WORK, and that work is yours to give:
+//     GATHERER   fetches what lies about the star (stone, reed, shell, and lumen where there is any) and carries it to the Heart
+//     BUILDER    raises what you order built, piece by piece, from what is in the store or lying near
+//     FIGHTER    keeps to the rally point you set, goes for any enemy that comes in sight, and attacks what you send it against
+//     GUARD      stands by the place you post it at, and does not leave it
+//     (free)     lives by its own brain, as all of them used to
+// A creature lives a minute or two, so work is a TRADE HANDED DOWN: a child is born into its parent's work, and you say how many of each you want
+// (the colony fills the places from those best made for them, and lets the worst go when there are too many). So a squad is a standing thing: its
+// members die and are replaced, the squad goes on.
+// The order says WHAT to do and WHERE. How well it is done is the creature's own: a fast one with hands gathers more, a big spiked one hits harder, a
+// timid one hangs back. And those who do their work well breed more (their fitness is raised by it), so in time you breed gatherers and fighters.
+// A hungry worker leaves its work to feed, and comes back: the more who work, the more food the star must grow.
+(function () {
+  'use strict';
+  const clamp = G.clamp;
+  const JOBS = G.JOBS = { g: { name: 'Gatherer', many: 'gatherers', doing: 'gathering', hue: 42 }, b: { name: 'Builder', many: 'builders', doing: 'building', hue: 28 }, f: { name: 'Fighter', many: 'fighters', doing: 'fighting', hue: 350 }, u: { name: 'Guard', many: 'guards', doing: 'standing guard', hue: 205 } };
+  const RES = G.RES = ['stone', 'reed', 'shell', 'lumen'];
+  /** the colony of a star: what is in its store, how many of each trade are wanted, where the fighters rally, what is waiting to be built */
+  const colony = G.colony = function (W) { W = W || G.W; return W.col || (W.col = { stock: [0, 0, 0, 0], got: [0, 0, 0, 0], want: { g: 0, b: 0, f: 0, u: 0 }, rally: null, queue: [], auto: true, nodes: null }); };
+  const mine = function (c) { return !c.team; };      // of your colony (an enemy has a team of its own)
+  const shoreOf = function (W) { return G.shoreY ? G.shoreY(W) : W.wh * 0.25; };
+  /** may this creature go to that height of the star? (one of the water stops at the shore; one of the land only paddles in the shallows) */
+  const reach = G.canReach = function (W, c, y) { const sy = shoreOf(W); return c.ph.home ? y <= sy + (W.wh - sy) * 0.06 - c.ph.r : y >= sy + c.ph.r; };
+
+  // ── the Heart: the middle of the colony, and its store. It stands in the shallows, where those of the land and those of the water can both come ──
+  G.heartOf = function (W) { W = W || G.W; const Wk = W.works || []; for (let i = 0; i < Wk.length; i++) if (Wk[i].bp && Wk[i].bp.type === 'heart' && !Wk[i].enemy) return Wk[i]; return null; };
+  const heartY = function (W, S) { const sy = shoreOf(W); return sy + (W.wh - sy) * 0.03 + 6 - S * 0.45; };
+  G.ensureHeart = function (W) {
+    W = W || G.W; let h = G.heartOf(W); if (h || !G.blueprintFrom || W.title) return h;
+    const sp = (W.species || []).filter(function (s) { return !s.extinct; }).sort(function (a, b) { return b.n - a.n; })[0], hue = sp ? sp.hue : 190, S = 74;
+    const bp = G.blueprintFrom({ seed: (W.seed >>> 0) % 9973 + 5, type: 'heart', S: S, hue: hue, spiky: 0, brain: 0.6, wet: true }, '2222222222222222222222222222');
+    h = { name: 'The Heart', looks: 'the middle of the colony, and its store', x: W.ww * 0.5, y: heartY(W, S), r: 80, until: W.t + 1e7, by: 'whole colony', hue: hue, sp: sp ? sp.id : 0, field: 0, plan: 'The Heart', gen: W.gen, bp: bp, hp: 1 };
+    (W.works = W.works || []).unshift(h); colony(W);
+    return h;
+  };
+  /** where a carrier sets its load down (and a builder takes one up) */
+  const dropAt = G.storeAt = function (W) { const h = G.heartOf(W); if (!h) return null; const sy = shoreOf(W); return { x: h.x + (h.bp.hw || 60) + 34, y: sy + (W.wh - sy) * 0.03 + 4 }; };
+
+  // ── lumen: the rare thing every star wants. It grows as crystals in a few places; a gatherer breaks a piece off and carries it home ──
+  function nodes(W) {
+    const col = colony(W); if (col.nodes) return col.nodes; const sy = shoreOf(W), r = G.rng ? G.rng((W.seed >>> 0) + 77) : Math.random, rich = W.lumenRich === undefined ? 1 : W.lumenRich, e = (G.sideEdge ? G.sideEdge(W) : 40) + 60;
+    col.nodes = [];
+    if (rich > 0) { col.nodes.push({ x: e + r() * (W.ww - 2 * e), y: W.wh - 80 - r() * 60, n: Math.round((14 + r() * 10) * rich), n0: 0, k: 3 }); if (sy > 150) col.nodes.push({ x: e + r() * (W.ww - 2 * e), y: 60 + r() * Math.max(10, sy - 130), n: Math.round((10 + r() * 8) * rich), n0: 0, k: 3 }); if (rich > 1.5) col.nodes.push({ x: e + r() * (W.ww - 2 * e), y: sy + (W.wh - sy) * (0.3 + 0.4 * r()), n: Math.round(30 * rich), n0: 0, k: 3 }); }
+    col.nodes.forEach(function (q) { q.n0 = q.n; });
+    return col.nodes;
+  }
+  G.lumenNodes = nodes;
+
+  // ── moving with a purpose (as those on a plan do): straight there, at its own pace ──
+  function go(c, tx, ty, dt, haste) { const dx = tx - c.x, dy = ty - c.y, dist = Math.hypot(dx, dy) || 1, grip = c.haul >= 0 ? (c.ph.hands || c.ph.limbs > 0 ? 0.85 : 0.6) : 1, sp = Math.min(c.ph.speed * (haste || 2) * grip, dist * 2.4), k = Math.min(1, dt * 5); c.vx += (dx / dist * sp - c.vx) * k; c.vy += (dy / dist * sp - c.vy) * k; if (dist > 8) c.ang = Math.atan2(dy, dx); return dist; }
+
+  // ── gathering ──
+  function source(W, c, col) {
+    const M = W.mats || [], N = nodes(W), k0 = c.gk === undefined ? -1 : c.gk, ax = c.area ? c.area.x : c.x, ay = c.area ? c.area.y : c.y, d0 = G.storeAt(W) || { x: c.x, y: c.y }; let best = null, bd = 1e18;
+    for (let i = 0; i < N.length; i++) { const q = N[i]; if (q.n <= 0 || (k0 >= 0 && k0 !== 3) || !reach(W, c, q.y)) continue; const dd = (q.x - ax) * (q.x - ax) + (q.y - ay) * (q.y - ay) * 1 - 250000; if (dd < bd) { bd = dd; best = q; } }      // (lumen is worth a longer walk)
+    for (let i = 0; i < M.length; i++) { const q = M[i]; if ((q.by && q.by !== c.id && W.t - q.byT < 14) || (k0 >= 0 && k0 !== q.k) || !reach(W, c, q.y)) continue; if ((q.x - d0.x) * (q.x - d0.x) + (q.y - d0.y) * (q.y - d0.y) < 70 * 70) continue;
+      const dd = (q.x - ax) * (q.x - ax) + (q.y - ay) * (q.y - ay); if (dd < bd) { bd = dd; best = q; } }
+    return best;
+  }
+  function gather(W, c, col, dt) {
+    const drop = G.storeAt(W); if (!drop) return; let j = c.gj;
+    if (!j) { c.gT = (c.gT || 0) - dt; if (c.gT > 0) { if (Math.hypot(c.x - drop.x, c.y - drop.y) > 260) go(c, drop.x, drop.y + 30, dt, 1.2); return; } c.gT = 0.6 + G.rand() * 0.6; const s = source(W, c, col); if (!s) return; if (s.k !== 3) { s.by = c.id; s.byT = W.t; } j = c.gj = { ph: 0, s: s, k: s.k, t: 0 }; }
+    j.t += dt;
+    if (j.ph === 0) { const s = j.s; if ((s.k === 3 ? s.n <= 0 : W.mats.indexOf(s) < 0) || j.t > 40) { c.gj = null; return; } if (s.k !== 3) s.byT = W.t;
+      if (go(c, s.x, s.y, dt, 2.2) < c.ph.r + 14) { if (s.k === 3) s.n--; else W.mats.splice(W.mats.indexOf(s), 1); j.ph = 1; j.t = 0; c.haul = j.k; G.emit('picked', c, j.k); } }
+    else { if (!reach(W, c, drop.y) && Math.abs(c.y - drop.y) < 60 && Math.abs(c.x - drop.x) < 60) j.t = 99;      /* as near as it can come */
+      if (go(c, drop.x, drop.y, dt, 2.2) < 36 || j.t > 45) { if (j.t <= 45 || j.t === 99) { col.stock[j.k]++; col.got[j.k]++; c.score = (c.score || 0) + (j.k === 3 ? 2 : 1); c.done = (c.done || 0) + 1; if (G.learn) G.learn(c, 0.3); G.emit('delivered', c, j.k); } c.haul = -1; c.gj = null; } }
+  }
+
+  // ── fighting ──
+  const strike = G.strike = function (W, a, b) {
+    const ph = a.ph, dmg = (5 + 4 * Math.min(2, ph.spike || 0) + 2.5 * Math.min(2, ph.cnt ? ph.cnt[0] : 0) + ph.r * 0.25) * (0.55 + (ph.aggro || 0)) * (1 - Math.min(0.9, b.ph.defense || 0) * 0.8) * (a.job === 'f' ? 1.3 : a.job === 'u' ? 1.15 : 1) * (b.job === 'u' ? 0.6 : b.job === 'f' ? 0.72 : 1);      // (trained for it: a fighter hits harder, and it and a guard take a blow better)
+    a.cool2 = 1.0; a.strike = 0.7; b.E -= dmg; b.flash = 1; a.E -= 2 * (b.ph.spike || 0); a.score = (a.score || 0) + dmg / 14; a.dealt = (a.dealt || 0) + dmg; W.stats.fights = (W.stats.fights || 0) + 1;
+    if (b.team && !a.team) b.foe = a;
+    G.emit('fight', a, b);
+    if (b.E <= 0) { a.score += 2; a.kills = (a.kills || 0) + 1; G.killCreature(b, 'fought', a); G.emit('slain', a, b); }
+    if (a.E <= 0) G.killCreature(a, 'fought', b);
+  };
+  /** the nearest of the other side within R of a point (foes: a list made once a moment) */
+  function foeNear(foes, x, y, R) { let best = null, bd = R * R; for (let i = 0; i < foes.length; i++) { const o = foes[i]; if (o.dead || o.inShip) continue; const d = (o.x - x) * (o.x - x) + (o.y - y) * (o.y - y); if (d < bd) { bd = d; best = o; } } return best; }
+  function fight(W, c, col, foes, dt, guard) {
+    const hp = G.heartOf(W), post = c.post || (guard ? null : col.rally) || (hp ? { x: hp.x + (guard ? 0 : 120), y: (G.storeAt(W) || hp).y + (c.ph.home ? -30 : 70) } : { x: c.x, y: c.y });
+    let foe = c.foe && !c.foe.dead && W.cre.indexOf(c.foe) >= 0 ? c.foe : null; if (!foe) { c.foe = null; if (foes.length) foe = foeNear(foes, guard ? post.x : c.x, guard ? post.y : c.y, guard ? 230 : 330) || (guard ? null : foeNear(foes, post.x, post.y, 520)); }
+    if (foe && reach(W, c, foe.y)) { const d = go(c, foe.x, foe.y, dt, 2.5); c.tired = Math.min(c.tired || 0, 0.6); if (d < c.ph.r + foe.ph.r + 10 && !(c.cool2 > 0)) strike(W, c, foe); return; }
+    const py = clamp(post.y, c.ph.home ? 10 : shoreOf(W) + c.ph.r + 2, c.ph.home ? shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r : W.wh - 10), d = Math.hypot(c.x - post.x, c.y - py), leash = guard ? 70 : 130;
+    if (d > leash) go(c, post.x + Math.cos(c.id * 2.4) * leash * 0.6, py + Math.sin(c.id * 2.4) * leash * 0.4, dt, d > 400 ? 2.4 : 1.4); else if (guard) c.score = (c.score || 0) + dt * 0.02;
+  }
+  /** one of the other side, come to raid: it goes for whoever of yours is near, and otherwise for the Heart, which it breaks piece by piece */
+  function raid(W, c, col, yours, dt) {
+    const back = c.foe && !c.foe.dead && !c.foe.inShip && Math.hypot(c.foe.x - c.x, c.foe.y - c.y) < 260 ? c.foe : null, near = back || foeNear(yours.filter(function (o) { return o.job === 'f' || o.job === 'u'; }), c.x, c.y, 120), hp = G.heartOf(W);      // (it fights back at whoever struck it, and goes for a fighter or a guard that comes near: it has come for the Heart, not for those who live round it)
+    if (near && reach(W, c, near.y)) { if (go(c, near.x, near.y, dt, 2.4) < c.ph.r + near.ph.r + 10 && !(c.cool2 > 0)) strike(W, c, near); return; }
+    const tgt = c.raidAt && (W.works || []).indexOf(c.raidAt) >= 0 ? c.raidAt : hp; if (!tgt) return; const ty = clamp(tgt.y + tgt.bp.S * 0.45, c.ph.home ? 10 : shoreOf(W) + c.ph.r + 2, c.ph.home ? shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r : W.wh - 10);
+    if (go(c, tgt.x + Math.cos(c.id) * 40, ty, dt, 2) < 90 && !(c.cool2 > 0)) { c.cool2 = 1.2; c.strike = 0.7; G.damageWork(tgt, 2 + c.ph.r * 0.1 + Math.min(2, c.ph.spike || 0), c); }
+  }
+  /** a building is struck: so much harm knocks a piece off it; one with no piece left is gone */
+  G.damageWork = function (w, dmg, by) {
+    const W = G.W; if (!w || !w.bp) return; w.harm = (w.harm || 0) + dmg; w.dmg = 1; w.hitGen = W.gen; w.hitT = W.t; G.emit('work-hit', w, by);
+    const tough = w.bp.type === 'heart' ? 110 : w.bp.type === 'wall' ? 90 : 60;      // (how much harm one piece takes)
+    while (w.harm >= tough) { w.harm -= tough; const P = w.bp.P; let k = -1; for (let i = P.length - 1; i >= 0; i--) if (P[i].st > 0) { k = i; break; } if (k < 0) break; P[k].st = 0; G.emit('build-fall', w, P[k]); }
+    if (G.buildCount && G.buildCount(w)[0] === 0) { const i = (W.works || []).indexOf(w); if (i >= 0) W.works.splice(i, 1); G.emit('work-gone', w, 'razed'); if (w.bp.type === 'heart') G.emit('heart-lost', w, by); }
+  };
+
+  G.on('heart-lost', function (w, by) { const W = G.W, col = colony(W); col.fell = (col.fell || 0) + 1; col.taken = col.stock.slice(); col.stock = [0, 0, 0, 0]; const h = G.ensureHeart(W); if (h) { h.bp.P.forEach(function (p, i) { p.st = i < 2 ? 2 : 0; }); h.ruin = true; h.fellGen = W.gen; h.hitT = W.t; }
+    W.cre.forEach(function (c) { if (c.team && !c.dead) c.leave = 1; }); G.emit('heart-fell', h, by, col.taken); });
+  /** the Heart is mended by the builders, a piece at a time, out of the store (slowly, and from what they can scrape together, when it is empty) */
+  function mend(W, col) { const h = G.heartOf(W); if (!h) return; if (W.t - (h.hitT === undefined ? -99 : h.hitT) < 8) { h.mendT = 0; return; } const P = h.bp.P; let k = -1; for (let i = 0; i < P.length; i++) if (P[i].st < 2) { k = i; break; }
+    if (k < 0) { if (h.ruin || h.dmg) { h.ruin = false; h.dmg = 0; h.harm = 0; G.emit('heart-whole', h); } return; }
+    const nb = G.jobCount(W).b; h.mendT = (h.mendT || 0) + 1.2; if (h.mendT < (nb ? Math.max(2.4, 10 / nb) : 16)) return;
+    if (P[k].st === 0) { const m = P[k].m | 0; if (col.stock[m] > 0) col.stock[m]--; else { let any = -1; for (let q = 0; q < 3; q++) if (col.stock[q] > 0) { any = q; break; } if (any >= 0) col.stock[any]--; else if (h.mendT < 22) return; } }
+    P[k].st++; P[k].t0 = W.t; h.mendT = 0; G.emit('heart-mended', h, P[k]); }
+  /** a finished tower strikes at the nearest raider in reach, every moment and a half */
+  function towers(W, dt) { const Wk = W.works || []; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.tower || !w.bp || w.enemy) continue; w.zapT = (w.zapT || 0) - dt; if (w.zapT > 0) continue; w.zapT = 0.5;
+      const n = G.buildCount(w); if (n[0] < n[2] * 0.7) continue; let best = null, bd = 300 * 300; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (!c.team || c.dead || c.inShip) continue; const d = (c.x - w.x) * (c.x - w.x) + (c.y - w.y) * (c.y - w.y); if (d < bd) { bd = d; best = c; } }
+      if (!best) continue; w.zapT = 1.5; best.E -= 13; best.flash = 1; w.zaps = (w.zaps || 0) + 1; G.emit('tower-zap', w, best); if (best.E <= 0) { w.kills = (w.kills || 0) + 1; G.killCreature(best, 'fought', null); G.emit('tower-kill', w, best); } } }
+  G.on('scored', function () { const W = G.W; if (!W || !W.col || !W.col.nodes || W.gen % 2) return; W.col.nodes.forEach(function (q) { if (q.n < q.n0) q.n++; }); });      // (lumen grows back, a piece every other year)
+  // raiders are not the star's own: its winter does not choose among them (a raid that is not beaten wears itself out in three years)
+  G.on('winter', function () { const W = G.W; if (W) W.cre.forEach(function (c) { if (c.team && W.gen - c.born < 3) c.doomed = false; }); });
+
+  // ── who does what: your quotas are filled from those best made for the work ──
+  const APT = { g: function (c) { return c.ph.speed * 0.02 + (c.ph.hands ? 0.6 : 0) + Math.min(4, c.ph.limbs || 0) * 0.1 + (c.g.s ? c.g.s[3] * 0.4 : 0); }, b: function (c) { return (c.ph.hands ? 0.8 : 0) + Math.min(4, c.ph.limbs || 0) * 0.12 + (c.g.s ? c.g.s[3] * 0.6 : 0) + c.ph.speed * 0.008; },
+    f: function (c) { return c.ph.r * 0.04 + Math.min(2, c.ph.spike || 0) * 0.5 + (c.ph.aggro || 0) + Math.min(2, c.ph.cnt ? c.ph.cnt[0] : 0) * 0.3 - (c.g.s ? c.g.s[1] * 0.5 : 0); }, u: function (c) { return (c.ph.defense || 0) * 2 + c.ph.r * 0.035 + Math.min(2, c.ph.spike || 0) * 0.3 - (c.g.s ? c.g.s[1] * 0.3 : 0); } };
+  G.jobFit = function (c, job) { return APT[job] ? APT[job](c) : 0; };
+  /** how many of your colony have each trade (and how many are free) */
+  G.jobCount = function (W) { W = W || G.W; const n = { g: 0, b: 0, f: 0, u: 0, free: 0, all: 0 }; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c)) continue; n.all++; if (c.job && n[c.job] !== undefined) n[c.job]++; else n.free++; } return n; };
+  const setJob = G.setJob = function (c, job, pinned) { if (c.job === job) { if (pinned) c.pin = true; return; } c.job = job || ''; c.pin = !!pinned && !!job; c.gj = null; if (c.haul >= 0 && !c.deedId) c.haul = -1; c.foe = null; if (!job) { c.post = null; c.area = null; } c.score = 0; G.emit('job', c, job); };
+  function staff(W, col) {
+    const n = G.jobCount(W), keys = ['f', 'u', 'b', 'g'];
+    for (let q = 0; q < keys.length; q++) { const k = keys[q], want = Math.min(col.want[k] | 0, Math.max(0, n.all - 2));
+      if (n[k] < want) { let best = null, bs = -1e9; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c) || c.job || c.deedId || c.inShip || c.stranger !== undefined || c.age < 0) continue; const s = APT[k](c) + (c.E / c.ph.Emax) * 0.2; if (s > bs) { bs = s; best = c; } } if (best) { setJob(best, k, false); return; } }
+      else if (n[k] > want) { let worst = null, ws = 1e9; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c) || c.job !== k || c.pin || c.deedId) continue; const s = (c.score || 0) + APT[k](c) * 0.3; if (s < ws) { ws = s; worst = c; } } if (worst) { setJob(worst, '', false); return; } }
+    }
+  }
+  // a child is born into its parent's trade
+  G.on('birth', function (c, a, b) { const p = a && a.job && mine(a) ? a : b && b.job && mine(b) ? b : null; if (p && !c.team) { c.job = p.job; if (p.post) c.post = p.post; if (p.area) c.area = p.area; if (p.gk !== undefined) c.gk = p.gk; } if (a && a.team) c.team = a.team; });
+  // a builder who sets a piece has done its work
+  G.on('build-piece', function (d, pc, c) { if (c && c.job === 'b') { c.score = (c.score || 0) + 1; c.done = (c.done || 0) + 1; } });
+
+  // ── those who do their work well breed more ──
+  G.on('scored', function () {
+    const W = G.W; if (!W) return; const by = { g: [], b: [], f: [], u: [] };
+    for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; c.jobF = 1; if (!c.dead && c.job && by[c.job] && mine(c)) by[c.job].push(c); }
+    for (const k in by) { const L = by[k]; if (L.length < 3 || !L.some(function (c) { return (c.score || 0) > 0; })) continue; L.sort(function (a, b) { return (a.score || 0) - (b.score || 0); });
+      for (let i = 0; i < L.length; i++) { const c = L[i]; c.jobF = 0.78 + 0.5 * (i / (L.length - 1)); c.fit = clamp((c.fit || 0) * c.jobF, 0, 1); c.score = (c.score || 0) * 0.4; } }
+  });
+
+  // ── what is waiting to be built: one thing at a time, by the builders ──
+  const KINDS = G.BUILDABLE = {
+    house: { name: 'House', what: 'a house for a family', res: { house: true, size: 0.04 }, note: 'Tired ones come home to it and sleep sheltered.' },
+    hall: { name: 'Hall', what: 'a hall to gather in', res: { pull: 0.08, size: 0.075 }, note: 'A place of their own: it draws them together.' },
+    huts: { name: 'Farm', what: 'huts round a store of food', res: { feed: 0.25, size: 0.075 }, note: 'It feeds those who live round it.' },
+    wall: { name: 'Wall', what: 'a ring of posts to live inside', res: { solid: true, size: 0.075 }, note: 'Only your own may pass it.' },
+    tower: { name: 'Tower', what: 'a watchtower that strikes at enemies', res: { pull: 0.22, size: 0.07, tower: true }, cost: [0, 0, 0, 3], note: 'It strikes at any enemy that comes near. Its eye is cut from 3 lumen.' },
+    port: { name: 'Spaceport', what: 'a spaceport on the shore, to build a spaceship on', res: { port: true, size: 0.085 }, note: 'The pad a spaceship is built on. On land only.' },
+    ship: { name: 'Starship', what: 'a spaceship on the spaceport', res: { ship: true, size: 0.06 }, note: 'It carries a crew to another star. It needs a spaceport.' } };
+  /** may this be built there? '' if so, else why not */
+  G.buildOk = function (type, x, y) {
+    const W = G.W, K = KINDS[type]; if (!W || !K) return 'unknown'; const sy = shoreOf(W), Wk = W.works || [], e = (G.sideEdge ? G.sideEdge(W) : 40) + 70;
+    if (type === 'ship') { const port = Wk.filter(function (w) { return w.bp && w.bp.type === 'port' && !w.fall; })[0]; if (!port) return 'It needs a spaceport first.'; if (Wk.some(function (w) { return w.bp && w.bp.type === 'ship' && !w.visitor; })) return 'There is a ship already.'; return ''; }
+    if (type === 'port') { if (Wk.some(function (w) { return w.bp && w.bp.type === 'port'; })) return 'There is a spaceport already.'; if (y > sy - 30) return 'A spaceport stands on land.'; }
+    if (x < e || x > W.ww - e) return 'Too near the edge.';
+    if (type !== 'port') { if (y > sy) { if (y < sy + 250) return 'Too near the waterline: under water, build deeper.'; if (y > W.wh - 70) return 'Too near the floor.'; } else { if (y > sy - 46) return 'Too near the waterline.'; if (y < 170) return 'Too near the top.'; } }
+    for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (w.bp && Math.abs(w.x - x) < (w.bp.hw || 60) + 90 && Math.abs(w.y - y) < 150) return 'Too near the ' + w.name + '.'; }
+    if ((colony(W).queue || []).some(function (q) { return Math.abs(q.x - x) < 170 && Math.abs(q.y - y) < 150; })) return 'Something is already to be built there.';
+    return '';
+  };
+  G.buildOrder = function (type, x, y) {
+    const W = G.W, K = KINDS[type]; if (!W || !K) return null; const why = G.buildOk(type, x, y); if (why) return { error: why };
+    const col = colony(W); if (K.cost) { for (let q = 0; q < 4; q++) if ((K.cost[q] || 0) > col.stock[q]) return { error: 'It needs ' + K.cost[q] + ' ' + RES[q] + ' (there is ' + col.stock[q] + ' in the store).' }; for (let q = 0; q < 4; q++) col.stock[q] -= K.cost[q] || 0; }
+    const n = (W.works || []).filter(function (w) { return w.bp && w.bp.type === type; }).length + col.queue.filter(function (q) { return q.type === type; }).length;
+    const o = { id: (col.nextQ = (col.nextQ || 0) + 1), type: type, x: x, y: y, name: K.name + (n ? ' ' + (n + 1) : ''), gen: W.gen }; col.queue.push(o); if (col.want.b < 3) col.want.b = 3; G.emit('build-ordered', o); return o;
+  };
+  G.buildCancel = function (id) { const col = colony(); const i = col.queue.findIndex(function (q) { return q.id === id; }); if (i >= 0) { const K = KINDS[col.queue[i].type]; if (K && K.cost) for (let q = 0; q < 4; q++) col.stock[q] += K.cost[q] || 0; col.queue.splice(i, 1); G.emit('build-cancelled', id); } };
+  function startBuild(W, col) {
+    const o = col.queue[0]; if (!o || W.deed || !G.deedStart) return; const B = W.cre.filter(function (c) { return !c.dead && mine(c) && c.job === 'b' && !c.deedId && !c.hungry; }); if (B.length < 2) return;
+    if (o.type === 'ship') { const port = (W.works || []).filter(function (w) { return w.bp && w.bp.type === 'port' && !w.fall; })[0]; if (!port || G.buildCount(port)[0] < G.buildCount(port)[2]) { if (!port) col.queue.shift(); return; } const dk = G.dockOf(port); o.x = dk.x; o.y = dk.y; o.at = { x: dk.x, y: dk.y }; }
+    const K = KINDS[o.type], bySp = {}; B.forEach(function (c) { bySp[c.sp] = (bySp[c.sp] || 0) + 1; }); let spId = 0, bn = -1; for (const k in bySp) if (bySp[k] > bn && +k) { bn = bySp[k]; spId = +k; }
+    const sp = (spId && G.speciesById(spId)) || W.species.filter(function (s) { return !s.extinct; }).sort(function (a, b) { return b.n - a.n; })[0]; if (!sp) return;
+    const res = Object.assign({ name: o.name, looks: 'ordered by you, raised by your builders', stuff: 'rock', shape: 'circle', size: 0.075, solid: false, feed: 0, slow: 0, hurt: 0, pull: 0, life: 240, type: o.type === 'tower' ? 'spire' : o.type, ordered: true }, K.res);
+    if (o.at) res.at = o.at; else if (o.type !== 'ship') res.at = { x: o.x, y: o.y };
+    const d = G.deedStart({ kind: sp.name, title: o.name, say: '', what: 'build ' + K.what, why: 'you ordered it', share: 0.5, own: true, steps: [{ do: 'gather', secs: 3, cry: '' }, { do: 'build', secs: 46, cry: '' }], place: { x: o.x / W.ww, y: o.y / W.wh }, result: res });
+    if (!d || d.title !== o.name) return;
+    W.cre.forEach(function (c) { if (c.deedId === d.id) c.deedId = 0; }); B.slice(0, 12).forEach(function (c, j) { c.deedId = d.id; c.deedJ = j; }); d.n0 = Math.min(12, B.length); d.ordered = o.id; col.queue.shift(); G.emit('build-started', o, d);
+  }
+  // an ordered building is the builders' work, whoever they are: nobody else is called in to make up the numbers
+  { const s0 = G.step; G.step = function (dt) { s0(dt); const W = G.W; if (!W || W.title) return; const d = W.deed; if (d && d.ordered) { let n = 0; const used = {};
+        for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.deedId !== d.id || c.dead) continue; if (c.job !== 'b' || c.team) { c.deedId = 0; c.bj = null; if (c.haul >= 0) c.haul = -1; continue; } n++; used[c.deedJ] = 1; }
+        if (n < 12) for (let i = 0; i < W.cre.length && n < 12; i++) { const c = W.cre[i]; if (c.dead || c.team || c.job !== 'b' || c.deedId || c.inShip || c.asleep || c.E < c.ph.Emax * 0.3) continue; let j = 0; while (used[j]) j++; used[j] = 1; c.deedId = d.id; c.deedJ = j; n++; }      /* (a builder born or named since joins in) */
+        d.n0 = Math.max(2, n); } }; }
+
+  // ── the colony's moment: every step ──
+  let acc = 0;
+  { const s1 = G.step; G.step = function (dt) { s1(dt); const W = G.W; if (!W || W.title || W.extinct) return; const col = colony(W);
+      if (!W.farOf) G.ensureHeart(W);
+      acc += dt; if (acc >= 1.2) { acc = 0; for (let q = 0; q < 6; q++) staff(W, col); startBuild(W, col); mend(W, col); const h = G.heartOf(W); if (h) { h.x = clamp(h.x, 200, W.ww - 200); h.y = heartY(W, h.bp.S); } }
+      let foes = null, yours = null, gone = false, anyFoe = false; towers(W, dt); for (let i = 0; i < W.cre.length; i++) if (W.cre[i].team && !W.cre[i].dead) { anyFoe = true; break; }
+      for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue; if (c.cool2 > 0) c.cool2 -= dt;
+        if (c.team) { if (c.eKeep !== undefined && c.E < c.eKeep && c.E > 0) c.E += (c.eKeep - c.E) * 0.8;      /* (raiders came provisioned: living costs them little while the raid lasts) */
+          if (c.leave) { const fx = c.from ? c.from.x : c.x < W.ww / 2 ? -40 : W.ww + 40, fy = c.from ? c.from.y : c.y; c.leave += dt; if (go(c, clamp(fx, 60, W.ww - 60), clamp(fy, c.ph.home ? 10 : shoreOf(W) + c.ph.r + 2, c.ph.home ? shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r : W.wh - 10), dt, 2.2) < 50 || c.leave > 22) { c.gone = 1; gone = true; } continue; }
+          if (!yours) yours = W.cre.filter(function (o) { return !o.dead && !o.team && !o.inShip; }); if (!c.inShip && !c.asleep) raid(W, c, col, yours, dt); continue; }
+        if (!c.job) continue;
+        if (c.deedId || c.asleep || c.inShip || c.goTo) continue;
+        const fed = c.E / c.ph.Emax; if (c.hungry) { if (fed > (c.job === 'f' || c.job === 'u' ? 0.8 : 0.62) || ((c.job === 'f' || c.job === 'u') && anyFoe && fed > 0.2)) c.hungry = false; else { if (c.job === 'g' && c.haul >= 0 && !c.gj) c.haul = -1; continue; } } else if (fed < (c.job === 'f' || c.job === 'u' ? 0.5 : 0.33) && !((c.job === 'f' || c.job === 'u') && anyFoe)) { c.hungry = true; continue; }      /* (fighters and guards keep themselves better fed, to be fit when it comes to it; and nobody leaves a fight to eat) */
+        if (c.job === 'g') gather(W, c, col, dt);
+        else if (c.job === 'f' || c.job === 'u') { if (!foes) foes = W.cre.filter(function (o) { return !o.dead && o.team; }); fight(W, c, col, foes, dt, c.job === 'u'); }
+      }
+      for (let i = W.cre.length - 1; i >= 0; i--) { const c = W.cre[i]; if (c.team) { c.eKeep = c.E; if (gone && c.gone) { W.cre.splice(i, 1); G.emit('foe-left', c); } } }
+    }; }
+
+  // ── your orders ──
+  /** send these creatures somewhere, or against something. o: { x, y } and maybe foe (a creature), mat (a thing to gather: its sort is taken), work (a building) */
+  G.order = function (list, o) {
+    const W = G.W, col = colony(W); let n = 0;
+    list.forEach(function (c) { if (!c || c.dead || c.team) return; n++;
+      if (o.foe) { if (c.job !== 'f' && c.job !== 'u') setJob(c, 'f', true); c.foe = o.foe; }
+      else if (o.mat !== undefined) { if (c.job !== 'g') setJob(c, 'g', true); c.gk = o.mat; c.area = { x: o.x, y: o.y }; c.gj = null; }
+      else if (o.work && (c.job === 'u' || c.job === 'f')) { setJob(c, 'u', true); c.post = { x: o.work.x, y: o.work.y + o.work.bp.S * 0.45 + 30 }; }
+      else if (c.job === 'f' || c.job === 'u') { c.post = { x: o.x, y: o.y }; c.foe = null; }
+      else if (c.job === 'g') { c.area = { x: o.x, y: o.y }; c.gk = undefined; c.gj = null; }
+      else c.goTo = { x: o.x, y: reach(W, c, o.y) ? o.y : c.ph.home ? Math.min(o.y, shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r) : Math.max(o.y, shoreOf(W) + c.ph.r + 2), until: W.t + 25, order: 1 };      /* (as near as its body lets it come) */
+    });
+    if (!o.foe && o.mat === undefined && !o.work && list.length && list.every(function (c) { return c.job === 'f'; }) && list.length >= G.jobCount(W).f) col.rally = { x: o.x, y: o.y };      /* all the fighters at once: that is where fighters rally from now on */
+    G.emit('ordered', list, o); return n;
+  };
+  /** one of another side is set down on your star (team: which side) */
+  G.foeDrop = function (genome, x, y, team) { const W = G.W, c = G.makeCreature(G.cloneGenome(genome), null, null, []); c.team = team || 1; c.x = c.px = clamp(x, 30, W.ww - 30); c.y = c.py = clamp(y, 30, W.wh - 30); c.E = c.ph.Emax * 0.9; c.P = c.ph.Emax * 0.4; c.snap = G.snapOf ? G.snapOf(c) : null; W.cre.push(c); G.emit('foe', c); return c; };
+  /** give these creatures a trade (or none) */
+  G.assign = function (list, job) { const col = colony(); list.forEach(function (c) { if (c && !c.dead && !c.team) setJob(c, job, true); }); const n = G.jobCount(); for (const k in JOBS) if (col.want[k] < n[k]) col.want[k] = n[k]; G.emit('assigned', list, job); };
+  /** in words: what this creature's work is, and how it is getting on */
+  G.jobText = function (c) { const J = JOBS[c.job]; if (!J) return ''; return J.name + (c.hungry ? ' (gone to feed)' : c.job === 'g' ? (c.done ? ': ' + c.done + ' loads brought in' : '') : c.job === 'b' ? (c.done ? ': ' + c.done + ' pieces set' : '') : (c.kills ? ': ' + c.kills + ' enemies slain' : c.dealt ? ': it has fought' : '')) + '.'; };
+})();
+
+</script>
 <script data-part="sim">
 // ── Running the pond: fixed steps, fast-forward, starting and seeding ponds ──
 (function () {
@@ -10267,7 +10523,7 @@ G.addSystem({
   F.make = function (p) {
     const kinds = F.kindsOf(p), mood = F.moodOf(p), defs = F._defs;
     G.newWorld({ seed: 1 + ((hash(p.i, p.j, 31) * 4e9) >>> 0) });
-    const W = G.W; W.gen = 20 + ((hash(p.i, p.j, 32) * 60) | 0);
+    const W = G.W; W.gen = 20 + ((hash(p.i, p.j, 32) * 60) | 0); W.farOf = F.key(p);      // (a far star: no Heart of yours is raised on it)
     if (defs) { W.organs = clone(defs.organs); W.designs = clone(defs.designs); W.plans = clone(defs.plans); W.nextOrgan = defs.nextOrgan + 500; W.nextDesign = defs.nextDesign + 500; W.nextPlan = defs.nextPlan + 500; }      // (what is invented there is numbered apart from what is invented at home)
     kinds.forEach(function (g0, k) {
       const n = 14 + ((hash(p.i, p.j, 40 + k) * 9) | 0), cx = W.ww * (0.22 + 0.56 * hash(p.i, p.j, 50 + k)), cy = W.wh * (0.42 + 0.4 * hash(p.i, p.j, 60 + k));
@@ -10353,7 +10609,7 @@ G.addSystem({
   { const s0 = G.step; G.step = function (dt) { s0(dt); const W = G.W; if (!W || W.title) return;
       for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue;
         if (c.outAt !== undefined) { if (W.t < c.outAt) { const sh = F.shipOf(); if (sh) { c.x = c.px = sh.x; c.y = c.py = sh.y - sh.bp.S * 0.3; } c.vx = c.vy = 0; c.inShip = true; c.E = Math.max(c.E, c.ph.Emax * 0.8); continue; } c.outAt = undefined; c.inShip = false; G.emit('stepped-out', c); }
-        const g = c.goTo; if (g) { const dx = g.x - c.x, dy = g.y - c.y, d = Math.hypot(dx, dy); if (d < 26 || W.t > g.until || c.inShip) { if (!c.inShip || d < 26 || W.t > g.until) c.goTo = null; continue; } const st = Math.min(d, Math.max(80, c.ph.speed * 1.4) * dt); c.x += dx / d * st; c.y += dy / d * st; c.vx = dx / d * 20; c.vy = dy / d * 20; c.ang = Math.atan2(dy, dx); c.E = Math.max(c.E, c.ph.Emax * 0.5); } }
+        const g = c.goTo; if (g) { const dx = g.x - c.x, dy = g.y - c.y, d = Math.hypot(dx, dy); if (d < 26 || W.t > g.until || c.inShip) { if (!c.inShip || d < 26 || W.t > g.until) c.goTo = null; continue; } const st = Math.min(d, Math.max(80, c.ph.speed * 1.4) * dt); c.x += dx / d * st; c.y += dy / d * st; c.vx = dx / d * 20; c.vy = dy / d * 20; c.ang = Math.atan2(dy, dx); if (!g.order) c.E = Math.max(c.E, c.ph.Emax * 0.5); } }
     }; }
   /** Go and watch a far pond you have been to (your outpost, if any of yours still live there). Nothing is taken there and nothing brought back: the ship
    *  stays where it is. F.home() brings you back. */
@@ -10438,6 +10694,80 @@ G.addSystem({
   G.on('new-pond', function (opts) { if (opts && opts.voyage) return; F.book = {}; F.origin = null; F.visiting = null; F.homeBlob = null; F.here = null; F._kinds = {}; F._pool = null; });      // a new pond of your own: a new sky
   // each ADD in a far pond is one of the few the ship could carry
   G.on('placed', function () { const V = F.there(); if (V && V.adds > 0) { V.adds--; G.emit('voyage-add', V); } });
+})();
+
+</script>
+<script data-part="57y_raids">
+// ── Rival stars, and their raids ──
+// Some of the stars near yours are RIVALS: colonies like your own, that want what is in your store. A rival sends a ship. You are warned a year ahead
+// (who is coming, and about how many); the ship comes down on your land in spring, its raiders step out and go for your Heart. They are that star's own
+// kinds (57x_far.js: every star has its kinds, grown from the same life as yours, so as your star's creatures grow stronger so do theirs).
+//     beaten off     every raider slain: you keep your store, and take the lumen their ship carried
+//     the Heart falls   they take what is in the store and go home in their ship (54i_colony.js); your builders raise the Heart again
+//     worn out       a raid that is neither beaten nor wins gives up after three years and goes home
+// Raids grow with what you have: a rich star with many buildings draws a bigger raid than a poor one. The first comes ten years or so after the colony
+// is founded, so there is time to name fighters and guards and build a tower.
+(function () {
+  'use strict';
+  const clamp = G.clamp;
+  const col = function (W) { return G.colony(W || G.W); };
+  /** the rival stars near home, nearest first: { i, j, key, name, hue, dist } (the same ones every time) */
+  G.rivals = function () {
+    const F = G.far, out = []; if (!F) return out;
+    const o = F.origin || { i: 0, j: 0 };      // (cells are counted from the star you set out from)
+    for (let i = -4; i <= 4; i++) for (let j = -4; j <= 4; j++) { const p = F.cell(i, j); if (!p || p.free) continue; const d = Math.hypot(i, j); out.push({ i: i, j: j, key: F.key(p), name: p.name, hue: p.hue, dist: d, p: p, rival: F.hash(i, j, 70) < 0.42 }); }
+    out.sort(function (a, b) { return a.dist - b.dist; }); let R = out.filter(function (q) { return q.rival; }); if (!R.length && out.length) { out[0].rival = true; R = [out[0]]; }
+    return R.slice(0, 6);
+  };
+  /** how much there is to take on your star: what draws a raid, and sets its size */
+  const wealth = function (W) { const c = col(W); return c.stock[0] + c.stock[1] + c.stock[2] + 5 * c.stock[3] + 6 * (W.works || []).filter(function (w) { return w.bp && w.bp.type !== 'heart' && !w.visitor; }).length; };
+  G.raidSize = function (W) { W = W || G.W; const c = col(W); return Math.round(clamp(3 + (c.raidN || 0) * 1.3 + wealth(W) / 55, 3, 14)); };
+
+  /** a raid is announced: it will land next spring. who: one of G.rivals() (the nearest, if none is given) */
+  G.raidWarn = function (who, n) {
+    const W = G.W, c = col(W); if (c.raid || W.farOf) return null; const R = G.rivals(); who = who || R[(c.raidN || 0) % Math.max(1, Math.min(2, R.length))]; if (!who) return null;
+    c.raid = { id: (c.raidN || 0) + 1, key: who.key, i: who.i, j: who.j, name: who.name, hue: who.hue, n: n || G.raidSize(W), landGen: W.gen + 1, state: 'warn', out: 0, t0: 0, x: 0, y: 0, seed: 1 + ((G.far.hash(who.i, who.j, 71) * 9000) | 0) };
+    G.emit('raid-warn', c.raid); return c.raid;
+  };
+  function land(W, c) {
+    const r = c.raid, sy = G.shoreY(W), hp = G.heartOf(W), e = (G.sideEdge ? G.sideEdge(W) : 40) + 110, port = (W.works || []).filter(function (w) { return w.bp && w.bp.type === 'port'; })[0];
+    let x = G.rand() < 0.5 ? W.ww * 0.2 : W.ww * 0.8; if (port && Math.abs(port.x - x) < 260) x = W.ww - x; x = clamp(x, e, W.ww - e);
+    r.x = x; r.y = Math.max(70, sy - 34); r.state = 'land'; r.t0 = W.t; r.out = 0; r.landed = W.gen; G.emit('raid-land', r, hp);
+  }
+  function raiders(W, r) { const out = []; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.team && c.raid === r.id && !c.dead && !c.gone) out.push(c); } return out; }
+  function stepOut(W, r) {
+    const F = G.far, kinds = F.kindsOf(r.p || F.cell(r.i, r.j) || { i: r.i, j: r.j, kinds: 2, hue: r.hue }); let pool = kinds.length ? kinds : (W.species || []).filter(function (s) { return s.rep && !s.extinct; }).map(function (s) { return s.rep; }); if (!pool.length) return;
+    // of that star's kinds, the ones best made for fighting come; each a little its own
+    const best = pool.slice().sort(function (a, b) { const pa = G.derive(a), pb = G.derive(b); return (pb.r * 0.04 + (pb.spike || 0) * 0.5 + (pb.aggro || 0)) - (pa.r * 0.04 + (pa.spike || 0) * 0.5 + (pa.aggro || 0)); });
+    const g0 = best[r.out % Math.min(2, best.length)], g = r.out ? G.mutate(G.cloneGenome(g0), 0.4, null).g : G.cloneGenome(g0); g.mv = 0;
+    const c = G.foeDrop(g, r.x + (r.out % 2 ? 1 : -1) * (26 + (r.out % 3) * 9), r.y + 16, 1); c.raid = r.id; c.from = { x: r.x, y: r.y + 10 }; c.E = c.ph.Emax * 0.75; c.born = W.gen; c.vy = 30; r.out++; G.emit('raider-out', c, r);
+  }
+  function over(W, c, how) { const r = c.raid; if (!r || r.state === 'leave') return; r.state = 'leave'; r.t0 = W.t; r.how = how; const f = (c.foes = c.foes || {}), e = f[r.key] || (f[r.key] = { name: r.name, hue: r.hue, raids: 0, beaten: 0, won: 0 }); e.raids++;
+    if (how === 'beaten') { e.beaten++; r.loot = 2 + Math.round(r.n / 3); c.stock[3] += r.loot; c.got[3] += r.loot; } else if (how === 'won') e.won++;
+    G.emit('raid-over', r, how); }
+
+  // each year: is it time for one?
+  G.on('scored', function () {
+    const W = G.W; if (!W || W.farOf || W.title || !W.col || G.mode !== 'play') return; const c = W.col; if (c.peace) return;
+    if (!c.nextRaid) c.nextRaid = W.gen + 10 + Math.floor(G.rand() * 4);
+    if (!c.raid && W.gen + 1 >= c.nextRaid && G.heartOf(W)) G.raidWarn();
+  });
+  // the raid itself
+  { const s0 = G.step; G.step = function (dt) { s0(dt); const W = G.W; if (!W || W.title || !W.col || !W.col.raid) return; const c = W.col, r = c.raid;
+      if (r.state === 'warn') { if (W.gen >= r.landGen && W.season === 0 && W.st > 1.5) land(W, c); return; }
+      if (!r.bound) { r.bound = 1; W.cre.forEach(function (q) { if (q.team && !q.raid) { q.raid = r.id; q.from = { x: r.x, y: r.y + 10 }; } }); }      // (a game opened again in the middle of a raid: its raiders are that raid's)
+      const t = W.t - r.t0;
+      if (r.state === 'land') { if (t > 3 && r.out < r.n) { if (t > 3 + r.out * 0.55) stepOut(W, r); } else if (r.out >= r.n) { r.state = 'on'; r.t0 = W.t; } return; }
+      if (r.state === 'on') { const L = raiders(W, r); r.left = L.length; if (!L.length) { over(W, c, c.fellNow === r.id ? 'won' : 'beaten'); return; }
+        if (W.gen - r.landed >= 3 && !r.tired) { r.tired = 1; L.forEach(function (q) { q.leave = 1; }); c.fellNow = 0; r.wornOut = 1; }
+        if (r.wornOut && L.every(function (q) { return q.leave; }) && L.length === 0) over(W, c, 'worn'); return; }
+      if (r.state === 'leave') { if (t > 5.5) { c.raid = null; c.raidN = (c.raidN || 0) + 1; c.nextRaid = W.gen + 7 + Math.floor(G.rand() * 6); c.fellNow = 0; G.emit('raid-gone', r); } }
+    }; }
+  // when the Heart falls to a raid, the raid has won: its raiders go back to the ship (54i_colony.js marks them as leaving)
+  G.on('heart-fell', function () { const W = G.W, c = W && W.col; if (c && c.raid && c.raid.state === 'on') { c.fellNow = c.raid.id; c.raid.won = 1; } });
+  G.on('foe-left', function (q) { const W = G.W, c = W && W.col; if (!c || !c.raid || q.raid !== c.raid.id) return; if (raiders(W, c.raid).length === 0) over(W, c, c.raid.wornOut ? 'worn' : 'won'); });
+  /** in words: where a raid stands (for the panel and the bar) */
+  G.raidText = function (W) { W = W || G.W; const r = W && W.col && W.col.raid; if (!r) return ''; return r.state === 'warn' ? 'A raid from ' + r.name + ' lands next spring: about ' + r.n + ' raiders' : r.state === 'land' ? 'Raiders from ' + r.name + ' are landing' : r.state === 'on' ? (r.left || r.n) + ' raiders from ' + r.name + ' on your star' : r.how === 'beaten' ? 'The raid from ' + r.name + ' is beaten' : 'The raiders from ' + r.name + ' are going home'; };
 })();
 
 </script>
@@ -11538,6 +11868,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   G.on('pond-click', function (c) {
     if (G.mode !== 'play' || !G.W || G.isBlocked()) return;
     closePop();
+    if (G.cmd && G.cmd.takeClick && G.cmd.takeClick(c)) return;      // (a place for something to be built, or where those you chose are sent)
     if (UI.placing) {
       const info = UI.placing;
       G.addZone(c.x, c.y, info);
@@ -11619,7 +11950,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     let item = null; try { item = G.keep ? G.keep(c) : null; } catch (e) { console.error(e); }
     if (item) item.age = ('Marvel · ' + def.name).slice(0, 70);
     if (G.sfx) G.sfx('discovery');
-    if (G.select) G.select(c); if (G.focusOn) G.focusOn(c.x, c.y, 2.4);
+    if (!(G.cmd && G.cmd.busy && G.cmd.busy())) { if (G.select) G.select(c); if (G.focusOn) G.focusOn(c.x, c.y, 2.4); }      // (the view is not taken from someone in the middle of giving orders: the banner tells, and NOW has it)
     if (G.banner) G.banner('★ A MARVEL', 'Creature #' + c.id + ' was born with ' + def.name + '. ' + def.wonder + (def.why ? ' (' + def.why + ')' : '') + (item ? ' It is kept in your collection (BOOK).' : ''), 12000);
     if (G.log) G.log('disc', 'A marvel: ' + def.name, 'Creature #' + c.id + '. ' + def.wonder);
     if (G.markDirty) G.markDirty();
@@ -11651,7 +11982,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const b = bannerQ.shift();
     if (!b) { bannerTimer = 0; return; }
     refs.banner.innerHTML = '<small>' + escapeHtml(b[0]) + '</small>' + escapeHtml(b[1]);
-    { let y = 78; ['wish', 'wxnow', 'voybar', 'voypick'].forEach(function (id) { const e = document.getElementById(id); if (e && !e.classList.contains('hide') && e.offsetHeight && window.innerWidth > 720) y = Math.max(y, e.getBoundingClientRect().bottom + 10 - 14); });
+    { let y = 78; ['wish', 'wxnow', 'voybar', 'voypick', 'resbar'].forEach(function (id) { const e = document.getElementById(id); if (e && !e.classList.contains('hide') && e.offsetHeight && window.innerWidth > 720) y = Math.max(y, e.getBoundingClientRect().bottom + 10 - 14); });
       refs.banner.style.setProperty('transform', 'translate(-50%,' + Math.round(y) + 'px)', 'important'); }      /* just below the wish and the weather, never on them */
     refs.banner.classList.add('show');
     G.sfx('discovery');
@@ -12210,7 +12541,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
 (function () {
   'use strict';
   if (typeof document === 'undefined' || !G.banner) return;
-  const BIG = /marvel|decided|did it|came to nothing|wish came true|new age|it happened|stranger|arrived|is home/i;
+  const BIG = /marvel|decided|did it|came to nothing|wish came true|new age|it happened|stranger|arrived|is home|raid|heart|enemy/i;
   const short = function (s, n) { s = String(s || ''); if (s.length <= n) return s; const cut = s.slice(0, n), dot = cut.lastIndexOf('. '); return dot > n * 0.5 ? cut.slice(0, dot + 1) : cut.replace(/\s+\S*$/, '') + '…'; };
   const esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   // notes: one line at a time, bottom right
@@ -13256,6 +13587,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       else if (UI.modal && UI.modal !== 'still') closeModal();
       else if (UI.placing || UI.meteor) G.cancelPlacing();
       else if (UI.popName) G.closePop();
+      else if (G.cmd && G.cmd.escape && G.cmd.escape()) { /* (a place being chosen, or those you chose, let go) */ }
       else if (G.R.sel) G.select(null);
       else G.openMenu();
       return;
@@ -13568,6 +13900,272 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
 })();
 
 </script>
+<script data-part="command">
+// ── The command screen: how you run your colony ──
+// The engine of the colony is in 54i_colony.js. This is what you see and touch:
+//     the STORE BAR (top)       what is in the store: stone, reed, shell, lumen; and how many live on your star
+//     the COLONY PANEL (left)   the trades (how many of each you have, and how many you want: − and +), and what can be built
+//     CHOOSING                  click one, or drag a box round many; click a trade's name to choose everyone of that trade
+//     ORDERS                    right-click the star: those you chose go there. On an enemy: attack it. On something lying about, or on lumen:
+//                               gather it. On a building: guard it. (No right button? SEND, then click.)
+//     the CHOSEN BAR (bottom)   who you have chosen, and the trades you can give them
+//     on the star itself        rings under the chosen, a small mark of its trade over every worker, what the gatherers carry, the lumen, the
+//                               store beside the Heart, where things are to be built, where the fighters rally, and red rings under enemies
+// The view: the left button now chooses, so the view is moved with the right (or middle) button, or with W A S D and the arrow keys.
+(function () {
+  'use strict';
+  if (typeof document === 'undefined' || !G.JOBS) return;
+  const $ = function (id) { return document.getElementById(id); };
+  const esc = function (s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  const JOBS = G.JOBS, ORDER = ['g', 'b', 'f', 'u'], COL = { g: '#f2c14e', b: '#ff9a4c', f: '#ff5d73', u: '#5db8ff', '': '#9fb6c6' }, RGB = { g: '242,193,78', b: '255,154,76', f: '255,93,115', u: '93,184,255', move: '120,240,190' };
+  const BUILD = ['house', 'hall', 'huts', 'wall', 'tower', 'port', 'ship'];
+  const C = G.cmd = { sel: [], placing: null, send: false };
+  const FX = [], ZAP = [], POP = [];
+  let sig = '', lastT = 0, tip = '', tipUntil = 0, folded = false, lastClick = { id: 0, t: 0 };
+  try { folded = localStorage.getItem('primordia.cmdFold') === '1'; } catch (e) { /* no storage: it stays open */ }
+
+  const now = function () { return performance.now(); };
+  /** is there a colony to command on what is being shown? (your own star, in play, not out in space) */
+  const live = function () { const W = G.W; return !!(W && G.mode === 'play' && !W.title && !W.extinct && !W.farOf && !(G.far && G.far.there && G.far.there()) && !(G.pondAsleep && G.pondAsleep())); };
+  const mine = function (c) { return c && !c.dead && !c.team && !c.inShip && G.W.cre.indexOf(c) >= 0; };
+  const pos = function (c) { return { x: c.rx === undefined ? c.x : c.rx, y: c.ry === undefined ? c.y : c.ry }; };
+  const say = function (s, secs) { tip = s; tipUntil = now() + (secs || 5) * 1000; sig = ''; };
+
+  /** is the player in the middle of commanding? (then nothing else takes the view or the card from them) */
+  let lastAct = 0;
+  C.busy = function () { const W = G.W; return live() && (C.sel.length > 0 || !!C.placing || C.send || !!G.ui.box || now() - lastAct < 25000 || !!(W.col && W.col.raid && W.col.raid.state !== 'warn')); };
+  const acted = function () { lastAct = now(); };
+
+  // ── choosing ──
+  C.boxOk = function () { return live() && !G.isBlocked() && !C.placing; };
+  C.set = function (list, add) { acted(); const s = add ? C.sel.filter(mine) : []; (list || []).forEach(function (c) { if (mine(c) && s.indexOf(c) < 0) s.push(c); }); C.sel = s; sig = ''; };
+  C.clear = function () { C.sel = []; C.send = false; sig = ''; };
+  C.all = function (job) { const W = G.W; if (!W) return; C.set(W.cre.filter(function (c) { return mine(c) && (job === '' ? !c.job : c.job === job); })); if (C.sel.length !== 1) G.select(null); if (!C.sel.length) say('Nobody has that trade yet. Press + to ask for some.'); };
+  C.escape = function () { if (C.placing) { C.placing = null; sig = ''; return true; } if (C.send) { C.send = false; sig = ''; return true; } if (C.sel.length > 1 || (C.sel.length === 1 && !G.R.sel)) { C.clear(); return true; } return false; };
+  G.on('box-select', function (b, add) {
+    if (!live()) return; const W = G.W, got = [];
+    for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (!mine(c)) continue; const p = pos(c); if (p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1) got.push(c); }
+    C.set(got, add); if (G.selectThing) G.selectThing(null); G.selectZone(null); G.select(C.sel.length === 1 ? C.sel[0] : null);
+  });
+  // a click that chose one creature chooses it for orders too (twice quickly: everyone in sight of the same trade)
+  G.on('pond-click', function (c) {
+    if (!live() || G.isBlocked()) return; const s = G.R.sel, t = now();
+    if (s && mine(s)) { if (lastClick.id === s.id && t - lastClick.t < 420) { const v = G.view, x0 = -v.ox / v.scale, y0 = -v.oy / v.scale, x1 = x0 + v.w / v.scale, y1 = y0 + v.h / v.scale; C.set(G.W.cre.filter(function (o) { return mine(o) && (o.job || '') === (s.job || '') && o.x >= x0 && o.x <= x1 && o.y >= y0 && o.y <= y1; })); if (C.sel.length > 1) G.select(null); }
+      else C.set([s], c.shift); lastClick = { id: s.id, t: t }; }
+    else if (!c.shift) C.clear();
+  });
+  G.on('new-pond', function () { C.sel = []; C.placing = null; C.send = false; FX.length = 0; sig = ''; });
+
+  // ── orders ──
+  function near(list, x, y, R, ok) { let best = null, bd = R * R; for (let i = 0; i < list.length; i++) { const o = list[i]; if (ok && !ok(o)) continue; const d = (o.x - x) * (o.x - x) + (o.y - y) * (o.y - y); if (d < bd) { bd = d; best = o; } } return best; }
+  function orderAt(p) {
+    const W = G.W; C.sel = C.sel.filter(mine); if (!C.sel.length) return false;
+    const R = Math.max(20, 22 / G.view.scale), foe = near(W.cre, p.x, p.y, R + 14, function (o) { return o.team && !o.dead && !o.inShip; }), node = near(G.lumenNodes(W), p.x, p.y, 50, function (q) { return q.n > 0; }), mat = near(W.mats || [], p.x, p.y, R),
+      hit = G.thingAt ? G.thingAt(p.x, p.y) : null, work = hit && hit.k === 'work' && hit.o.bp ? hit.o : null, n = C.sel.length, who = n === 1 ? 'It' : 'All ' + n, soldiers = C.sel.some(function (c) { return c.job === 'f' || c.job === 'u'; });
+    let o, col, words;
+    if (foe) { o = { x: foe.x, y: foe.y, foe: foe }; col = RGB.f; words = who + (n === 1 ? ' goes' : ' go') + ' for the enemy.'; }
+    else if (node) { o = { x: node.x, y: node.y, mat: 3 }; col = '120,235,255'; words = who + (n === 1 ? ' is' : ' are') + ' to gather lumen here.'; }
+    else if (mat) { o = { x: mat.x, y: mat.y, mat: mat.k }; col = RGB.g; words = who + (n === 1 ? ' is' : ' are') + ' to gather ' + G.RES[mat.k] + ' round here.'; }
+    else if (work && soldiers) { o = { x: work.x, y: work.y, work: work }; col = RGB.u; words = 'The fighters and guards among them are to guard the ' + work.name + '.'; }
+    else { o = { x: p.x, y: p.y }; col = soldiers ? RGB.f : RGB.move; words = C.sel.every(function (c) { return c.job === 'f'; }) ? (n === 1 ? 'Its' : 'Their') + ' post is here now.' : C.sel.every(function (c) { return c.job === 'g'; }) ? 'They gather round here now.' : who + (n === 1 ? ' goes' : ' go') + ' there.'; }
+    const cant = C.sel.filter(function (c) { return !G.canReach(W, c, o.y); }).length;
+    acted(); G.order(C.sel, o); FX.push({ x: o.x, y: o.y, t0: now(), col: col, from: C.sel.map(pos) });
+    say(words + (cant ? ' (' + (cant === n ? (n === 1 ? 'It is' : 'They are') : cant === 1 ? 'One of them is' : cant + ' of them are') + ' of the ' + (C.sel.filter(function (c) { return !G.canReach(W, c, o.y); })[0].ph.home ? 'land' : 'water') + ': as near as ' + (cant === 1 ? 'it' : 'they') + ' can come.)' : ''), 6);
+    if (G.sfx) G.sfx('click'); return true;
+  }
+  G.on('pond-order', function (p) { if (!live() || G.isBlocked()) return; if (C.placing) { C.placing = null; sig = ''; return; } if (!orderAt(p)) say('Choose some of your creatures first: click one, or drag a box round several.'); });
+  /** a left click that is not a choice: a place for what is being built, or (after SEND) where the chosen are to go */
+  C.takeClick = function (p) {
+    if (!live()) return false;
+    if (C.placing) { const r = G.buildOrder(C.placing, p.x, p.y); if (r && r.error) { say(r.error, 5); return true; } say(r ? r.name + ' is ordered. Your builders will raise it' + (G.jobCount().b < 2 ? ' (you need two builders at least: they are being named now)' : '') + '.' : '', 6); if (!p.shift) C.placing = null; sig = ''; return true; }
+    if (C.send) { C.send = false; sig = ''; orderAt(p); return true; }
+    return false;
+  };
+  C.job = function (job) { C.sel = C.sel.filter(mine); if (!C.sel.length) return; G.assign(C.sel, job); say(C.sel.length === 1 ? 'It is ' + (job ? 'a ' + JOBS[job].name.toLowerCase() : 'free') + ' now.' : 'All ' + C.sel.length + ' are ' + (job ? JOBS[job].many : 'free') + ' now.' + (job ? ' Their children will be too.' : ''), 5); sig = ''; if (G.R.sel && G.refreshCard) G.refreshCard(); };
+  C.want = function (job, d) { const W = G.W; if (!W) return; acted(); const col = G.colony(W), n = G.jobCount(W); col.want[job] = G.clamp((col.want[job] | 0) + d, 0, Math.max(0, n.all - 2)); if (d < 0) W.cre.forEach(function (c) { if (c.job === job) c.pin = false; }); sig = ''; if (G.markDirty) G.markDirty(); };
+  C.build = function (type) {
+    const K = G.BUILDABLE[type]; if (!K || !live()) return; acted();
+    if (type === 'ship') { const r = G.buildOrder('ship', 0, 0); say(r && r.error ? r.error : 'A starship is ordered. Your builders will raise it on the spaceport.', 6); sig = ''; return; }
+    C.placing = C.placing === type ? null : type; C.send = false; sig = ''; if (C.placing) say(K.name + ': click the place for it' + (type === 'port' ? ' (on land).' : '. Under water or on land.') + ' Right-click to let it be.', 9);
+  };
+
+  // ── the look of it ──
+  const css = '#resbar{position:fixed;left:50%;top:14px;transform:translateX(-50%);display:flex;gap:4px;align-items:center;padding:5px 12px;border-radius:999px;z-index:3;white-space:nowrap;font:700 13px system-ui,sans-serif;color:#e8f4ff}' +
+    '#resbar .r{display:flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px}#resbar .r img{width:20px;height:20px}#resbar .r small{font:600 10px system-ui;letter-spacing:.08em;color:rgba(207,232,255,.6);text-transform:uppercase}#resbar .r.lum{color:#8ef0ff}#resbar .r.up b{color:#9dffcf}#resbar .sep{width:1px;height:18px;background:rgba(207,232,255,.2);margin:0 4px}' +
+    '#resbar .r.bad{color:#ff9db0;animation:cmdPulse 1s ease-in-out infinite}@keyframes cmdPulse{50%{opacity:.55}}' +
+    '#cmd{position:fixed;left:14px;top:218px;width:236px;padding:9px 10px 10px;z-index:2;font:12px system-ui,sans-serif;color:#dcecf8;user-select:none}' +
+    '#cmd .ch{display:flex;align-items:center;justify-content:space-between;cursor:pointer}#cmd .ch b{font-size:12px;letter-spacing:.2em;color:#f6d365;text-shadow:0 0 10px rgba(246,211,101,.5)}#cmd .ch span{font-size:16px;line-height:14px;color:rgba(207,232,255,.7);padding:0 4px}' +
+    '#cmd.fold .cb{display:none}#cmd.fold{width:auto}' +
+    '#cmd .csec{margin:9px 0 4px;font:700 10px system-ui;letter-spacing:.16em;color:rgba(207,232,255,.6);display:flex;justify-content:space-between;align-items:center}#cmd .csec small{font:600 9.5px system-ui;letter-spacing:.04em;text-transform:none;color:rgba(207,232,255,.5)}' +
+    '#cmd .crow{display:flex;align-items:center;gap:6px;height:28px;border-radius:8px;padding:0 4px}#cmd .crow:hover{background:rgba(207,232,255,.07)}#cmd .crow i{width:10px;height:10px;border-radius:50%;flex:none;border:1.5px solid #14202e}' +
+    '#cmd .crow .nm{flex:1;font-weight:700;cursor:pointer;white-space:nowrap}#cmd .crow .nm:hover{text-decoration:underline}#cmd .crow .cn{width:26px;text-align:right;font-weight:800;font-size:13px}#cmd .crow .cw{width:22px;text-align:center;color:rgba(207,232,255,.75);font-weight:700}#cmd .crow .cn.low{color:#ffb86b}' +
+    '#cmd .crow button{appearance:none;width:24px;height:24px;border-radius:7px;border:1px solid rgba(207,232,255,.28);background:rgba(7,18,31,.5);color:#e8f4ff;font:800 14px system-ui;line-height:1;cursor:pointer;padding:0}#cmd .crow button:hover{border-color:#33d6a6;box-shadow:inset 0 0 10px rgba(51,214,166,.35)}' +
+    '#cmd .cgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}#cmd .cgrid button{appearance:none;border:1px solid rgba(207,232,255,.24);background:rgba(7,18,31,.45);border-radius:9px;padding:3px 0 4px;cursor:pointer;color:#dcecf8;font:700 9.5px system-ui;letter-spacing:.03em;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0}' +
+    '#cmd .cgrid button img{width:38px;height:38px;display:block}#cmd .cgrid button:hover{border-color:#33d6a6;box-shadow:inset 0 0 12px rgba(51,214,166,.3)}#cmd .cgrid button.on{border-color:#f6d365;box-shadow:inset 0 0 14px rgba(246,211,101,.4)}#cmd .cgrid button.no{opacity:.42}' +
+    '#cmd .cq{margin-top:6px;height:40px;overflow:hidden;font-size:11px;line-height:1.35;color:rgba(207,232,255,.85)}#cmd .cq div{display:flex;justify-content:space-between;gap:6px;white-space:nowrap}#cmd .cq div span{overflow:hidden;text-overflow:ellipsis}#cmd .cq a{color:#ff9db0;cursor:pointer;font-weight:800;padding:0 4px}' +
+    '#cmd .ctip{margin-top:6px;height:44px;overflow:hidden;font-size:11px;line-height:1.3;color:#ffe9a8}#cmd .ctip.dim{color:rgba(207,232,255,.55)}' +
+    '#cmd label{display:flex;align-items:center;gap:4px;cursor:pointer;font:600 9.5px system-ui;letter-spacing:.02em;text-transform:none;color:rgba(207,232,255,.7)}#cmd label input{margin:0;accent-color:#33d6a6}' +
+    'body.cmdOpen #zoom{left:262px}@media (min-width:1100px){body.cmdOpen #rarebox{left:262px}}' +
+    '#selbar{position:fixed;bottom:14px;left:660px;z-index:4;padding:8px 12px;border-radius:16px;display:flex;flex-direction:column;gap:5px;max-width:calc(100vw - 690px);font:12px system-ui,sans-serif;color:#dcecf8}#selbar.hide{display:none}' +
+    '#selbar .s1{display:flex;align-items:center;gap:6px;flex-wrap:wrap;white-space:nowrap}#selbar .s1 b{font-size:12px;letter-spacing:.14em;color:#9dffcf}#selbar .s1 .what{color:rgba(207,232,255,.85);overflow:hidden;text-overflow:ellipsis;max-width:260px}' +
+    '#selbar button{appearance:none;border:1px solid rgba(207,232,255,.28);background:rgba(7,18,31,.5);color:#e8f4ff;border-radius:999px;padding:5px 10px;font:800 10.5px system-ui;letter-spacing:.08em;cursor:pointer;display:flex;align-items:center;gap:5px}#selbar button i{width:8px;height:8px;border-radius:50%;display:inline-block}#selbar button:hover{border-color:#33d6a6}#selbar button.on{border-color:#f6d365;color:#ffe9a8}#selbar button.x{padding:5px 8px}' +
+    '#selbar .s2{font-size:10.5px;color:rgba(207,232,255,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '@media (max-width:1180px){#selbar{left:14px;bottom:76px;max-width:calc(100vw - 28px)}}@media (max-width:720px){#resbar{top:auto;bottom:70px;font-size:11px;padding:3px 8px}#resbar .r small{display:none}#cmd{top:auto;bottom:112px;left:7px}}';
+  const PICS = {}, ICON = {};
+  function icon(k) { if (ICON[k]) return ICON[k]; try { const cv = document.createElement('canvas'); cv.width = cv.height = 44; const x = cv.getContext('2d'); x.translate(22, 24); x.scale(2.1, 2.1); x.lineJoin = 'round'; G.matDraw(x, { x: 0, y: 0, k: k, s: 0.37 }, 0); ICON[k] = cv.toDataURL('image/png'); } catch (e) { ICON[k] = ''; } return ICON[k]; }
+  function pic(type) { if (PICS[type] !== undefined) return PICS[type]; let url = ''; try { const t = type === 'tower' ? 'spire' : type, W = G.W, sp = W && (W.species || []).filter(function (s) { return !s.extinct; }).sort(function (a, b) { return b.n - a.n; })[0];
+      const bp = G.blueprintFrom({ seed: 91 + BUILD.indexOf(type) * 8, type: t, S: t === 'house' ? 50 : t === 'ship' ? 70 : 84, hue: sp ? sp.hue : 190, spiky: 0, brain: 0.7, wet: false }, '22222222222222222222222222222222222222222222222222'); url = G.buildPic({ bp: bp }, 44); } catch (e) { url = ''; } return (PICS[type] = url); }
+  G.on('new-pond', function () { for (const k in PICS) delete PICS[k]; });
+  let ui = null;
+  function build() {
+    if (ui) return ui; const root = $('ui') || document.body;
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    const res = document.createElement('div'); res.id = 'resbar'; res.className = 'glass';
+    res.innerHTML = [0, 1, 2, 3].map(function (k) { return '<span class="r' + (k === 3 ? ' lum' : '') + '" id="res' + k + '" title="' + (k === 3 ? 'Lumen: the rare thing every star wants. It grows as crystals in a few places; gatherers bring it home.' : G.RES[k].charAt(0).toUpperCase() + G.RES[k].slice(1) + ' in the store. Builders build with it; gatherers bring it in.') + '"><img alt="" src="' + icon(k) + '"><b>0</b><small>' + G.RES[k] + '</small></span>'; }).join('') +
+      '<span class="sep"></span><span class="r" id="resPop" title="How many live on your star (and how many of them work)"><b>0</b><small>alive</small></span><span class="r bad" id="resFoe" style="display:none;cursor:pointer" title="Enemies on your star: click to see them"><b>0</b><small>enemies</small></span><span class="r warn" id="resRaid" style="display:none"><small style="color:#ffd0a8"></small></span>';
+    root.appendChild(res); res.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('#resFoe')) C.seeFoes(); });
+    const cmd = document.createElement('div'); cmd.id = 'cmd'; cmd.className = 'glass' + (folded ? ' fold' : '');
+    cmd.innerHTML = '<div class="ch" id="cmdHead" title="Fold or unfold"><b>YOUR COLONY</b><span id="cmdFoldMark">' + (folded ? '+' : '–') + '</span></div><div class="cb">' +
+      '<div class="csec"><span>TRADES</span><small>have · want</small></div>' +
+      ORDER.map(function (k) { return '<div class="crow" data-job="' + k + '" title="' + esc(TIPS[k]) + '"><i style="background:' + COL[k] + '"></i><span class="nm" data-all="' + k + '">' + JOBS[k].name + 's</span><span class="cn" id="cn' + k + '">0</span><button data-want="' + k + '" data-d="-1" aria-label="fewer ' + JOBS[k].many + '">−</button><span class="cw" id="cw' + k + '">0</span><button data-want="' + k + '" data-d="1" aria-label="more ' + JOBS[k].many + '">+</button></div>'; }).join('') +
+      '<div class="crow" title="Those with no trade: they live by their own brains, as all of them used to."><i style="background:' + COL[''] + '"></i><span class="nm" data-all="">Free</span><span class="cn" id="cnfree">0</span><span style="width:78px;font-size:10px;color:rgba(207,232,255,.5);text-align:right">no orders</span></div>' +
+      '<div class="csec"><span>BUILD</span><label title="When it is on, the kinds of your star also build what they themselves decide on, as they always did."><input type="checkbox" id="cmdAuto">they build too</label></div>' +
+      '<div class="cgrid">' + BUILD.map(function (t) { return '<button data-build="' + t + '" title="' + esc(G.BUILDABLE[t].name + ': ' + G.BUILDABLE[t].note) + '"><img alt="" data-pic="' + t + '"><span>' + esc(G.BUILDABLE[t].name) + '</span></button>'; }).join('') + '</div>' +
+      '<div class="cq" id="cmdQ"></div><div class="ctip dim" id="cmdTip"></div></div>';
+    root.appendChild(cmd);
+    cmd.addEventListener('click', function (e) {
+      const t = e.target, b = t.closest ? t.closest('[data-want],[data-all],[data-build],[data-cancel],#cmdHead') : null; if (!b) return;
+      if (b.id === 'cmdHead') { folded = !folded; cmd.classList.toggle('fold', folded); $('cmdFoldMark').textContent = folded ? '+' : '–'; try { localStorage.setItem('primordia.cmdFold', folded ? '1' : '0'); } catch (e2) { /* not kept */ } sig = ''; return; }
+      if (b.dataset.want !== undefined) C.want(b.dataset.want, (+b.dataset.d) * (e.shiftKey ? 5 : 1));
+      else if (b.dataset.all !== undefined) C.all(b.dataset.all);
+      else if (b.dataset.build) C.build(b.dataset.build);
+      else if (b.dataset.cancel) { G.buildCancel(+b.dataset.cancel); sig = ''; }
+    });
+    cmd.addEventListener('change', function (e) { if (e.target && e.target.id === 'cmdAuto') { G.colony().auto = !!e.target.checked; say(e.target.checked ? 'The kinds of your star build what they decide on too.' : 'Nothing is built now but what you order.', 5); if (G.markDirty) G.markDirty(); } });
+    const sel = document.createElement('div'); sel.id = 'selbar'; sel.className = 'glass hide';
+    sel.innerHTML = '<div class="s1"><b id="selN"></b><span class="what" id="selWhat"></span>' + ORDER.map(function (k) { return '<button data-job="' + k + '" title="' + esc(TIPS[k]) + '"><i style="background:' + COL[k] + '"></i>' + JOBS[k].name.toUpperCase() + '</button>'; }).join('') + '<button data-job="" title="No trade: it lives by its own brain">FREE</button><button id="selSend" title="Then click the star: they go there (the same as a right-click)">SEND ▸</button><button class="x" id="selX" title="Let them go (Esc)">✕</button></div><div class="s2" id="selHint"></div>';
+    root.appendChild(sel);
+    sel.addEventListener('click', function (e) { const b = e.target.closest ? e.target.closest('button') : null; if (!b) return; if (b.id === 'selX') { C.clear(); G.select(null); } else if (b.id === 'selSend') { C.send = !C.send; C.placing = null; sig = ''; } else if (b.dataset.job !== undefined) C.job(b.dataset.job); });
+    return (ui = { res: res, cmd: cmd, sel: sel });
+  }
+  const TIPS = { g: 'Gatherers fetch what lies about the star (stone, reed, shell) and lumen, and carry it to the Heart. Click the name to choose them all.', b: 'Builders raise what you order built, from the store and from what lies near. Click the name to choose them all.', f: 'Fighters keep to their rally point, go for any enemy in sight, and attack what you send them against. Click the name to choose them all.', u: 'Guards stand by the place you post them at and do not leave it. Click the name to choose them all.' };
+
+  function refresh() {
+    const W = G.W, on = live(); build(); document.body.classList.toggle('cmdOpen', on && !folded);
+    ui.res.style.display = on ? '' : 'none'; ui.cmd.style.display = on ? '' : 'none'; if (!on) { ui.sel.classList.add('hide'); return; }
+    C.sel = C.sel.filter(mine);
+    const col = G.colony(W), n = G.jobCount(W), foes = W.cre.filter(function (c) { return c.team && !c.dead; }).length, hp = G.heartOf(W), hc = hp ? G.buildCount(hp) : [0, 0, 1];
+    const selSig = C.sel.length + ':' + C.sel.map(function (c) { return c.job || '-'; }).join('');
+    const s = [col.stock.join(','), JSON.stringify(n), JSON.stringify(col.want), foes, col.queue.map(function (q) { return q.id; }).join('.'), W.deed && W.deed.ordered ? W.deed.title + (W.deed.wait || '') + (W.deed.placed || 0) : '', C.placing, C.send, selSig, tip && now() < tipUntil ? tip : '', col.auto, folded, hc.join('/'), col.raid ? col.raid.state + col.raid.id : ''].join('|');
+    { const se = $('season'); if (se && se.offsetHeight) { const top = Math.round(se.getBoundingClientRect().bottom + 10); if (window.innerWidth > 720 && ui.cmd.style.top !== top + 'px') ui.cmd.style.top = top + 'px'; } }
+    if (s === sig) return; sig = s;
+    for (let k = 0; k < 4; k++) { const e = $('res' + k); e.querySelector('b').textContent = col.stock[k]; }
+    $('resPop').querySelector('b').textContent = n.all; $('resPop').title = n.all + ' live on your star: ' + (n.all - n.free) + ' work, ' + n.free + ' are free.';
+    { const f = $('resFoe'); f.style.display = foes ? '' : 'none'; f.querySelector('b').textContent = foes; const w = $('resRaid'), r = col.raid; w.style.display = r && r.state === 'warn' ? '' : 'none'; if (r && r.state === 'warn') { w.querySelector('small').textContent = 'raid next spring: ~' + r.n; w.title = G.raidText(W) + '.'; } }
+    ORDER.forEach(function (k) { const a = $('cn' + k); a.textContent = n[k]; a.classList.toggle('low', n[k] < (col.want[k] | 0)); $('cw' + k).textContent = col.want[k] | 0; });
+    $('cnfree').textContent = n.free; $('cmdAuto').checked = col.auto !== false;
+    const imgs = ui.cmd.querySelectorAll('img[data-pic]'); for (let i = 0; i < imgs.length; i++) { const u = pic(imgs[i].dataset.pic); if (u && imgs[i].getAttribute('src') !== u) imgs[i].src = u; }
+    const bs = ui.cmd.querySelectorAll('[data-build]'); for (let i = 0; i < bs.length; i++) { const t = bs[i].dataset.build, K = G.BUILDABLE[t]; bs[i].classList.toggle('on', C.placing === t); bs[i].classList.toggle('no', !!(K.cost && K.cost.some(function (v, q) { return v > col.stock[q]; })) || (t === 'ship' && !!G.buildOk('ship', 0, 0))); }
+    { const d = W.deed && W.deed.ordered ? W.deed : null, rows = []; if (d) { const c = d.bp ? G.buildCount(d) : null; rows.push('<div><span><b>' + esc(d.title) + '</b> ' + (c ? c[0] + ' of ' + c[2] + ' pieces' : 'being laid out') + (d.wait ? ' · waiting for ' + esc(d.wait) : '') + '</span></div>'); }
+      col.queue.slice(0, d ? 1 : 2).forEach(function (q, i) { rows.push('<div><span>' + esc(q.name) + ' · ' + (n.b < 2 ? 'needs 2 builders' : !d && i === 0 && W.deed ? 'after the ' + esc(W.deed.title || 'plan') : 'waiting') + '</span><a data-cancel="' + q.id + '" title="Do not build it">✕</a></div>'); });
+      if (col.queue.length > (d ? 1 : 2)) rows[rows.length - 1] = rows[rows.length - 1].replace('</span>', ' (+' + (col.queue.length - (d ? 1 : 2)) + ' more)</span>');
+      $('cmdQ').innerHTML = rows.join(''); }
+    { const t = $('cmdTip'), live2 = tip && now() < tipUntil; t.textContent = live2 ? tip : C.placing ? 'Click the place for the ' + G.BUILDABLE[C.placing].name + '. Right-click to let it be.' : 'Drag a box to choose creatures. Right-click sends them. Move the view with the right button, or W A S D.'; t.classList.toggle('dim', !live2 && !C.placing); }
+    // those you have chosen
+    const m = C.sel.length; ui.sel.classList.toggle('hide', !m);
+    if (m) { const by = {}; let land = 0; C.sel.forEach(function (c) { by[c.job || ''] = (by[c.job || ''] || 0) + 1; if (c.ph.home) land++; });
+      $('selN').textContent = m === 1 ? '1 CHOSEN' : m + ' CHOSEN'; $('selWhat').textContent = ORDER.concat(['']).filter(function (k) { return by[k]; }).map(function (k) { return by[k] + ' ' + (k ? (by[k] === 1 ? JOBS[k].name.toLowerCase() : JOBS[k].many) : 'free'); }).join(', ');
+      const bb = ui.sel.querySelectorAll('button[data-job]'); for (let i = 0; i < bb.length; i++) bb[i].classList.toggle('on', Object.keys(by).length === 1 && by[bb[i].dataset.job] === m);
+      $('selSend').classList.toggle('on', C.send);
+      $('selHint').textContent = C.send ? 'Now click the star: where they are to go, an enemy to attack, or something to gather.' : (land && land < m ? land + ' of the land, ' + (m - land) + ' of the water. ' : land ? 'Of the land. ' : 'Of the water. ') + 'Right-click the star to send them; an enemy to attack; a thing lying about to gather it.';
+      const tb = $('toolbar'), ins = $('inspector'); if (tb && window.innerWidth > 1180) { ui.sel.style.left = Math.round(tb.getBoundingClientRect().right + 12) + 'px'; const insOpen = ins && !ins.classList.contains('hide') && ins.offsetHeight; ui.sel.style.maxWidth = 'calc(100vw - ' + Math.round(tb.getBoundingClientRect().right + 26 + (insOpen ? 322 : 0)) + 'px)'; $('selHint').style.display = insOpen ? 'none' : ''; } else { ui.sel.style.left = ''; ui.sel.style.maxWidth = ''; } }
+  }
+
+  // ── what is drawn on the star ──
+  function label(ctx, x, y, inv, a, colr, size) { ctx.save(); ctx.translate(x, y); ctx.scale(inv, inv); ctx.font = '800 ' + (size || 10.5) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const w = ctx.measureText(a).width + 12; ctx.fillStyle = 'rgba(7,18,31,0.72)'; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(-w / 2, -9, w, 18, 9); else ctx.rect(-w / 2, -9, w, 18); ctx.fill(); ctx.fillStyle = colr || '#e8f4ff'; ctx.fillText(a, 0, 0.5); ctx.restore(); }
+  function flag(ctx, x, y, inv, colr, t) { ctx.save(); ctx.translate(x, y); ctx.scale(inv, inv); ctx.strokeStyle = '#14202e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -26); ctx.stroke(); ctx.fillStyle = colr; ctx.beginPath(); ctx.moveTo(0, -26); ctx.lineTo(15 + Math.sin(t * 5) * 1.5, -21); ctx.lineTo(0, -16); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0, 0, 6, 2.5, 0, 0, 6.2832); ctx.fillStyle = 'rgba(7,18,31,0.5)'; ctx.fill(); ctx.restore(); }
+  function draw() {
+    const ctx = G.ctx, v = G.view, W = G.W; if (!ctx || !W || !live()) return;
+    const t = G.rt || 0, T = now(), s = v.scale * v.dpr, inv = 1 / v.scale, col = G.colony(W), chosen = new Set(C.sel);
+    ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    // lumen: crystals where it grows
+    const N = G.lumenNodes(W);
+    for (let i = 0; i < N.length; i++) { const q = N[i], k = Math.min(9, q.n <= 0 ? 0 : 2 + Math.ceil(q.n / 4));
+      const g = ctx.createRadialGradient(q.x, q.y - 6, 2, q.x, q.y - 6, 46); g.addColorStop(0, 'rgba(120,235,255,' + (q.n > 0 ? 0.30 + 0.08 * Math.sin(t * 2 + i) : 0.05) + ')'); g.addColorStop(1, 'rgba(120,235,255,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.x, q.y - 6, 46, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = 'rgba(20,32,46,0.55)'; ctx.beginPath(); ctx.ellipse(q.x, q.y + 6, 24, 7, 0, 0, 6.2832); ctx.fill();
+      for (let j = 0; j < k; j++) { const a = j * 2.4, r = j === 0 ? 0 : 7 + (j % 3) * 5; ctx.save(); ctx.translate(q.x + Math.cos(a) * r, q.y + 2 - Math.abs(Math.sin(a)) * r * 0.5 - (j === 0 ? 4 : 0)); const z = j === 0 ? 2.1 : 1.3 + (j % 2) * 0.3; ctx.scale(z, z); G.matDraw(ctx, { x: 0, y: 0, k: 3, s: j * 0.37 + i }, t); ctx.restore(); }
+      if (v.scale > 0.45) label(ctx, q.x, q.y + 22, inv, q.n > 0 ? 'LUMEN ' + q.n : 'lumen: growing back', q.n > 0 ? '#8ef0ff' : 'rgba(207,232,255,.6)', 10); }
+    // the store, beside the Heart: what is in it lies there to be seen
+    const st = G.storeAt(W), hp = G.heartOf(W);
+    if (st) { for (let k = 0; k < 4; k++) { const n = Math.min(10, Math.ceil(col.stock[k] / (k === 3 ? 2 : 5))); for (let j = 0; j < n; j++) G.matDraw(ctx, { x: st.x - 22 + k * 15 + (j % 2) * 6, y: st.y - 2 - Math.floor(j / 2) * 5, k: k, s: (j * 0.31 + k * 0.17) % 1 }, t); } }
+    if (hp) { const c = G.buildCount(hp), top = hp.y + hp.bp.S * 0.45 + 12 * inv; if (c[0] < c[2] || hp.ruin || T - (hp.hitAt || 0) < 4000) { const w = 70 * inv, hh = 6 * inv; ctx.fillStyle = 'rgba(7,18,31,0.75)'; ctx.fillRect(hp.x - w / 2, top, w, hh); ctx.fillStyle = c[0] / c[2] > 0.5 ? '#6ef0a8' : c[0] / c[2] > 0.25 ? '#f6d365' : '#ff5d73'; ctx.fillRect(hp.x - w / 2, top, w * c[0] / c[2], hh); if (hp.ruin) label(ctx, hp.x, top - 13 * inv, inv, 'being raised again', '#ffe9a8', 10); } }
+    // what is waiting to be built, and the place being chosen for something
+    col.queue.forEach(function (q) { if (q.type === 'ship') return; ctx.strokeStyle = 'rgba(255,154,76,' + (0.55 + 0.2 * Math.sin(t * 3)) + ')'; ctx.lineWidth = 2 * inv; ctx.setLineDash([8 * inv, 7 * inv]); ctx.beginPath(); ctx.ellipse(q.x, q.y - 34, 52, 44, 0, 0, 6.2832); ctx.stroke(); ctx.setLineDash([]); label(ctx, q.x, q.y + 12 * inv, inv, q.name + ': to be built', '#ffd0a8', 10); });
+    if (C.placing && G.input.ptr.inside) { const p = G.input.ptr, why = G.buildOk(C.placing, p.wx, p.wy), okc = why ? '255,93,115' : '110,240,168'; ctx.fillStyle = 'rgba(' + okc + ',0.16)'; ctx.strokeStyle = 'rgba(' + okc + ',0.9)'; ctx.lineWidth = 2 * inv; ctx.beginPath(); ctx.ellipse(p.wx, p.wy - 34, 56, 46, 0, 0, 6.2832); ctx.fill(); ctx.stroke();
+      const u = pic(C.placing); if (u) { let im = draw.img || (draw.img = {}); if (!im[C.placing]) { im[C.placing] = new Image(); im[C.placing].src = u; } if (im[C.placing].complete && im[C.placing].naturalWidth) { ctx.globalAlpha = 0.75; ctx.drawImage(im[C.placing], p.wx - 50, p.wy - 93, 100, 100); ctx.globalAlpha = 1; } }
+      label(ctx, p.wx, p.wy + 16 * inv, inv, why || G.BUILDABLE[C.placing].name + ': click to build here', why ? '#ffb3c0' : '#b9ffd9', 11); }
+    // a raid: the ship it came in
+    { const r = col.raid; if (r && r.state !== 'warn') { const bp = raidShip(r), tt = W.t - r.t0, S = bp.S; let off = 0; if (r.state === 'land' && tt < 3) { const u = 1 - tt / 3; off = -720 * u * u; } else if (r.state === 'leave' && tt > 1.5) { const u = (tt - 1.5) / 4; off = -900 * u * u; }
+        ctx.fillStyle = 'rgba(4,12,20,' + 0.32 * Math.max(0, 1 + off / 500) + ')'; ctx.beginPath(); ctx.ellipse(r.x, r.y + 4, S * 0.7, 8, 0, 0, 6.2832); ctx.fill();
+        if (off < -4) { const g = ctx.createLinearGradient(0, r.y + off, 0, r.y + off + 70); g.addColorStop(0, 'rgba(255,220,140,0.9)'); g.addColorStop(1, 'rgba(255,110,60,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(r.x - 12, r.y + off); ctx.lineTo(r.x + 12, r.y + off); ctx.lineTo(r.x + Math.sin(t * 30) * 4, r.y + off + 50 + Math.sin(t * 23) * 12); ctx.closePath(); ctx.fill(); }
+        G.drawBlueprint(ctx, { x: r.x, y: r.y + off - S * 0.45, bp: bp }, false);
+        label(ctx, r.x, r.y + off - (bp.top || S * 1.6) - 14 * inv, inv, 'RAIDERS OF ' + String(r.name).toUpperCase(), '#ff9db0', 10.5); } }
+    // where the fighters rally, and where guards are posted
+    if (col.rally && G.jobCount(W).f) { flag(ctx, col.rally.x, col.rally.y, inv, COL.f, t); if (v.scale > 0.5) label(ctx, col.rally.x, col.rally.y + 12 * inv, inv, 'rally', '#ffc0ca', 9.5); }
+    { const seen = {}; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.team || !c.post || (c.job !== 'u' && c.job !== 'f') || (c.job === 'f' && col.rally && c.post === col.rally)) continue; const key = Math.round(c.post.x / 20) + ',' + Math.round(c.post.y / 20); if (seen[key]) continue; seen[key] = 1; flag(ctx, c.post.x, c.post.y, inv, COL[c.job], t); } }
+    if (!W.deed && G.drawHauls) G.drawHauls(ctx);      // what the gatherers carry (while a plan is on, the plan draws it)
+    // the creatures: a ring under the chosen and under enemies, a mark of its trade over every worker, and how hurt those in a fight are
+    for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.inShip) continue; const x = c.rx === undefined ? c.x : c.rx, y = c.ry === undefined ? c.y : c.ry, r = c.ph.r;
+      if (c.team) { ctx.strokeStyle = 'rgba(255,60,90,' + (0.75 + 0.2 * Math.sin(t * 6 + i)) + ')'; ctx.lineWidth = Math.max(2, 2 * inv); ctx.beginPath(); ctx.ellipse(x, y + r * 0.1, r * 1.35 + 2, r * 0.5 + 1.5, 0, 0, 6.2832); ctx.stroke(); ctx.fillStyle = '#ff3c5a'; ctx.beginPath(); const yy = y - r * 2.2 - 6 * inv, z = Math.max(4, 4.5 * inv); ctx.moveTo(x, yy + z); ctx.lineTo(x - z, yy - z * 0.6); ctx.lineTo(x + z, yy - z * 0.6); ctx.closePath(); ctx.fill(); ctx.strokeStyle = '#14202e'; ctx.lineWidth = inv; ctx.stroke(); }
+      else { if (chosen.has(c)) { ctx.strokeStyle = 'rgba(120,255,190,0.95)'; ctx.lineWidth = Math.max(1.6, 2 * inv); ctx.beginPath(); ctx.ellipse(x, y + r * 0.1, r * 1.35 + 2, r * 0.5 + 1.5, 0, 0, 6.2832); ctx.stroke(); }
+        if (c.job && COL[c.job]) { const z = Math.max(2.6, 3.4 * inv), yy = y - r * 1.9 - 5 * inv; ctx.fillStyle = COL[c.job]; ctx.strokeStyle = '#14202e'; ctx.lineWidth = Math.max(0.8, inv); ctx.beginPath(); if (c.job === 'f') { ctx.moveTo(x, yy - z * 1.2); ctx.lineTo(x + z, yy + z * 0.8); ctx.lineTo(x - z, yy + z * 0.8); ctx.closePath(); } else if (c.job === 'u') ctx.rect(x - z * 0.85, yy - z * 0.85, z * 1.7, z * 1.7); else if (c.job === 'b') { ctx.moveTo(x, yy - z); ctx.lineTo(x + z, yy); ctx.lineTo(x, yy + z); ctx.lineTo(x - z, yy); ctx.closePath(); } else ctx.arc(x, yy, z * 0.9, 0, 6.2832); ctx.fill(); ctx.stroke(); if (c.hungry) { ctx.fillStyle = 'rgba(7,18,31,0.6)'; ctx.beginPath(); ctx.arc(x, yy, z * 0.45, 0, 6.2832); ctx.fill(); } } }
+      if (c.hpT && T - c.hpT < 4500) { const w = 24 * inv, hh = 3.5 * inv, yy = y - r * 2.6 - 12 * inv, f = G.clamp(c.E / c.ph.Emax, 0, 1); ctx.fillStyle = 'rgba(7,18,31,0.8)'; ctx.fillRect(x - w / 2 - inv, yy - inv, w + 2 * inv, hh + 2 * inv); ctx.fillStyle = c.team ? '#ff5d73' : '#6ef0a8'; ctx.fillRect(x - w / 2, yy, w * f, hh); } }
+    // a tower's stroke, an order just given, and what was just lost or won
+    for (let i = ZAP.length - 1; i >= 0; i--) { const z = ZAP[i], u = (T - z.t0) / 260; if (u >= 1) { ZAP.splice(i, 1); continue; } ctx.strokeStyle = 'rgba(140,240,255,' + (1 - u) + ')'; ctx.lineWidth = (3.5 - 2 * u) * Math.max(1, inv); ctx.beginPath(); ctx.moveTo(z.x0, z.y0); ctx.lineTo((z.x0 + z.x1) / 2 + Math.sin(i * 7 + z.t0) * 8, (z.y0 + z.y1) / 2 + Math.cos(i * 5 + z.t0) * 8); ctx.lineTo(z.x1, z.y1); ctx.stroke(); }
+    for (let i = FX.length - 1; i >= 0; i--) { const f = FX[i], u = (T - f.t0) / 900; if (u >= 1) { FX.splice(i, 1); continue; } const a = 1 - u;
+      if (f.from && u < 0.5) { ctx.strokeStyle = 'rgba(' + f.col + ',' + 0.5 * (1 - u * 2) + ')'; ctx.lineWidth = 1.5 * inv; ctx.beginPath(); for (let k = 0; k < f.from.length && k < 40; k++) { ctx.moveTo(f.from[k].x, f.from[k].y); ctx.lineTo(f.x, f.y); } ctx.stroke(); }
+      ctx.strokeStyle = 'rgba(' + f.col + ',' + a + ')'; ctx.lineWidth = 2.5 * inv; ctx.beginPath(); ctx.ellipse(f.x, f.y, (8 + 26 * u) * inv, (4 + 13 * u) * inv, 0, 0, 6.2832); ctx.stroke(); ctx.beginPath(); ctx.ellipse(f.x, f.y, (4 + 12 * u) * inv, (2 + 6 * u) * inv, 0, 0, 6.2832); ctx.stroke(); }
+    for (let i = POP.length - 1; i >= 0; i--) { const p = POP[i], u = (T - p.t0) / 1400; if (u >= 1) { POP.splice(i, 1); continue; } ctx.globalAlpha = Math.min(1, (1 - u) * 2); label(ctx, p.x, p.y - (14 + 26 * u) * inv, inv, p.text, p.col, 11); ctx.globalAlpha = 1; }
+    ctx.restore();
+    // the box being dragged
+    const b = G.ui.box; if (b) { ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); ctx.fillStyle = 'rgba(120,255,190,0.10)'; ctx.strokeStyle = 'rgba(120,255,190,0.9)'; ctx.lineWidth = 1.5; const x = Math.min(b.x0, b.x1), y = Math.min(b.y0, b.y1), w = Math.abs(b.x1 - b.x0), h = Math.abs(b.y1 - b.y0); ctx.fillRect(x, y, w, h); ctx.strokeRect(x + 0.5, y + 0.5, w, h); ctx.restore(); }
+  }
+
+  const SHIPS = {};
+  function raidShip(r) { const k = r.seed + ':' + Math.round(r.hue); if (!SHIPS[k]) SHIPS[k] = G.blueprintFrom({ seed: r.seed, type: 'ship', S: 74, hue: r.hue, spiky: 1, brain: 0.8, wet: false }, '22222222222222222222222222222222222222222222222222'); return SHIPS[k]; }
+  /** take the view to where the enemy is (their raiders, or the ship they came in) */
+  C.seeFoes = function () { const W = G.W; if (!W) return; const L = W.cre.filter(function (c) { return c.team && !c.dead; }), r = G.colony(W).raid; let x = 0, y = 0; if (L.length) { L.forEach(function (c) { x += c.x; y += c.y; }); x /= L.length; y /= L.length; } else if (r && r.state !== 'warn') { x = r.x; y = r.y; } else return; G.select(null); G.focusOn(x, y, 1.5); };
+  G.on('raid-warn', function (r) { if (G.mode !== 'play') return; G.banner('A raid is coming', 'The colony of ' + r.name + ' is sending a ship: about ' + r.n + ' raiders will land next spring, and go for your Heart. Name fighters and guards and keep them near it.', 9000); if (G.log) G.log('sel', 'A raid is coming', 'From ' + r.name + ': about ' + r.n + ' raiders, next spring. If the Heart falls they take what is in the store.'); if (G.hub) G.hub.poke(); sig = ''; });
+  G.on('raid-land', function (r) { if (G.mode !== 'play') return; if (G.speed > 4) G.setSpeed(1); G.banner('Raid', 'The raiders of ' + r.name + ' are landing on your star! ' + (G.jobCount().f + G.jobCount().u ? 'Your fighters and guards will meet them.' : 'You have no fighters: name some, quickly.'), 8000); if (G.sfx) G.sfx('discovery'); sig = ''; });
+  G.on('raid-over', function (r, how) { if (G.mode !== 'play') return; if (how === 'beaten') { G.banner('The raid is beaten', 'Every raider of ' + r.name + ' is slain. You took ' + r.loot + ' lumen from their ship.', 8000); if (G.log) G.log('sel', 'Raid beaten', 'The raiders of ' + r.name + ' are all slain: ' + r.loot + ' lumen taken from their ship.'); } else if (how === 'worn') { if (G.note) G.note('The raid', 'The raiders of ' + r.name + ' have given up and are going home.'); } if (G.hub) G.hub.poke(); sig = ''; });
+  if (G.hub) { G.hub.add(function (W) { const col = W.col, r = col && col.raid; if (!r || W.farOf) return null; const txt = G.raidText(W), hp = G.heartOf(W), hc = hp ? G.buildCount(hp) : [0, 0, 1], n = G.jobCount(W);
+      const row = G.hub.row({ icon: '!', title: r.state === 'warn' ? 'A raid is coming' : 'Raid', tag: r.state === 'warn' ? 'next spring' : r.state === 'on' ? (r.left || r.n) + ' raiders' : '', bad: true, sub: esc(txt) + '. You have <b>' + n.f + ' fighters</b> and <b>' + n.u + ' guards</b>; the Heart has ' + hc[0] + ' of ' + hc[2] + ' pieces.', act: r.state === 'warn' ? '' : 'foes', live: r.state !== 'warn' });
+      return { sig: 'raid' + r.id + r.state + (r.left || 0) + hc[0] + n.f + n.u, dangers: [row], alarm: ['raid' + r.id + r.state], alarmRows: [row] }; }); G.hub.act('foes', function () { C.seeFoes(); }); }
+
+  // ── what happens, told ──
+  G.on('fight', function (a, b) { const T = now(); a.hpT = T; b.hpT = T; });
+  G.on('tower-zap', function (w, c) { ZAP.push({ x0: w.x, y0: w.y + w.bp.S * 0.45 - (w.bp.top || 100), x1: c.x, y1: c.y, t0: now() }); c.hpT = now(); });
+  G.on('slain', function (a, b) { if (G.mode !== 'play') return; POP.push({ x: b.x, y: b.y, t0: now(), text: b.team ? 'enemy slain' : (b.job ? JOBS[b.job].name.toLowerCase() : 'one of yours') + ' lost', col: b.team ? '#b9ffd9' : '#ffb3c0' }); });
+  G.on('tower-kill', function (w, b) { if (G.mode === 'play') POP.push({ x: b.x, y: b.y, t0: now(), text: 'struck down by the ' + w.name, col: '#b9ffd9' }); });
+  G.on('delivered', function (c, k) { if (G.mode !== 'play' || G.speed > 4) return; const st = G.storeAt(G.W); if (st && k === 3) POP.push({ x: st.x, y: st.y - 10, t0: now(), text: '+1 lumen', col: '#8ef0ff' }); });
+  let hitSaid = 0;
+  G.on('work-hit', function (w, by) { if (G.mode !== 'play' || !w.bp) return; w.hitAt = now(); if (w.bp.type === 'heart' && by && by.team && now() - hitSaid > 25000) { hitSaid = now(); G.banner('Raid', 'Your Heart is under attack! Send your fighters: choose them (click FIGHTERS in the colony panel) and right-click the enemy.', 7000); if (G.log) G.log('sel', 'The Heart is under attack', 'Raiders are breaking it piece by piece. If it falls they take everything in the store.'); } });
+  G.on('heart-fell', function (h, by, taken) { if (G.mode !== 'play') return; const got = (taken || []).map(function (n, k) { return n ? n + ' ' + G.RES[k] : ''; }).filter(Boolean).join(', '); G.banner('The Heart has fallen', 'The raiders broke your Heart' + (got ? ' and took what was in the store: ' + got : '') + '. They are going home. Your builders will raise it again.', 8000); if (G.log) G.log('sel', 'The Heart has fallen', (got ? 'Taken from the store: ' + got + '. ' : '') + 'Your builders will raise it again, piece by piece.'); });
+  G.on('heart-whole', function () { if (G.mode === 'play' && G.note) G.note('The Heart', 'The Heart is whole again.'); });
+  G.on('build-started', function (o) { if (G.mode === 'play') say('Your builders have started on the ' + o.name + '.', 6); });
+  G.on('deed-end', function (d, how) { if (G.mode === 'play' && d && d.ordered) { say(how === 'done' ? 'The ' + d.title + ' is finished.' : 'The ' + d.title + ' was given up: too few builders came to it.', 8); sig = ''; } });
+
+  // ── keeping it all going ──
+  G.addSystem({ name: 'command',
+    update: function (dt) {
+      const T = now(); if (T - lastT > 250) { lastT = T; try { refresh(); } catch (e) { console.error(e); } }
+      // the view is moved with W A S D or the arrow keys
+      if (G.mode === 'play' && G.W && !G.isBlocked() && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) { const K = G.input.keys, dx = (K.d || K.ArrowRight ? 1 : 0) - (K.a || K.ArrowLeft ? 1 : 0), dy = (K.s || K.ArrowDown ? 1 : 0) - (K.w || K.ArrowUp ? 1 : 0); if (dx || dy) { const sp = 620 / G.view.scale * Math.min(0.05, dt || 0.016); G.cam.x += dx * sp; G.cam.y += dy * sp; G.applyCam(); } }
+    },
+    draw: function () { try { draw(); } catch (e) { if (!draw.err) { draw.err = 1; console.error(e); } } } });
+})();
+
+</script>
 <script data-part="budget">
 // ── A budget for every thing the AI does ──
 // Each kind of AI work has its own budget in dollars FOR THIS POND (what a pond has spent is kept in its save, G.ai.life).
@@ -13732,7 +14330,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const W = G.W;
     if (!W || W.title) return null;
     const out = {
-      v: 1, at: Date.now(), craft: W.craft || undefined, far: G.voyCollect ? undefined : W.farKeep || undefined, hstyle: W.houseStyle || undefined, taught: W.taught || undefined, works: (W.works || []).filter(function (w) { return w.bp; }).slice(-24).map(function (w) { const b = w.bp; return { n: w.name, l: w.looks, x: Math.round(w.x), y: Math.round(w.y), r: Math.round(w.r), by: w.by, hue: Math.round(w.hue || 0), sp: w.sp || 0, plan: w.plan, what: w.what, why: w.why, gen: w.gen, b: [b.seed, b.type, Math.round(b.S), Math.round(b.hue), b.spiky, +b.brain.toFixed(2), b.wet === false ? 0 : 1], pk: G.blueprintPack ? G.blueprintPack(b) || undefined : undefined, st: b.P.map(function (p) { return p.st; }).join('') }; }), room: +(W.room || 0).toFixed(1), shore: +(W.shore || G.SHORE0).toFixed(3), rich: +(W.richS || 1).toFixed(3), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
+      v: 1, at: Date.now(), farOf: W.farOf || undefined, colony: W.col ? { stock: W.col.stock, got: W.col.got, want: W.col.want, rally: W.col.rally, auto: W.col.auto, queue: (W.col.queue || []).slice(0, 12), nodes: W.col.nodes, nextQ: W.col.nextQ, foes: W.col.foes, fell: W.col.fell, peace: W.col.peace, nextRaid: W.col.nextRaid, raidN: W.col.raidN, fellNow: W.col.fellNow, raid: W.col.raid ? (function (r) { return { id: r.id, key: r.key, i: r.i, j: r.j, name: r.name, hue: r.hue, n: r.n, landGen: r.landGen, landed: r.landed, state: r.state, out: r.out, t0: r.t0, x: r.x, y: r.y, seed: r.seed, how: r.how, loot: r.loot, tired: r.tired, wornOut: r.wornOut }; })(W.col.raid) : undefined } : undefined, craft: W.craft || undefined, far: G.voyCollect ? undefined : W.farKeep || undefined, hstyle: W.houseStyle || undefined, taught: W.taught || undefined, works: (W.works || []).filter(function (w) { return w.bp; }).slice(-24).map(function (w) { const b = w.bp; return { n: w.name, l: w.looks, x: Math.round(w.x), y: Math.round(w.y), r: Math.round(w.r), by: w.by, hue: Math.round(w.hue || 0), sp: w.sp || 0, plan: w.plan, what: w.what, why: w.why, gen: w.gen, b: [b.seed, b.type, Math.round(b.S), Math.round(b.hue), b.spiky, +b.brain.toFixed(2), b.wet === false ? 0 : 1], pk: G.blueprintPack ? G.blueprintPack(b) || undefined : undefined, st: b.P.map(function (p) { return p.st; }).join('') }; }), room: +(W.room || 0).toFixed(1), shore: +(W.shore || G.SHORE0).toFixed(3), rich: +(W.richS || 1).toFixed(3), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
       set: W.set, disc: W.disc, nextSp: W.nextSp, ai: G.ai && G.ai.model ? G.ai.model : '', drawn: G.ai && G.ai.drawn ? 1 : 0, spend: G.ai ? G.ai.life : {},
       hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species, +(h.look || 0).toFixed(3), +(h.lookTop || 0).toFixed(2), +(h.whole || 0).toFixed(3), +(h.wholeTop || 0).toFixed(2), +(h.body || 0).toFixed(1), +(h.bodyTop || 0).toFixed(1), +(h.size || 0).toFixed(1), +(h.sizeTop || 0).toFixed(1), (G.MARKS_X || []).map(function (m) { const q = h.mx && h.mx[m.id]; return q ? [+q[0].toFixed(3), +q[1].toFixed(2)] : 0; }), +(h.room || 0).toFixed(1)]; }),
       discLog: W.discLog.slice(-40),
@@ -13758,7 +14356,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const maxC = Math.min(sorted.length, 220);
     for (let i = 0; i < maxC; i++) {
       const c = sorted[i];
-      out.cre.push([G.packGenome(c.g), Math.round(c.x), Math.round(c.y), Math.round(c.E), c.age, c.sp, c.born, c.eb === undefined ? -1 : +c.eb.toFixed(2), c.ew === undefined ? -1 : +c.ew.toFixed(2), c.real ? 1 : 0, c.real ? c.real.why : '', (G.MARKS_X || []).map(function (m) { return c.mx && c.mx[m.id] !== undefined ? +c.mx[m.id].toFixed(2) : -1; }), c.line ? (c.crew ? 2 : 1) : 0]);
+      out.cre.push([G.packGenome(c.g), Math.round(c.x), Math.round(c.y), Math.round(c.E), c.age, c.sp, c.born, c.eb === undefined ? -1 : +c.eb.toFixed(2), c.ew === undefined ? -1 : +c.ew.toFixed(2), c.real ? 1 : 0, c.real ? c.real.why : '', (G.MARKS_X || []).map(function (m) { return c.mx && c.mx[m.id] !== undefined ? +c.mx[m.id].toFixed(2) : -1; }), c.line ? (c.crew ? 2 : 1) : 0, c.job || '', c.team | 0]);
     }
     // children already on their way (spring's births come a few at a time) are saved as born, so a save in spring does not lose them
     (W.births || []).slice(0, 60).forEach(function (b) { const c = b && b.c; if (!c || !c.g || out.cre.length >= 240) return; out.cre.push([G.packGenome(c.g), Math.round(b.x), Math.round(b.y), Math.round(c.E), c.age || 0, c.sp || 0, c.born === undefined ? W.gen : c.born, -1, -1, 0, '']); });
@@ -13884,11 +14482,20 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     G.newWorld({ seed: num(d.seed, 1, 4e9, 1) });
     const W = G.W;
     W.gen = Math.floor(num(d.gen, 1, 1e6, 1));
+    if (typeof d.farOf === 'string') W.farOf = d.farOf.slice(0, 40);
+    if (d.colony && typeof d.colony === 'object' && G.colony) { const c0 = G.colony(W), q = d.colony, n4 = function (a) { return Array.isArray(a) ? [0, 1, 2, 3].map(function (i) { return Math.floor(num(a[i], 0, 1e7, 0)); }) : [0, 0, 0, 0]; };
+      c0.stock = n4(q.stock); c0.got = n4(q.got); ['g', 'b', 'f', 'u'].forEach(function (k) { c0.want[k] = Math.floor(num(q.want && q.want[k], 0, 400, 0)); }); c0.auto = q.auto !== false; c0.nextQ = Math.floor(num(q.nextQ, 0, 1e6, 0));
+      if (q.rally && isFinite(+q.rally.x)) c0.rally = { x: num(q.rally.x, 0, 1e5, 500), y: num(q.rally.y, 0, 1e5, 500) };
+      if (Array.isArray(q.nodes)) c0.nodes = q.nodes.slice(0, 8).map(function (o) { return { x: num(o.x, 0, 1e5, 500), y: num(o.y, 0, 1e5, 500), n: Math.floor(num(o.n, 0, 9999, 0)), n0: Math.floor(num(o.n0, 0, 9999, 0)), k: 3 }; });
+      if (Array.isArray(q.queue)) c0.queue = q.queue.slice(0, 12).filter(function (o) { return o && G.BUILDABLE && G.BUILDABLE[o.type]; }).map(function (o) { return { id: Math.floor(num(o.id, 0, 1e6, 0)), type: o.type, x: num(o.x, 0, 1e5, 500), y: num(o.y, 0, 1e5, 500), name: String(o.name || '').replace(/[<>]/g, '').slice(0, 30), gen: num(o.gen, 0, 1e6, 0) }; });
+      if (q.foes && typeof q.foes === 'object') { c0.foes = {}; Object.keys(q.foes).slice(0, 24).forEach(function (k) { const f = q.foes[k]; if (f && /^-?[0-9]+,-?[0-9]+$/.test(k)) c0.foes[k] = { name: String(f.name || '').replace(/[<>]/g, '').slice(0, 30), hue: num(f.hue, 0, 360, 200), raids: Math.floor(num(f.raids, 0, 1e5, 0)), beaten: Math.floor(num(f.beaten, 0, 1e5, 0)), won: Math.floor(num(f.won, 0, 1e5, 0)), taken: f.taken ? Math.floor(num(f.taken, 0, 1e6, 0)) : undefined }; }); }
+      c0.fell = Math.floor(num(q.fell, 0, 1e5, 0)); c0.peace = !!q.peace; c0.nextRaid = Math.floor(num(q.nextRaid, 0, 1e7, 0)); c0.raidN = Math.floor(num(q.raidN, 0, 1e5, 0)); c0.fellNow = Math.floor(num(q.fellNow, 0, 1e5, 0));
+      if (q.raid && typeof q.raid === 'object' && /^(warn|land|on|leave)$/.test(q.raid.state)) { const r = q.raid; c0.raid = { id: Math.floor(num(r.id, 0, 1e5, 1)), key: String(r.key || '').slice(0, 20), i: Math.floor(num(r.i, -99, 99, 1)), j: Math.floor(num(r.j, -99, 99, 0)), name: String(r.name || 'a far star').replace(/[<>]/g, '').slice(0, 30), hue: num(r.hue, 0, 360, 0), n: Math.floor(num(r.n, 1, 20, 4)), landGen: Math.floor(num(r.landGen, 0, 1e7, 0)), landed: Math.floor(num(r.landed, 0, 1e7, 0)), state: r.state, out: Math.floor(num(r.out, 0, 20, 0)), t0: num(r.t0, 0, 1e9, 0), x: num(r.x, 0, 1e5, 300), y: num(r.y, 0, 1e5, 200), seed: Math.floor(num(r.seed, 1, 1e6, 7)), how: r.how === 'beaten' || r.how === 'won' || r.how === 'worn' ? r.how : undefined, loot: Math.floor(num(r.loot, 0, 99, 0)), tired: r.tired ? 1 : 0, wornOut: r.wornOut ? 1 : 0 }; } }
     if (d.craft && typeof d.craft === 'object') { W.craft = {}; Object.keys(d.craft).slice(0, 40).forEach(function (k) { if (isFinite(+k)) W.craft[+k] = Math.floor(num(d.craft[k], 0, 99, 0)); }); }
     W.farKeep = d.far && typeof d.far === 'object' ? d.far : undefined; if (G.farLoaded) G.farLoaded(d);      // the far ponds you have been to (kept as they came where there is nobody to read them: the server that lives the pond for you while you are out)
     if (d.hstyle && typeof d.hstyle === 'object') { W.houseStyle = {}; Object.keys(d.hstyle).slice(0, 12).forEach(function (k) { const q = d.hstyle[k]; if (q && Array.isArray(q.pieces) && isFinite(+k)) W.houseStyle[+k] = { about: String(q.about || '').replace(/[<>]/g, '').slice(0, 120), pieces: q.pieces.slice(0, 14) }; }); }
     if (d.taught && typeof d.taught === 'object') { W.taught = {}; Object.keys(G.JUDGE_KINDS || { strike: 1, build: 1, help: 1, attack: 1, hunt: 1 }).forEach(function (k) { const r = d.taught[k]; if (r && typeof r === 'object') W.taught[k] = { good: num(r.good, 0, 1e6, 0), bad: num(r.bad, 0, 1e6, 0), rate0: num(r.rate0, 0, 1e4, 0), gen0: num(r.gen0, 0, 1e6, 0) }; }); }
-    if (Array.isArray(d.works) && G.blueprintFrom) W.works = d.works.slice(0, 24).filter(function (q) { return q && Array.isArray(q.b) && ['wall', 'huts', 'spire', 'hall', 'house', 'ship', 'port'].indexOf(q.b[1]) >= 0; }).map(function (q) { const t = function (s, n) { return String(s || '').replace(/[<>]/g, '').slice(0, n); }; return { name: t(q.n, 40), looks: t(q.l, 200), x: num(q.x, 0, 1e5, 500), y: num(q.y, 0, 1e5, 500), r: num(q.r, 20, 200, 80), by: t(q.by, 40), hue: num(q.hue, 0, 360, 50), sp: num(q.sp, 0, 1e6, 0), plan: t(q.plan, 80), what: t(q.what, 200), why: t(q.why, 200), gen: num(q.gen, 0, 1e6, 0), until: 1e9, field: 0, bp: G.blueprintUnpack(G.blueprintFrom({ seed: num(q.b[0], 0, 4294967295, 1), type: q.b[1], S: num(q.b[2], 40, 130, 80), hue: num(q.b[3], 0, 360, 50), spiky: q.b[4] ? 1 : 0, brain: num(q.b[5], 0, 1, 0.3), wet: q.b[6] === 0 ? false : true }, String(q.st || '')), q.pk, String(q.st || '')) }; });
+    if (Array.isArray(d.works) && G.blueprintFrom) W.works = d.works.slice(0, 24).filter(function (q) { return q && Array.isArray(q.b) && ['wall', 'huts', 'spire', 'hall', 'house', 'ship', 'port', 'heart'].indexOf(q.b[1]) >= 0; }).map(function (q) { const t = function (s, n) { return String(s || '').replace(/[<>]/g, '').slice(0, n); }; return { name: t(q.n, 40), looks: t(q.l, 200), x: num(q.x, 0, 1e5, 500), y: num(q.y, 0, 1e5, 500), r: num(q.r, 20, 200, 80), by: t(q.by, 40), hue: num(q.hue, 0, 360, 50), sp: num(q.sp, 0, 1e6, 0), plan: t(q.plan, 80), what: t(q.what, 200), why: t(q.why, 200), gen: num(q.gen, 0, 1e6, 0), until: 1e9, field: 0, bp: G.blueprintUnpack(G.blueprintFrom({ seed: num(q.b[0], 0, 4294967295, 1), type: q.b[1], S: num(q.b[2], 40, 130, 80), hue: num(q.b[3], 0, 360, 50), spiky: q.b[4] ? 1 : 0, brain: num(q.b[5], 0, 1, 0.3), wet: q.b[6] === 0 ? false : true }, String(q.st || '')), q.pk, String(q.st || '')) }; });
     W.room = num(d.room, 0, G.ROOM_MAX || 10, 0);
     W.richS = num(d.rich, 1, 5000, num(d.gen, 0, 1e6, 0) > 50 ? 3.8 : 1); W.rich = W.richS;      /* (a pond saved before richness was kept: an old one is taken to be rich enough for the bodies it has) */ W.sizeCap = Math.min(G.sizeCapOf(W.richS), Math.max(14, 1.2 * Math.sqrt(0.03 * (+d.ww || W.ww) * (+d.wh || W.wh) / (125 * 11.34))));      // before any creature is rebuilt: how big a body may be depends on it
     W.shore = num(d.shore, G.SHORE0, 0.5, G.SHORE0);      // a pond saved when the land began smaller comes back with the bigger land
@@ -13985,7 +14592,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       c.E = num(r[3], 1, c.ph.Emax, c.ph.Emax * 0.5); c.age = Math.floor(num(r[4], 0, 20, 0)); c.sp = Math.floor(num(r[5], 0, 1e6, 0)); c.born = Math.floor(num(r[6], 0, 1e6, 1));
       if (r[7] >= 0 && r[8] >= 0) { c.eb = num(r[7], 0, 1, 0.3); c.ew = num(r[8], 0, 1, 0.3); c.st = r[9] ? 0 : 2; if (r[9]) c.real = { b: c.eb, w: c.ew, why: String(r[10] || '').replace(/[<>]/g, '').slice(0, 70), gen: c.born }; c.ph.charm = c.eb; c.ph.whole = c.ew; W.eyeN = (W.eyeN || 0) + (r[9] ? 1 : 0); }
       if (Array.isArray(r[11]) && G.MARKS_X) { c.mx = c.mx || G.markPrior(c.g); G.MARKS_X.forEach(function (m, k) { if (r[11][k] >= 0) c.mx[m.id] = num(r[11][k], 0, 1, c.mx[m.id]); }); }
-      if (r[12]) c.line = 1; if (r[12] === 2) c.crew = 1;      // of the line of one who came from another pond
+      if (r[12]) c.line = 1; if (r[12] === 2) c.crew = 1; if (typeof r[13] === 'string' && /^[gbfu]$/.test(r[13])) c.job = r[13]; if (r[14] > 0) c.team = Math.floor(num(r[14], 0, 9, 0));      // of the line of one who came from another pond
       c.snap = G.snapOf(c);
       W.cre.push(c);
     });

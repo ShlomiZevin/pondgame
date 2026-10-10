@@ -578,7 +578,7 @@
       { const side = G.sideEdge(W) + ph.r; if (c.x < side) { c.x = side; c.vx = Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; }
         else if (c.x > ww - side) { c.x = ww - side; c.vx = -Math.abs(c.vx) * 0.5; c.ang = Math.PI - c.ang; } }
       // a creature of the water stops at the shore; a creature of the land only paddles in the shallows; one at home in both goes where it likes
-      const crew = c.goTo || c.inShip || (c.deedId && W.deed && W.deed.id === c.deedId && (W.deed.voyage || (W.deed.result && (W.deed.result.port || W.deed.result.ship))));      // (those building a spaceport or its ship, and the crew of a mission, walk to the port wherever it is: up the beach, or down to the water's edge)
+      const crew = c.goTo || c.inShip || (c.deedId && W.deed && W.deed.id === c.deedId && (W.deed.voyage || W.deed.ordered || (W.deed.result && (W.deed.result.port || W.deed.result.ship))));      // (those building a spaceport or its ship, and the crew of a mission, walk to the port wherever it is: up the beach, or down to the water's edge)
       const top = (crew ? 0 : landTop) + ph.r, bot = crew ? wh - ph.r : botLim;
       if (c.y < top) { c.y = top; c.vy = Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
       else if (c.y > bot) { c.y = bot; c.vy = -Math.abs(c.vy) * 0.5; c.ang = -c.ang; }
@@ -833,6 +833,8 @@
       const byP = Math.floor(p.P / (cost * p.ph.pneed));
       if (byP < n) { W.stats.protShort += n - byP; n = byP > 0 ? byP : (G.rand() < 0.25 ? 1 : 0); }
       if (G.marvelBlessed && G.marvelBlessed(p) && n < 1 && p.E > cost * 0.6) n = 1;      // a new marvel is treasured: its carriers have a child if they at all can
+      if (p.team) n = 0;      // (raiders have come to break, not to settle)
+      if (p.jobF > 1.12 && n < 3) n++; else if (p.jobF < 0.9 && n > 1) n--;      // the colony sees its best workers fed: they have a child more, and its worst a child less
       if (n > 0) plan.push({ p: p, n: n });
     }
     {
@@ -1093,7 +1095,7 @@
         cre[i].crowd = sw / (n - 1);
         if (sw > 0.5) cre[i].rk = 0.4 * cre[i].rk + 0.6 * win / sw; }
     }
-    for (let i = 0; i < cre.length; i++) cre[i].sel = clamp((cre[i].fed === undefined ? 0.5 : cre[i].fed) / 0.5, 0, 1) * (0.25 + 0.75 * cre[i].rk) * (cre[i].crowd === undefined ? 1 : Math.max(0.4, 1.2 - 1.6 * cre[i].crowd)) * (1.5 / (0.6 + 2 * shapes[cre[i].shp] / cre.length)) * (1.1 - 0.4 * hues[cre[i].hb] / cre.length) * (1 + (W.grow || 0) * 0.15 * clamp((cre[i].ph.r - meanR) / meanR, -0.5, 1)) * (function (c) { const lf = (c.liveT || 0) > 2 ? (c.landT || 0) / c.liveT : 0, sh = W.shore || 0.16, lu = W.landUse || 0; return 1 + 1.6 * lf * clamp(1 - lu / sh, 0, 1) + 1.6 * (1 - lf) * clamp(1 - (1 - lu) / (1 - sh), 0, 1); })(cre[i]);
+    for (let i = 0; i < cre.length; i++) cre[i].sel = (cre[i].jobF || 1) * clamp((cre[i].fed === undefined ? 0.5 : cre[i].fed) / 0.5, 0, 1) * (0.25 + 0.75 * cre[i].rk) * (cre[i].crowd === undefined ? 1 : Math.max(0.4, 1.2 - 1.6 * cre[i].crowd)) * (1.5 / (0.6 + 2 * shapes[cre[i].shp] / cre.length)) * (1.1 - 0.4 * hues[cre[i].hb] / cre.length) * (1 + (W.grow || 0) * 0.15 * clamp((cre[i].ph.r - meanR) / meanR, -0.5, 1)) * (function (c) { const lf = (c.liveT || 0) > 2 ? (c.landT || 0) / c.liveT : 0, sh = W.shore || 0.16, lu = W.landUse || 0; return 1 + 1.6 * lf * clamp(1 - lu / sh, 0, 1) + 1.6 * (1 - lf) * clamp(1 - (1 - lu) / (1 - sh), 0, 1); })(cre[i]);
     if (cre.length > 8) {
       // fitness sharing: a creature in a crowd of look-alikes counts for less, however it is measured, so no single look can take the whole pond
       for (let i = 0; i < cre.length; i++) if (!cre[i].fv) cre[i].fv = G.features(cre[i].g);

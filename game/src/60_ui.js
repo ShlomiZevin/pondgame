@@ -309,6 +309,7 @@
   G.on('pond-click', function (c) {
     if (G.mode !== 'play' || !G.W || G.isBlocked()) return;
     closePop();
+    if (G.cmd && G.cmd.takeClick && G.cmd.takeClick(c)) return;      // (a place for something to be built, or where those you chose are sent)
     if (UI.placing) {
       const info = UI.placing;
       G.addZone(c.x, c.y, info);
@@ -390,7 +391,7 @@
     let item = null; try { item = G.keep ? G.keep(c) : null; } catch (e) { console.error(e); }
     if (item) item.age = ('Marvel · ' + def.name).slice(0, 70);
     if (G.sfx) G.sfx('discovery');
-    if (G.select) G.select(c); if (G.focusOn) G.focusOn(c.x, c.y, 2.4);
+    if (!(G.cmd && G.cmd.busy && G.cmd.busy())) { if (G.select) G.select(c); if (G.focusOn) G.focusOn(c.x, c.y, 2.4); }      // (the view is not taken from someone in the middle of giving orders: the banner tells, and NOW has it)
     if (G.banner) G.banner('★ A MARVEL', 'Creature #' + c.id + ' was born with ' + def.name + '. ' + def.wonder + (def.why ? ' (' + def.why + ')' : '') + (item ? ' It is kept in your collection (BOOK).' : ''), 12000);
     if (G.log) G.log('disc', 'A marvel: ' + def.name, 'Creature #' + c.id + '. ' + def.wonder);
     if (G.markDirty) G.markDirty();
@@ -422,7 +423,7 @@
     const b = bannerQ.shift();
     if (!b) { bannerTimer = 0; return; }
     refs.banner.innerHTML = '<small>' + escapeHtml(b[0]) + '</small>' + escapeHtml(b[1]);
-    { let y = 78; ['wish', 'wxnow', 'voybar', 'voypick'].forEach(function (id) { const e = document.getElementById(id); if (e && !e.classList.contains('hide') && e.offsetHeight && window.innerWidth > 720) y = Math.max(y, e.getBoundingClientRect().bottom + 10 - 14); });
+    { let y = 78; ['wish', 'wxnow', 'voybar', 'voypick', 'resbar'].forEach(function (id) { const e = document.getElementById(id); if (e && !e.classList.contains('hide') && e.offsetHeight && window.innerWidth > 720) y = Math.max(y, e.getBoundingClientRect().bottom + 10 - 14); });
       refs.banner.style.setProperty('transform', 'translate(-50%,' + Math.round(y) + 'px)', 'important'); }      /* just below the wish and the weather, never on them */
     refs.banner.classList.add('show');
     G.sfx('discovery');

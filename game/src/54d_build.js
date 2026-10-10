@@ -13,7 +13,7 @@
 (function () {
   'use strict';
   const clamp = G.clamp, TAU = 6.2832, INK = '#14202e';
-  const MAT = [{ id: 'stone', cap: 44, col: [205, 12, 62] }, { id: 'reed', cap: 40, col: [78, 38, 58] }, { id: 'shell', cap: 26, col: [32, 55, 84] }];
+  const MAT = [{ id: 'stone', cap: 44, col: [205, 12, 62] }, { id: 'reed', cap: 40, col: [78, 38, 58] }, { id: 'shell', cap: 26, col: [32, 55, 84] }, { id: 'lumen', cap: 0, col: [178, 90, 66] }];
   G.MATS = MAT;
   const hsl = function (h, s, l, a) { return 'hsla(' + ((h % 360) + 360) % 360 + ',' + s + '%,' + l + '%,' + (a === undefined ? 1 : a) + ')'; };
 
@@ -69,6 +69,13 @@
       for (let i = 0; i < N; i++) { const h = S * 0.24; add('rect', 0, y, w, h, 0, [0, 24, 48 + 3 * i]); if (i % 2) win(0, y - h * 0.5, w * 0.3); y -= h; w *= 0.88; }
       roof(0, y, w * 1.3, w * 0.7); add('lamp', 0, y - (sp ? w * 1.2 : w * 0.75), S * 0.16, S * 0.16, 2, [50, 95, 72]);
       for (let i = 0; i < 4; i++) add('rect', (i - 1.5) * S * 0.42, S * 0.1, S * 0.14, S * 0.12, 0, [0, 18, 44]);
+    } else if (o.type === 'heart') {      // the Heart of the colony: a round keep with a great glowing eye, a crown, and their flag
+      const bw = S * 1.5, bh = S * 0.62; add('rect', 0, 0, bw * 1.12, S * 0.14, 0, [0, 14, 40]);
+      P.push({ s: 'vase', x: 0, y: -S * 0.14, w: bw, h: bh, m: 0, c: [0, 40, 54], st: 0 }); add('door', 0, -S * 0.14, bw * 0.2, bh * 0.52, 1, [0, 30, 16]);
+      add('window', -bw * 0.3, -S * 0.14 - bh * 0.34, bw * 0.15, bw * 0.2, 2, [14, 34, 82]); add('window', bw * 0.3, -S * 0.14 - bh * 0.34, bw * 0.15, bw * 0.2, 2, [14, 34, 82]);
+      add('onion', 0, -S * 0.14 - bh, bw * 0.78, S * 0.7, 2, [20, 62, 58]); add('circ', 0, -S * 0.14 - bh - S * 0.16, S * 0.26, S * 0.26, 2, [50, 95, 74]);
+      add('drop', -bw * 0.5, -S * 0.14 - bh * 0.92, S * 0.16, S * 0.22, 2, [14, 34, 82]); add('drop', bw * 0.5, -S * 0.14 - bh * 0.92, S * 0.16, S * 0.22, 2, [14, 34, 82]);
+      add('flag', 0, -S * 0.14 - bh - S * 0.7, S * 0.24, S * 0.34, 1, [0, 85, 60]);
     } else if (o.type === 'port') {      // a spaceport: a wide flat pad on the shore (its middle clear, for a ship to stand on), marked at its edges, with a gantry tower at one side and lights
       const Wd = S * 2.3, ph = S * 0.16, tx = -Wd * 0.4, th = S * (1.25 + 0.5 * rich), n = 3 + Math.round(2 * rich);
       P.push({ s: 'rect', x: 0, y: 0, w: Wd, h: ph, m: 0, c: [0, 12, 40], st: 0, rr: 0.1 });
@@ -158,7 +165,7 @@
     let spiky = 0; if (f) { (f.rules || []).forEach(function (q) { if (q.k === 2 || q.k === 7) spiky = 1; }); if (f.crest > 0.25) spiky = 1; }
     let h = 0, n = 0; for (let i = 0; i < W.cre.length; i++) if (W.cre[i].sp === d.sp) { h += W.cre[i].g.h; n++; }
     const craft = G.craftOf(d.sp);      // how many buildings their kind (and the kinds it came from) has raised: practice shows
-    const o = { wet: !(r.port || r.ship) && d.y > (G.shoreY ? G.shoreY(W) : 0), seed: (G.hash ? G.hash(String(d.title) + d.id) : d.id * 7919) >>> 0, type: r.port ? 'port' : r.ship ? 'ship' : r.house ? 'house' : r.solid ? 'wall' : r.feed > 0.05 ? 'huts' : r.pull > 0.15 ? 'spire' : 'hall', S: r.port ? clamp((r.size || 0.085) * m, 84, 124) : r.ship ? clamp((r.size || 0.06) * m, 52, 84) : r.house ? clamp((r.size || 0.04) * m, 36, 58) : clamp((r.size || 0.08) * m, 55, 118), hue: d.hue || 50, spiky: spiky, brain: clamp((n ? h / n : 0) / 7 + 0.09 * craft, 0, 1), craft: craft };
+    const o = { wet: !(r.port || r.ship) && d.y > (G.shoreY ? G.shoreY(W) : 0), seed: (G.hash ? G.hash(String(d.title) + d.id) : d.id * 7919) >>> 0, type: r.type && r.type !== 'port' && r.type !== 'ship' ? r.type : r.port ? 'port' : r.ship ? 'ship' : r.house ? 'house' : r.solid ? 'wall' : r.feed > 0.05 ? 'huts' : r.pull > 0.15 ? 'spire' : 'hall', S: r.port ? clamp((r.size || 0.085) * m, 84, 124) : r.ship ? clamp((r.size || 0.06) * m, 52, 84) : r.house ? clamp((r.size || 0.04) * m, 36, 58) : clamp((r.size || 0.08) * m, 55, 118), hue: d.hue || 50, spiky: spiky, brain: clamp((n ? h / n : 0) / 7 + 0.09 * craft, 0, 1), craft: craft };
     o.P = plan(o); fit(o, W); settle(o, true); return o;      // (the fallback shape: used when the kind's own design cannot be had)
   }
   G.blueprintPack = function (bp) { return bp.designed ? { about: bp.about || '', P: bp.P.map(function (p) { return [p.s, Math.round(p.x), Math.round(p.y), Math.round(p.w), Math.round(p.h), p.m, p.c[0], p.c[1], p.c[2], p.rr || 0]; }) } : null; };
@@ -189,7 +196,7 @@
     //   · when every piece is set, all hands colour it.
     // There are never more setters than there is material and room for (about a third of the band); the rest haul. No more is fetched than is still needed.
     const busyP = {}, busyM = new Set(), transit = [0, 0, 0]; let setters = 0, held = 0;
-    M.forEach(function (c) { const j = c.bj && c.bj.d === d.id ? c.bj : null; if (!j) return; if (j.ph === 'fetch') { if (W.mats.indexOf(j.mat) < 0) { c.bj = null; return; } busyM.add(j.mat); transit[j.mat.k]++; } else if (j.ph === 'carry') transit[j.k]++; else if (j.ph === 'take' || j.ph === 'bring') { if (P[j.p].st > 0) { if (j.ph === 'bring') d.pile[j.k]++; c.bj = null; return; } busyP[j.p] = 1; setters++; if (j.ph === 'take') held++; } else if (j.ph === 'paint') { if (P[j.p].st > 1) { c.bj = null; return; } busyP[j.p] = 1; } });
+    M.forEach(function (c) { const j = c.bj && c.bj.d === d.id ? c.bj : null; if (!j) return; if (j.ph === 'fetch') { if (!j.mat.store && W.mats.indexOf(j.mat) < 0) { c.bj = null; return; } busyM.add(j.mat); transit[j.mat.k]++; } else if (j.ph === 'carry') transit[j.k]++; else if (j.ph === 'take' || j.ph === 'bring') { if (P[j.p].st > 0) { if (j.ph === 'bring') d.pile[j.k]++; c.bj = null; return; } busyP[j.p] = 1; setters++; if (j.ph === 'take') held++; } else if (j.ph === 'paint') { if (P[j.p].st > 1) { c.bj = null; return; } busyP[j.p] = 1; } });
     const unset = [0, 0, 0]; let nUnset = 0; for (let i = 0; i < P.length; i++) if (P[i].st === 0) { unset[P[i].m]++; nUnset++; }
     let inPile = d.pile[0] + d.pile[1] + d.pile[2] - held; const maxSet = Math.max(2, Math.ceil(M.length / 3));
     d.sizeT = (d.sizeT || 0) - dt; if (d.sizeT <= 0) { d.sizeT = 1.5; let toPaint = 0; for (let i = 0; i < P.length; i++) if (P[i].st < 2) toPaint++; const want = clamp(Math.ceil((nUnset * 1.6 + toPaint * 0.5) / 2) + 1, 2, P.length <= 4 ? 2 : 14);      /* (a little house of three or four pieces goes up one piece on another: two hands are all it can use) */ for (let k = M.length - 1; k >= 0 && M.length > Math.max(P.length < 9 ? 2 : 5, want); k--) { const c = M[k]; if (c.bj || !(c.idleT > (P.length < 9 ? 2.5 : 7))) continue; c.deedId = 0; c.idleT = 0; c.haul = -1; M.splice(k, 1); d.sent = (d.sent || 0) + 1; } d.n0 = Math.max(2, Math.min(d.n0, Math.max(want, M.length))); }      /* no more hands than the work needs: the others go back to feeding */
@@ -201,7 +208,10 @@
           if (inPile > 0 && setters < maxSet) { let pi = -1, alt = -1; for (let i = 0; i < P.length; i++) { if (P[i].st !== 0 || busyP[i] || !ready(i)) continue; if (d.pile[P[i].m] > 0) { pi = i; break; } if (alt < 0) alt = i; } if (pi < 0) pi = alt; if (pi >= 0) { j = { d: d.id, ph: 'take', p: pi }; busyP[pi] = 1; setters++; inPile--; } }
           if (!j && nUnset - (d.pile[0] + d.pile[1] + d.pile[2]) - (transit[0] + transit[1] + transit[2]) > 0) {
             let best = null, bd = 1e12, any = null, ad = 1e12; for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (busyM.has(q) || (!c.ph.lungs && q.y < sy + 6)) continue; const dd = (q.x - c.x) * (q.x - c.x) + (q.y - c.y) * (q.y - c.y) + (q.x - pileAt[0]) * (q.x - pileAt[0]) + (q.y - pileAt[1]) * (q.y - pileAt[1]); if (dd < ad) { ad = dd; any = q; } if (unset[q.k] - d.pile[q.k] - transit[q.k] > 0 && dd < bd) { bd = dd; best = q; } }      /* the shortest whole trip: there and back to the pile */
-            const mat = best || any; if (mat) { j = { d: d.id, ph: 'fetch', mat: mat }; busyM.add(mat); transit[mat.k]++; } else d.wait = MAT[unset[0] ? 0 : unset[1] ? 1 : 2].id;
+            let mat = best || any;
+            { const st = G.storeAt ? G.storeAt(W) : null, col = W.col; if (st && col) { let k0 = -1; for (let q = 0; q < 3; q++) if (unset[q] - d.pile[q] - transit[q] > 0 && col.stock[q] > 0) { k0 = q; break; } if (k0 < 0 && !mat) for (let q = 0; q < 3; q++) if (col.stock[q] > 0) { k0 = q; break; }
+                if (k0 >= 0) { const dd = (st.x - c.x) * (st.x - c.x) + (st.y - c.y) * (st.y - c.y) + (st.x - pileAt[0]) * (st.x - pileAt[0]) + (st.y - pileAt[1]) * (st.y - pileAt[1]); if (!best || dd < bd) { col.stock[k0]--; mat = { x: st.x, y: st.y, k: k0, s: 0.5, store: 1 }; } } } }      /* (from the colony's store, when that is the shorter trip or nothing lies about) */
+            if (mat) { j = { d: d.id, ph: 'fetch', mat: mat }; busyM.add(mat); transit[mat.k]++; } else d.wait = MAT[unset[0] ? 0 : unset[1] ? 1 : 2].id;
           }
         } else { let pi = -1; for (let i = 0; i < P.length; i++) if (P[i].st === 1 && !busyP[i]) { pi = i; break; } if (pi >= 0) { j = { d: d.id, ph: 'paint', p: pi, t: 0 }; busyP[pi] = 1; } }
         c.bj = j;
@@ -261,13 +271,13 @@
     { let port = null, ship = null; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.bp || w.fall) continue; if (w.bp.type === 'port') port = w; else if (w.bp.type === 'ship' && !w.visitor) ship = w; } if (port && ship && !ship.lifting) { const dk = G.dockOf(port); ship.x = dk.x; ship.y = dk.y - ship.bp.S * 0.45; } }
     // The land widens with the generations. What was built under water must stay under it: when the waterline comes down on the highest of them, the whole
     // underwater town settles deeper together (so its rows and the room between its buildings stay as they were), never left half in the air.
-    W.sinkT = (W.sinkT || 0) - dt; if (W.sinkT <= 0) { W.sinkT = 3; const sy = G.shoreY ? G.shoreY(W) : 0, wetOf = function (w) { return w.bp && w.bp.type !== 'port' && w.bp.type !== 'ship' && w.bp.wet !== false && !w.visitor; }; let need = 0, low = 0;
+    W.sinkT = (W.sinkT || 0) - dt; if (W.sinkT <= 0) { W.sinkT = 3; const sy = G.shoreY ? G.shoreY(W) : 0, wetOf = function (w) { return w.bp && w.bp.type !== 'port' && w.bp.type !== 'ship' && w.bp.type !== 'heart' && w.bp.wet !== false && !w.visitor; }; let need = 0, low = 0;
       for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!wetOf(w)) continue; need = Math.max(need, sy + 40 - (w.y + w.bp.S * 0.45 - (w.bp.top || 60))); low = Math.max(low, w.y + w.bp.S * 0.45); }
       if (need > 0) { const sh = Math.min(need, 12, Math.max(0, W.wh - 60 - low)); if (sh > 0) for (let i = 0; i < Wk.length; i++) if (wetOf(Wk[i])) Wk[i].y += sh; } }
     for (let i = Wk.length - 1; i >= 0; i--) {
       const w = Wk[i]; if (!w.bp) continue;
       w.until = W.t + 9999;      // it does not run out by the clock
-      if (w.visitor) continue;      // (a ship come from another pond: it is its crew's, and leaves with them)
+      if (w.visitor || w.bp.type === 'heart') continue;      // (a ship come from another pond is its crew's; the Heart is kept by the whole colony)
       w.upT = (w.upT || 0) - dt; if (w.upT > 0) continue; w.upT = w.fall ? 0.12 : 5;
       let kin = 0; for (let k = 0; k < W.cre.length; k++) if (W.cre[k].sp === w.sp && !W.cre[k].dead) kin++;
       const P = w.bp.P;
@@ -304,7 +314,7 @@
   if (G.on) {
     // when it stands, those of the kind who are near are glad: they are fed a little by it, it is a lesson worth keeping, and it shows
     G.on('deed-end', function (d, how, made) { const W = G.W; if (W && made && d.bp && how === 'done') for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.sp !== d.sp || Math.hypot(c.x - d.x, c.y - d.y) > 420) continue; c.E = Math.min(c.ph.Emax, c.E + 0.12 * c.ph.Emax); c.mend = 1; c.glad = 6; c.vy -= 60; if (G.learn) G.learn(c, 0.6); G.emit('glad', c); } });
-    G.on('deed-end', function (d, how, made) { if (made && d.bp) { made.bp = d.bp; made.sp = d.sp; made.built = d.built || null; { const F = (G.W && G.W.fields) || []; for (let k = 0; k < F.length; k++) if (F[k].id === made.field) F[k].hidden = true; } made.until = (G.W ? G.W.t : 0) + 9999; } });
+    G.on('deed-end', function (d, how, made) { if (made && d.result && d.result.tower) made.tower = 1; if (made && d.bp) { made.bp = d.bp; made.sp = d.sp; made.built = d.built || null; { const F = (G.W && G.W.fields) || []; for (let k = 0; k < F.length; k++) if (F[k].id === made.field) F[k].hidden = true; } made.until = (G.W ? G.W.t : 0) + 9999; } });
     G.on('new-pond', function () { if (G.W) G.W.mats = null; });
   }
   { const step0 = G.step; G.step = function (dt) { step0(dt); const W = G.W; if (!W || W.title) return; matsStep(W, dt); const d = W.deed; if (d && d.result && d.steps[d.i] && d.steps[d.i].do === 'build') buildStep(W, d, dt); worksStep(W, dt); if (W.works && W.works.length) homeStep(W, dt); }; }
@@ -366,6 +376,7 @@
   // wall; otherwise a hall, and later a tower beside it. One more for every forty generations the kind has lasted, up to four. So a pond fills, slowly, with
   // what its creatures made, and each kind's quarter is its own. (It costs nothing: the plan of pieces is worked out by the game.)
   G.on('scored', function () {
+    if (G.W && G.W.col && G.W.col.auto === false) return;      // (you have taken building into your own hands)
     const W = G.W; if (!W || W.title || W.deed || G.mode !== 'play' || W.gen < 12 || (W.works || []).length >= 22) return;
     { const Wk0 = W.works || [], hasPort = Wk0.some(function (w) { return w.bp && w.bp.type === 'port'; }), hasShip = Wk0.some(function (w) { return w.bp && w.bp.type === 'ship'; }); if (!(hasPort && !hasShip) && G.rand() > 0.45) return; }
     const kinds = W.species.filter(function (s) { return !s.extinct && s.n >= 10 && W.gen - s.born >= 6; }); if (!kinds.length) return;
@@ -449,6 +460,7 @@
     if (building && o.pile) { const hw = bp.hw || 60, px = clamp(b[0] + hw + 44, 30, G.W.ww - 30), py = b[1] + 6; let n = 0; for (let k = 0; k < 3; k++) for (let q = 0; q < Math.min(6, o.pile[k]); q++) { matDraw(ctx, { x: px + ((n % 4) - 1.5) * 9, y: py - Math.floor(n / 4) * 7, k: k, s: (n * 0.37) % 1 }, 0); n++; } }      // what has been brought, waiting to be set
   };
   function matDraw(ctx, q, t) {
+    if (q.k === 3) { const g = 0.75 + 0.25 * Math.sin(t * 3 + q.s * 9); ctx.fillStyle = 'hsla(178,95%,' + Math.round(62 + 14 * g) + '%,1)'; ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(q.x, q.y - 8); ctx.lineTo(q.x + 4.6, q.y - 1); ctx.lineTo(q.x, q.y + 6); ctx.lineTo(q.x - 4.6, q.y - 1); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.moveTo(q.x - 1, q.y - 5); ctx.lineTo(q.x + 1.6, q.y - 1.5); ctx.lineTo(q.x - 1.6, q.y - 0.5); ctx.closePath(); ctx.fill(); return; }
     const c = MAT[q.k].col; ctx.strokeStyle = INK; ctx.lineWidth = 1.3;
     if (q.k === 0) { ctx.fillStyle = hsl(c[0], c[1], c[2] - 8 + 16 * q.s); ctx.beginPath(); ctx.ellipse(q.x, q.y, 6.5 + 2 * q.s, 4.6 + 1.5 * q.s, q.s * 3, 0, TAU); ctx.fill(); ctx.stroke(); }
     else if (q.k === 1) { ctx.strokeStyle = hsl(c[0], c[1] + 10, c[2] - 14); ctx.lineWidth = 2; ctx.lineCap = 'round'; for (let k = -1; k <= 1; k++) { const sw = Math.sin(t * 1.3 + q.s * 9 + k) * 1.8; ctx.beginPath(); ctx.moveTo(q.x + k * 3, q.y + 6); ctx.quadraticCurveTo(q.x + k * 3.5, q.y - 3, q.x + k * 5 + sw, q.y - 10 - 3 * q.s); ctx.stroke(); } }
@@ -461,5 +473,6 @@
       if (W && !W.title && W.mats && G.mode === 'play') { const v = G.view, s = v.scale * v.dpr; if (v.scale > 0.22) { const x0 = -v.ox / v.scale - 20, y0 = -v.oy / v.scale - 20, x1 = x0 + v.w / v.scale + 40, y1 = y0 + v.h / v.scale + 40, t = G.rt || 0; ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); for (let i = 0; i < W.mats.length; i++) { const q = W.mats[i]; if (q.x > x0 && q.x < x1 && q.y > y0 && q.y < y1) matDraw(ctx, q, t); } ctx.restore(); } }
       if (f0) f0(ctx);
     }; }
-  G.drawHauls = function (ctx) { const W = G.W, d = W && W.deed; if (!d) return; const t = G.rt || 0; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.deedId !== d.id || !(c.haul >= 0) || c.dead) continue; matDraw(ctx, { x: c.x, y: c.y - c.ph.r * 2.9 - 5 + Math.sin(t * 7 + c.id) * 1.2, k: c.haul, s: (c.id % 10) / 10 }, t); } };
+  G.matDraw = matDraw;
+  G.drawHauls = function (ctx) { const W = G.W, d = W && W.deed; if (!W) return; const t = G.rt || 0; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (!(c.haul >= 0) || c.dead || c.inShip || !((d && c.deedId === d.id) || c.job === 'g')) continue;      /* what a builder or a gatherer carries rides above its head */ matDraw(ctx, { x: c.x, y: c.y - c.ph.r * 2.9 - 5 + Math.sin(t * 7 + c.id) * 1.2, k: c.haul, s: (c.id % 10) / 10 }, t); } };
 })();

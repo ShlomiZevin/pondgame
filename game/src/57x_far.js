@@ -51,7 +51,7 @@
   F.make = function (p) {
     const kinds = F.kindsOf(p), mood = F.moodOf(p), defs = F._defs;
     G.newWorld({ seed: 1 + ((hash(p.i, p.j, 31) * 4e9) >>> 0) });
-    const W = G.W; W.gen = 20 + ((hash(p.i, p.j, 32) * 60) | 0);
+    const W = G.W; W.gen = 20 + ((hash(p.i, p.j, 32) * 60) | 0); W.farOf = F.key(p);      // (a far star: no Heart of yours is raised on it)
     if (defs) { W.organs = clone(defs.organs); W.designs = clone(defs.designs); W.plans = clone(defs.plans); W.nextOrgan = defs.nextOrgan + 500; W.nextDesign = defs.nextDesign + 500; W.nextPlan = defs.nextPlan + 500; }      // (what is invented there is numbered apart from what is invented at home)
     kinds.forEach(function (g0, k) {
       const n = 14 + ((hash(p.i, p.j, 40 + k) * 9) | 0), cx = W.ww * (0.22 + 0.56 * hash(p.i, p.j, 50 + k)), cy = W.wh * (0.42 + 0.4 * hash(p.i, p.j, 60 + k));
@@ -137,7 +137,7 @@
   { const s0 = G.step; G.step = function (dt) { s0(dt); const W = G.W; if (!W || W.title) return;
       for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue;
         if (c.outAt !== undefined) { if (W.t < c.outAt) { const sh = F.shipOf(); if (sh) { c.x = c.px = sh.x; c.y = c.py = sh.y - sh.bp.S * 0.3; } c.vx = c.vy = 0; c.inShip = true; c.E = Math.max(c.E, c.ph.Emax * 0.8); continue; } c.outAt = undefined; c.inShip = false; G.emit('stepped-out', c); }
-        const g = c.goTo; if (g) { const dx = g.x - c.x, dy = g.y - c.y, d = Math.hypot(dx, dy); if (d < 26 || W.t > g.until || c.inShip) { if (!c.inShip || d < 26 || W.t > g.until) c.goTo = null; continue; } const st = Math.min(d, Math.max(80, c.ph.speed * 1.4) * dt); c.x += dx / d * st; c.y += dy / d * st; c.vx = dx / d * 20; c.vy = dy / d * 20; c.ang = Math.atan2(dy, dx); c.E = Math.max(c.E, c.ph.Emax * 0.5); } }
+        const g = c.goTo; if (g) { const dx = g.x - c.x, dy = g.y - c.y, d = Math.hypot(dx, dy); if (d < 26 || W.t > g.until || c.inShip) { if (!c.inShip || d < 26 || W.t > g.until) c.goTo = null; continue; } const st = Math.min(d, Math.max(80, c.ph.speed * 1.4) * dt); c.x += dx / d * st; c.y += dy / d * st; c.vx = dx / d * 20; c.vy = dy / d * 20; c.ang = Math.atan2(dy, dx); if (!g.order) c.E = Math.max(c.E, c.ph.Emax * 0.5); } }
     }; }
   /** Go and watch a far pond you have been to (your outpost, if any of yours still live there). Nothing is taken there and nothing brought back: the ship
    *  stays where it is. F.home() brings you back. */
