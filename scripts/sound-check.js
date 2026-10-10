@@ -13,5 +13,9 @@ const { chromium } = require('../../plaxzy-creator/node_modules/playwright-core'
   console.log('each moment has its sound: ' + await fr.evaluate(() => ['built', 'liftoff', 'landing', 'raid', 'grew'].map((n) => n + ' ' + (G.fxSound(n, { volume: 0 }) ? 'yes' : 'NO')).join(' · ')));
   await fr.evaluate(() => { G.emit('colony-tier', 1, 0); G.emit('raid-warn', { name: 'Test', n: 3 }); }); await page.waitForTimeout(300);
   console.log('after a tier and a raid warning: ' + await fr.evaluate(() => _played.filter((p) => /fx:(grew|raid)/.test(p)).join(', ')));
+  // every sound measured (nobody here can hear them): how long, how loud, silence before it starts, and for the air of a star whether the loop's end meets its beginning
+  await fr.evaluate(() => { ['reef', 'crag', 'marsh', 'crystal', 'ember', 'frost'].forEach((t) => G.fxWant('amb.' + t)); }); await page.waitForTimeout(4000);
+  const F = await fr.evaluate(() => G.fxFacts());
+  Object.keys(F).sort().forEach((k) => { const m = F[k]; console.log('  ' + k.padEnd(12) + (m.unused ? 'NOT USED (' + m.unused + ')' : (m.secs + ' s').padEnd(9) + ('loudness ' + m.rms).padEnd(17) + ('peak ' + m.peak).padEnd(12) + ('starts after ' + m.lead + ' s').padEnd(21) + (k.indexOf('amb.') === 0 ? ('loop seam ' + (m.seam0 === undefined ? m.seam : m.seam0 + ' → joined')).padEnd(26) : ''.padEnd(26)) + 'played at ' + m.gain)); });
   console.log(errs.slice(0, 6).join('\n') || 'no errors'); await browser.close();
 })().catch((e) => { console.error(e); process.exit(1); });

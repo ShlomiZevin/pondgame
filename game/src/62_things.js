@@ -122,7 +122,7 @@
     }
     if (z.haven) { const n = Math.min(G.HAVEN_ROOM || 3, Math.max(z.hvPrev || 0, z.hvNow || 0)); return { t: 'shelters marvels · ' + n + ' of ' + (G.HAVEN_ROOM || 3) + ' places taken', tone: 'good', bar: null }; }
     if (p.nut > 0.2) { const u = G.usedBy ? G.usedBy(z) : null; return { t: 'feeds the star' + (u ? ' · ' + pct(u.can) + ' can eat it' : '') + (z.near ? ' · ' + z.near + ' here' : ''), tone: 'good', bar: null }; }
-    const what = Math.abs(p.heat) > 0.3 ? (p.heat > 0 ? 'warms the water' : 'chills the water') : Math.abs(p.light) > 0.3 ? (p.light > 0 ? 'lights the water' : 'darkens the water') : p.sticky > 0.3 ? 'slows what touches it' : p.pull ? (p.pull > 0 ? 'draws creatures in' : 'drives creatures away') : p.hard > 0.3 ? 'blocks the way' : 'drifts';
+    const what = Math.abs(p.heat) > 0.3 ? (p.heat > 0 ? 'warms the air' : 'chills the air') : Math.abs(p.light) > 0.3 ? (p.light > 0 ? 'lights the air' : 'darkens the air') : p.sticky > 0.3 ? 'slows what touches it' : p.pull ? (p.pull > 0 ? 'draws creatures in' : 'drives creatures away') : p.hard > 0.3 ? 'blocks the way' : 'drifts';
     return { t: what + (z.near ? ' · ' + z.near + ' here' : ''), tone: 'calm', bar: null };
   };
 })();

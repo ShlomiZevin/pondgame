@@ -36,7 +36,7 @@
     const light = W.set.light * (W.mods.length ? Math.max(0.1, 1 + G.modSum('light')) : 1);
     if (light < 0.7) { fx('glow', 2); fx('sense', 2); P.part[5] += 1.5; P.part[4] += 1; P.list.push('it is dark'); }
     // short of breath: more than a fifth of the pond's breaths last season came up short
-    if (W.lastStats && W.cre.length && (W.lastStats.gasp || 0) > W.lastStats.breaths * 0.2) { P.o2 = 2; P.list.push('the water is thin on oxygen (fins and frills breathe better; small bodies need less)'); }
+    if (W.lastStats && W.cre.length && (W.lastStats.gasp || 0) > W.lastStats.breaths * 0.2) { P.o2 = 2; P.list.push('the air is thin on oxygen (fins and frills breathe better; small bodies need less)'); }
     if (light > 1.2) { fx('photo', 2.5); P.list.push('there is plenty of light'); }
     if (W.mods.length && G.modSum('poison') > 0.1) { fx('poison', 4); P.c[8] += 2; P.list.push('the whole star is poisoned'); }
     // size: a hunter takes only prey well under its own size, so danger makes a bigger body a likelier thing to stumble on; hunger, heat and thin air favour small bodies

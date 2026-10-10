@@ -68,7 +68,7 @@
 
   // ── the game's own imagination (no server needed) ──
   const KINDS = [
-    { fx: { photo: 0.8 }, names: ['Sun Leaf', 'Light Sail', 'Green Frond', 'Algae Coat'], note: 'Feeds on light, so its owner can rest in the bright shallows.', shape: 'leaf', hue: 120 },
+    { fx: { photo: 0.8 }, names: ['Sun Leaf', 'Light Sail', 'Green Frond', 'Algae Coat'], note: 'Feeds on light, so its owner can rest in the bright open.', shape: 'leaf', hue: 120 },
     { fx: { sense: 0.8 }, names: ['Feeler', 'Whisker Stalk', 'Scent Horn', 'Ripple Ear'], note: 'Senses food and danger from much further away.', shape: 'antenna', hue: 50 },
     { fx: { speed: 0.8 }, names: ['Jet Sac', 'Water Screw', 'Kick Fin', 'Paddle Tail'], note: 'A burst of speed.', shape: 'jet', hue: 195 },
     { fx: { armor: 0.8, speed: -0.3 }, names: ['Shell Plate', 'Stone Hide', 'Bone Shield'], note: 'Hard to bite, but slow.', shape: 'shell', hue: 40 },
@@ -76,9 +76,9 @@
     { fx: { spike: 0.8 }, names: ['Thorn', 'Barb Horn', 'Needle Crown'], note: 'Anything that bites it gets hurt.', shape: 'thorn', hue: 280 },
     { fx: { toxin: 0.8 }, names: ['Bitter Gland', 'Stinger', 'Venom Sac'], note: 'It tastes terrible, and eating it costs dearly.', shape: 'bulb', hue: 100 },
     { fx: { glow: 0.7, sense: 0.3 }, names: ['Glow Bulb', 'Lantern Eye', 'Star Spot'], note: 'A light of its own, in the dark.', shape: 'bulb', hue: 55 },
-    { fx: { heat: 0.8 }, names: ['Heat Skin', 'Ember Coat'], note: 'Shrugs off hot water.', shape: 'shell', hue: 15 },
+    { fx: { heat: 0.8 }, names: ['Heat Skin', 'Ember Coat'], note: 'Shrugs off heat.', shape: 'shell', hue: 15 },
     { fx: { cold: 0.8 }, names: ['Frost Coat', 'Winter Fur', 'Ice Fat'], note: 'Shrugs off the cold.', shape: 'fur', hue: 205 },
-    { fx: { poison: 0.8 }, names: ['Filter Liver', 'Clean Gut'], note: 'Swims through poison unharmed.', shape: 'bulb', hue: 265 },
+    { fx: { poison: 0.8 }, names: ['Filter Liver', 'Clean Gut'], note: 'Goes through poison unharmed.', shape: 'bulb', hue: 265 },
     { fx: { photo: 0.5, armor: 0.4, speed: -0.4 }, names: ['Reef Crust', 'Moss Shell'], note: 'A living crust: it feeds on light and protects, and barely moves.', shape: 'shell', hue: 140 },
     { fx: { eat: 0.4 }, digest: true, names: ['Grinder Gut', 'Second Stomach', 'Sifter'], note: 'Digests a food its owner could not eat before.', shape: 'tube', hue: 25 },
     { fx: { speed: 0.5, sense: 0.4 }, names: ['Hunter Fin', 'Chase Whisker'], note: 'Fast and alert: made for the chase.', shape: 'jet', hue: 350 },

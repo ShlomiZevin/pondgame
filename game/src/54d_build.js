@@ -475,6 +475,7 @@
     if (building && o.pile) { const hw = bp.hw || 60, px = clamp(b[0] + hw + 44, 30, G.W.ww - 30), py = b[1] + 6; let n = 0; for (let k = 0; k < 3; k++) for (let q = 0; q < Math.min(6, o.pile[k]); q++) { matDraw(ctx, { x: px + ((n % 4) - 1.5) * 9, y: py - Math.floor(n / 4) * 7, k: k, s: (n * 0.37) % 1 }, 0); n++; } }      // what has been brought, waiting to be set
   };
   function matDraw(ctx, q, t) {
+    if (ctx === G.ctx && G.art && G.art.mat && G.W && !G.W.title && G.art.mat(ctx, G.W, q.k, q.x, q.y, q.s)) return;      // (on a painted star what lies about is painted too: 53_art.js)
     if (q.k === 3) { const g = 0.75 + 0.25 * Math.sin(t * 3 + q.s * 9); ctx.fillStyle = 'hsla(178,95%,' + Math.round(62 + 14 * g) + '%,1)'; ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(q.x, q.y - 8); ctx.lineTo(q.x + 4.6, q.y - 1); ctx.lineTo(q.x, q.y + 6); ctx.lineTo(q.x - 4.6, q.y - 1); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.moveTo(q.x - 1, q.y - 5); ctx.lineTo(q.x + 1.6, q.y - 1.5); ctx.lineTo(q.x - 1.6, q.y - 0.5); ctx.closePath(); ctx.fill(); return; }
     const c = MAT[q.k].col; ctx.strokeStyle = INK; ctx.lineWidth = 1.3;
     if (q.k === 0) { ctx.fillStyle = hsl(c[0], c[1], c[2] - 8 + 16 * q.s); ctx.beginPath(); ctx.ellipse(q.x, q.y, 6.5 + 2 * q.s, 4.6 + 1.5 * q.s, q.s * 3, 0, TAU); ctx.fill(); ctx.stroke(); }

@@ -90,7 +90,8 @@
   let MAP = null;      // { key, lo, hi, job }
   function mapFor(W) {
     const art = G.art && G.art.ground ? G.art.ground(W) : null, key = (W.seed >>> 0) + ':' + idOf(W) + ':' + Math.round(W.ww) + ':' + Math.round(W.wh) + (art ? ':painted' : '');
-    if (!MAP || MAP.key !== key) { if (art) MAP = { key: key, lo: null, hi: null, job: startJob(W, 0.36), art: art }; else { const lo = startJob(W, 0.22); lo.run(400); MAP = { key: key, lo: lo, hi: null, job: startJob(W, 0.8) }; } }
+    if (!MAP || MAP.key !== key) { const dim = Math.round(W.ww) + ':' + Math.round(W.wh) + ':' + (W.seed >>> 0), was = MAP && !MAP.art && !MAP.plain && MAP.dim === dim ? (MAP.hi || MAP.lo) : null;      /* (when a star's painted ground comes, the ground it had until then fades into it) */
+      if (art) { MAP = { key: key, lo: null, hi: null, job: startJob(W, 0.36), art: art, dim: dim }; if (was && was.cv) MAP.prev = { cv: was.cv, t0: performance.now() }; } else { const lo = startJob(W, 0.22); lo.run(400); MAP = { key: key, lo: lo, hi: null, job: startJob(W, 0.8), dim: dim }; } }
     if (MAP.job) { if (MAP.job.run(MAP.art ? 11 : 7)) { MAP.hi = MAP.job; MAP.job = null; } }
     return MAP;
   }
@@ -146,7 +147,9 @@
       if (gx1 > gx0 && gy1 > gy0) { ctx.imageSmoothingEnabled = true; ctx.fillStyle = A.pat || (A.pat = ctx.createPattern(A.tile, 'repeat')); ctx.fillRect(gx0, gy0, gx1 - gx0, gy1 - gy0);
         if (mp && mp.done && mp.tint) { ctx.drawImage(mp.tint, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.save(); ctx.globalCompositeOperation = 'hard-light'; ctx.drawImage(mp.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore();
           if (mp.em) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.3 * Math.sin(t * 1.3); ctx.drawImage(mp.em, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore(); } } }
-    } else if (mp && mp.cv) { ctx.imageSmoothingEnabled = true; ctx.drawImage(mp.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN);
+      if (M.prev) { const a = 1 - (performance.now() - M.prev.t0) / 1800; if (a > 0) { ctx.save(); ctx.globalAlpha = a; ctx.drawImage(M.prev.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore(); } else M.prev = null; }
+    } else if (G.art && G.art.groundWaiting && G.art.groundWaiting(W)) { ctx.fillStyle = 'rgb(' + L.ramp[2].join(',') + ')'; ctx.fillRect(-MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); M.plain = true;      /* (its painted ground is on its way: a plain ground of its own colour until it comes, not the drawn one) */
+    } else if (mp && mp.cv) { M.plain = false; ctx.imageSmoothingEnabled = true; ctx.drawImage(mp.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN);
       if (mp.em && mp.done) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.3 * Math.sin(t * 1.3); ctx.drawImage(mp.em, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore(); }
       if (v.scale > 0.95) { const pat = ctx.createPattern(grainTile(), 'repeat'); if (pat) { ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = Math.min(0.5, (v.scale - 0.95) * 0.5); ctx.scale(0.6, 0.6); ctx.fillStyle = pat; ctx.fillRect(x0 / 0.6, y0 / 0.6, (x1 - x0) / 0.6, (y1 - y0) / 0.6); ctx.restore(); } } }
     // the slow shadows of clouds
@@ -155,8 +158,8 @@
     // the standing things, far ones first
     const n = Math.round(14 + span * (bot - top) / 150000), P = [];
     for (let i = 0; i < n; i++) { const x = e + rnd(seed, i, 21) * span, y = top + rnd(seed, i, 22) * (bot - top), s = 12 + rnd(seed, i, 23) * 20; if (x + s * 3 < x0 || x - s * 3 > x1 || y + s * 2 < y0 || y - s * 3 > y1) continue; if (Math.hypot(x - mid0.x, (y - mid0.y) * 1.4) < 380 || (G.siteAt && G.siteAt(W, x, y, 40))) continue; P.push([x, y, s, rnd(seed, i, 24), i]); }
-    const painted = !!(M.art && G.sceneryPainted(W));
-    if (painted) paintedScenery(ctx, W, seed, t, x0, y0, x1, y1);      // (on a painted star, drawn rocks would look pasted on: what stands there is painted too)
+    const painted = !!(M.art && G.sceneryPainted(W)), soon = !painted && !!(G.art && ((G.art.natureWaiting && G.art.natureWaiting(W)) || (G.art.groundWaiting && G.art.groundWaiting(W))));      /* (soon: its painted scenery is on its way, so the drawn scenery is not shown first) */
+    if (soon) { /* nothing yet */ } else if (painted) paintedScenery(ctx, W, seed, t, x0, y0, x1, y1);      // (on a painted star, drawn rocks would look pasted on: what stands there is painted too)
     else { if (!M.art) P.sort(function (a, b) { return a[1] - b[1]; }).forEach(function (q) { prop(ctx, id, L, q[0], q[1], q[2], q[3], t, q[4]); }); sites(ctx, W, L, id, seed, t, x0, y0, x1, y1); }
     beacons(ctx, W, L, seed, t);
     ctx.restore();

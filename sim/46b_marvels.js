@@ -16,7 +16,7 @@
     { id: 3, name: 'Dragon Breath', wonder: 'It can breathe fire. What hunts it gets burned.', sp: 'fire', glyph: 'flame', hue: 18, fx: { glow: 0.5, heat: 0.5 } },
     { id: 4, name: 'Diamond Heart', wonder: 'A diamond grew in its chest. Almost nothing bites through it, and it shines.', sp: '', glyph: 'gem', hue: 190, fx: { armor: 0.8, glow: 0.5 } },
     { id: 5, name: 'Rainbow Coat', wonder: 'Its coat shimmers through every colour, and neither heat nor cold nor poison troubles it much.', sp: '', glyph: 'rainbow', hue: 320, fx: { glow: 0.4, heat: 0.4, cold: 0.4, poison: 0.3 } },
-    { id: 6, name: 'Healing Light', wonder: 'Its glow mends whatever swims near it.', sp: 'heal', glyph: 'heart', hue: 130, fx: { glow: 0.4 } },
+    { id: 6, name: 'Healing Light', wonder: 'Its glow mends whatever comes near it.', sp: 'heal', glyph: 'heart', hue: 130, fx: { glow: 0.4 } },
     { id: 7, name: 'Lucky Star', wonder: 'Fortune follows it: danger has a way of missing.', sp: 'luck', glyph: 'clover', hue: 105, fx: { speed: 0.1 } },
     { id: 8, name: 'Heart of Spring', wonder: 'Every spring it has more children than anyone.', sp: 'fertile', glyph: 'sun', hue: 58, fx: { eat: 0.2 } },
     { id: 9, name: "Titan's Heart", wonder: 'It grew far bigger than its kind has ever been.', sp: 'titan', glyph: 'crown', hue: 30, fx: { armor: 0.3, eat: 0.2 } },

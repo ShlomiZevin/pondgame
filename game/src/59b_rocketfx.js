@@ -15,7 +15,7 @@
   if (typeof document === 'undefined') return;
   const TAU = 6.2832, P = [], MAX = 460, FEED = [], LAST = {};
   const rnd = Math.random, clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
-  const SPR = {};
+  const SPR = {}; let PALE = 1;
   /** a soft, lumpy puff of one colour (drawn once): lighter on top, shaded underneath */
   function puff(rgb) {
     if (SPR[rgb]) return SPR[rgb]; const c = document.createElement('canvas'); c.width = c.height = 96; const x = c.getContext('2d');
@@ -51,8 +51,8 @@
     const body = function (len, wd, c0, c1) { if (len < 2) return; const g = ctx.createLinearGradient(0, f.y, 0, f.y + len); g.addColorStop(0, c0); g.addColorStop(1, c1); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(f.x - wd * 0.55, f.y - 2); ctx.bezierCurveTo(f.x - wd * 1.25, f.y + len * 0.28, f.x - wd * 0.5, f.y + len * 0.74, f.x + Math.sin(t * 31 + len) * wd * 0.12, f.y + len); ctx.bezierCurveTo(f.x + wd * 0.5, f.y + len * 0.74, f.x + wd * 1.25, f.y + len * 0.28, f.x + wd * 0.55, f.y - 2); ctx.closePath(); ctx.fill(); };
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     // the light it throws: on the ground, and round its mouth
-    { const fall = clamp(1 - h / 460, 0, 1) * pw; if (fall > 0.02) { const rx = (150 + 190 * pw) * (0.6 + 0.4 * fall); ctx.save(); ctx.translate(f.x, f.ground + 6); ctx.scale(1, 0.36); const g = ctx.createRadialGradient(0, 0, 4, 0, 0, rx); g.addColorStop(0, 'rgba(255,196,120,' + 0.38 * fall + ')'); g.addColorStop(0.45, 'rgba(255,140,60,' + 0.17 * fall + ')'); g.addColorStop(1, 'rgba(255,110,40,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, TAU); ctx.fill(); ctx.restore(); }
-      const g2 = ctx.createRadialGradient(f.x, f.y + s * 0.4, 1, f.x, f.y + s * 0.4, s * (2 + 2.6 * pw)); g2.addColorStop(0, 'rgba(255,190,110,' + 0.3 * pw + ')'); g2.addColorStop(1, 'rgba(255,120,50,0)'); ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(f.x, f.y + s * 0.4, s * (2 + 2.6 * pw), 0, TAU); ctx.fill(); }
+    { const fall = clamp(1 - h / 460, 0, 1) * pw; if (fall > 0.02) { const rx = (150 + 190 * pw) * (0.6 + 0.4 * fall); ctx.save(); ctx.translate(f.x, f.ground + 6); ctx.scale(1, 0.36); const g = ctx.createRadialGradient(0, 0, 4, 0, 0, rx); g.addColorStop(0, 'rgba(255,196,120,' + 0.38 * fall * PALE + ')'); g.addColorStop(0.45, 'rgba(255,140,60,' + 0.17 * fall * PALE + ')'); g.addColorStop(1, 'rgba(255,110,40,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, TAU); ctx.fill(); ctx.restore(); }
+      const g2 = ctx.createRadialGradient(f.x, f.y + s * 0.4, 1, f.x, f.y + s * 0.4, s * (2 + 2.6 * pw)); g2.addColorStop(0, 'rgba(255,190,110,' + 0.3 * pw * PALE + ')'); g2.addColorStop(1, 'rgba(255,120,50,0)'); ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(f.x, f.y + s * 0.4, s * (2 + 2.6 * pw), 0, TAU); ctx.fill(); }
     body(L, w * 1.5, 'rgba(255,170,70,' + 0.62 * pw + ')', 'rgba(255,70,20,0)');
     body(L * 0.74, w * 0.95, 'rgba(255,232,160,' + 0.85 * pw + ')', 'rgba(255,150,50,0)');
     body(L * 0.46, w * 0.5, 'rgba(255,255,255,0.96)', 'rgba(170,215,255,0)');
@@ -70,7 +70,9 @@
     for (const k in LAST) if (now - LAST[k].at > 600) delete LAST[k];
     step(dt);
     const s = v.scale * v.dpr; ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); ctx.imageSmoothingEnabled = true;
-    const grey = puff('224,226,234'), dark = puff('122,124,138'), hot = puff('255,170,90'), dust = puff(dustRgb());
+    // (over pale ground, snow or light sand, white smoke would be lost: there it is greyer, and its fire's glare is held back)
+    const gm = G.art && G.art.ground && G.W && !G.W.title ? G.art.ground(G.W) : null, lum = gm ? gm.mean[0] * 0.3 + gm.mean[1] * 0.55 + gm.mean[2] * 0.15 : 110, pale = lum > 150;
+    const grey = puff(pale ? '176,182,198' : '224,226,234'), dark = puff(pale ? '84,90,108' : '122,124,138'), hot = puff('255,170,90'), dust = puff(dustRgb()); PALE = pale ? 0.6 : 1;
     // dust lowest, then smoke (the oldest first), then the fire, then the sparks
     for (let pass = 0; pass < 2; pass++) for (let i = 0; i < P.length; i++) { const p = P[i]; if (p.k === 2 || (p.k === 1) !== (pass === 0)) continue; const u = p.t / p.life, a = Math.min(1, u * 9) * (u < 0.45 ? 1 : (1 - u) / 0.55), d = p.r * 2;
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot || 0);

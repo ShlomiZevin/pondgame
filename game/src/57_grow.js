@@ -14,7 +14,7 @@
     g = G.clamp(g, 1, MAXG); if (Math.abs(g - (v.grow || 1)) < 0.001) return;
     const ow = W.ww, oh = W.wh, cx = G.cam.x / ow, cy = G.cam.y / oh;
     v.grow = g;
-    v.wh = 1400 * g; if (G.canvas && v.h) { v.base = v.h / v.wh; v.ww = G.clamp(v.w / v.base, 840 * g, 3360 * g); } else v.ww = ow * v.wh / oh;      // (the same sum as G.resize, without rebuilding the canvas)
+    v.wh = 1400 * g; if (G.canvas && v.h) { v.base = v.h / v.wh; v.ww = G.clamp(v.w / v.base, (G.FLAT ? 1900 : 840) * g, 3360 * g); } else v.ww = ow * v.wh / oh;      // (the same sum as G.resize, without rebuilding the canvas)
     W.ww = v.ww; W.wh = v.wh;
     const kx = W.ww / ow, ky = W.wh / oh;
     const mv = function (L, also) { if (!L) return; for (let i = 0; i < L.length; i++) { const o = L[i]; if (!o || typeof o.x !== 'number') continue; o.x *= kx; o.y *= ky; if (also) { if (typeof o.px === 'number') { o.px *= kx; o.py *= ky; } if (typeof o.tx === 'number') { o.tx *= kx; o.ty *= ky; } } } };

@@ -49,7 +49,7 @@
     { const ph = c.ph; if (ph && ph.love > 0.3) out.push('Made for ' + FOODS[ph.fav] + ' food' + (ph.bane >= 0 ? '; ' + FOODS[ph.bane] + ' food makes it ill' + (c.ill ? ' (it has found that out ' + (c.ill === 1 ? 'once' : c.ill + ' times') + ')' : '') : '') + '.'); }
     if (c.lessons > 3 && c.learned > 0.05) out.push('It has learned from ' + c.lessons + ' meals and mishaps.');
     if (c.bornKnowing > 0.05) out.push('It was born knowing some of what its parents had learned.'); if (c.taught > 2) out.push('It has been learning from its elders.'); if (c.judged) out.push('You have told it ' + (c.judged > 0 ? 'GOOD' : 'BAD') + ' ' + Math.abs(c.judged) + (Math.abs(c.judged) === 1 ? ' time.' : ' times.'));
-    if (L.land > 0.3) out.push('Spends its days on the shore.'); else if (L.shore > 0.3) out.push('Keeps to the water by the shore.'); else if (L.deep > 0.5) out.push('Lives in the dark deep.'); else if ((c.liveT || 0) > 3) out.push('Lives in open water.');
+    if (L.land > 0.3) out.push('Lives in the open air.'); else if (L.shore > 0.3) out.push('Keeps near the air-breathers.'); else if (L.deep > 0.5) out.push('Keeps to the dark places.'); else if ((c.liveT || 0) > 3) out.push('Glides over open ground.');
     return out.join(' ');
   };
   G.newWorld = function (opts) {
@@ -175,7 +175,7 @@
   G.envText = function (W) {
     const e = (W || G.W).env; if (!e) return '';
     const names = ['', '', '', 'blue', 'violet', 'pink'];
-    return [e.o2 < 0.8 ? 'thin on oxygen' : e.o2 > 1.08 ? 'rich in oxygen' : 'fair oxygen', e.murk > 0.66 ? 'murky' : e.murk < 0.33 ? 'clear' : 'hazy', e.rich > 1.15 ? 'fertile' : e.rich < 0.9 ? 'poor' : 'middling food', e.warm > 0.1 ? 'warm' : e.warm < -0.1 ? 'cool' : 'mild', names[e.deep] + ' food in the deep'].join(' · ');
+    return [e.o2 < 0.8 ? 'thin on oxygen' : e.o2 > 1.08 ? 'rich in oxygen' : 'fair oxygen', e.murk > 0.66 ? 'murky' : e.murk < 0.33 ? 'clear' : 'hazy', e.rich > 1.15 ? 'fertile' : e.rich < 0.9 ? 'poor' : 'middling food', e.warm > 0.1 ? 'warm' : e.warm < -0.1 ? 'cool' : 'mild', names[e.deep] + ' big prey'].join(' · ');
   };
   /** 0 in the bright shallows (left) to 1 in the dark deep (right) */
   G.depthAt = function (x) { return clamp(x / G.W.ww, 0, 1); };
@@ -1155,17 +1155,17 @@
   // ── discoveries: the first time evolution invents something that actually takes hold ──
   const DISC = {
     grow0: 'First legs! Something can crawl and grab.', grow1: 'First fins! Something learned to paddle.', grow2: 'First spikes! A prickly new defence.', grow3: 'First tentacles! Long arms that reach and feel.',
-    grow4: 'First feelers! Glowing tips that sense the water.', grow5: 'First armour plates!', grow6: 'First frills! A fan to show off.', grow7: 'First horns!',
-    eye: 'First eye! Something can really see.', eyes3: 'Three eyes or more! Something sees all around.', mouth1: 'First beak!', mouth2: 'First jaws! Teeth, and the big prey of the deep to use them on.', mouth3: 'First sucker mouth!', mouth4: 'First whiskers!',
-    tail: 'First tail! A body built to swim.', pair: 'A matching pair! One part of the body doubled, one on each side.', ring: 'A ring! A part of the body opened into a hollow.', lobes: 'Lobes! An outline that swells and dips all the way round.', stalk: 'A stalk! A part of the body held out away from the rest.', sideways: 'Sideways on! A body with a front and a back.', faceaway: 'A head! The face moved onto a part of its own.', seg2: 'More than one part! A second mass budded from the body.', seg5: 'A body of five parts.', seg8: 'A very long body: eight segments.', seg11: 'A giant: a body of eleven segments.', coat1: 'Scales! A coat of small hard plates.', coat2: 'Fur! A warm coat.', coat3: 'Feathers!', neck: 'A neck! A head set apart from the body.', bighead: 'A big head!', nested: 'A part growing on a part! Something like a hand on an arm.', star: 'A new body plan! A star, with arms all around.',
+    grow4: 'First feelers! Glowing tips that sense the air.', grow5: 'First armour plates!', grow6: 'First frills! A fan to show off.', grow7: 'First horns!',
+    eye: 'First eye! Something can really see.', eyes3: 'Three eyes or more! Something sees all around.', mouth1: 'First beak!', mouth2: 'First jaws! Teeth, and big prey to use them on.', mouth3: 'First sucker mouth!', mouth4: 'First whiskers!',
+    tail: 'First tail! A body built to glide.', pair: 'A matching pair! One part of the body doubled, one on each side.', ring: 'A ring! A part of the body opened into a hollow.', lobes: 'Lobes! An outline that swells and dips all the way round.', stalk: 'A stalk! A part of the body held out away from the rest.', sideways: 'Sideways on! A body with a front and a back.', faceaway: 'A head! The face moved onto a part of its own.', seg2: 'More than one part! A second mass budded from the body.', seg5: 'A body of five parts.', seg8: 'A very long body: eight segments.', seg11: 'A giant: a body of eleven segments.', coat1: 'Scales! A coat of small hard plates.', coat2: 'Fur! A warm coat.', coat3: 'Feathers!', neck: 'A neck! A head set apart from the body.', bighead: 'A big head!', nested: 'A part growing on a part! Something like a hand on an arm.', star: 'A new body plan! A star, with arms all around.',
     shell: 'First shell!', crest: 'First crest!', glow: 'First glow! A creature that makes its own light.', venom: 'First poison glands!', pattern: 'First markings! Skin with a pattern.',
-    walker: 'Out of the water! Something can breathe air and live on the shore.', hands: 'Hands! Fingers at the front of the body.', biter: 'A real bite: jaws strong enough for big prey.',
+    walker: 'A new breath! Something can breathe the open air, and walk.', hands: 'Hands! Fingers at the front of the body.', biter: 'A real bite: jaws strong enough for big prey.',
     hidden: 'First thought! A brain grew a hidden cell.', hidden3: 'A bigger brain: three hidden cells.',
     photo: 'Light-eaters! Some creatures now live on sunlight, like plants.',
     giant: 'First giant! A much bigger creature.', tiny: 'First speck! A very tiny creature.',
     diet0: 'A new diet! Something thrives on gold food.', diet1: 'A new diet! Something thrives on lime food.', diet3: 'A new diet! Something thrives on blue food.',
     diet4: 'A new diet! Something thrives on violet food.', diet5: 'A new diet! Something thrives on pink food.',
-    heat: 'Heat-proof! A creature that can take the warm.', cold: 'Cold-proof! A creature that shrugs off winter.', tox: 'Poison-proof! A creature that can swim through poison.',
+    heat: 'Heat-proof! A creature that can take the warm.', cold: 'Cold-proof! A creature that shrugs off winter.', tox: 'Poison-proof! A creature that can go through poison.',
     stick: 'Stickiness! Creatures learned to cling to their kin.', sprint: 'A sprint! Creatures can burst forward.', flee: 'First escape! Creatures learned to turn away from danger.',
   };
   G.discover = function (key, text) {
@@ -1408,7 +1408,7 @@
     else bits.push('Eats ' + names[best[0]] + ' food.');
     if (G.FLAT) bits.push(ph.home ? 'It breathes air and walks.' : (ph.air || 0) > 0.3 ? 'It is half-way to breathing air.' : 'It breathes as the first life of the star did.'); else
     bits.push(ph.home ? 'A creature of the land: it lives, feeds and breeds out of the water, and only paddles in the shallows.' : (ph.air || 0) > 0.3 ? 'A creature of the water that comes out onto the wet edge of the shore.' : 'A creature of the water.');
-    if (ph.jaws) bits.push('Its bite can take the big prey of the deep.');
+    if (ph.jaws) bits.push('Its bite can take the big prey.');
     if (g.h >= 2) bits.push('A thinking brain with ' + g.h + ' hidden cells.');
     if (g.c[6] > 0.5) bits.push('Likes it hot.');
     if (g.c[7] > 0.5) bits.push('Shrugs off winter.');

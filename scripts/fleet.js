@@ -36,6 +36,11 @@ const path = require('path');
   console.log('there: ' + await fr.evaluate(() => { const V = G.far.visiting; if (!V) return 'NOT ARRIVED'; const W = G.W; return V.name + ' · ships landed ' + (W.works || []).filter((w) => w.visitor).length + ' (fleet of ' + V.fleetN + ') · of ours set down ' + W.cre.filter((c) => c.line && !c.dead).length + ' · ADDs ' + V.adds; }));
   await fr.evaluate(() => { const s = (G.W.works || []).filter((w) => w.visitor)[0]; if (s) { G.cam.z = 1.3; G.focusOn(s.x - 120, s.y + 40, 1.3); } }); await page.waitForTimeout(6000); await shot('3-landed');
   console.log('home meanwhile: ' + await fr.evaluate(() => { G.far.look('home'); const W = G.W; const r = 'ships away ' + (W.works || []).filter((w) => w.bp && w.bp.type === 'ship' && w.away).length + ' of ' + (W.works || []).filter((w) => w.bp && w.bp.type === 'ship').length + ' · lumen ' + G.colony().stock[3] + ' (was ' + window._lum0 + ')'; G.far.look('far'); return r; }));
+  // home again: every ship that flew comes down on its own pad
+  await fr.evaluate(() => { G.voyageHome(true); });
+  let seenUp = 0, shotDone = false; const t1 = Date.now();
+  while (Date.now() - t1 < 60000) { const st = await fr.evaluate(() => ({ v: !!G.far.visiting, up: (G.W.works || []).filter((w) => w.lifting).length })); if (!st.v && st.up > seenUp) seenUp = st.up; if (!st.v && st.up >= 2 && !shotDone) { shotDone = true; await page.waitForTimeout(900); await shot('4-coming-home'); } if (!st.v && seenUp && !st.up) break; await page.waitForTimeout(120); }
+  console.log('home: ' + await fr.evaluate(() => { const W = G.W, S = (W.works || []).filter((w) => w.bp && w.bp.type === 'ship'), P = (W.works || []).filter((w) => w.bp && w.bp.type === 'port'); return 'ships standing ' + S.filter((w) => !w.lifting && !w.away).length + ' of ' + S.length + ' · each on a pad: ' + S.every((s) => P.some((p) => { const d = G.dockOf(p); return Math.abs(d.x - s.x) < 6 && Math.abs(d.y - s.bp.S * 0.45 - s.y) < 6; })); }) + ' · most in the air at once ' + seenUp);
   console.log(errs.slice(0, 8).join('\n') || 'no errors');
   await browser.close();
 })().catch((e) => { console.error(e); process.exit(1); });

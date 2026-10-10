@@ -26,7 +26,7 @@
   G.measurePond = measure;
 
   const LABEL = { alive: 'creatures alive', foodPerCreature: 'food each creature finds', size: 'body size', speed: 'speed', brain: 'brain size', parts: 'things growing on the body',
-    bodySegments: 'body segments', walkers: '% that can walk', starBodies: '% with a star-shaped body', biters: '% with a real bite', onTheShore: '% living on the shore', withEyes: '% with eyes', withLimbs: '% with limbs', lightEaters: '% living on light', inTheDeep: '% living in the deep', hunters: '% hunters', armoured: '% armoured', fitness: 'average fitness' };
+    bodySegments: 'body segments', walkers: '% that can walk', starBodies: '% with a star-shaped body', biters: '% with a real bite', onTheShore: '% breathing the open air', withEyes: '% with eyes', withLimbs: '% with limbs', lightEaters: '% living on light', inTheDeep: '% living in the deep', hunters: '% hunters', armoured: '% armoured', fitness: 'average fitness' };
 
   /** the biggest changes between two measurements, as plain facts */
   function changes(a, b) {
@@ -50,8 +50,8 @@
     else {
       const c = ch[0], up = c.to > c.from;
       const why = /food/.test(c.what) ? (up ? 'they have become better at finding food' : 'food has become harder to find')
-        : /eyes/.test(c.what) ? 'seeing food from afar pays off' : /limbs/.test(c.what) ? 'limbs help them swim and reach' : /light/.test(c.what) ? 'living on sunlight means never having to chase a meal'
-        : /deep/.test(c.what) ? 'the deep has food nobody else was eating' : /hunters/.test(c.what) ? 'other creatures have become a meal' : /size/.test(c.what) ? (up ? 'a bigger body stores more energy for winter' : 'a small body is cheap to run')
+        : /eyes/.test(c.what) ? 'seeing food from afar pays off' : /limbs/.test(c.what) ? 'limbs help them move and reach' : /light/.test(c.what) ? 'living on sunlight means never having to chase a meal'
+        : /deep/.test(c.what) ? 'there was food nobody else was eating' : /hunters/.test(c.what) ? 'other creatures have become a meal' : /size/.test(c.what) ? (up ? 'a bigger body stores more energy for winter' : 'a small body is cheap to run')
         : /speed/.test(c.what) ? (up ? 'the fast reach food first' : 'moving less saves energy') : /brain/.test(c.what) ? 'smarter steering finds more food' : /armour/.test(c.what) ? 'armour keeps hunters off' : 'it helps them survive';
       text = 'In these generations, ' + c.what + ' went from ' + c.from + ' to ' + c.to + ': ' + why + '.' + (ch[1] ? ' Also, ' + ch[1].what + ' went from ' + ch[1].from + ' to ' + ch[1].to + '.' : '');
     }

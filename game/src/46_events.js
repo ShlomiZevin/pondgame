@@ -127,10 +127,10 @@
 
   // ── the game's own reading of a sentence (no server needed) ──
   const RULES = [
-    [/mud|murk|swamp|stagnant|fog|silt/, { name: 'Murky water', note: 'The water thickens. Light dies quickly and breath comes hard.', hue: 60, shake: 0.2, duration: 30, light: -0.2, water: { oxygen: -0.6, murk: 0.8 } }],
-    [/clear water|crystal|fresh/, { name: 'Fresh water', note: 'The water clears and fills with air. Bigger bodies can breathe.', hue: 190, shake: 0.1, fx: 'bubbles', duration: 30, water: { oxygen: 0.8, murk: -0.6 } }],
-    [/ice age|freez|frozen|blizzard|snow|winter|cold|frost/, { name: 'A great cold', note: 'The water turns bitter cold. Only the cold-proof are comfortable.', temp: -0.8, light: -0.2, food: 0.5, duration: 80, hue: 205, shake: 0.2 }],
-    [/heat|hot|boil|drought|desert|sun burn|scorch|fire|lava|volcan/, { name: 'A great heat', note: 'The water warms and the algae thin out.', temp: 0.8, food: 0.5, duration: 70, hue: 15, shake: 0.4 }],
+    [/mud|murk|swamp|stagnant|fog|silt/, { name: 'Murky water', note: 'The air thickens. Light dies quickly and breath comes hard.', hue: 60, shake: 0.2, duration: 30, light: -0.2, water: { oxygen: -0.6, murk: 0.8 } }],
+    [/clear water|crystal|fresh/, { name: 'Fresh water', note: 'The air clears and grows rich. Bigger bodies can breathe.', hue: 190, shake: 0.1, fx: 'bubbles', duration: 30, water: { oxygen: 0.8, murk: -0.6 } }],
+    [/ice age|freez|frozen|blizzard|snow|winter|cold|frost/, { name: 'A great cold', note: 'The air turns bitter cold. Only the cold-proof are comfortable.', temp: -0.8, light: -0.2, food: 0.5, duration: 80, hue: 205, shake: 0.2 }],
+    [/heat|hot|boil|drought|desert|sun burn|scorch|fire|lava|volcan/, { name: 'A great heat', note: 'The air warms and the green food thins out.', temp: 0.8, food: 0.5, duration: 70, hue: 15, shake: 0.4 }],
     [/dark|eclipse|night|shadow|black/, { name: 'The long dark', note: 'The light fades. Light-eaters go hungry; the deep hardly notices.', light: -0.8, food: 0.6, duration: 70, hue: 250, shake: 0.1 }],
     [/bright|sunny|spring|sunshine|rainbow|paradise|feast|bloom|harvest|plenty/, { name: 'A golden season', note: 'Light and food everywhere. Everyone grows fat.', light: 0.5, food: 2.2, duration: 60, hue: 50, shake: 0.1, feed: { count: 120, tag: 2 } }],
     [/meteor|asteroid|comet|bomb|explo|nuke|blast/, { name: 'Impact', note: 'Something huge strikes the star.', kill: { share: 0.45, who: 'random' }, temp: 0.3, duration: 30, hue: 30, shake: 1, current: 0.8 }],
@@ -138,16 +138,16 @@
     [/giant|whale|shark|monster|predator|kraken|dragon|hunter|eat|alien|abduct/, { name: 'Something hungry', note: 'It takes the biggest ones first.', kill: { share: 0.3, who: 'biggest' }, hue: 340, shake: 0.6, current: 0.4 }],
     [/wall|cage|lock|vault|safe|fence|behind|trapped|sealed|prison|fortress|dome/, { name: 'Locked away', note: 'A wall rises around the food. Only those who can break in will eat.', hue: 210, shake: 0.6, thing: { name: 'Steel Wall', props: { vault: 0.6, hard: 1 }, hue: 210, note: 'A wall around the food. Something will have to learn to get through.', weak: 2 } }],
     [/everyone|every one|all of them|give them|they all|grow |sprout|bless/, { name: 'A strange gift', note: 'Bodies change all at once. Whether it lasts is up to the star.', hue: 290, shake: 0.3, mutate: 1.5, duration: 30, gift: { trait: '?', share: 0.7 } }],
-    [/clear water|crystal|fresh water|oxygen|bubbl/, { name: 'Fresh water', note: 'The water clears and fills with air. Bigger bodies can breathe.', hue: 190, shake: 0.1, fx: 'bubbles', duration: 30, water: { oxygen: 0.8, murk: -0.6 } }],
-    [/mud|murk|swamp|stagnant|fog|silt/, { name: 'Murky water', note: 'The water thickens. Light dies quickly and breath comes hard.', hue: 60, shake: 0.2, duration: 30, light: -0.2, water: { oxygen: -0.6, murk: 0.8 } }],
+    [/clear water|crystal|fresh water|oxygen|bubbl/, { name: 'Fresh water', note: 'The air clears and grows rich. Bigger bodies can breathe.', hue: 190, shake: 0.1, fx: 'bubbles', duration: 30, water: { oxygen: 0.8, murk: -0.6 } }],
+    [/mud|murk|swamp|stagnant|fog|silt/, { name: 'Murky water', note: 'The air thickens. Light dies quickly and breath comes hard.', hue: 60, shake: 0.2, duration: 30, light: -0.2, water: { oxygen: -0.6, murk: 0.8 } }],
     [/fashion|admire|beauty contest|trend|style/, { name: 'A new fashion', note: 'What the star finds beautiful has changed.', hue: 320, shake: 0.1, mutate: 1.2, duration: 20, admire: '?' }],
     [/storm|flood|wave|tsunami|hurricane|tornado|wind|current|whirl/, { name: 'A great storm', note: 'Everything is swept across the star.', current: 1, kill: { share: 0.1, who: 'slowest' }, hue: 200, shake: 0.7 }],
     [/radiat|mutat|magic|wizard|chaos|strange|weird|cosmic/, { name: 'Strange days', note: 'Children are born far stranger than usual.', mutate: 3.5, duration: 90, hue: 300, shake: 0.3 }],
-    [/poison|pollut|toxic|acid|oil|sewage|trash|venom|contaminat/, { name: 'Poisoned water', note: 'The whole star turns foul. Only the poison-proof are comfortable.', poison: 0.65, food: 0.8, duration: 110, hue: 95, shake: 0.3, fx: 'spores' }],
+    [/poison|pollut|toxic|acid|oil|sewage|trash|venom|contaminat/, { name: 'Poisoned air', note: 'The whole star turns foul. Only the poison-proof are comfortable.', poison: 0.65, food: 0.8, duration: 110, hue: 95, shake: 0.3, fx: 'spores' }],
     [/rain|food|manna|snack|candy|sugar|cake|pizza/, { name: 'A rain of food', note: 'It falls everywhere at once.', feed: { count: 180, tag: 0 }, food: 1.6, duration: 30, hue: 45, shake: 0.1 }],
   ];
   // ── nature's own surprises: nobody asked for them ──
-  const NATURE = ['a cold snap', 'a heat wave', 'the long dark', 'a golden season of plenty', 'a great storm', 'strange days of mutation', 'murky water', 'fresh clear water', 'a sickness', 'a rain of food'];
+  const NATURE = ['a cold snap', 'a heat wave', 'the long dark', 'a golden season of plenty', 'a great storm', 'strange days of mutation', 'murky water', 'fresh clear air', 'a sickness', 'a rain of food'];
   G.natureTick = function (gen) {
     const W = G.W;
     if (!W || W.title || gen < 18) return;

@@ -7,7 +7,7 @@
   'use strict';
   // key → [what it is for, which of the pond's troubles it answers (matched against the measured pressures)]
   const FOR = {
-    grow0: ['legs grab food and can carry a body onto the shore', /scarce|few can eat/],
+    grow0: ['legs grab food and carry a body over the ground', /scarce|few can eat/],
     grow1: ['fins add speed and turning, and breathe like gills', /oxygen|hunters|attacking|eats|deadly/],
     grow2: ['spikes hurt whatever bites', /hunters|attacking|weak to spikes/],
     grow3: ['tentacles reach food from further off', /scarce|sticky/],
@@ -16,7 +16,7 @@
     grow6: ['frills breathe well and catch the eye', /oxygen/],
     grow7: ['horns wound an attacker', /hunters|attacking|weak to spikes/],
     eye: ['an eye finds food before bumping into it', /scarce|dark|hunters/], eyes3: ['more eyes see further and all around', /scarce|dark|hunters/],
-    mouth1: ['a beak bites harder than a plain mouth', /protein|jaws and beaks/], mouth2: ['jaws open up the big prey of the deep, rich in protein', /protein|jaws and beaks/],
+    mouth1: ['a beak bites harder than a plain mouth', /protein|jaws and beaks/], mouth2: ['jaws open up the big prey, rich in protein', /protein|jaws and beaks/],
     mouth3: ['a sucker reaches food a plain mouth misses', /scarce/], mouth4: ['whiskers feel for food where eyes fail', /dark|scarce/],
     tail: ['a tail is the cheapest speed there is', /hunters|attacking|scarce/],
     seg11: ['a giant is too big for most mouths, if it can feed itself', /hunters|attacking/], coat1: ['scales turn small bites aside', /hunters|attacking/], coat2: ['fur keeps a body working in the cold', /cold/], coat3: ['feathers keep out the cold and help it steer', /cold/],
@@ -26,7 +26,7 @@
     shell: ['a shell turns bites, at the price of speed', /hunters|attacking|weak to armour/], crest: ['a crest protects a little and is for show', /hunters/],
     glow: ['its own light draws food and grows algae', /dark|glowing/], venom: ['poison makes it a bad meal', /hunters|attacking|weak to poison/],
     pattern: ['markings cost nothing and are there for mates to see', null],
-    walker: ['food on the shore lies untouched by anything that cannot walk', null], hands: ['fingers pick the shore\'s food faster', null], biter: ['a strong bite takes the big prey of the deep', /protein/],
+    walker: ['the plants of the open ground lie untouched by anything that cannot walk', null], hands: ['fingers pick the ground\'s plants faster', null], biter: ['a strong bite takes the big prey', /protein/],
   };
   // key → does this creature have it?
   const HAS = {

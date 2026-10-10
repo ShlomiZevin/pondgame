@@ -143,6 +143,7 @@
     if (d && d.steps[d.i].do !== 'liftoff') { settle(d); if (G.deedStop) G.deedStop('off'); }
     if (G.hub) G.hub.poke();
   };
+  let flew = {};
   // the mates of the ship that leads rise with it, a breath behind each other, and stand again when it does
   function matesUp(ship, u) { if (!F.mates) return; F.mates(ship).forEach(function (m, k) { if (m.y0v === undefined) m.y0v = m.y; const uu = clamp(u * 1.15 - 0.08 * (k + 1), 0, 1); m.lifting = uu > 0; m.y = m.y0v - uu * uu * 640; }); }
   function matesDown() { ((G.W && G.W.works) || []).forEach(function (w) { if (w.y0v !== undefined) { w.y = w.y0v; w.lifting = false; delete w.y0v; } }); }
@@ -185,7 +186,7 @@
     if (!d || !d.voyage) return; const W = G.W, ship = shipOfPlan(d), crew = W.cre.filter(function (c) { return c.inShip && !c.dead; });
     if (how !== 'done' || !ship || crew.length < 1 || G.mode !== 'play') { settle(d); return; }
     // lift-off is done: the ship is away
-    const p = d.voyage.p, at = spot(p), y0 = d.voyage.y0; ship.y = y0; ship.lifting = false; d.voyage.lift = 0; matesDown();
+    const p = d.voyage.p, at = spot(p), y0 = d.voyage.y0; ship.y = y0; ship.lifting = false; d.voyage.lift = 0; flew = {}; if (F.mates) F.mates(ship).forEach(function (m) { flew[m.name] = 1; }); matesDown();      /* (which ships flew with it: they come down with it when it is home again) */
     fly(ship.bp, ship.x, y0 - 640, at.x, at.y, 7, 'CROSSING SPACE TO ' + esc(p.name.toUpperCase()) + ' · ' + crew.length + ' aboard', function () {
       crew.forEach(function (c) { c.inShip = false; }); W.cre.forEach(function (c) { c.crewPick = 0; });
       const out = F.sail(p, crew, ship); pickEl.classList.add('hide');
@@ -223,6 +224,7 @@
     const V = F.visiting, W = G.W, H = homeAt(), back = aboard.filter(function (c) { return c !== bring; }), stay = W.cre.filter(function (c) { return !c.dead && c.line && aboard.indexOf(c) < 0 && c !== bring; }).length;
     fly(s ? s.bp : V.ship.bp, s ? s.x : W.ww / 2, s ? s.y - 640 : W.wh / 2, H.x, H.y, quick ? 3 : 7, 'FLYING HOME FROM ' + esc(V.name.toUpperCase()) + ' · ' + (aboard.length + (bring && aboard.indexOf(bring) < 0 ? 1 : 0)) + ' aboard', function () {
       aboard.forEach(function (c) { c.inShip = false; c.goTo = null; });
+      flew = {}; ((V && V.mates) || []).forEach(function (m) { flew[m.name] = 1; });      /* (the ships that flew out with it come down with it) */
       const r = F.home(bring, back); pickEl.classList.add('hide'); if (!r) return; if (G.setSpeed) G.setSpeed(1);
       const nb = (r.crew || []).length;
       say('THE SHIP IS HOME', (nb ? nb + ' of the crew came home in it. ' : 'It came home alone. ') + (stay ? stay + ' of yours stayed at ' + V.name + ': they are your outpost there (SPACE, then LOOK IN, to see them). ' : '') + (r.brought ? (r.brought.guestName || 'One creature') + ' came with it, a stranger here: see how your own take to it.' : ''), 10000);
@@ -240,9 +242,12 @@
   /** the ship in flight: it points where it flies, its engine burning behind it */
   /** the ship comes down where it is to stand: the view goes to it, it descends on its fire, and those aboard step out after (57x_far.js lets them out one by one) */
   let landing = null; const FXB = [];
-  function land(ship) { if (!ship) return; const W = G.W; landing = { ship: ship, y0: ship.y, t0: W.t, T: 2.8 }; G.emit('ship-landing', ship); ship.lifting = true; ship.y = landing.y0 - 640; if (G.cam) { G.cam.z = 0.3; G.cam.x = ship.x; G.cam.y = landing.y0 - 200; if (G.applyCam) G.applyCam(); } if (G.flyTo) G.flyTo(ship.x, landing.y0 - 70, 1.12, 1.9); }
+  function land(ship) { if (!ship) return; const W = G.W; landing = { ship: ship, y0: ship.y, t0: W.t, T: 2.8, mates: [] }; G.emit('ship-landing', ship); ship.lifting = true; ship.y = landing.y0 - 640;
+    (W.works || []).forEach(function (w) { if (w === ship || !w.bp || w.bp.type !== 'ship' || w.away || !(ship.visitor ? w.visitor : flew[w.name])) return; landing.mates.push({ ship: w, y0: w.y, d: 0.4 * (landing.mates.length + 1) }); w.lifting = true; w.y -= 640; }); if (!ship.visitor) flew = {}; if (G.cam) { G.cam.z = 0.3; G.cam.x = ship.x; G.cam.y = landing.y0 - 200; if (G.applyCam) G.applyCam(); } if (G.flyTo) G.flyTo(ship.x, landing.y0 - 70, 1.12, 1.9); }
   { const s2 = G.step; G.step = function (dt) { s2(dt); if (!landing) return; const W = G.W, k = landing, sh = k.ship; if (!W || (W.works || []).indexOf(sh) < 0) { landing = null; return; }
-      const u = clamp((W.t - k.t0) / k.T, 0, 1); sh.lifting = true; sh.y = k.y0 - (1 - u) * (1 - u) * 640; k.u = u; if (u >= 1) { sh.y = k.y0; sh.lifting = false; landing = null; if (G.R) G.R.shake = 0.35; if (G.sfx) G.sfx('meteor'); } }; }
+      const u = clamp((W.t - k.t0) / k.T, 0, 1); let allDown = u >= 1; if (!k.down) { sh.lifting = true; sh.y = k.y0 - (1 - u) * (1 - u) * 640; } k.u = u;
+      (k.mates || []).forEach(function (m) { if (m.down || (W.works || []).indexOf(m.ship) < 0) { m.down = true; return; } const um = clamp((W.t - k.t0 - m.d) / k.T, 0, 1); m.u = um; m.ship.lifting = true; m.ship.y = m.y0 - (1 - um) * (1 - um) * 640; if (um >= 1) { m.ship.y = m.y0; m.ship.lifting = false; m.down = true; if (G.R) G.R.shake = Math.max(G.R.shake || 0, 0.2); } else allDown = false; });
+      if (u >= 1 && !k.down) { k.down = true; sh.y = k.y0; sh.lifting = false; if (G.R) G.R.shake = 0.35; if (G.sfx) G.sfx('meteor'); } if (allDown) landing = null; }; }
   G.on('went-aboard', function (c, ship) { if (G.mode === 'play') { FXB.push({ x: c.x, y: c.y, ship: ship, t0: now(), id: c.id, in: true }); if (G.sfx) G.sfx('click'); } });
   G.on('stepped-out', function (c) { const sh = F.shipOf(); if (G.mode === 'play' && sh) { FXB.push({ x: c.goTo ? sh.x + (c.goTo.x - sh.x) * 0.25 : sh.x + 40, y: sh.y + 50, ship: sh, t0: now(), id: c.id, in: false }); if (G.sfx) G.sfx('click'); } });
   /** boarding and stepping out, made plain: a ramp at the ship while they board, a call over it, and each one seen going in (or coming out) as a spark with its number */
@@ -262,7 +267,8 @@
       if (u < 0.6) { const g = ctx.createRadialGradient(px, py, 0, px, py, 16); g.addColorStop(0, 'rgba(255,245,200,0.95)'); g.addColorStop(1, 'rgba(246,211,101,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, 16, 0, TAU); ctx.fill(); ctx.fillStyle = '#fff3c8'; ctx.beginPath(); ctx.arc(px, py, 4, 0, TAU); ctx.fill(); }
       const a = Math.min(1, (1 - u) * 3), ty = (k.in ? hy : ay) - 34 - u * 22, txt = '#' + k.id + (k.in ? '  aboard ✓' : '  steps out'); ctx.font = '800 12px system-ui, sans-serif'; const tw = ctx.measureText(txt).width + 18, tx = k.in ? hx : ax; ctx.fillStyle = 'rgba(9,18,30,' + 0.88 * a + ')'; G.roundRect(ctx, tx - tw / 2, ty - 11, tw, 22, 11); ctx.fill(); ctx.fillStyle = 'rgba(' + (k.in ? '154,240,208' : '246,211,101') + ',' + a + ')'; ctx.fillText(txt, tx, ty + 0.5); }
     // coming down: its fire under it
-    if (landing && (G.W.works || []).indexOf(landing.ship) >= 0 && G.rocketFx) { const sh = landing.ship, S = sh.bp.S || 70; G.rocketFx.feed({ id: 'land', x: sh.x, y: sh.y + S * 0.34, ground: landing.y0 + S * 0.45 + 4, power: 0.6 + 0.4 * (1 - (landing.u || 0)), size: 26 }); }
+    if (landing && (G.W.works || []).indexOf(landing.ship) >= 0 && G.rocketFx) { const sh = landing.ship, S = sh.bp.S || 70; if (!landing.down) G.rocketFx.feed({ id: 'land', x: sh.x, y: sh.y + S * 0.34, ground: landing.y0 + S * 0.45 + 4, power: 0.6 + 0.4 * (1 - (landing.u || 0)), size: 26 });
+      (landing.mates || []).forEach(function (m, k) { if (!m.down && (m.u || 0) > 0) G.rocketFx.feed({ id: 'landm' + k, x: m.ship.x, y: m.ship.y + S * 0.34, ground: m.y0 + S * 0.45 + 4, power: 0.6 + 0.4 * (1 - (m.u || 0)), size: 26 }); }); }
     else if (landing && (G.W.works || []).indexOf(landing.ship) >= 0) { const sh = landing.ship, S = sh.bp.S || 70, x = sx(sh.x), y = sy(sh.y + S * 0.5), Lf = (70 + 150 * (1 - (landing.u || 0))) * v.scale * (0.8 + 0.25 * Math.sin(t * 29)), w = S * 0.28 * v.scale, fg = ctx.createLinearGradient(0, y, 0, y + Lf); fg.addColorStop(0, 'rgba(255,250,220,0.95)'); fg.addColorStop(0.3, 'rgba(255,190,90,0.85)'); fg.addColorStop(1, 'rgba(255,110,60,0)'); ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(x - w, y - 4); ctx.quadraticCurveTo(x, y + Lf * 1.5, x + w, y - 4); ctx.closePath(); ctx.fill();
       const gy = sy(landing.y0 + S * 0.55); for (let i = 0; i < 12; i++) { const q = (t * 0.9 + i / 12) % 1, side = i % 2 ? 1 : -1; ctx.fillStyle = 'rgba(232,238,248,' + 0.3 * (1 - q) * (landing.u || 0) + ')'; ctx.beginPath(); ctx.arc(x + side * (10 + 120 * q) * v.scale, gy - q * 14 * v.scale, (12 + 30 * q) * v.scale, 0, TAU); ctx.fill(); } }
     ctx.restore();

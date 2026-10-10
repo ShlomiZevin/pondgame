@@ -312,7 +312,7 @@
     if (r() < m * 2) { g.t[1] += n() * 0.07; note('t', 1, 'speed', false); }
     // breath: how far out of the water it can live. It drifts like any gene, and now and then takes a real step either way
     if (r() < m * 2.5) { g.t[5] = (g.t[5] || 0) + n() * 0.06; note('t', 5, 'breath', false); }
-    if (r() < 0.03 * wild) { const up = r() < 0.5; g.t[5] = clamp((g.t[5] || 0) + (up ? 0.18 : -0.18), 0, 1); note('t', 5, up ? 'can stay longer out of the water' : 'keeps more to the water', true); }
+    if (r() < 0.03 * wild) { const up = r() < 0.5; g.t[5] = clamp((g.t[5] || 0) + (up ? 0.18 : -0.18), 0, 1); note('t', 5, up ? 'breathes the open air more easily' : 'breathes more as the first life did', true); }
     { const was = (+parent.t[5] || 0) >= 0.5, now = (g.t[5] || 0) >= 0.5, Wd = G.W;
       if (was !== now && Wd) { const sh = Wd.shore || G.SHORE0 || 0.24, lu = Wd.landUse || 0, full = now ? lu / sh : (1 - lu) / (1 - sh);      // how lived-in the side it would be born into is
         if (r() < clamp(full * 1.6 - 0.1, 0, 0.97)) g.t[5] = was ? Math.max(0.5, +parent.t[5] || 0.5) : Math.min(0.49, +parent.t[5] || 0); } }

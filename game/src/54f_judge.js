@@ -46,7 +46,7 @@
     if (c.eatFlash > 0.4) return 'eating';
     const i = c.inp, o = c.out; if (i && Math.max(Math.abs(i[5]), Math.abs(i[6])) > 0.35) return o[2] > 0.6 ? 'fleeing from danger' : 'near danger, and not running';
     if (i && Math.max(Math.abs(i[3]), Math.abs(i[4])) > 0.35 && o[0] > 0.5) return 'chasing prey'; if (i && Math.max(Math.abs(i[1]), Math.abs(i[2])) > 0.35 && o[0] > 0.4) return 'going for food';
-    if (o && o[4] > 0.5 && (i[10] || 0) > 0.3) return 'keeping with its family'; return o && o[0] > 0.5 ? 'swimming about' : 'drifting';
+    if (o && o[4] > 0.5 && (i[10] || 0) > 0.3) return 'keeping with its family'; return o && o[0] > 0.5 ? 'moving about' : 'drifting';
   };
 
   // ── how common each counted deed is: counted every generation, per hundred creatures ──

@@ -70,7 +70,7 @@
     if (ph.love > 0.3) add('\u2665 ' + FOOD[ph.fav], 'Its body is made for ' + FOOD[ph.fav] + ' food: it gets more from it.', 'g');
     if (ph.love > 0.3 && ph.bane >= 0) add('\u2715 ' + FOOD[ph.bane] + (c.ill ? ' \u00d7' + c.ill : ''), FOOD[ph.bane] + ' food makes it ill' + (c.ill ? ' (it has found that out ' + c.ill + (c.ill === 1 ? ' time)' : ' times)') : '') + '.', 'r');
     if (G.FLAT) { if (ph.home) add('breathes air', 'It breathes air and walks: one of the two ways of living on a star.'); }
-    else if (L.land > 0.3) add('on the shore', 'It spends its days on the land.'); else if (L.shore > 0.3) add('by the shore', 'It keeps to the water by the shore.'); else if (L.deep > 0.5) add('the dark deep', 'It lives in the dark deep.'); else if ((c.liveT || 0) > 3) add('open water', 'It lives in open water.');
+    else if (L.land > 0.3) add('in the open air', 'It lives in the open air.'); else if (L.shore > 0.3) add('near the air-breathers', 'It keeps near the air-breathers.'); else if (L.deep > 0.5) add('the dark places', 'It keeps to the dark places.'); else if ((c.liveT || 0) > 3) add('open ground', 'It glides over open ground.');
     if (c.lessons > 3 && c.learned > 0.05) add('learned \u00d7' + c.lessons, 'It has learned from ' + c.lessons + ' meals and mishaps in its own life.', 'v');
     if (c.bornKnowing > 0.05) add('born knowing', 'It was born knowing some of what its parents had learned.', 'v');
     if (c.taught > 2) add('taught by elders', 'It has been learning from its elders.', 'v');

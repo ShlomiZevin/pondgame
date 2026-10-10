@@ -106,9 +106,10 @@
     return out;
   }
   /** the building `name` (heart0..3, house, hall, huts, tower, wall, spire, port, ship) as this star's people build it, or null until it has come */
-  A.sprite = function (W, name) {
-    W = W || G.W; const pe = A.people(W); if (!pe || !G.terrainOf) return null;
-    const part = CIVIC[name] ? 'civic' : 'works', id = G.terrainOf(W).id, key = part + '.' + id + '.' + norm(pe.kind);
+  A.sprite = function (W, name) { W = W || G.W; const pe = A.people(W); if (!pe || !G.terrainOf) return null; return A.spriteOf(G.terrainOf(W).id, pe, name); };
+  /** the same, for any people of any kind of star (a rival's ship is its own people's, not yours) */
+  A.spriteOf = function (id, pe, name) {
+    const part = CIVIC[name] ? 'civic' : 'works', key = part + '.' + id + '.' + norm(pe.kind);
     if (!SHEET[key] || (ST[key] && ST[key].near)) ask(key, { what: part, terrain: id, people: { kind: pe.kind, facts: pe.facts, colours: pe.colours } }, function (img, r) { SHEET[key] = cut(img, (r.art && r.art.cells) || []); });
     const s = SHEET[key]; return s ? s[name] || null : null;
   };
@@ -122,6 +123,20 @@
   A.groundTile = function (id) { for (const k in GROUND) if (k.indexOf('ground.' + id + '.') === 0) return GROUND[k].tile; return null; };
   /** a ship in flight: the painting of this star's ship without the stand it was built on, drawn upright with its middle at 0, 0 and `size` tall: true if it could */
   A.shipFlying = function (ctx, W, team, size) { const s = A.sprite(W, 'ship'); if (!s) return false; const cutY = Math.max(10, Math.round(s.ay - s.w * 0.1)), k = size / cutY; ctx.imageSmoothingEnabled = true; ctx.drawImage(A.tinted(s, team), 0, 0, s.w, cutY, -s.ax * k, -size / 2, s.w * k, size); return true; };
+  // while a painting is on its way a building is not shown the old drawn way and then swapped: it waits as a shape of light (54h_look.js asks)
+  let playT = 0; G.on('begin', function () { playT = performance.now(); }); G.on('new-pond', function () { playT = performance.now(); });
+  /** is the painting of this building of this star still on its way? (asked for and not yet come; or the game has only just begun and nothing could be asked yet) */
+  A.waiting = function (W, name) { W = W || G.W; const pe = A.people(W); if (!pe || !G.terrainOf || !A.WIDTH[name]) return false; const key = (CIVIC[name] ? 'civic' : 'works') + '.' + G.terrainOf(W).id + '.' + norm(pe.kind); if (SHEET[key]) return false;
+    const s = ST[key], now = performance.now(); if (s) return s.v === 'asked' && Date.now() - s.at < 70000; return !(G.host && G.host.ready) && playT > 0 && now - playT < 5000; };
+  const waitKey = function (key, have) { if (have) return false; const s = ST[key]; if (s) return s.v === 'asked' && Date.now() - s.at < 70000; return !(G.host && G.host.ready) && playT > 0 && performance.now() - playT < 5000; };
+  /** is this star's painted ground still on its way? and what stands on it? (then the old drawn ground and scenery are not shown first: 52c_terrain.js) */
+  A.groundWaiting = function (W) { W = W || G.W; if (!W || W.title || !G.terrainOf) return false; const key = 'ground.' + G.terrainOf(W).id + '.' + (((W.seed >>> 0) >>> 5) % 2); return waitKey(key, !!GROUND[key]); };
+  A.natureWaiting = function (W) { W = W || G.W; if (!W || W.title || !G.terrainOf) return false; const key = 'nature.' + G.terrainOf(W).id + '.0'; return waitKey(key, !!SHEET[key]); };
+  /** a small thing lying on the ground (0 a stone, 1 a reed, 2 a shell, 3 a piece of lumen), painted as this kind of star's own: true if it could be drawn so */
+  const MATN = ['quarry', 'reeds', 'shells', 'lumen'], MATW = [19, 15, 18, 15];
+  A.mat = function (ctx, W, k, x, y, s) { const sp = A.nature(W, MATN[k]); if (!sp) return false;
+    if (!sp.sm) { const w1 = 56, h1 = Math.max(8, Math.round(sp.h * w1 / sp.w)), a = mk(Math.ceil(sp.w / 2), Math.ceil(sp.h / 2)), b = mk(w1, h1); a.getContext('2d').drawImage(sp.cv, 0, 0, a.width, a.height); const bx = b.getContext('2d'); bx.imageSmoothingEnabled = true; bx.drawImage(a, 0, 0, w1, h1); sp.sm = b; }      /* (made small in two steps, so it stays clean) */
+    const w = MATW[k] * (0.86 + 0.3 * (s || 0)), h = w * sp.sm.height / sp.sm.width; ctx.fillStyle = 'rgba(0,0,0,0.26)'; ctx.beginPath(); ctx.ellipse(x + w * 0.12, y + h * 0.16, w * 0.5, w * 0.16, 0, 0, 6.2832); ctx.fill(); ctx.imageSmoothingEnabled = true; ctx.drawImage(sp.sm, x - w / 2, y - h * 0.72, w, h); return true; };
   /** is a painting of this star's buildings there (or on its way)? */
   A.on = function (W) { W = W || G.W; const pe = W && W.arch; if (!pe || !G.terrainOf) return false; const id = G.terrainOf(W).id; return !!SHEET['civic.' + id + '.' + norm(pe.kind)]; };
 
@@ -146,6 +161,10 @@
     try { x.filter = 'blur(2.2px)'; } catch (e) { /* no blur: a hard edge */ } x.drawImage(s.cv, pad, pad); x.filter = 'none'; x.globalCompositeOperation = 'source-in'; x.fillStyle = 'rgb(' + k + ')'; x.fillRect(0, 0, c.width, c.height);
     c.pad = pad; return (s.f[k] = c);
   };
+  /** the people of a rival star, as far as they are known: the first of its kinds (so their ship looks theirs): { id (their kind of star), pe } or null */
+  A.rivalPeople = function (r) { if (!r) return null; if (r._pe !== undefined) return r._pe; let out = null; try { const F = G.far, p = (F.cell && F.cell(r.i, r.j)) || { i: r.i, j: r.j, kinds: 2, hue: r.hue }, K = F.kindsOf(p), g = K && K[0], id = G.starOf ? G.starOf(p).terrain.id : null; if (g && g.f && id) { const facts = G.form.facts(g.f); out = { id: id, pe: { kind: String(G.form.kind(g.f).full).slice(0, 40), facts: facts.slice(0, -1).slice(0, 8), colours: String(facts[facts.length - 1] || '').slice(0, 60) } }; } } catch (e) { out = null; } return (r._pe = out); };
+  /** draw the ship a raid came in at x, y (its foot), as its own people build it; in the air it has left its stand behind: true if it could */
+  A.drawRaid = function (ctx, r, x, y, air) { const rp = A.rivalPeople(r), s = rp ? A.spriteOf(rp.id, rp.pe, 'ship') : null; if (!s) return false; const k = A.WIDTH.ship / s.w, cutY = air ? Math.max(10, Math.round(s.ay - s.w * 0.1)) : s.h; ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(A.tinted(s, 'foe'), 0, 0, s.w, cutY, x - s.ax * k, y - s.ay * k, s.w * k, cutY * k); ctx.restore(); return true; };
   /** how wide each building stands on the star (its picture is fitted to this) */
   A.WIDTH = { heart0: 150, heart1: 190, heart2: 246, heart3: 300, house: 124, hall: 214, huts: 200, tower: 112, wall: 230, spire: 108, port: 290, ship: 112 };
   /** draw a building of this star at a point of the star (x, y: the middle of its foundation), in its owner's colour: true if it could */

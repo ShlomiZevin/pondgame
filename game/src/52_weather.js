@@ -182,7 +182,7 @@
     const sig = L.map(function (q) { return q.name + Math.ceil(q.left / 2); }).join('|') + stripOpen;
     if (sig === stripSig) return; stripSig = sig;
     if (L.length <= 2) stripOpen = false;
-    if (L.length > 2 && !stripOpen) { strip.innerHTML = '<span class="wx more"><b>' + L.length + ' things in the water</b><i>' + L.slice(0, 3).map(function (q) { return String(q.name).replace(/[&<>]/g, ''); }).join(', ') + (L.length > 3 ? ' +' + (L.length - 3) : '') + '</i><em>▾</em></span>'; return; }
+    if (L.length > 2 && !stripOpen) { strip.innerHTML = '<span class="wx more"><b>' + L.length + ' things on the star</b><i>' + L.slice(0, 3).map(function (q) { return String(q.name).replace(/[&<>]/g, ''); }).join(', ') + (L.length > 3 ? ' +' + (L.length - 3) : '') + '</i><em>▾</em></span>'; return; }
     strip.innerHTML = (L.length > 2 ? '<span class="wx more"><b>Fold</b><em>▴</em></span>' : '') + L.map(function (q) { return '<span class="wx"><b>' + String(q.name).replace(/[&<>]/g, '') + '</b>' + (q.does ? '<i>' + q.does + '</i>' : '') + '<span class="bar"><u style="width:' + Math.round(100 * Math.max(0, Math.min(1, q.left / q.of))) + '%"></u></span><span>' + Math.ceil(q.left) + 's</span></span>'; }).join('');
   }
 

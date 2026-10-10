@@ -144,9 +144,20 @@
   function shadowOf(K) { if (K.sh) return K.sh; const c = document.createElement('canvas'); c.width = K.cv.width; c.height = K.cv.height; const x = c.getContext('2d'); x.drawImage(K.cv, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height); return (K.sh = c); }
   const drawK = G.drawBlueprint, SHOWN = new WeakMap(), fr = function (v) { return v - Math.floor(v); };
   /** the painting this building is shown by, if its star's people have theirs: { s, name, k (star units to a pixel of it) } */
-  function artOf(o) { const A = G.art, bp = o.bp; if (!A || !A.sprite || !bp) return null; const t = bp.type, name = t === 'heart' ? (o.enemy ? 'heart2' : 'heart' + Math.min(3, Math.max(o.tier | 0, bp.tier | 0))) : t === 'spire' ? (o.tower || (o.result && o.result.tower) ? 'tower' : 'spire') : t; if (!A.WIDTH[name]) return null; const s = A.sprite(G.W, name); return s ? { s: s, name: name, k: A.WIDTH[name] / s.w } : null; }
+  const artName = function (o) { const bp = o.bp, t = bp.type; return t === 'heart' ? (o.enemy ? 'heart2' : 'heart' + Math.min(3, Math.max(o.tier | 0, bp.tier | 0))) : t === 'spire' ? (o.tower || (o.result && o.result.tower) ? 'tower' : 'spire') : t; };
+  function artOf(o) { const A = G.art, bp = o.bp; if (!A || !A.sprite || !bp) return null; const name = artName(o); if (!A.WIDTH[name]) return null; const s = A.sprite(G.W, name); return s ? { s: s, name: name, k: A.WIDTH[name] / s.w } : null; }
+  /** while its painting is on its way a building stands as a shape of light in its owner's colour (so it is never seen drawn one way and then another) */
+  function lightUp(ctx, o) { const bp = o.bp, b = baseOf(o), t = G.rt || 0, col = TEAMC[ownerOf(o)], P = bp.P, hw = bp.hw || 60, top = bp.top || bp.S * 1.4; ctx.save(); ctx.translate(b[0], b[1]);
+    for (let i = 0; i < P.length; i++) { const p = P[i]; if (p.s === 'flag' || p.s === 'lamp') continue; ctx.beginPath(); path(ctx, p, p.w, p.h, t); ctx.fillStyle = 'rgba(' + col + ',' + (0.10 + 0.04 * Math.sin(t * 2.4 + i)) + ')'; ctx.fill(); ctx.strokeStyle = 'rgba(' + col + ',0.42)'; ctx.lineWidth = 1.1; ctx.stroke(); }
+    ctx.globalCompositeOperation = 'lighter'; const sy = -top * ((t * 0.5) % 1), g = ctx.createLinearGradient(0, sy - 12, 0, sy + 12); g.addColorStop(0, 'rgba(' + col + ',0)'); g.addColorStop(0.5, 'rgba(' + col + ',0.2)'); g.addColorStop(1, 'rgba(' + col + ',0)'); ctx.fillStyle = g; ctx.fillRect(-hw - 10, sy - 12, hw * 2 + 20, 24); ctx.restore(); }
   G.buildArt = artOf;
   const prog = function (bp) { let a = 0, c = 0; const P = bp.P; for (let i = 0; i < P.length; i++) { if (P[i].st > 0) a++; if (P[i].st > 1) c++; } return [a / Math.max(1, P.length), c / Math.max(1, P.length)]; };
+  // a building's small picture (on its card): its painting, where it has one
+  { const pic0 = G.buildPic; if (pic0) G.buildPic = function (o, px) { let a = null; try { a = o && o.bp && G.W && !G.W.title && (o.name !== undefined || o.title !== undefined) ? artOf(o) : null; } catch (e) { a = null; } if (!a) return pic0(o, px);
+      const pr = prog(o.bp), team = ownerOf(o), sig = 'art:' + a.name + ':' + team + ':' + Math.round(pr[0] * 24) + ':' + Math.round(pr[1] * 24); if (o._pic && o._pic.sig === sig) return o._pic.url;
+      try { const N = (px || 96) * 2, cv = document.createElement('canvas'); cv.width = cv.height = N; const x = cv.getContext('2d'), s = a.s, k = Math.min(N * 0.94 / s.w, N * 0.92 / s.h), x0 = (N - s.w * k) / 2, y0 = N * 0.96 - s.h * k, yF = Math.round(s.h * (1 - pr[0])), yC = Math.round(s.h * (1 - Math.min(pr[0], pr[1]))); x.imageSmoothingEnabled = true;
+        const part = function (img, ya, yb, al) { if (yb - ya < 1) return; x.globalAlpha = al; x.drawImage(img, 0, ya, s.w, yb - ya, x0, y0 + ya * k, s.w * k, (yb - ya) * k); }; part(G.art.grey(s), 0, yF, 0.22); part(G.art.grey(s), yF, yC, 1); part(G.art.tinted(s, team), yC, s.h, 1);
+        o._pic = { sig: sig, url: cv.toDataURL('image/png') }; return o._pic.url; } catch (e) { return pic0(o, px); } }; }
   { const bt0 = G.buildTop; if (bt0) G.buildTop = function (o) { let a = null; try { a = o && o.bp && G.W && !G.W.title && (o.name !== undefined || o.title !== undefined) ? artOf(o) : null; } catch (e) { a = null; } return a ? a.s.ay * a.k - o.bp.S * 0.45 + 6 : bt0(o); }; }
   function groundPart(ctx, o, building, art) {
     const W = G.W, bp = o.bp, t = G.rt || 0, b = baseOf(o), S = bp.S, hw = bp.hw || 60, top = bp.top || S * 1.4, col = TEAMC[ownerOf(o)], P = bp.P, ring = bp.type === 'wall' && !bp.designed, pad = bp.type !== 'ship' && bp.type !== 'port' && !ring, TL = G.terrainLook ? G.terrainLook(W) : null;
@@ -204,14 +215,14 @@
   const UP = [];      // the buildings waiting for their turn among the creatures, this frame: back ones first
   G.drawBlueprint = function (ctx, o, building) {
     const bp = o && o.bp; if (!bp || !G.W || ctx !== G.ctx || (o.name === undefined && o.title === undefined)) return drawK(ctx, o, building);
-    let art = null; try { art = artOf(o); groundPart(ctx, o, building, art); } catch (e) { if (!G.drawBlueprint.err) { G.drawBlueprint.err = 1; console.error(e); } }
-    const u = { o: o, b: building, a: ctx.globalAlpha, y: baseOf(o)[1] + (bp.type === 'ship' ? (o.lifting ? 1e6 : 90) : 0), art: art };      /* (a ship stands ON its port, so it is drawn after it; in the air, after everything) */ let i = UP.length; while (i > 0 && UP[i - 1].y > u.y) i--; UP.splice(i, 0, u);
+    let art = null, wait = false; try { art = artOf(o); wait = !art && !!(G.art && G.art.waiting && G.art.waiting(G.W, artName(o))); if (!wait) groundPart(ctx, o, building, art); else { const b = baseOf(o), hw = bp.hw || 60; ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.ellipse(b[0], b[1] + 4, hw * 1.1, hw * 0.3, 0, 0, TAU); ctx.fill(); } } catch (e) { if (!G.drawBlueprint.err) { G.drawBlueprint.err = 1; console.error(e); } }
+    const u = { o: o, b: building, a: ctx.globalAlpha, y: baseOf(o)[1] + (bp.type === 'ship' ? (o.lifting ? 1e6 : 90) : 0), art: art, wait: wait };      /* (a ship stands ON its port, so it is drawn after it; in the air, after everything) */ let i = UP.length; while (i > 0 && UP[i - 1].y > u.y) i--; UP.splice(i, 0, u);
     if (UP.length > 700) G.drawUprights(ctx, 1e9);
   };
   /** anything else that stands up from the ground takes its turn among the creatures and the buildings too: fn(ctx, arg) is called when it comes */
   G.upright = function (y, fn, arg) { const u = { y: y, fn: fn, arg: arg, a: 1 }; let lo = 0, hi = UP.length; while (lo < hi) { const m = (lo + hi) >> 1; if (UP[m].y > y) hi = m; else lo = m + 1; } UP.splice(lo, 0, u); if (UP.length > 700) G.drawUprights(G.ctx, 1e9); };
   /** draw the buildings that stand behind the line y (50_render.js: before each creature, and once more after the last) */
   G.drawUprights = function (ctx, y) {
-    while (UP.length && UP[0].y <= y) { const u = UP.shift(); ctx.save(); ctx.globalAlpha = u.a; try { if (u.fn) u.fn(ctx, u.arg); else if (u.art) artUp(ctx, u.o, u.b, u.art); else plainUp(ctx, u.o, u.b); } catch (e) { if (!G.drawBlueprint.err2) { G.drawBlueprint.err2 = 1; console.error(e); } } ctx.restore(); }
+    while (UP.length && UP[0].y <= y) { const u = UP.shift(); ctx.save(); ctx.globalAlpha = u.a; try { if (u.fn) u.fn(ctx, u.arg); else if (u.art) artUp(ctx, u.o, u.b, u.art); else if (u.wait) lightUp(ctx, u.o); else plainUp(ctx, u.o, u.b); } catch (e) { if (!G.drawBlueprint.err2) { G.drawBlueprint.err2 = 1; console.error(e); } } ctx.restore(); }
   };
 })();

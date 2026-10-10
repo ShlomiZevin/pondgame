@@ -39,11 +39,17 @@
   G.groveShare = function (W) { return 0.86; };
   /** where a star's first life begins: in the feeding ground nearest its middle */
   G.firstGrove = function (W) { const S = G.sitesOf(W).filter(function (s) { return s.k === 'grove'; }), c = centre(W); const L = S.filter(function (q) { return q.x < W.ww * 0.5; }), T = L.length ? L : S;      /* (on the side of the star where the green food its first cells live on comes up) */ T.sort(function (a, b) { return Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y); }); return T[0] || null; };
-  /** where a piece of food comes up: in one of the feeding grounds (now and then anywhere) */
-  G.foodSpot = function (W) { const S = G.sitesOf(W).filter(function (s) { return s.k === 'grove'; }); if (!S.length || G.rand() > G.groveShare(W)) return { x: W.ww * (0.14 + 0.72 * G.rand()), y: W.wh * (0.14 + 0.72 * G.rand()) };      // (a little comes up over the middle of the star)
+  /** where there is food to be had: the star's feeding grounds, and your colony's FOOD GARDENS. A garden is a small feeding place inside the colony (food comes up
+   *  round it as it does in a feeding ground, less of it, and fewer feed there at once): so those who live by it need not cross the star for every meal, and the
+   *  colony is lived IN. The food of the star is not more for it, only nearer home. [{ k: 'grove' | 'garden', x, y, r, cap, lim }] */
+  G.feedPlaces = function (W) { W = W || G.W; const P0 = W._fp; if (P0 && W.t >= P0.t && W.t - P0.t < 2) return P0.L; const L = G.sitesOf(W).filter(function (s) { return s.k === 'grove'; }).map(function (s) { return { k: 'grove', x: s.x, y: s.y, r: s.r, cap: 1, lim: 14 }; }), Wk = W.works || [];
+    for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.bp || w.bp.type !== 'huts' || w.enemy || w.fall || w.visitor) continue; const n = G.buildCount ? G.buildCount(w) : [1, 1, 1]; if (n[0] < n[2] * 0.6) continue; L.push({ k: 'garden', x: w.x, y: w.y + w.bp.S * 0.45 + 46, r: 84, cap: 0.42, lim: 8 }); }
+    W._fp = { t: W.t, L: L }; return L; };
+  /** where a piece of food comes up: in one of the feeding places (now and then anywhere) */
+  G.foodSpot = function (W) { const S = G.feedPlaces(W); if (!S.length || G.rand() > G.groveShare(W)) return { x: W.ww * (0.14 + 0.72 * G.rand()), y: W.wh * (0.14 + 0.72 * G.rand()) };      // (a little comes up over the middle of the star)
     // it comes up where it has been eaten: the feeding ground with the least on it is filled first (so food does not pile up where nobody is while those who feed go short)
     let gf = W._gf; if (!gf || W.t - gf.t > 0.5 || gf.n.length !== S.length) { gf = W._gf = { t: W.t, n: S.map(function () { return 0; }) }; const F = W.food; for (let i = 0; i < F.length; i++) { const f = F[i]; if (f.dead) continue; for (let q = 0; q < S.length; q++) if (Math.abs(f.x - S[q].x) < S[q].r && Math.abs(f.y - S[q].y) < S[q].r) { gf.n[q]++; break; } } }
-    let b = 0; for (let q = 1; q < S.length; q++) if (gf.n[q] + G.rand() * 6 < gf.n[b] + G.rand() * 6) b = q; gf.n[b]++; return inDisc(S[b]); };
+    let b = 0; for (let q = 1; q < S.length; q++) if ((gf.n[q] + G.rand() * 6) / S[q].cap < (gf.n[b] + G.rand() * 6) / S[b].cap) b = q; gf.n[b]++;      /* (a garden holds less than a feeding ground) */ return inDisc(S[b]); };
   /** where a stone (0), a reed (1) or a shell (2) turns up: in its deposit */
   G.matSpot = function (W, k) { const want = k === 0 ? 'quarry' : k === 1 ? 'reeds' : 'shells', S = G.sitesOf(W).filter(function (s) { return s.k === want; }); return S.length ? inDisc(S[0]) : null; };
   /** the deposit or feeding ground a point lies in (nothing is built there) */
@@ -108,11 +114,11 @@
       const r = 40 + 36 * k; return { x: clamp(hm.x + Math.cos(aa) * r * 1.45, 60, W.ww - 60), y: clamp(hm.y + 22 + Math.sin(aa) * r * 0.6, 40, W.wh - 40), at: 'home' }; }
     const a = fr(c.id * 0.6180339) * 6.2832, r = 120 + fr(c.id * 0.4142135) * 150; return { x: clamp(H.x + Math.cos(a) * r * 1.5, 60, W.ww - 60), y: clamp(H.y - 20 + Math.sin(a) * r * 0.85, 40, W.wh - 40) }; };
   function habits(W, dt) {
-    if (!G.FLAT) return; const S = G.sitesOf(W).filter(function (s) { return s.k === 'grove'; }); if (!S.length) return; const str = 1, H = W.gen < 5 ? null : hub(W);      // (a young star's first life stays where it began; later, those who have fed drift home to the colony)
+    if (!G.FLAT) return; const S = G.feedPlaces(W); if (!S.length) return; const str = 1, H = W.gen < 5 ? null : hub(W);      // (a young star's first life stays where it began; later, those who have fed drift home to the colony)
     const crowd = S.map(function () { return 0; }); for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue; for (let q = 0; q < S.length; q++) if (Math.hypot(c.x - S[q].x, (c.y - S[q].y) / 0.8) < S[q].r) { crowd[q]++; break; } }      // (a full feeding ground sends the hungry on to the next)      // (the habits come with the feeding grounds: while food still comes up everywhere, everyone forages where it is)
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.inShip || c.asleep || c.goTo || c.deedId || c.team === 1 || c.outAt !== undefined) continue; if (c.job && !c.hungry) { c.feedGo = 0; continue; }
       const fed = c.E / c.ph.Emax; if (c.feedGo) { if (fed > (c.homeW && !c.job ? 0.66 : 0.74)) c.feedGo = 0; }      /* (one with a home to go back to leaves the feeding ground a little sooner) */ else if (fed < (W.gen < 5 ? 0.7 : 0.44) || c.hungry) c.feedGo = 1;      /* (a young star's first life keeps to where the food is) */
-      if (c.feedGo) { let g = S[0], bd = 1e18; for (let q = 0; q < S.length; q++) { const d = Math.hypot(S[q].x - c.x, S[q].y - c.y) * (1 + Math.max(0, crowd[q] - 14) / 16) * (c.grove === q ? 0.7 : 1); if (d < bd) { bd = d; g = S[q]; c.groveN = q; } } c.grove = c.groveN; if (Math.hypot(c.x - g.x, (c.y - g.y) / 0.8) > g.r * 0.78) steer(c, g.x + Math.cos(c.id) * g.r * 0.4, g.y + Math.sin(c.id) * g.r * 0.3, dt, 1.6, 3.2 * str); }
+      if (c.feedGo) { let g = S[0], bd = 1e18; for (let q = 0; q < S.length; q++) { const d = Math.hypot(S[q].x - c.x, S[q].y - c.y) * (1 + Math.max(0, crowd[q] - S[q].lim) / (S[q].lim + 2)) * (c.grove === q ? 0.7 : 1); if (d < bd) { bd = d; g = S[q]; c.groveN = q; } } c.grove = c.groveN; if (Math.hypot(c.x - g.x, (c.y - g.y) / 0.8) > g.r * 0.78) steer(c, g.x + Math.cos(c.id) * g.r * 0.4, g.y + Math.sin(c.id) * g.r * 0.3, dt, 1.6, 3.2 * str); }
       else if (!c.job && !c.team && H && c.stranger === undefined) { const p = G.commonsSpot(W, c); if (p && Math.hypot(c.x - p.x, c.y - p.y) > (p.at ? 40 : 70)) steer(c, p.x, p.y, dt, 1.15, 1.8 * str); } }
   }
   { const s0 = G.step; let acc = 9; G.step = function (dt) { s0(dt); const W = G.W; if (!W || W.title) return; habits(W, dt); if (!W.col) return; acc += dt; if (acc >= 1) { acc = 0; G.formUp(W); } }; }

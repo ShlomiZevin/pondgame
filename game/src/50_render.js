@@ -277,6 +277,15 @@ function drawHazardWashes() {
 }
 
 // ── layer 5: food ──
+// on a star a piece of food is a small solid thing lying on the ground, lit from the upper left and with its own shadow (0 a berry, 1 a sprout, 2 big prey): drawn once, kept
+function foodOrb(tag, kind) {
+  const key = 'o' + tag + ':' + kind; if (R.foodHalo[key]) return R.foodHalo[key]; const cv = document.createElement('canvas'); cv.width = cv.height = 48; const c = cv.getContext('2d'), h = G.TAGHUE[tag];
+  { const g = c.createRadialGradient(26, 38, 1, 26, 38, 15); g.addColorStop(0, 'rgba(0,0,0,0.42)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.save(); c.translate(0, 38); c.scale(1, 0.4); c.translate(0, -38); c.fillStyle = g; c.beginPath(); c.arc(26, 38, 15, 0, 6.2832); c.fill(); c.restore(); }
+  if (kind === 1) { c.strokeStyle = G.hsl(h + 20, 45, 30, 1); c.lineWidth = 2.6; c.lineCap = 'round'; c.beginPath(); c.moveTo(24, 38); c.lineTo(24, 22); c.stroke(); [[-1, -0.7], [1, 0.7]].forEach(function (q) { const g = c.createLinearGradient(24 - 12, 14, 24 + 12, 30); g.addColorStop(0, G.hsl(h, 70, 74, 1)); g.addColorStop(1, G.hsl(h, 70, 40, 1)); c.fillStyle = g; c.strokeStyle = 'rgba(10,20,30,0.5)'; c.lineWidth = 1; c.beginPath(); c.ellipse(24 + q[0] * 8.5, 24, 9.5, 5, q[1], 0, 6.2832); c.fill(); c.stroke(); }); c.fillStyle = G.hsl(h, 90, 80, 1); c.beginPath(); c.arc(24, 17, 4, 0, 6.2832); c.fill(); c.stroke(); }
+  else { const r = kind === 2 ? 15 : 12, g = c.createRadialGradient(24 - r * 0.38, 26 - r * 0.42, r * 0.1, 24, 26, r); g.addColorStop(0, G.hsl(h, 85, 88, 1)); g.addColorStop(0.42, G.hsl(h, 88, 62, 1)); g.addColorStop(1, G.hsl(h, 80, 32, 1)); c.fillStyle = g; c.beginPath(); c.arc(24, 26, r, 0, 6.2832); c.fill(); c.strokeStyle = 'rgba(10,20,30,0.5)'; c.lineWidth = 1.2; c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.85)'; c.beginPath(); c.ellipse(24 - r * 0.36, 26 - r * 0.42, r * 0.2, r * 0.13, -0.6, 0, 6.2832); c.fill(); if (kind === 2) { c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineWidth = 1.6; c.beginPath(); c.arc(24, 26, r + 4, 0, 6.2832); c.stroke(); } }
+  return (R.foodHalo[key] = cv);
+}
 function drawFood() {
   const W = G.W; if (!W) return;
   const ctx = G.ctx, t = G.rt;
@@ -289,7 +298,7 @@ function drawFood() {
     if (o.dead) continue;
     const tw = 0.75 + 0.25 * Math.sin(t * 2.2 + o.ph);
     const s = (6 + o.v * 0.25) * (G.FLAT ? 0.72 : 1);
-    ctx.globalAlpha = tw * (G.FLAT ? 0.5 : 0.8);
+    ctx.globalAlpha = tw * (G.FLAT ? 0.2 : 0.8);
     ctx.drawImage(foodHaloSprite(o.tag), o.x - s, o.y - s, s * 2, s * 2);
   }
   ctx.globalAlpha = 1;
@@ -303,6 +312,7 @@ function drawFood() {
       ctx.beginPath(); ctx.arc(o.x, o.y, 2 + u * 7, 0, 6.2832); ctx.fill();
       continue;
     }
+    if (G.FLAT && !W.title) { const fade = Math.min(1, (o.born === undefined ? 1 : o.born) / 0.8), r = (o.big ? 6.6 : o.land ? 6.4 : 3 + o.v * 0.07) * (0.4 + 0.6 * fade); ctx.globalAlpha = fade; ctx.drawImage(foodOrb(o.tag, o.big ? 2 : o.land ? 1 : 0), o.x - r * 1.85, o.y - r * 2.0, r * 3.7, r * 3.7); ctx.globalAlpha = 1; continue; }
     if (o.land) {
       // a plant on the shore: two leaves
       ctx.fillStyle = G.hsl(G.TAGHUE[o.tag], 70, 62, 0.95);
@@ -631,7 +641,7 @@ function drawCharacter(ctx, c, x, y, scale, t, opt) {
     const hy = y - hop - r * 254 / R.SIDE * 0.92, sign = scared ? '!' : c.pois > 0.3 ? 'x_x' : c.chill > 0.05 ? '*brr*' : c.hot > 0.05 ? '~phew~' : c.gasp > 0.7 && id % 4 === 0 ? 'o O' : still ? 'z z' : '';
     if (sign) { ctx.save(); ctx.font = '700 ' + Math.round(Math.max(9, r * (sign.length > 2 ? 0.36 : 0.55))) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,18,31,0.8)'; ctx.fillStyle = scared ? PAL.gold : c.pois > 0.3 ? PAL.algae : c.chill > 0.05 ? PAL.frost : c.hot > 0.05 ? PAL.rose : PAL.frost; const by2 = hy - 4 * Math.sin(t * 3 + id); ctx.strokeText(sign, x + r * 0.5, by2); ctx.fillText(sign, x + r * 0.5, by2); ctx.restore(); }
   }
-  if (c.flash > 0 && c.mutAge > 0) { ctx.save(); ctx.strokeStyle = G.rgba(PAL.rose, Math.min(1, c.flash)); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(x, y - r * 1.5, r * 1.3, r * 2.1, 0, 0, 6.2832); ctx.stroke(); ctx.restore(); }
+  if (c.flash > 0 && c.mutAge > 0 && !G.FLAT) { ctx.save(); ctx.strokeStyle = G.rgba(PAL.rose, Math.min(1, c.flash)); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(x, y - r * 1.5, r * 1.3, r * 2.1, 0, 0, 6.2832); ctx.stroke(); ctx.restore(); }
 }
 function drawCreatureBody(ctx, c, x, y, scale, t, opt) {
   opt = opt || {};

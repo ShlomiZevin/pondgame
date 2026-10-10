@@ -105,7 +105,7 @@
     const gr = v.grow || 1;                  // the pond grows when it is crowded (57_grow): it is then taller than 1400, and still all of it fits the window
     v.base = H / (1400 * gr);
     v.wh = 1400 * gr;
-    v.ww = G.clamp(W / v.base, 840 * gr, 3360 * gr);
+    v.ww = G.clamp(W / v.base, (G.FLAT ? 1900 : 840) * gr, 3360 * gr);      // (a star keeps room for its places whatever the shape of the window: on a narrow one a part of it is seen)
     if (!G.cam.set) { G.cam.x = v.ww / 2; G.cam.y = v.wh / 2; G.cam.set = true; }
     G.applyCam();
     G.emit('resize');

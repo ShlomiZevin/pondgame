@@ -71,7 +71,7 @@
       '<div class="tabs" id="gtabs"><button data-m="look" class="on">BEAUTY</button><button data-m="whole">WHOLE</button>' + (G.MARKS_X || []).map(function (m) { return '<button data-m="mx_' + m.id + '">' + m.label.toUpperCase() + '</button>'; }).join('') + '<button data-m="fit">FITNESS</button><button data-m="room">ROOM</button><button data-m="body">PARTS</button><button data-m="size">SIZE</button><button data-m="skill">SKILL</button><button data-m="pop">POP</button><button data-m="genes">GENES</button></div>' +
       '<canvas id="graph" width="560" height="184"></canvas><div class="gnote" id="gnote"></div><button class="gnote" id="aiLine" style="min-height:0;color:var(--gold);background:none;border:0;padding:0;font:inherit;font-size:11px;line-height:1.3;text-align:left;cursor:pointer;text-decoration:underline dotted;display:block" title="See what each kind of AI use cost"></button><div class="ilabel">What changed</div><div class="log" id="mutLog"></div></div>';
     refs.panel = p;
-    if (window.innerWidth < 720) p.classList.add('min');
+    if (window.innerWidth < 720 || window.innerHeight <= 520) p.classList.add('min');      // (on a small screen it starts folded)
     $('panelToggle').onclick = function () { p.classList.toggle('min'); G.sfx('click'); };
     const tabs = $('gtabs').children;
     for (let i = 0; i < tabs.length; i++) tabs[i].onclick = function () {

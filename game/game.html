@@ -345,7 +345,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const gr = v.grow || 1;                  // the pond grows when it is crowded (57_grow): it is then taller than 1400, and still all of it fits the window
     v.base = H / (1400 * gr);
     v.wh = 1400 * gr;
-    v.ww = G.clamp(W / v.base, 840 * gr, 3360 * gr);
+    v.ww = G.clamp(W / v.base, (G.FLAT ? 1900 : 840) * gr, 3360 * gr);      // (a star keeps room for its places whatever the shape of the window: on a narrow one a part of it is seen)
     if (!G.cam.set) { G.cam.x = v.ww / 2; G.cam.y = v.wh / 2; G.cam.set = true; }
     G.applyCam();
     G.emit('resize');
@@ -794,7 +794,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     if (r() < m * 2) { g.t[1] += n() * 0.07; note('t', 1, 'speed', false); }
     // breath: how far out of the water it can live. It drifts like any gene, and now and then takes a real step either way
     if (r() < m * 2.5) { g.t[5] = (g.t[5] || 0) + n() * 0.06; note('t', 5, 'breath', false); }
-    if (r() < 0.03 * wild) { const up = r() < 0.5; g.t[5] = clamp((g.t[5] || 0) + (up ? 0.18 : -0.18), 0, 1); note('t', 5, up ? 'can stay longer out of the water' : 'keeps more to the water', true); }
+    if (r() < 0.03 * wild) { const up = r() < 0.5; g.t[5] = clamp((g.t[5] || 0) + (up ? 0.18 : -0.18), 0, 1); note('t', 5, up ? 'breathes the open air more easily' : 'breathes more as the first life did', true); }
     { const was = (+parent.t[5] || 0) >= 0.5, now = (g.t[5] || 0) >= 0.5, Wd = G.W;
       if (was !== now && Wd) { const sh = Wd.shore || G.SHORE0 || 0.24, lu = Wd.landUse || 0, full = now ? lu / sh : (1 - lu) / (1 - sh);      // how lived-in the side it would be born into is
         if (r() < clamp(full * 1.6 - 0.1, 0, 0.97)) g.t[5] = was ? Math.max(0.5, +parent.t[5] || 0.5) : Math.min(0.49, +parent.t[5] || 0); } }
@@ -1168,19 +1168,19 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
       if (life.diet === 0 && hitL(0.05)) { if (!has(f, 0) && !has(f, 3) && room) { const q = newRule(f.n, r() < 0.5 ? 0 : 3); f.rules.push(q); note('grew ' + KMANY[q.k] + ', to reach the gold food', true); } else { f.ms += 0.05; note('its mouth grew, for the gold food', false); } }
       else if (life.diet === 1 && hitL(0.05)) { if (!has(f, 1) && room) { f.rules.push(newRule(f.n, 1)); note('grew fins, to turn after the lime food', true); } }
       else if (life.diet === 2 && hitL(0.03)) { if (f.mk !== 3) { f.mk = 3; note('its mouth became a sucker, for grazing the green food', true); } }
-      else if (life.diet === 3 && hitL(0.05)) { if (f.en < 2) { f.en++; note('grew an eye, to find the blue food of the deep', true); } else if (!has(f, 4) && room && r() < 0.4) { f.rules.push(newRule(f.n, 4)); note('grew feelers, to find the blue food of the deep', true); } else { f.es += 0.05; note('its eyes grew, for the blue food of the deep', false); } }
+      else if (life.diet === 3 && hitL(0.05)) { if (f.en < 2) { f.en++; note('grew an eye, to find the blue food', true); } else if (!has(f, 4) && room && r() < 0.4) { f.rules.push(newRule(f.n, 4)); note('grew feelers, to find the blue food', true); } else { f.es += 0.05; note('its eyes grew, for the blue food', false); } }
       else if (life.diet === 4 && hitL(0.05)) { if (f.mk !== 2) { f.mk = 2; note('grew jaws, for the tough violet food', true); } else if (!has(f, 2) && room) { f.rules.push(newRule(f.n, 2)); note('grew spikes, for the tough violet food', true); } }
       else if (life.diet === 5 && hitL(0.05)) { if (!f.tk) { f.tk = 1 + Math.floor(r() * 2); note('grew a tail, to chase the quick pink food', true); } else if (!has(f, 1) && room) { f.rules.push(newRule(f.n, 1)); note('grew fins, to chase the quick pink food', true); } }
       if ((f._air || 0) >= 0.5 && hitL(0.22)) { const Lg = legR();
         if (!Lg) {      // no legs yet: they come first, in place of tentacles or fins if the body has no room for more
           if (!room) { let at = -1; for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on < 0 && (q.k === 3 || q.k === 1) && !f.rules.some(function (x) { return x.on === i; })) { at = i; if (q.k === 3) break; } } if (at >= 0) dropRule(f, at); }
           if (f.rules.length < 6) { const q = newRule(f.n, 0); q.t = r() < 0.7 ? 0 : 3; f.rules.push(q); note('grew legs, living on the land', true); } }
-        else if (f.tk && r() < 0.5) { f.tk = 0; note('lost its swimming tail on dry land', true); }
-        else if (has(f, 1) && r() < 0.2) { for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k === 1 && f.rules[i].on < 0) { dropRule(f, i); break; } note('its fins withered on dry land', true); } else if (f.tk && r() < 0.3) { f.tk = 0; note('lost its swimming tail on dry land', true); } else if (f.coat !== 2) { f.coat = 2; note('grew fur, living on the shore', true); } else if (Lg && Lg.t !== 1) { Lg.t = 1; note('its feet grew fingers, living on the shore', true); } }
-      else if (life.shore > 0.3 && life.land < 0.05 && hitL(0.06)) { const Lg = legR(); if (!Lg && room) { f.rules.push(newRule(f.n, 0)); note('grew legs, living by the shore', true); } else if (Lg && Lg.b < f.n - 1) { Lg.b++; note('grew more legs, living by the shore', true); } }
-      else if (life.deep > 0.5 && hitL(0.05)) { if (f.glow < 0.6) { f.glow = clamp(f.glow + 0.4, 0, 1); note('began to glow, living in the dark deep', true); } else { f.es += 0.05; note('its eyes grew, living in the dark deep', false); } }
-      else if ((f._air || 0) < 0.5 && has(f, 0) && hitL(0.16)) { for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.k === 0 && q.on < 0 && !f.rules.some(function (x) { return x.on === i; })) { q.k = 1; q.t = 0; note('its legs flattened into fins, living in the water', true); break; } } }
-      else if (life.land < 0.02 && life.shore < 0.1 && life.deep < 0.3 && hitL(0.03)) { if (!has(f, 1) && room) { f.rules.push(newRule(f.n, 1)); note('grew fins, living in open water', true); } else if (!f.tk) { f.tk = 1 + Math.floor(r() * 2); note('grew a tail, living in open water', true); } }
+        else if (f.tk && r() < 0.5) { f.tk = 0; note('lost its tail, walking in the open air', true); }
+        else if (has(f, 1) && r() < 0.2) { for (let i = 0; i < f.rules.length; i++) if (f.rules[i].k === 1 && f.rules[i].on < 0) { dropRule(f, i); break; } note('its fins withered, walking in the open air', true); } else if (f.tk && r() < 0.3) { f.tk = 0; note('lost its tail, walking in the open air', true); } else if (f.coat !== 2) { f.coat = 2; note('grew fur, living in the open air', true); } else if (Lg && Lg.t !== 1) { Lg.t = 1; note('its feet grew fingers, living in the open air', true); } }
+      else if (life.shore > 0.3 && life.land < 0.05 && hitL(0.06)) { const Lg = legR(); if (!Lg && room) { f.rules.push(newRule(f.n, 0)); note('grew legs, to walk the ground', true); } else if (Lg && Lg.b < f.n - 1) { Lg.b++; note('grew more legs, to walk the ground', true); } }
+      else if (life.deep > 0.5 && hitL(0.05)) { if (f.glow < 0.6) { f.glow = clamp(f.glow + 0.4, 0, 1); note('began to glow, living where it is dark', true); } else { f.es += 0.05; note('its eyes grew, living where it is dark', false); } }
+      else if ((f._air || 0) < 0.5 && has(f, 0) && hitL(0.16)) { for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.k === 0 && q.on < 0 && !f.rules.some(function (x) { return x.on === i; })) { q.k = 1; q.t = 0; note('its legs flattened into fins, gliding instead of walking', true); break; } } }
+      else if (life.land < 0.02 && life.shore < 0.1 && life.deep < 0.3 && hitL(0.03)) { if (!has(f, 1) && room) { f.rules.push(newRule(f.n, 1)); note('grew fins, to glide over open ground', true); } else if (!f.tk) { f.tk = 1 + Math.floor(r() * 2); note('grew a tail, to glide over open ground', true); } }
     }
     // what the pond is up against makes the fitting answer a likelier thing to stumble on
     const pp = press ? press.part : null;
@@ -3059,7 +3059,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     { const ph = c.ph; if (ph && ph.love > 0.3) out.push('Made for ' + FOODS[ph.fav] + ' food' + (ph.bane >= 0 ? '; ' + FOODS[ph.bane] + ' food makes it ill' + (c.ill ? ' (it has found that out ' + (c.ill === 1 ? 'once' : c.ill + ' times') + ')' : '') : '') + '.'); }
     if (c.lessons > 3 && c.learned > 0.05) out.push('It has learned from ' + c.lessons + ' meals and mishaps.');
     if (c.bornKnowing > 0.05) out.push('It was born knowing some of what its parents had learned.'); if (c.taught > 2) out.push('It has been learning from its elders.'); if (c.judged) out.push('You have told it ' + (c.judged > 0 ? 'GOOD' : 'BAD') + ' ' + Math.abs(c.judged) + (Math.abs(c.judged) === 1 ? ' time.' : ' times.'));
-    if (L.land > 0.3) out.push('Spends its days on the shore.'); else if (L.shore > 0.3) out.push('Keeps to the water by the shore.'); else if (L.deep > 0.5) out.push('Lives in the dark deep.'); else if ((c.liveT || 0) > 3) out.push('Lives in open water.');
+    if (L.land > 0.3) out.push('Lives in the open air.'); else if (L.shore > 0.3) out.push('Keeps near the air-breathers.'); else if (L.deep > 0.5) out.push('Keeps to the dark places.'); else if ((c.liveT || 0) > 3) out.push('Glides over open ground.');
     return out.join(' ');
   };
   G.newWorld = function (opts) {
@@ -3185,7 +3185,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   G.envText = function (W) {
     const e = (W || G.W).env; if (!e) return '';
     const names = ['', '', '', 'blue', 'violet', 'pink'];
-    return [e.o2 < 0.8 ? 'thin on oxygen' : e.o2 > 1.08 ? 'rich in oxygen' : 'fair oxygen', e.murk > 0.66 ? 'murky' : e.murk < 0.33 ? 'clear' : 'hazy', e.rich > 1.15 ? 'fertile' : e.rich < 0.9 ? 'poor' : 'middling food', e.warm > 0.1 ? 'warm' : e.warm < -0.1 ? 'cool' : 'mild', names[e.deep] + ' food in the deep'].join(' · ');
+    return [e.o2 < 0.8 ? 'thin on oxygen' : e.o2 > 1.08 ? 'rich in oxygen' : 'fair oxygen', e.murk > 0.66 ? 'murky' : e.murk < 0.33 ? 'clear' : 'hazy', e.rich > 1.15 ? 'fertile' : e.rich < 0.9 ? 'poor' : 'middling food', e.warm > 0.1 ? 'warm' : e.warm < -0.1 ? 'cool' : 'mild', names[e.deep] + ' big prey'].join(' · ');
   };
   /** 0 in the bright shallows (left) to 1 in the dark deep (right) */
   G.depthAt = function (x) { return clamp(x / G.W.ww, 0, 1); };
@@ -4165,17 +4165,17 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   // ── discoveries: the first time evolution invents something that actually takes hold ──
   const DISC = {
     grow0: 'First legs! Something can crawl and grab.', grow1: 'First fins! Something learned to paddle.', grow2: 'First spikes! A prickly new defence.', grow3: 'First tentacles! Long arms that reach and feel.',
-    grow4: 'First feelers! Glowing tips that sense the water.', grow5: 'First armour plates!', grow6: 'First frills! A fan to show off.', grow7: 'First horns!',
-    eye: 'First eye! Something can really see.', eyes3: 'Three eyes or more! Something sees all around.', mouth1: 'First beak!', mouth2: 'First jaws! Teeth, and the big prey of the deep to use them on.', mouth3: 'First sucker mouth!', mouth4: 'First whiskers!',
-    tail: 'First tail! A body built to swim.', pair: 'A matching pair! One part of the body doubled, one on each side.', ring: 'A ring! A part of the body opened into a hollow.', lobes: 'Lobes! An outline that swells and dips all the way round.', stalk: 'A stalk! A part of the body held out away from the rest.', sideways: 'Sideways on! A body with a front and a back.', faceaway: 'A head! The face moved onto a part of its own.', seg2: 'More than one part! A second mass budded from the body.', seg5: 'A body of five parts.', seg8: 'A very long body: eight segments.', seg11: 'A giant: a body of eleven segments.', coat1: 'Scales! A coat of small hard plates.', coat2: 'Fur! A warm coat.', coat3: 'Feathers!', neck: 'A neck! A head set apart from the body.', bighead: 'A big head!', nested: 'A part growing on a part! Something like a hand on an arm.', star: 'A new body plan! A star, with arms all around.',
+    grow4: 'First feelers! Glowing tips that sense the air.', grow5: 'First armour plates!', grow6: 'First frills! A fan to show off.', grow7: 'First horns!',
+    eye: 'First eye! Something can really see.', eyes3: 'Three eyes or more! Something sees all around.', mouth1: 'First beak!', mouth2: 'First jaws! Teeth, and big prey to use them on.', mouth3: 'First sucker mouth!', mouth4: 'First whiskers!',
+    tail: 'First tail! A body built to glide.', pair: 'A matching pair! One part of the body doubled, one on each side.', ring: 'A ring! A part of the body opened into a hollow.', lobes: 'Lobes! An outline that swells and dips all the way round.', stalk: 'A stalk! A part of the body held out away from the rest.', sideways: 'Sideways on! A body with a front and a back.', faceaway: 'A head! The face moved onto a part of its own.', seg2: 'More than one part! A second mass budded from the body.', seg5: 'A body of five parts.', seg8: 'A very long body: eight segments.', seg11: 'A giant: a body of eleven segments.', coat1: 'Scales! A coat of small hard plates.', coat2: 'Fur! A warm coat.', coat3: 'Feathers!', neck: 'A neck! A head set apart from the body.', bighead: 'A big head!', nested: 'A part growing on a part! Something like a hand on an arm.', star: 'A new body plan! A star, with arms all around.',
     shell: 'First shell!', crest: 'First crest!', glow: 'First glow! A creature that makes its own light.', venom: 'First poison glands!', pattern: 'First markings! Skin with a pattern.',
-    walker: 'Out of the water! Something can breathe air and live on the shore.', hands: 'Hands! Fingers at the front of the body.', biter: 'A real bite: jaws strong enough for big prey.',
+    walker: 'A new breath! Something can breathe the open air, and walk.', hands: 'Hands! Fingers at the front of the body.', biter: 'A real bite: jaws strong enough for big prey.',
     hidden: 'First thought! A brain grew a hidden cell.', hidden3: 'A bigger brain: three hidden cells.',
     photo: 'Light-eaters! Some creatures now live on sunlight, like plants.',
     giant: 'First giant! A much bigger creature.', tiny: 'First speck! A very tiny creature.',
     diet0: 'A new diet! Something thrives on gold food.', diet1: 'A new diet! Something thrives on lime food.', diet3: 'A new diet! Something thrives on blue food.',
     diet4: 'A new diet! Something thrives on violet food.', diet5: 'A new diet! Something thrives on pink food.',
-    heat: 'Heat-proof! A creature that can take the warm.', cold: 'Cold-proof! A creature that shrugs off winter.', tox: 'Poison-proof! A creature that can swim through poison.',
+    heat: 'Heat-proof! A creature that can take the warm.', cold: 'Cold-proof! A creature that shrugs off winter.', tox: 'Poison-proof! A creature that can go through poison.',
     stick: 'Stickiness! Creatures learned to cling to their kin.', sprint: 'A sprint! Creatures can burst forward.', flee: 'First escape! Creatures learned to turn away from danger.',
   };
   G.discover = function (key, text) {
@@ -4418,7 +4418,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     else bits.push('Eats ' + names[best[0]] + ' food.');
     if (G.FLAT) bits.push(ph.home ? 'It breathes air and walks.' : (ph.air || 0) > 0.3 ? 'It is half-way to breathing air.' : 'It breathes as the first life of the star did.'); else
     bits.push(ph.home ? 'A creature of the land: it lives, feeds and breeds out of the water, and only paddles in the shallows.' : (ph.air || 0) > 0.3 ? 'A creature of the water that comes out onto the wet edge of the shore.' : 'A creature of the water.');
-    if (ph.jaws) bits.push('Its bite can take the big prey of the deep.');
+    if (ph.jaws) bits.push('Its bite can take the big prey.');
     if (g.h >= 2) bits.push('A thinking brain with ' + g.h + ' hidden cells.');
     if (g.c[6] > 0.5) bits.push('Likes it hot.');
     if (g.c[7] > 0.5) bits.push('Shrugs off winter.');
@@ -5014,7 +5014,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   'use strict';
   // key → [what it is for, which of the pond's troubles it answers (matched against the measured pressures)]
   const FOR = {
-    grow0: ['legs grab food and can carry a body onto the shore', /scarce|few can eat/],
+    grow0: ['legs grab food and carry a body over the ground', /scarce|few can eat/],
     grow1: ['fins add speed and turning, and breathe like gills', /oxygen|hunters|attacking|eats|deadly/],
     grow2: ['spikes hurt whatever bites', /hunters|attacking|weak to spikes/],
     grow3: ['tentacles reach food from further off', /scarce|sticky/],
@@ -5023,7 +5023,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     grow6: ['frills breathe well and catch the eye', /oxygen/],
     grow7: ['horns wound an attacker', /hunters|attacking|weak to spikes/],
     eye: ['an eye finds food before bumping into it', /scarce|dark|hunters/], eyes3: ['more eyes see further and all around', /scarce|dark|hunters/],
-    mouth1: ['a beak bites harder than a plain mouth', /protein|jaws and beaks/], mouth2: ['jaws open up the big prey of the deep, rich in protein', /protein|jaws and beaks/],
+    mouth1: ['a beak bites harder than a plain mouth', /protein|jaws and beaks/], mouth2: ['jaws open up the big prey, rich in protein', /protein|jaws and beaks/],
     mouth3: ['a sucker reaches food a plain mouth misses', /scarce/], mouth4: ['whiskers feel for food where eyes fail', /dark|scarce/],
     tail: ['a tail is the cheapest speed there is', /hunters|attacking|scarce/],
     seg11: ['a giant is too big for most mouths, if it can feed itself', /hunters|attacking/], coat1: ['scales turn small bites aside', /hunters|attacking/], coat2: ['fur keeps a body working in the cold', /cold/], coat3: ['feathers keep out the cold and help it steer', /cold/],
@@ -5033,7 +5033,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     shell: ['a shell turns bites, at the price of speed', /hunters|attacking|weak to armour/], crest: ['a crest protects a little and is for show', /hunters/],
     glow: ['its own light draws food and grows algae', /dark|glowing/], venom: ['poison makes it a bad meal', /hunters|attacking|weak to poison/],
     pattern: ['markings cost nothing and are there for mates to see', null],
-    walker: ['food on the shore lies untouched by anything that cannot walk', null], hands: ['fingers pick the shore\'s food faster', null], biter: ['a strong bite takes the big prey of the deep', /protein/],
+    walker: ['the plants of the open ground lie untouched by anything that cannot walk', null], hands: ['fingers pick the ground\'s plants faster', null], biter: ['a strong bite takes the big prey', /protein/],
   };
   // key → does this creature have it?
   const HAS = {
@@ -5134,7 +5134,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     const light = W.set.light * (W.mods.length ? Math.max(0.1, 1 + G.modSum('light')) : 1);
     if (light < 0.7) { fx('glow', 2); fx('sense', 2); P.part[5] += 1.5; P.part[4] += 1; P.list.push('it is dark'); }
     // short of breath: more than a fifth of the pond's breaths last season came up short
-    if (W.lastStats && W.cre.length && (W.lastStats.gasp || 0) > W.lastStats.breaths * 0.2) { P.o2 = 2; P.list.push('the water is thin on oxygen (fins and frills breathe better; small bodies need less)'); }
+    if (W.lastStats && W.cre.length && (W.lastStats.gasp || 0) > W.lastStats.breaths * 0.2) { P.o2 = 2; P.list.push('the air is thin on oxygen (fins and frills breathe better; small bodies need less)'); }
     if (light > 1.2) { fx('photo', 2.5); P.list.push('there is plenty of light'); }
     if (W.mods.length && G.modSum('poison') > 0.1) { fx('poison', 4); P.c[8] += 2; P.list.push('the whole star is poisoned'); }
     // size: a hunter takes only prey well under its own size, so danger makes a bigger body a likelier thing to stumble on; hunger, heat and thin air favour small bodies
@@ -5257,7 +5257,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 
   // ── the game's own imagination (no server needed) ──
   const KINDS = [
-    { fx: { photo: 0.8 }, names: ['Sun Leaf', 'Light Sail', 'Green Frond', 'Algae Coat'], note: 'Feeds on light, so its owner can rest in the bright shallows.', shape: 'leaf', hue: 120 },
+    { fx: { photo: 0.8 }, names: ['Sun Leaf', 'Light Sail', 'Green Frond', 'Algae Coat'], note: 'Feeds on light, so its owner can rest in the bright open.', shape: 'leaf', hue: 120 },
     { fx: { sense: 0.8 }, names: ['Feeler', 'Whisker Stalk', 'Scent Horn', 'Ripple Ear'], note: 'Senses food and danger from much further away.', shape: 'antenna', hue: 50 },
     { fx: { speed: 0.8 }, names: ['Jet Sac', 'Water Screw', 'Kick Fin', 'Paddle Tail'], note: 'A burst of speed.', shape: 'jet', hue: 195 },
     { fx: { armor: 0.8, speed: -0.3 }, names: ['Shell Plate', 'Stone Hide', 'Bone Shield'], note: 'Hard to bite, but slow.', shape: 'shell', hue: 40 },
@@ -5265,9 +5265,9 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     { fx: { spike: 0.8 }, names: ['Thorn', 'Barb Horn', 'Needle Crown'], note: 'Anything that bites it gets hurt.', shape: 'thorn', hue: 280 },
     { fx: { toxin: 0.8 }, names: ['Bitter Gland', 'Stinger', 'Venom Sac'], note: 'It tastes terrible, and eating it costs dearly.', shape: 'bulb', hue: 100 },
     { fx: { glow: 0.7, sense: 0.3 }, names: ['Glow Bulb', 'Lantern Eye', 'Star Spot'], note: 'A light of its own, in the dark.', shape: 'bulb', hue: 55 },
-    { fx: { heat: 0.8 }, names: ['Heat Skin', 'Ember Coat'], note: 'Shrugs off hot water.', shape: 'shell', hue: 15 },
+    { fx: { heat: 0.8 }, names: ['Heat Skin', 'Ember Coat'], note: 'Shrugs off heat.', shape: 'shell', hue: 15 },
     { fx: { cold: 0.8 }, names: ['Frost Coat', 'Winter Fur', 'Ice Fat'], note: 'Shrugs off the cold.', shape: 'fur', hue: 205 },
-    { fx: { poison: 0.8 }, names: ['Filter Liver', 'Clean Gut'], note: 'Swims through poison unharmed.', shape: 'bulb', hue: 265 },
+    { fx: { poison: 0.8 }, names: ['Filter Liver', 'Clean Gut'], note: 'Goes through poison unharmed.', shape: 'bulb', hue: 265 },
     { fx: { photo: 0.5, armor: 0.4, speed: -0.4 }, names: ['Reef Crust', 'Moss Shell'], note: 'A living crust: it feeds on light and protects, and barely moves.', shape: 'shell', hue: 140 },
     { fx: { eat: 0.4 }, digest: true, names: ['Grinder Gut', 'Second Stomach', 'Sifter'], note: 'Digests a food its owner could not eat before.', shape: 'tube', hue: 25 },
     { fx: { speed: 0.5, sense: 0.4 }, names: ['Hunter Fin', 'Chase Whisker'], note: 'Fast and alert: made for the chase.', shape: 'jet', hue: 350 },
@@ -5488,7 +5488,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     { name: 'Sail', adj: 'Sailed', note: 'A tall sail along the back: it rides the current and looks twice the size.', place: 'back', motion: 'sway', colour: 'accent', pts: [[0, -0.05], [0.15, -0.45], [0.4, -0.3], [0.5, -0.5], [0.7, -0.28], [0.85, -0.4], [1, 0], [0.85, 0.4], [0.7, 0.28], [0.5, 0.5], [0.4, 0.3], [0.15, 0.45], [0, 0.05]], smooth: false, ribs: [[0, 0, 1, 0], [0.15, -0.4, 0.15, 0.4], [0.5, -0.45, 0.5, 0.45], [0.85, -0.35, 0.85, 0.35]], fx: { speed: 0.18, armour: 0.08, agility: -0.15 } },
     { name: 'Antler', adj: 'Antlered', note: 'Branching antlers: for shoving rivals and for show.', place: 'head', motion: 'still', colour: 'pale', pts: [[0, -0.07], [0.3, -0.12], [0.4, -0.45], [0.5, -0.42], [0.47, -0.12], [0.7, -0.15], [0.85, -0.42], [0.94, -0.36], [0.82, -0.08], [1, 0], [0.8, 0.07], [0.45, 0.07], [0, 0.07]], smooth: false, fx: { attack: 0.35, armour: 0.1, speed: -0.12 } },
     { name: 'Lure', adj: 'Luring', note: 'A glowing bait on a stalk: food comes to it.', place: 'head', motion: 'sway', colour: 'body', pts: [[0, -0.04], [0.5, -0.1], [0.82, -0.06], [0.82, 0.06], [0.5, 0.02], [0, 0.04]], dots: [[0.92, 0, 0.14]], fx: { reach: 0.35, senses: 0.2, speed: -0.1 } },
-    { name: 'Comb', adj: 'Combed', note: 'A comb of fine teeth that strains food out of the water.', place: 'sides', motion: 'pulse', colour: 'pale', pts: [[0, -0.1], [0.9, -0.14], [0.92, -0.04], [0.2, 0], [0.92, 0.04], [0.9, 0.14], [0, 0.1]], smooth: false, ribs: [[0.3, -0.11, 0.3, -0.45], [0.5, -0.12, 0.5, -0.5], [0.7, -0.13, 0.7, -0.45], [0.3, 0.11, 0.3, 0.45], [0.5, 0.12, 0.5, 0.5], [0.7, 0.13, 0.7, 0.45]], fx: { reach: 0.26, agility: -0.12 } },
+    { name: 'Comb', adj: 'Combed', note: 'A comb of fine teeth that strains food out of the air.', place: 'sides', motion: 'pulse', colour: 'pale', pts: [[0, -0.1], [0.9, -0.14], [0.92, -0.04], [0.2, 0], [0.92, 0.04], [0.9, 0.14], [0, 0.1]], smooth: false, ribs: [[0.3, -0.11, 0.3, -0.45], [0.5, -0.12, 0.5, -0.5], [0.7, -0.13, 0.7, -0.45], [0.3, 0.11, 0.3, 0.45], [0.5, 0.12, 0.5, 0.5], [0.7, 0.13, 0.7, 0.45]], fx: { reach: 0.26, agility: -0.12 } },
     { name: 'Club', adj: 'Clubbed', note: 'A heavy knob on an arm: one swing settles an argument.', place: 'sides', motion: 'sway', colour: 'dark', pts: [[0, -0.07], [0.55, -0.08], [0.65, -0.3], [0.9, -0.34], [1.05, -0.1], [1.05, 0.1], [0.9, 0.34], [0.65, 0.3], [0.55, 0.08], [0, 0.07]], dots: [[0.85, -0.14, 0.05], [0.85, 0.14, 0.05]], fx: { attack: 0.45, speed: -0.15 } },
     { name: 'Fan', adj: 'Fanned', note: 'A wide fan it spreads in alarm, and to be admired.', place: 'sides', motion: 'bristle', colour: 'accent', pts: [[0, -0.05], [0.6, -0.55], [0.8, -0.38], [0.95, -0.42], [1, -0.15], [1.08, 0], [1, 0.15], [0.95, 0.42], [0.8, 0.38], [0.6, 0.55], [0, 0.05]], ribs: [[0, 0, 0.7, -0.45], [0, 0, 0.98, -0.25], [0, 0, 1.05, 0], [0, 0, 0.98, 0.25], [0, 0, 0.7, 0.45]], dots: [[0.72, 0, 0.09]], fx: { armour: 0.25, senses: 0.15, speed: -0.12 } },
     { name: 'Hook', adj: 'Hooked', note: 'A curved hook that catches and holds.', place: 'sides', motion: 'sway', colour: 'pale', pts: [[0, -0.09], [0.5, -0.16], [0.9, -0.05], [1, 0.25], [0.8, 0.5], [0.55, 0.42], [0.78, 0.28], [0.76, 0.12], [0.5, 0.04], [0, 0.09]], fx: { reach: 0.2, attack: 0.2, agility: -0.12 } },
@@ -5835,10 +5835,10 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
 
   // ── the game's own reading of a sentence (no server needed) ──
   const RULES = [
-    [/mud|murk|swamp|stagnant|fog|silt/, { name: 'Murky water', note: 'The water thickens. Light dies quickly and breath comes hard.', hue: 60, shake: 0.2, duration: 30, light: -0.2, water: { oxygen: -0.6, murk: 0.8 } }],
-    [/clear water|crystal|fresh/, { name: 'Fresh water', note: 'The water clears and fills with air. Bigger bodies can breathe.', hue: 190, shake: 0.1, fx: 'bubbles', duration: 30, water: { oxygen: 0.8, murk: -0.6 } }],
-    [/ice age|freez|frozen|blizzard|snow|winter|cold|frost/, { name: 'A great cold', note: 'The water turns bitter cold. Only the cold-proof are comfortable.', temp: -0.8, light: -0.2, food: 0.5, duration: 80, hue: 205, shake: 0.2 }],
-    [/heat|hot|boil|drought|desert|sun burn|scorch|fire|lava|volcan/, { name: 'A great heat', note: 'The water warms and the algae thin out.', temp: 0.8, food: 0.5, duration: 70, hue: 15, shake: 0.4 }],
+    [/mud|murk|swamp|stagnant|fog|silt/, { name: 'Murky water', note: 'The air thickens. Light dies quickly and breath comes hard.', hue: 60, shake: 0.2, duration: 30, light: -0.2, water: { oxygen: -0.6, murk: 0.8 } }],
+    [/clear water|crystal|fresh/, { name: 'Fresh water', note: 'The air clears and grows rich. Bigger bodies can breathe.', hue: 190, shake: 0.1, fx: 'bubbles', duration: 30, water: { oxygen: 0.8, murk: -0.6 } }],
+    [/ice age|freez|frozen|blizzard|snow|winter|cold|frost/, { name: 'A great cold', note: 'The air turns bitter cold. Only the cold-proof are comfortable.', temp: -0.8, light: -0.2, food: 0.5, duration: 80, hue: 205, shake: 0.2 }],
+    [/heat|hot|boil|drought|desert|sun burn|scorch|fire|lava|volcan/, { name: 'A great heat', note: 'The air warms and the green food thins out.', temp: 0.8, food: 0.5, duration: 70, hue: 15, shake: 0.4 }],
     [/dark|eclipse|night|shadow|black/, { name: 'The long dark', note: 'The light fades. Light-eaters go hungry; the deep hardly notices.', light: -0.8, food: 0.6, duration: 70, hue: 250, shake: 0.1 }],
     [/bright|sunny|spring|sunshine|rainbow|paradise|feast|bloom|harvest|plenty/, { name: 'A golden season', note: 'Light and food everywhere. Everyone grows fat.', light: 0.5, food: 2.2, duration: 60, hue: 50, shake: 0.1, feed: { count: 120, tag: 2 } }],
     [/meteor|asteroid|comet|bomb|explo|nuke|blast/, { name: 'Impact', note: 'Something huge strikes the star.', kill: { share: 0.45, who: 'random' }, temp: 0.3, duration: 30, hue: 30, shake: 1, current: 0.8 }],
@@ -5846,16 +5846,16 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     [/giant|whale|shark|monster|predator|kraken|dragon|hunter|eat|alien|abduct/, { name: 'Something hungry', note: 'It takes the biggest ones first.', kill: { share: 0.3, who: 'biggest' }, hue: 340, shake: 0.6, current: 0.4 }],
     [/wall|cage|lock|vault|safe|fence|behind|trapped|sealed|prison|fortress|dome/, { name: 'Locked away', note: 'A wall rises around the food. Only those who can break in will eat.', hue: 210, shake: 0.6, thing: { name: 'Steel Wall', props: { vault: 0.6, hard: 1 }, hue: 210, note: 'A wall around the food. Something will have to learn to get through.', weak: 2 } }],
     [/everyone|every one|all of them|give them|they all|grow |sprout|bless/, { name: 'A strange gift', note: 'Bodies change all at once. Whether it lasts is up to the star.', hue: 290, shake: 0.3, mutate: 1.5, duration: 30, gift: { trait: '?', share: 0.7 } }],
-    [/clear water|crystal|fresh water|oxygen|bubbl/, { name: 'Fresh water', note: 'The water clears and fills with air. Bigger bodies can breathe.', hue: 190, shake: 0.1, fx: 'bubbles', duration: 30, water: { oxygen: 0.8, murk: -0.6 } }],
-    [/mud|murk|swamp|stagnant|fog|silt/, { name: 'Murky water', note: 'The water thickens. Light dies quickly and breath comes hard.', hue: 60, shake: 0.2, duration: 30, light: -0.2, water: { oxygen: -0.6, murk: 0.8 } }],
+    [/clear water|crystal|fresh water|oxygen|bubbl/, { name: 'Fresh water', note: 'The air clears and grows rich. Bigger bodies can breathe.', hue: 190, shake: 0.1, fx: 'bubbles', duration: 30, water: { oxygen: 0.8, murk: -0.6 } }],
+    [/mud|murk|swamp|stagnant|fog|silt/, { name: 'Murky water', note: 'The air thickens. Light dies quickly and breath comes hard.', hue: 60, shake: 0.2, duration: 30, light: -0.2, water: { oxygen: -0.6, murk: 0.8 } }],
     [/fashion|admire|beauty contest|trend|style/, { name: 'A new fashion', note: 'What the star finds beautiful has changed.', hue: 320, shake: 0.1, mutate: 1.2, duration: 20, admire: '?' }],
     [/storm|flood|wave|tsunami|hurricane|tornado|wind|current|whirl/, { name: 'A great storm', note: 'Everything is swept across the star.', current: 1, kill: { share: 0.1, who: 'slowest' }, hue: 200, shake: 0.7 }],
     [/radiat|mutat|magic|wizard|chaos|strange|weird|cosmic/, { name: 'Strange days', note: 'Children are born far stranger than usual.', mutate: 3.5, duration: 90, hue: 300, shake: 0.3 }],
-    [/poison|pollut|toxic|acid|oil|sewage|trash|venom|contaminat/, { name: 'Poisoned water', note: 'The whole star turns foul. Only the poison-proof are comfortable.', poison: 0.65, food: 0.8, duration: 110, hue: 95, shake: 0.3, fx: 'spores' }],
+    [/poison|pollut|toxic|acid|oil|sewage|trash|venom|contaminat/, { name: 'Poisoned air', note: 'The whole star turns foul. Only the poison-proof are comfortable.', poison: 0.65, food: 0.8, duration: 110, hue: 95, shake: 0.3, fx: 'spores' }],
     [/rain|food|manna|snack|candy|sugar|cake|pizza/, { name: 'A rain of food', note: 'It falls everywhere at once.', feed: { count: 180, tag: 0 }, food: 1.6, duration: 30, hue: 45, shake: 0.1 }],
   ];
   // ── nature's own surprises: nobody asked for them ──
-  const NATURE = ['a cold snap', 'a heat wave', 'the long dark', 'a golden season of plenty', 'a great storm', 'strange days of mutation', 'murky water', 'fresh clear water', 'a sickness', 'a rain of food'];
+  const NATURE = ['a cold snap', 'a heat wave', 'the long dark', 'a golden season of plenty', 'a great storm', 'strange days of mutation', 'murky water', 'fresh clear air', 'a sickness', 'a rain of food'];
   G.natureTick = function (gen) {
     const W = G.W;
     if (!W || W.title || gen < 18) return;
@@ -5923,7 +5923,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     { id: 3, name: 'Dragon Breath', wonder: 'It can breathe fire. What hunts it gets burned.', sp: 'fire', glyph: 'flame', hue: 18, fx: { glow: 0.5, heat: 0.5 } },
     { id: 4, name: 'Diamond Heart', wonder: 'A diamond grew in its chest. Almost nothing bites through it, and it shines.', sp: '', glyph: 'gem', hue: 190, fx: { armor: 0.8, glow: 0.5 } },
     { id: 5, name: 'Rainbow Coat', wonder: 'Its coat shimmers through every colour, and neither heat nor cold nor poison troubles it much.', sp: '', glyph: 'rainbow', hue: 320, fx: { glow: 0.4, heat: 0.4, cold: 0.4, poison: 0.3 } },
-    { id: 6, name: 'Healing Light', wonder: 'Its glow mends whatever swims near it.', sp: 'heal', glyph: 'heart', hue: 130, fx: { glow: 0.4 } },
+    { id: 6, name: 'Healing Light', wonder: 'Its glow mends whatever comes near it.', sp: 'heal', glyph: 'heart', hue: 130, fx: { glow: 0.4 } },
     { id: 7, name: 'Lucky Star', wonder: 'Fortune follows it: danger has a way of missing.', sp: 'luck', glyph: 'clover', hue: 105, fx: { speed: 0.1 } },
     { id: 8, name: 'Heart of Spring', wonder: 'Every spring it has more children than anyone.', sp: 'fertile', glyph: 'sun', hue: 58, fx: { eat: 0.2 } },
     { id: 9, name: "Titan's Heart", wonder: 'It grew far bigger than its kind has ever been.', sp: 'titan', glyph: 'crown', hue: 30, fx: { armor: 0.3, eat: 0.2 } },
@@ -6418,7 +6418,7 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
   G.measurePond = measure;
 
   const LABEL = { alive: 'creatures alive', foodPerCreature: 'food each creature finds', size: 'body size', speed: 'speed', brain: 'brain size', parts: 'things growing on the body',
-    bodySegments: 'body segments', walkers: '% that can walk', starBodies: '% with a star-shaped body', biters: '% with a real bite', onTheShore: '% living on the shore', withEyes: '% with eyes', withLimbs: '% with limbs', lightEaters: '% living on light', inTheDeep: '% living in the deep', hunters: '% hunters', armoured: '% armoured', fitness: 'average fitness' };
+    bodySegments: 'body segments', walkers: '% that can walk', starBodies: '% with a star-shaped body', biters: '% with a real bite', onTheShore: '% breathing the open air', withEyes: '% with eyes', withLimbs: '% with limbs', lightEaters: '% living on light', inTheDeep: '% living in the deep', hunters: '% hunters', armoured: '% armoured', fitness: 'average fitness' };
 
   /** the biggest changes between two measurements, as plain facts */
   function changes(a, b) {
@@ -6442,8 +6442,8 @@ input[type=text]:focus { border-color: var(--algae); box-shadow: 0 0 16px rgba(5
     else {
       const c = ch[0], up = c.to > c.from;
       const why = /food/.test(c.what) ? (up ? 'they have become better at finding food' : 'food has become harder to find')
-        : /eyes/.test(c.what) ? 'seeing food from afar pays off' : /limbs/.test(c.what) ? 'limbs help them swim and reach' : /light/.test(c.what) ? 'living on sunlight means never having to chase a meal'
-        : /deep/.test(c.what) ? 'the deep has food nobody else was eating' : /hunters/.test(c.what) ? 'other creatures have become a meal' : /size/.test(c.what) ? (up ? 'a bigger body stores more energy for winter' : 'a small body is cheap to run')
+        : /eyes/.test(c.what) ? 'seeing food from afar pays off' : /limbs/.test(c.what) ? 'limbs help them move and reach' : /light/.test(c.what) ? 'living on sunlight means never having to chase a meal'
+        : /deep/.test(c.what) ? 'there was food nobody else was eating' : /hunters/.test(c.what) ? 'other creatures have become a meal' : /size/.test(c.what) ? (up ? 'a bigger body stores more energy for winter' : 'a small body is cheap to run')
         : /speed/.test(c.what) ? (up ? 'the fast reach food first' : 'moving less saves energy') : /brain/.test(c.what) ? 'smarter steering finds more food' : /armour/.test(c.what) ? 'armour keeps hunters off' : 'it helps them survive';
       text = 'In these generations, ' + c.what + ' went from ' + c.from + ' to ' + c.to + ': ' + why + '.' + (ch[1] ? ' Also, ' + ch[1].what + ' went from ' + ch[1].from + ' to ' + ch[1].to + '.' : '');
     }
@@ -7140,6 +7140,15 @@ function drawHazardWashes() {
 }
 
 // ── layer 5: food ──
+// on a star a piece of food is a small solid thing lying on the ground, lit from the upper left and with its own shadow (0 a berry, 1 a sprout, 2 big prey): drawn once, kept
+function foodOrb(tag, kind) {
+  const key = 'o' + tag + ':' + kind; if (R.foodHalo[key]) return R.foodHalo[key]; const cv = document.createElement('canvas'); cv.width = cv.height = 48; const c = cv.getContext('2d'), h = G.TAGHUE[tag];
+  { const g = c.createRadialGradient(26, 38, 1, 26, 38, 15); g.addColorStop(0, 'rgba(0,0,0,0.42)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.save(); c.translate(0, 38); c.scale(1, 0.4); c.translate(0, -38); c.fillStyle = g; c.beginPath(); c.arc(26, 38, 15, 0, 6.2832); c.fill(); c.restore(); }
+  if (kind === 1) { c.strokeStyle = G.hsl(h + 20, 45, 30, 1); c.lineWidth = 2.6; c.lineCap = 'round'; c.beginPath(); c.moveTo(24, 38); c.lineTo(24, 22); c.stroke(); [[-1, -0.7], [1, 0.7]].forEach(function (q) { const g = c.createLinearGradient(24 - 12, 14, 24 + 12, 30); g.addColorStop(0, G.hsl(h, 70, 74, 1)); g.addColorStop(1, G.hsl(h, 70, 40, 1)); c.fillStyle = g; c.strokeStyle = 'rgba(10,20,30,0.5)'; c.lineWidth = 1; c.beginPath(); c.ellipse(24 + q[0] * 8.5, 24, 9.5, 5, q[1], 0, 6.2832); c.fill(); c.stroke(); }); c.fillStyle = G.hsl(h, 90, 80, 1); c.beginPath(); c.arc(24, 17, 4, 0, 6.2832); c.fill(); c.stroke(); }
+  else { const r = kind === 2 ? 15 : 12, g = c.createRadialGradient(24 - r * 0.38, 26 - r * 0.42, r * 0.1, 24, 26, r); g.addColorStop(0, G.hsl(h, 85, 88, 1)); g.addColorStop(0.42, G.hsl(h, 88, 62, 1)); g.addColorStop(1, G.hsl(h, 80, 32, 1)); c.fillStyle = g; c.beginPath(); c.arc(24, 26, r, 0, 6.2832); c.fill(); c.strokeStyle = 'rgba(10,20,30,0.5)'; c.lineWidth = 1.2; c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.85)'; c.beginPath(); c.ellipse(24 - r * 0.36, 26 - r * 0.42, r * 0.2, r * 0.13, -0.6, 0, 6.2832); c.fill(); if (kind === 2) { c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineWidth = 1.6; c.beginPath(); c.arc(24, 26, r + 4, 0, 6.2832); c.stroke(); } }
+  return (R.foodHalo[key] = cv);
+}
 function drawFood() {
   const W = G.W; if (!W) return;
   const ctx = G.ctx, t = G.rt;
@@ -7152,7 +7161,7 @@ function drawFood() {
     if (o.dead) continue;
     const tw = 0.75 + 0.25 * Math.sin(t * 2.2 + o.ph);
     const s = (6 + o.v * 0.25) * (G.FLAT ? 0.72 : 1);
-    ctx.globalAlpha = tw * (G.FLAT ? 0.5 : 0.8);
+    ctx.globalAlpha = tw * (G.FLAT ? 0.2 : 0.8);
     ctx.drawImage(foodHaloSprite(o.tag), o.x - s, o.y - s, s * 2, s * 2);
   }
   ctx.globalAlpha = 1;
@@ -7166,6 +7175,7 @@ function drawFood() {
       ctx.beginPath(); ctx.arc(o.x, o.y, 2 + u * 7, 0, 6.2832); ctx.fill();
       continue;
     }
+    if (G.FLAT && !W.title) { const fade = Math.min(1, (o.born === undefined ? 1 : o.born) / 0.8), r = (o.big ? 6.6 : o.land ? 6.4 : 3 + o.v * 0.07) * (0.4 + 0.6 * fade); ctx.globalAlpha = fade; ctx.drawImage(foodOrb(o.tag, o.big ? 2 : o.land ? 1 : 0), o.x - r * 1.85, o.y - r * 2.0, r * 3.7, r * 3.7); ctx.globalAlpha = 1; continue; }
     if (o.land) {
       // a plant on the shore: two leaves
       ctx.fillStyle = G.hsl(G.TAGHUE[o.tag], 70, 62, 0.95);
@@ -7494,7 +7504,7 @@ function drawCharacter(ctx, c, x, y, scale, t, opt) {
     const hy = y - hop - r * 254 / R.SIDE * 0.92, sign = scared ? '!' : c.pois > 0.3 ? 'x_x' : c.chill > 0.05 ? '*brr*' : c.hot > 0.05 ? '~phew~' : c.gasp > 0.7 && id % 4 === 0 ? 'o O' : still ? 'z z' : '';
     if (sign) { ctx.save(); ctx.font = '700 ' + Math.round(Math.max(9, r * (sign.length > 2 ? 0.36 : 0.55))) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,18,31,0.8)'; ctx.fillStyle = scared ? PAL.gold : c.pois > 0.3 ? PAL.algae : c.chill > 0.05 ? PAL.frost : c.hot > 0.05 ? PAL.rose : PAL.frost; const by2 = hy - 4 * Math.sin(t * 3 + id); ctx.strokeText(sign, x + r * 0.5, by2); ctx.fillText(sign, x + r * 0.5, by2); ctx.restore(); }
   }
-  if (c.flash > 0 && c.mutAge > 0) { ctx.save(); ctx.strokeStyle = G.rgba(PAL.rose, Math.min(1, c.flash)); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(x, y - r * 1.5, r * 1.3, r * 2.1, 0, 0, 6.2832); ctx.stroke(); ctx.restore(); }
+  if (c.flash > 0 && c.mutAge > 0 && !G.FLAT) { ctx.save(); ctx.strokeStyle = G.rgba(PAL.rose, Math.min(1, c.flash)); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(x, y - r * 1.5, r * 1.3, r * 2.1, 0, 0, 6.2832); ctx.stroke(); ctx.restore(); }
 }
 function drawCreatureBody(ctx, c, x, y, scale, t, opt) {
   opt = opt || {};
@@ -8255,7 +8265,7 @@ G.addSystem({
     const sig = L.map(function (q) { return q.name + Math.ceil(q.left / 2); }).join('|') + stripOpen;
     if (sig === stripSig) return; stripSig = sig;
     if (L.length <= 2) stripOpen = false;
-    if (L.length > 2 && !stripOpen) { strip.innerHTML = '<span class="wx more"><b>' + L.length + ' things in the water</b><i>' + L.slice(0, 3).map(function (q) { return String(q.name).replace(/[&<>]/g, ''); }).join(', ') + (L.length > 3 ? ' +' + (L.length - 3) : '') + '</i><em>▾</em></span>'; return; }
+    if (L.length > 2 && !stripOpen) { strip.innerHTML = '<span class="wx more"><b>' + L.length + ' things on the star</b><i>' + L.slice(0, 3).map(function (q) { return String(q.name).replace(/[&<>]/g, ''); }).join(', ') + (L.length > 3 ? ' +' + (L.length - 3) : '') + '</i><em>▾</em></span>'; return; }
     strip.innerHTML = (L.length > 2 ? '<span class="wx more"><b>Fold</b><em>▴</em></span>' : '') + L.map(function (q) { return '<span class="wx"><b>' + String(q.name).replace(/[&<>]/g, '') + '</b>' + (q.does ? '<i>' + q.does + '</i>' : '') + '<span class="bar"><u style="width:' + Math.round(100 * Math.max(0, Math.min(1, q.left / q.of))) + '%"></u></span><span>' + Math.ceil(q.left) + 's</span></span>'; }).join('');
   }
 
@@ -8366,7 +8376,8 @@ G.addSystem({
   let MAP = null;      // { key, lo, hi, job }
   function mapFor(W) {
     const art = G.art && G.art.ground ? G.art.ground(W) : null, key = (W.seed >>> 0) + ':' + idOf(W) + ':' + Math.round(W.ww) + ':' + Math.round(W.wh) + (art ? ':painted' : '');
-    if (!MAP || MAP.key !== key) { if (art) MAP = { key: key, lo: null, hi: null, job: startJob(W, 0.36), art: art }; else { const lo = startJob(W, 0.22); lo.run(400); MAP = { key: key, lo: lo, hi: null, job: startJob(W, 0.8) }; } }
+    if (!MAP || MAP.key !== key) { const dim = Math.round(W.ww) + ':' + Math.round(W.wh) + ':' + (W.seed >>> 0), was = MAP && !MAP.art && !MAP.plain && MAP.dim === dim ? (MAP.hi || MAP.lo) : null;      /* (when a star's painted ground comes, the ground it had until then fades into it) */
+      if (art) { MAP = { key: key, lo: null, hi: null, job: startJob(W, 0.36), art: art, dim: dim }; if (was && was.cv) MAP.prev = { cv: was.cv, t0: performance.now() }; } else { const lo = startJob(W, 0.22); lo.run(400); MAP = { key: key, lo: lo, hi: null, job: startJob(W, 0.8), dim: dim }; } }
     if (MAP.job) { if (MAP.job.run(MAP.art ? 11 : 7)) { MAP.hi = MAP.job; MAP.job = null; } }
     return MAP;
   }
@@ -8422,7 +8433,9 @@ G.addSystem({
       if (gx1 > gx0 && gy1 > gy0) { ctx.imageSmoothingEnabled = true; ctx.fillStyle = A.pat || (A.pat = ctx.createPattern(A.tile, 'repeat')); ctx.fillRect(gx0, gy0, gx1 - gx0, gy1 - gy0);
         if (mp && mp.done && mp.tint) { ctx.drawImage(mp.tint, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.save(); ctx.globalCompositeOperation = 'hard-light'; ctx.drawImage(mp.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore();
           if (mp.em) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.3 * Math.sin(t * 1.3); ctx.drawImage(mp.em, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore(); } } }
-    } else if (mp && mp.cv) { ctx.imageSmoothingEnabled = true; ctx.drawImage(mp.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN);
+      if (M.prev) { const a = 1 - (performance.now() - M.prev.t0) / 1800; if (a > 0) { ctx.save(); ctx.globalAlpha = a; ctx.drawImage(M.prev.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore(); } else M.prev = null; }
+    } else if (G.art && G.art.groundWaiting && G.art.groundWaiting(W)) { ctx.fillStyle = 'rgb(' + L.ramp[2].join(',') + ')'; ctx.fillRect(-MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); M.plain = true;      /* (its painted ground is on its way: a plain ground of its own colour until it comes, not the drawn one) */
+    } else if (mp && mp.cv) { M.plain = false; ctx.imageSmoothingEnabled = true; ctx.drawImage(mp.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN);
       if (mp.em && mp.done) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.3 * Math.sin(t * 1.3); ctx.drawImage(mp.em, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore(); }
       if (v.scale > 0.95) { const pat = ctx.createPattern(grainTile(), 'repeat'); if (pat) { ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = Math.min(0.5, (v.scale - 0.95) * 0.5); ctx.scale(0.6, 0.6); ctx.fillStyle = pat; ctx.fillRect(x0 / 0.6, y0 / 0.6, (x1 - x0) / 0.6, (y1 - y0) / 0.6); ctx.restore(); } } }
     // the slow shadows of clouds
@@ -8431,8 +8444,8 @@ G.addSystem({
     // the standing things, far ones first
     const n = Math.round(14 + span * (bot - top) / 150000), P = [];
     for (let i = 0; i < n; i++) { const x = e + rnd(seed, i, 21) * span, y = top + rnd(seed, i, 22) * (bot - top), s = 12 + rnd(seed, i, 23) * 20; if (x + s * 3 < x0 || x - s * 3 > x1 || y + s * 2 < y0 || y - s * 3 > y1) continue; if (Math.hypot(x - mid0.x, (y - mid0.y) * 1.4) < 380 || (G.siteAt && G.siteAt(W, x, y, 40))) continue; P.push([x, y, s, rnd(seed, i, 24), i]); }
-    const painted = !!(M.art && G.sceneryPainted(W));
-    if (painted) paintedScenery(ctx, W, seed, t, x0, y0, x1, y1);      // (on a painted star, drawn rocks would look pasted on: what stands there is painted too)
+    const painted = !!(M.art && G.sceneryPainted(W)), soon = !painted && !!(G.art && ((G.art.natureWaiting && G.art.natureWaiting(W)) || (G.art.groundWaiting && G.art.groundWaiting(W))));      /* (soon: its painted scenery is on its way, so the drawn scenery is not shown first) */
+    if (soon) { /* nothing yet */ } else if (painted) paintedScenery(ctx, W, seed, t, x0, y0, x1, y1);      // (on a painted star, drawn rocks would look pasted on: what stands there is painted too)
     else { if (!M.art) P.sort(function (a, b) { return a[1] - b[1]; }).forEach(function (q) { prop(ctx, id, L, q[0], q[1], q[2], q[3], t, q[4]); }); sites(ctx, W, L, id, seed, t, x0, y0, x1, y1); }
     beacons(ctx, W, L, seed, t);
     ctx.restore();
@@ -8564,9 +8577,10 @@ G.addSystem({
     return out;
   }
   /** the building `name` (heart0..3, house, hall, huts, tower, wall, spire, port, ship) as this star's people build it, or null until it has come */
-  A.sprite = function (W, name) {
-    W = W || G.W; const pe = A.people(W); if (!pe || !G.terrainOf) return null;
-    const part = CIVIC[name] ? 'civic' : 'works', id = G.terrainOf(W).id, key = part + '.' + id + '.' + norm(pe.kind);
+  A.sprite = function (W, name) { W = W || G.W; const pe = A.people(W); if (!pe || !G.terrainOf) return null; return A.spriteOf(G.terrainOf(W).id, pe, name); };
+  /** the same, for any people of any kind of star (a rival's ship is its own people's, not yours) */
+  A.spriteOf = function (id, pe, name) {
+    const part = CIVIC[name] ? 'civic' : 'works', key = part + '.' + id + '.' + norm(pe.kind);
     if (!SHEET[key] || (ST[key] && ST[key].near)) ask(key, { what: part, terrain: id, people: { kind: pe.kind, facts: pe.facts, colours: pe.colours } }, function (img, r) { SHEET[key] = cut(img, (r.art && r.art.cells) || []); });
     const s = SHEET[key]; return s ? s[name] || null : null;
   };
@@ -8580,6 +8594,20 @@ G.addSystem({
   A.groundTile = function (id) { for (const k in GROUND) if (k.indexOf('ground.' + id + '.') === 0) return GROUND[k].tile; return null; };
   /** a ship in flight: the painting of this star's ship without the stand it was built on, drawn upright with its middle at 0, 0 and `size` tall: true if it could */
   A.shipFlying = function (ctx, W, team, size) { const s = A.sprite(W, 'ship'); if (!s) return false; const cutY = Math.max(10, Math.round(s.ay - s.w * 0.1)), k = size / cutY; ctx.imageSmoothingEnabled = true; ctx.drawImage(A.tinted(s, team), 0, 0, s.w, cutY, -s.ax * k, -size / 2, s.w * k, size); return true; };
+  // while a painting is on its way a building is not shown the old drawn way and then swapped: it waits as a shape of light (54h_look.js asks)
+  let playT = 0; G.on('begin', function () { playT = performance.now(); }); G.on('new-pond', function () { playT = performance.now(); });
+  /** is the painting of this building of this star still on its way? (asked for and not yet come; or the game has only just begun and nothing could be asked yet) */
+  A.waiting = function (W, name) { W = W || G.W; const pe = A.people(W); if (!pe || !G.terrainOf || !A.WIDTH[name]) return false; const key = (CIVIC[name] ? 'civic' : 'works') + '.' + G.terrainOf(W).id + '.' + norm(pe.kind); if (SHEET[key]) return false;
+    const s = ST[key], now = performance.now(); if (s) return s.v === 'asked' && Date.now() - s.at < 70000; return !(G.host && G.host.ready) && playT > 0 && now - playT < 5000; };
+  const waitKey = function (key, have) { if (have) return false; const s = ST[key]; if (s) return s.v === 'asked' && Date.now() - s.at < 70000; return !(G.host && G.host.ready) && playT > 0 && performance.now() - playT < 5000; };
+  /** is this star's painted ground still on its way? and what stands on it? (then the old drawn ground and scenery are not shown first: 52c_terrain.js) */
+  A.groundWaiting = function (W) { W = W || G.W; if (!W || W.title || !G.terrainOf) return false; const key = 'ground.' + G.terrainOf(W).id + '.' + (((W.seed >>> 0) >>> 5) % 2); return waitKey(key, !!GROUND[key]); };
+  A.natureWaiting = function (W) { W = W || G.W; if (!W || W.title || !G.terrainOf) return false; const key = 'nature.' + G.terrainOf(W).id + '.0'; return waitKey(key, !!SHEET[key]); };
+  /** a small thing lying on the ground (0 a stone, 1 a reed, 2 a shell, 3 a piece of lumen), painted as this kind of star's own: true if it could be drawn so */
+  const MATN = ['quarry', 'reeds', 'shells', 'lumen'], MATW = [19, 15, 18, 15];
+  A.mat = function (ctx, W, k, x, y, s) { const sp = A.nature(W, MATN[k]); if (!sp) return false;
+    if (!sp.sm) { const w1 = 56, h1 = Math.max(8, Math.round(sp.h * w1 / sp.w)), a = mk(Math.ceil(sp.w / 2), Math.ceil(sp.h / 2)), b = mk(w1, h1); a.getContext('2d').drawImage(sp.cv, 0, 0, a.width, a.height); const bx = b.getContext('2d'); bx.imageSmoothingEnabled = true; bx.drawImage(a, 0, 0, w1, h1); sp.sm = b; }      /* (made small in two steps, so it stays clean) */
+    const w = MATW[k] * (0.86 + 0.3 * (s || 0)), h = w * sp.sm.height / sp.sm.width; ctx.fillStyle = 'rgba(0,0,0,0.26)'; ctx.beginPath(); ctx.ellipse(x + w * 0.12, y + h * 0.16, w * 0.5, w * 0.16, 0, 0, 6.2832); ctx.fill(); ctx.imageSmoothingEnabled = true; ctx.drawImage(sp.sm, x - w / 2, y - h * 0.72, w, h); return true; };
   /** is a painting of this star's buildings there (or on its way)? */
   A.on = function (W) { W = W || G.W; const pe = W && W.arch; if (!pe || !G.terrainOf) return false; const id = G.terrainOf(W).id; return !!SHEET['civic.' + id + '.' + norm(pe.kind)]; };
 
@@ -8604,6 +8632,10 @@ G.addSystem({
     try { x.filter = 'blur(2.2px)'; } catch (e) { /* no blur: a hard edge */ } x.drawImage(s.cv, pad, pad); x.filter = 'none'; x.globalCompositeOperation = 'source-in'; x.fillStyle = 'rgb(' + k + ')'; x.fillRect(0, 0, c.width, c.height);
     c.pad = pad; return (s.f[k] = c);
   };
+  /** the people of a rival star, as far as they are known: the first of its kinds (so their ship looks theirs): { id (their kind of star), pe } or null */
+  A.rivalPeople = function (r) { if (!r) return null; if (r._pe !== undefined) return r._pe; let out = null; try { const F = G.far, p = (F.cell && F.cell(r.i, r.j)) || { i: r.i, j: r.j, kinds: 2, hue: r.hue }, K = F.kindsOf(p), g = K && K[0], id = G.starOf ? G.starOf(p).terrain.id : null; if (g && g.f && id) { const facts = G.form.facts(g.f); out = { id: id, pe: { kind: String(G.form.kind(g.f).full).slice(0, 40), facts: facts.slice(0, -1).slice(0, 8), colours: String(facts[facts.length - 1] || '').slice(0, 60) } }; } } catch (e) { out = null; } return (r._pe = out); };
+  /** draw the ship a raid came in at x, y (its foot), as its own people build it; in the air it has left its stand behind: true if it could */
+  A.drawRaid = function (ctx, r, x, y, air) { const rp = A.rivalPeople(r), s = rp ? A.spriteOf(rp.id, rp.pe, 'ship') : null; if (!s) return false; const k = A.WIDTH.ship / s.w, cutY = air ? Math.max(10, Math.round(s.ay - s.w * 0.1)) : s.h; ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(A.tinted(s, 'foe'), 0, 0, s.w, cutY, x - s.ax * k, y - s.ay * k, s.w * k, cutY * k); ctx.restore(); return true; };
   /** how wide each building stands on the star (its picture is fitted to this) */
   A.WIDTH = { heart0: 150, heart1: 190, heart2: 246, heart3: 300, house: 124, hall: 214, huts: 200, tower: 112, wall: 230, spire: 108, port: 290, ship: 112 };
   /** draw a building of this star at a point of the star (x, y: the middle of its foundation), in its owner's colour: true if it could */
@@ -9057,11 +9089,11 @@ G.addSystem({
     const d = W.deed;
     if (d) {
       const st = d.steps[d.i], M = members(d), R = d.result ? d.result.size * Math.min(W.ww, W.wh) : 60;
-      if (!d.voyage && !(G.FLAT && d.bp)) { ctx.beginPath(); ctx.arc(d.x, d.y, R + 10, 0, TAU); ctx.strokeStyle = G.hsl(d.hue, 85, 70, 0.5 + 0.25 * Math.sin(t * 3)); ctx.lineWidth = 2.5; ctx.setLineDash([9, 8]); ctx.lineDashOffset = -t * 18; ctx.stroke(); ctx.setLineDash([]); }
+      if (!d.voyage && !G.FLAT) { ctx.beginPath(); ctx.arc(d.x, d.y, R + 10, 0, TAU); ctx.strokeStyle = G.hsl(d.hue, 85, 70, 0.5 + 0.25 * Math.sin(t * 3)); ctx.lineWidth = 2.5; ctx.setLineDash([9, 8]); ctx.lineDashOffset = -t * 18; ctx.stroke(); ctx.setLineDash([]); }
       if (d.bp && G.drawBlueprint) G.drawBlueprint(ctx, d, true); else if (d.progress > 0.02) mound(ctx, d.x, d.y + R * 0.4, R * 0.8, d.hue, d.progress);
       if (G.drawHauls) G.drawHauls(ctx);
       for (let k = 0; k < M.length; k++) {
-        const c = M[k], top = c.y - c.ph.r * 3.4; if (G.FLAT && d.bp) continue;      /* (on a star the builders wear their trade already: no flag as well) */
+        const c = M[k], top = c.y - c.ph.r * 3.4; if (G.FLAT) continue;      /* (on a star the builders wear their trade already: no flag as well) */
         ctx.strokeStyle = '#14202e'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(c.x + c.ph.r * 0.9, c.y - c.ph.r * 1.2); ctx.lineTo(c.x + c.ph.r * 0.9, top); ctx.stroke();      // each carries a little flag
         ctx.beginPath(); ctx.moveTo(c.x + c.ph.r * 0.9, top); ctx.lineTo(c.x + c.ph.r * 0.9 + 9 + Math.sin(t * 6 + k) * 1.5, top + 4); ctx.lineTo(c.x + c.ph.r * 0.9, top + 8); ctx.closePath(); ctx.fillStyle = G.hsl(d.hue, 90, 62, 1); ctx.fill(); ctx.stroke();
         if (c.carry && !(c.haul >= 0)) { ctx.beginPath(); ctx.arc(c.x - c.ph.r * 0.8, c.y - c.ph.r * 2.6, 4, 0, TAU); ctx.fillStyle = '#f6d365'; ctx.fill(); ctx.stroke(); }
@@ -9725,6 +9757,7 @@ G.addSystem({
     if (building && o.pile) { const hw = bp.hw || 60, px = clamp(b[0] + hw + 44, 30, G.W.ww - 30), py = b[1] + 6; let n = 0; for (let k = 0; k < 3; k++) for (let q = 0; q < Math.min(6, o.pile[k]); q++) { matDraw(ctx, { x: px + ((n % 4) - 1.5) * 9, y: py - Math.floor(n / 4) * 7, k: k, s: (n * 0.37) % 1 }, 0); n++; } }      // what has been brought, waiting to be set
   };
   function matDraw(ctx, q, t) {
+    if (ctx === G.ctx && G.art && G.art.mat && G.W && !G.W.title && G.art.mat(ctx, G.W, q.k, q.x, q.y, q.s)) return;      // (on a painted star what lies about is painted too: 53_art.js)
     if (q.k === 3) { const g = 0.75 + 0.25 * Math.sin(t * 3 + q.s * 9); ctx.fillStyle = 'hsla(178,95%,' + Math.round(62 + 14 * g) + '%,1)'; ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(q.x, q.y - 8); ctx.lineTo(q.x + 4.6, q.y - 1); ctx.lineTo(q.x, q.y + 6); ctx.lineTo(q.x - 4.6, q.y - 1); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.moveTo(q.x - 1, q.y - 5); ctx.lineTo(q.x + 1.6, q.y - 1.5); ctx.lineTo(q.x - 1.6, q.y - 0.5); ctx.closePath(); ctx.fill(); return; }
     const c = MAT[q.k].col; ctx.strokeStyle = INK; ctx.lineWidth = 1.3;
     if (q.k === 0) { ctx.fillStyle = hsl(c[0], c[1], c[2] - 8 + 16 * q.s); ctx.beginPath(); ctx.ellipse(q.x, q.y, 6.5 + 2 * q.s, 4.6 + 1.5 * q.s, q.s * 3, 0, TAU); ctx.fill(); ctx.stroke(); }
@@ -9824,7 +9857,7 @@ G.addSystem({
     if (c.eatFlash > 0.4) return 'eating';
     const i = c.inp, o = c.out; if (i && Math.max(Math.abs(i[5]), Math.abs(i[6])) > 0.35) return o[2] > 0.6 ? 'fleeing from danger' : 'near danger, and not running';
     if (i && Math.max(Math.abs(i[3]), Math.abs(i[4])) > 0.35 && o[0] > 0.5) return 'chasing prey'; if (i && Math.max(Math.abs(i[1]), Math.abs(i[2])) > 0.35 && o[0] > 0.4) return 'going for food';
-    if (o && o[4] > 0.5 && (i[10] || 0) > 0.3) return 'keeping with its family'; return o && o[0] > 0.5 ? 'swimming about' : 'drifting';
+    if (o && o[4] > 0.5 && (i[10] || 0) > 0.3) return 'keeping with its family'; return o && o[0] > 0.5 ? 'moving about' : 'drifting';
   };
 
   // ── how common each counted deed is: counted every generation, per hundred creatures ──
@@ -10313,9 +10346,20 @@ G.addSystem({
   function shadowOf(K) { if (K.sh) return K.sh; const c = document.createElement('canvas'); c.width = K.cv.width; c.height = K.cv.height; const x = c.getContext('2d'); x.drawImage(K.cv, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height); return (K.sh = c); }
   const drawK = G.drawBlueprint, SHOWN = new WeakMap(), fr = function (v) { return v - Math.floor(v); };
   /** the painting this building is shown by, if its star's people have theirs: { s, name, k (star units to a pixel of it) } */
-  function artOf(o) { const A = G.art, bp = o.bp; if (!A || !A.sprite || !bp) return null; const t = bp.type, name = t === 'heart' ? (o.enemy ? 'heart2' : 'heart' + Math.min(3, Math.max(o.tier | 0, bp.tier | 0))) : t === 'spire' ? (o.tower || (o.result && o.result.tower) ? 'tower' : 'spire') : t; if (!A.WIDTH[name]) return null; const s = A.sprite(G.W, name); return s ? { s: s, name: name, k: A.WIDTH[name] / s.w } : null; }
+  const artName = function (o) { const bp = o.bp, t = bp.type; return t === 'heart' ? (o.enemy ? 'heart2' : 'heart' + Math.min(3, Math.max(o.tier | 0, bp.tier | 0))) : t === 'spire' ? (o.tower || (o.result && o.result.tower) ? 'tower' : 'spire') : t; };
+  function artOf(o) { const A = G.art, bp = o.bp; if (!A || !A.sprite || !bp) return null; const name = artName(o); if (!A.WIDTH[name]) return null; const s = A.sprite(G.W, name); return s ? { s: s, name: name, k: A.WIDTH[name] / s.w } : null; }
+  /** while its painting is on its way a building stands as a shape of light in its owner's colour (so it is never seen drawn one way and then another) */
+  function lightUp(ctx, o) { const bp = o.bp, b = baseOf(o), t = G.rt || 0, col = TEAMC[ownerOf(o)], P = bp.P, hw = bp.hw || 60, top = bp.top || bp.S * 1.4; ctx.save(); ctx.translate(b[0], b[1]);
+    for (let i = 0; i < P.length; i++) { const p = P[i]; if (p.s === 'flag' || p.s === 'lamp') continue; ctx.beginPath(); path(ctx, p, p.w, p.h, t); ctx.fillStyle = 'rgba(' + col + ',' + (0.10 + 0.04 * Math.sin(t * 2.4 + i)) + ')'; ctx.fill(); ctx.strokeStyle = 'rgba(' + col + ',0.42)'; ctx.lineWidth = 1.1; ctx.stroke(); }
+    ctx.globalCompositeOperation = 'lighter'; const sy = -top * ((t * 0.5) % 1), g = ctx.createLinearGradient(0, sy - 12, 0, sy + 12); g.addColorStop(0, 'rgba(' + col + ',0)'); g.addColorStop(0.5, 'rgba(' + col + ',0.2)'); g.addColorStop(1, 'rgba(' + col + ',0)'); ctx.fillStyle = g; ctx.fillRect(-hw - 10, sy - 12, hw * 2 + 20, 24); ctx.restore(); }
   G.buildArt = artOf;
   const prog = function (bp) { let a = 0, c = 0; const P = bp.P; for (let i = 0; i < P.length; i++) { if (P[i].st > 0) a++; if (P[i].st > 1) c++; } return [a / Math.max(1, P.length), c / Math.max(1, P.length)]; };
+  // a building's small picture (on its card): its painting, where it has one
+  { const pic0 = G.buildPic; if (pic0) G.buildPic = function (o, px) { let a = null; try { a = o && o.bp && G.W && !G.W.title && (o.name !== undefined || o.title !== undefined) ? artOf(o) : null; } catch (e) { a = null; } if (!a) return pic0(o, px);
+      const pr = prog(o.bp), team = ownerOf(o), sig = 'art:' + a.name + ':' + team + ':' + Math.round(pr[0] * 24) + ':' + Math.round(pr[1] * 24); if (o._pic && o._pic.sig === sig) return o._pic.url;
+      try { const N = (px || 96) * 2, cv = document.createElement('canvas'); cv.width = cv.height = N; const x = cv.getContext('2d'), s = a.s, k = Math.min(N * 0.94 / s.w, N * 0.92 / s.h), x0 = (N - s.w * k) / 2, y0 = N * 0.96 - s.h * k, yF = Math.round(s.h * (1 - pr[0])), yC = Math.round(s.h * (1 - Math.min(pr[0], pr[1]))); x.imageSmoothingEnabled = true;
+        const part = function (img, ya, yb, al) { if (yb - ya < 1) return; x.globalAlpha = al; x.drawImage(img, 0, ya, s.w, yb - ya, x0, y0 + ya * k, s.w * k, (yb - ya) * k); }; part(G.art.grey(s), 0, yF, 0.22); part(G.art.grey(s), yF, yC, 1); part(G.art.tinted(s, team), yC, s.h, 1);
+        o._pic = { sig: sig, url: cv.toDataURL('image/png') }; return o._pic.url; } catch (e) { return pic0(o, px); } }; }
   { const bt0 = G.buildTop; if (bt0) G.buildTop = function (o) { let a = null; try { a = o && o.bp && G.W && !G.W.title && (o.name !== undefined || o.title !== undefined) ? artOf(o) : null; } catch (e) { a = null; } return a ? a.s.ay * a.k - o.bp.S * 0.45 + 6 : bt0(o); }; }
   function groundPart(ctx, o, building, art) {
     const W = G.W, bp = o.bp, t = G.rt || 0, b = baseOf(o), S = bp.S, hw = bp.hw || 60, top = bp.top || S * 1.4, col = TEAMC[ownerOf(o)], P = bp.P, ring = bp.type === 'wall' && !bp.designed, pad = bp.type !== 'ship' && bp.type !== 'port' && !ring, TL = G.terrainLook ? G.terrainLook(W) : null;
@@ -10373,15 +10417,15 @@ G.addSystem({
   const UP = [];      // the buildings waiting for their turn among the creatures, this frame: back ones first
   G.drawBlueprint = function (ctx, o, building) {
     const bp = o && o.bp; if (!bp || !G.W || ctx !== G.ctx || (o.name === undefined && o.title === undefined)) return drawK(ctx, o, building);
-    let art = null; try { art = artOf(o); groundPart(ctx, o, building, art); } catch (e) { if (!G.drawBlueprint.err) { G.drawBlueprint.err = 1; console.error(e); } }
-    const u = { o: o, b: building, a: ctx.globalAlpha, y: baseOf(o)[1] + (bp.type === 'ship' ? (o.lifting ? 1e6 : 90) : 0), art: art };      /* (a ship stands ON its port, so it is drawn after it; in the air, after everything) */ let i = UP.length; while (i > 0 && UP[i - 1].y > u.y) i--; UP.splice(i, 0, u);
+    let art = null, wait = false; try { art = artOf(o); wait = !art && !!(G.art && G.art.waiting && G.art.waiting(G.W, artName(o))); if (!wait) groundPart(ctx, o, building, art); else { const b = baseOf(o), hw = bp.hw || 60; ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.ellipse(b[0], b[1] + 4, hw * 1.1, hw * 0.3, 0, 0, TAU); ctx.fill(); } } catch (e) { if (!G.drawBlueprint.err) { G.drawBlueprint.err = 1; console.error(e); } }
+    const u = { o: o, b: building, a: ctx.globalAlpha, y: baseOf(o)[1] + (bp.type === 'ship' ? (o.lifting ? 1e6 : 90) : 0), art: art, wait: wait };      /* (a ship stands ON its port, so it is drawn after it; in the air, after everything) */ let i = UP.length; while (i > 0 && UP[i - 1].y > u.y) i--; UP.splice(i, 0, u);
     if (UP.length > 700) G.drawUprights(ctx, 1e9);
   };
   /** anything else that stands up from the ground takes its turn among the creatures and the buildings too: fn(ctx, arg) is called when it comes */
   G.upright = function (y, fn, arg) { const u = { y: y, fn: fn, arg: arg, a: 1 }; let lo = 0, hi = UP.length; while (lo < hi) { const m = (lo + hi) >> 1; if (UP[m].y > y) hi = m; else lo = m + 1; } UP.splice(lo, 0, u); if (UP.length > 700) G.drawUprights(G.ctx, 1e9); };
   /** draw the buildings that stand behind the line y (50_render.js: before each creature, and once more after the last) */
   G.drawUprights = function (ctx, y) {
-    while (UP.length && UP[0].y <= y) { const u = UP.shift(); ctx.save(); ctx.globalAlpha = u.a; try { if (u.fn) u.fn(ctx, u.arg); else if (u.art) artUp(ctx, u.o, u.b, u.art); else plainUp(ctx, u.o, u.b); } catch (e) { if (!G.drawBlueprint.err2) { G.drawBlueprint.err2 = 1; console.error(e); } } ctx.restore(); }
+    while (UP.length && UP[0].y <= y) { const u = UP.shift(); ctx.save(); ctx.globalAlpha = u.a; try { if (u.fn) u.fn(ctx, u.arg); else if (u.art) artUp(ctx, u.o, u.b, u.art); else if (u.wait) lightUp(ctx, u.o); else plainUp(ctx, u.o, u.b); } catch (e) { if (!G.drawBlueprint.err2) { G.drawBlueprint.err2 = 1; console.error(e); } } ctx.restore(); }
   };
 })();
 
@@ -10780,11 +10824,17 @@ G.addSystem({
   G.groveShare = function (W) { return 0.86; };
   /** where a star's first life begins: in the feeding ground nearest its middle */
   G.firstGrove = function (W) { const S = G.sitesOf(W).filter(function (s) { return s.k === 'grove'; }), c = centre(W); const L = S.filter(function (q) { return q.x < W.ww * 0.5; }), T = L.length ? L : S;      /* (on the side of the star where the green food its first cells live on comes up) */ T.sort(function (a, b) { return Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y); }); return T[0] || null; };
-  /** where a piece of food comes up: in one of the feeding grounds (now and then anywhere) */
-  G.foodSpot = function (W) { const S = G.sitesOf(W).filter(function (s) { return s.k === 'grove'; }); if (!S.length || G.rand() > G.groveShare(W)) return { x: W.ww * (0.14 + 0.72 * G.rand()), y: W.wh * (0.14 + 0.72 * G.rand()) };      // (a little comes up over the middle of the star)
+  /** where there is food to be had: the star's feeding grounds, and your colony's FOOD GARDENS. A garden is a small feeding place inside the colony (food comes up
+   *  round it as it does in a feeding ground, less of it, and fewer feed there at once): so those who live by it need not cross the star for every meal, and the
+   *  colony is lived IN. The food of the star is not more for it, only nearer home. [{ k: 'grove' | 'garden', x, y, r, cap, lim }] */
+  G.feedPlaces = function (W) { W = W || G.W; const P0 = W._fp; if (P0 && W.t >= P0.t && W.t - P0.t < 2) return P0.L; const L = G.sitesOf(W).filter(function (s) { return s.k === 'grove'; }).map(function (s) { return { k: 'grove', x: s.x, y: s.y, r: s.r, cap: 1, lim: 14 }; }), Wk = W.works || [];
+    for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.bp || w.bp.type !== 'huts' || w.enemy || w.fall || w.visitor) continue; const n = G.buildCount ? G.buildCount(w) : [1, 1, 1]; if (n[0] < n[2] * 0.6) continue; L.push({ k: 'garden', x: w.x, y: w.y + w.bp.S * 0.45 + 46, r: 84, cap: 0.42, lim: 8 }); }
+    W._fp = { t: W.t, L: L }; return L; };
+  /** where a piece of food comes up: in one of the feeding places (now and then anywhere) */
+  G.foodSpot = function (W) { const S = G.feedPlaces(W); if (!S.length || G.rand() > G.groveShare(W)) return { x: W.ww * (0.14 + 0.72 * G.rand()), y: W.wh * (0.14 + 0.72 * G.rand()) };      // (a little comes up over the middle of the star)
     // it comes up where it has been eaten: the feeding ground with the least on it is filled first (so food does not pile up where nobody is while those who feed go short)
     let gf = W._gf; if (!gf || W.t - gf.t > 0.5 || gf.n.length !== S.length) { gf = W._gf = { t: W.t, n: S.map(function () { return 0; }) }; const F = W.food; for (let i = 0; i < F.length; i++) { const f = F[i]; if (f.dead) continue; for (let q = 0; q < S.length; q++) if (Math.abs(f.x - S[q].x) < S[q].r && Math.abs(f.y - S[q].y) < S[q].r) { gf.n[q]++; break; } } }
-    let b = 0; for (let q = 1; q < S.length; q++) if (gf.n[q] + G.rand() * 6 < gf.n[b] + G.rand() * 6) b = q; gf.n[b]++; return inDisc(S[b]); };
+    let b = 0; for (let q = 1; q < S.length; q++) if ((gf.n[q] + G.rand() * 6) / S[q].cap < (gf.n[b] + G.rand() * 6) / S[b].cap) b = q; gf.n[b]++;      /* (a garden holds less than a feeding ground) */ return inDisc(S[b]); };
   /** where a stone (0), a reed (1) or a shell (2) turns up: in its deposit */
   G.matSpot = function (W, k) { const want = k === 0 ? 'quarry' : k === 1 ? 'reeds' : 'shells', S = G.sitesOf(W).filter(function (s) { return s.k === want; }); return S.length ? inDisc(S[0]) : null; };
   /** the deposit or feeding ground a point lies in (nothing is built there) */
@@ -10849,11 +10899,11 @@ G.addSystem({
       const r = 40 + 36 * k; return { x: clamp(hm.x + Math.cos(aa) * r * 1.45, 60, W.ww - 60), y: clamp(hm.y + 22 + Math.sin(aa) * r * 0.6, 40, W.wh - 40), at: 'home' }; }
     const a = fr(c.id * 0.6180339) * 6.2832, r = 120 + fr(c.id * 0.4142135) * 150; return { x: clamp(H.x + Math.cos(a) * r * 1.5, 60, W.ww - 60), y: clamp(H.y - 20 + Math.sin(a) * r * 0.85, 40, W.wh - 40) }; };
   function habits(W, dt) {
-    if (!G.FLAT) return; const S = G.sitesOf(W).filter(function (s) { return s.k === 'grove'; }); if (!S.length) return; const str = 1, H = W.gen < 5 ? null : hub(W);      // (a young star's first life stays where it began; later, those who have fed drift home to the colony)
+    if (!G.FLAT) return; const S = G.feedPlaces(W); if (!S.length) return; const str = 1, H = W.gen < 5 ? null : hub(W);      // (a young star's first life stays where it began; later, those who have fed drift home to the colony)
     const crowd = S.map(function () { return 0; }); for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue; for (let q = 0; q < S.length; q++) if (Math.hypot(c.x - S[q].x, (c.y - S[q].y) / 0.8) < S[q].r) { crowd[q]++; break; } }      // (a full feeding ground sends the hungry on to the next)      // (the habits come with the feeding grounds: while food still comes up everywhere, everyone forages where it is)
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.inShip || c.asleep || c.goTo || c.deedId || c.team === 1 || c.outAt !== undefined) continue; if (c.job && !c.hungry) { c.feedGo = 0; continue; }
       const fed = c.E / c.ph.Emax; if (c.feedGo) { if (fed > (c.homeW && !c.job ? 0.66 : 0.74)) c.feedGo = 0; }      /* (one with a home to go back to leaves the feeding ground a little sooner) */ else if (fed < (W.gen < 5 ? 0.7 : 0.44) || c.hungry) c.feedGo = 1;      /* (a young star's first life keeps to where the food is) */
-      if (c.feedGo) { let g = S[0], bd = 1e18; for (let q = 0; q < S.length; q++) { const d = Math.hypot(S[q].x - c.x, S[q].y - c.y) * (1 + Math.max(0, crowd[q] - 14) / 16) * (c.grove === q ? 0.7 : 1); if (d < bd) { bd = d; g = S[q]; c.groveN = q; } } c.grove = c.groveN; if (Math.hypot(c.x - g.x, (c.y - g.y) / 0.8) > g.r * 0.78) steer(c, g.x + Math.cos(c.id) * g.r * 0.4, g.y + Math.sin(c.id) * g.r * 0.3, dt, 1.6, 3.2 * str); }
+      if (c.feedGo) { let g = S[0], bd = 1e18; for (let q = 0; q < S.length; q++) { const d = Math.hypot(S[q].x - c.x, S[q].y - c.y) * (1 + Math.max(0, crowd[q] - S[q].lim) / (S[q].lim + 2)) * (c.grove === q ? 0.7 : 1); if (d < bd) { bd = d; g = S[q]; c.groveN = q; } } c.grove = c.groveN; if (Math.hypot(c.x - g.x, (c.y - g.y) / 0.8) > g.r * 0.78) steer(c, g.x + Math.cos(c.id) * g.r * 0.4, g.y + Math.sin(c.id) * g.r * 0.3, dt, 1.6, 3.2 * str); }
       else if (!c.job && !c.team && H && c.stranger === undefined) { const p = G.commonsSpot(W, c); if (p && Math.hypot(c.x - p.x, c.y - p.y) > (p.at ? 40 : 70)) steer(c, p.x, p.y, dt, 1.15, 1.8 * str); } }
   }
   { const s0 = G.step; let acc = 9; G.step = function (dt) { s0(dt); const W = G.W; if (!W || W.title) return; habits(W, dt); if (!W.col) return; acc += dt; if (acc >= 1) { acc = 0; G.formUp(W); } }; }
@@ -11088,7 +11138,7 @@ G.addSystem({
     box.classList.remove('hide'); box.classList.remove('shut');
     // it stands above the bottom menu, beside the zoom buttons, and may be as tall as the room up to the season card
     { const tb = document.getElementById('toolbar'), se = document.getElementById('season'), top = se && !se.classList.contains('hide') ? se.getBoundingClientRect().bottom + 10 : 14, bot = tb ? tb.getBoundingClientRect().top - 10 : window.innerHeight - 90;
-      if (window.innerWidth > 720) { box.style.top = 'auto'; box.style.bottom = Math.round(window.innerHeight - bot) + 'px'; box.style.left = (document.body.classList.contains('cmdLive') ? 340 : 78) + 'px';      /* (beside the colony panel and the zoom buttons, never over them) */ box.style.transform = 'none'; const hgt = Math.max(280, Math.min(640, Math.round(bot - top))); box.style.height = hgt + 'px'; box.style.maxHeight = hgt + 'px'; } else { box.style.height = '';      /* (always the same height: what is in it scrolls, the panel itself does not jump about) */ box.style.top = ''; box.style.bottom = ''; box.style.left = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
+      if (window.innerWidth > 720) { box.style.top = 'auto'; box.style.bottom = Math.round(window.innerHeight - bot) + 'px'; box.style.left = (document.body.classList.contains('cmdLive') ? 276 : 78) + 'px';      /* (beside the colony panel and the zoom buttons, never over them) */ box.style.transform = 'none'; const hgt = Math.max(280, Math.min(640, Math.round(bot - top))); box.style.height = hgt + 'px'; box.style.maxHeight = hgt + 'px'; } else { box.style.height = '';      /* (always the same height: what is in it scrolls, the panel itself does not jump about) */ box.style.top = ''; box.style.bottom = ''; box.style.left = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
     box.style.zIndex = '9';
     const ps = parts.map(function (p) { return p.sig || ''; }).join('~');
     if (s2 + tab + open + bo + ps === sig) return; sig = s2 + tab + open + bo + ps;
@@ -11158,7 +11208,7 @@ G.addSystem({
     g = G.clamp(g, 1, MAXG); if (Math.abs(g - (v.grow || 1)) < 0.001) return;
     const ow = W.ww, oh = W.wh, cx = G.cam.x / ow, cy = G.cam.y / oh;
     v.grow = g;
-    v.wh = 1400 * g; if (G.canvas && v.h) { v.base = v.h / v.wh; v.ww = G.clamp(v.w / v.base, 840 * g, 3360 * g); } else v.ww = ow * v.wh / oh;      // (the same sum as G.resize, without rebuilding the canvas)
+    v.wh = 1400 * g; if (G.canvas && v.h) { v.base = v.h / v.wh; v.ww = G.clamp(v.w / v.base, (G.FLAT ? 1900 : 840) * g, 3360 * g); } else v.ww = ow * v.wh / oh;      // (the same sum as G.resize, without rebuilding the canvas)
     W.ww = v.ww; W.wh = v.wh;
     const kx = W.ww / ow, ky = W.wh / oh;
     const mv = function (L, also) { if (!L) return; for (let i = 0; i < L.length; i++) { const o = L[i]; if (!o || typeof o.x !== 'number') continue; o.x *= kx; o.y *= ky; if (also) { if (typeof o.px === 'number') { o.px *= kx; o.py *= ky; } if (typeof o.tx === 'number') { o.tx *= kx; o.ty *= ky; } } } };
@@ -12126,6 +12176,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     if (d && d.steps[d.i].do !== 'liftoff') { settle(d); if (G.deedStop) G.deedStop('off'); }
     if (G.hub) G.hub.poke();
   };
+  let flew = {};
   // the mates of the ship that leads rise with it, a breath behind each other, and stand again when it does
   function matesUp(ship, u) { if (!F.mates) return; F.mates(ship).forEach(function (m, k) { if (m.y0v === undefined) m.y0v = m.y; const uu = clamp(u * 1.15 - 0.08 * (k + 1), 0, 1); m.lifting = uu > 0; m.y = m.y0v - uu * uu * 640; }); }
   function matesDown() { ((G.W && G.W.works) || []).forEach(function (w) { if (w.y0v !== undefined) { w.y = w.y0v; w.lifting = false; delete w.y0v; } }); }
@@ -12168,7 +12219,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     if (!d || !d.voyage) return; const W = G.W, ship = shipOfPlan(d), crew = W.cre.filter(function (c) { return c.inShip && !c.dead; });
     if (how !== 'done' || !ship || crew.length < 1 || G.mode !== 'play') { settle(d); return; }
     // lift-off is done: the ship is away
-    const p = d.voyage.p, at = spot(p), y0 = d.voyage.y0; ship.y = y0; ship.lifting = false; d.voyage.lift = 0; matesDown();
+    const p = d.voyage.p, at = spot(p), y0 = d.voyage.y0; ship.y = y0; ship.lifting = false; d.voyage.lift = 0; flew = {}; if (F.mates) F.mates(ship).forEach(function (m) { flew[m.name] = 1; }); matesDown();      /* (which ships flew with it: they come down with it when it is home again) */
     fly(ship.bp, ship.x, y0 - 640, at.x, at.y, 7, 'CROSSING SPACE TO ' + esc(p.name.toUpperCase()) + ' · ' + crew.length + ' aboard', function () {
       crew.forEach(function (c) { c.inShip = false; }); W.cre.forEach(function (c) { c.crewPick = 0; });
       const out = F.sail(p, crew, ship); pickEl.classList.add('hide');
@@ -12206,6 +12257,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const V = F.visiting, W = G.W, H = homeAt(), back = aboard.filter(function (c) { return c !== bring; }), stay = W.cre.filter(function (c) { return !c.dead && c.line && aboard.indexOf(c) < 0 && c !== bring; }).length;
     fly(s ? s.bp : V.ship.bp, s ? s.x : W.ww / 2, s ? s.y - 640 : W.wh / 2, H.x, H.y, quick ? 3 : 7, 'FLYING HOME FROM ' + esc(V.name.toUpperCase()) + ' · ' + (aboard.length + (bring && aboard.indexOf(bring) < 0 ? 1 : 0)) + ' aboard', function () {
       aboard.forEach(function (c) { c.inShip = false; c.goTo = null; });
+      flew = {}; ((V && V.mates) || []).forEach(function (m) { flew[m.name] = 1; });      /* (the ships that flew out with it come down with it) */
       const r = F.home(bring, back); pickEl.classList.add('hide'); if (!r) return; if (G.setSpeed) G.setSpeed(1);
       const nb = (r.crew || []).length;
       say('THE SHIP IS HOME', (nb ? nb + ' of the crew came home in it. ' : 'It came home alone. ') + (stay ? stay + ' of yours stayed at ' + V.name + ': they are your outpost there (SPACE, then LOOK IN, to see them). ' : '') + (r.brought ? (r.brought.guestName || 'One creature') + ' came with it, a stranger here: see how your own take to it.' : ''), 10000);
@@ -12223,9 +12275,12 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   /** the ship in flight: it points where it flies, its engine burning behind it */
   /** the ship comes down where it is to stand: the view goes to it, it descends on its fire, and those aboard step out after (57x_far.js lets them out one by one) */
   let landing = null; const FXB = [];
-  function land(ship) { if (!ship) return; const W = G.W; landing = { ship: ship, y0: ship.y, t0: W.t, T: 2.8 }; G.emit('ship-landing', ship); ship.lifting = true; ship.y = landing.y0 - 640; if (G.cam) { G.cam.z = 0.3; G.cam.x = ship.x; G.cam.y = landing.y0 - 200; if (G.applyCam) G.applyCam(); } if (G.flyTo) G.flyTo(ship.x, landing.y0 - 70, 1.12, 1.9); }
+  function land(ship) { if (!ship) return; const W = G.W; landing = { ship: ship, y0: ship.y, t0: W.t, T: 2.8, mates: [] }; G.emit('ship-landing', ship); ship.lifting = true; ship.y = landing.y0 - 640;
+    (W.works || []).forEach(function (w) { if (w === ship || !w.bp || w.bp.type !== 'ship' || w.away || !(ship.visitor ? w.visitor : flew[w.name])) return; landing.mates.push({ ship: w, y0: w.y, d: 0.4 * (landing.mates.length + 1) }); w.lifting = true; w.y -= 640; }); if (!ship.visitor) flew = {}; if (G.cam) { G.cam.z = 0.3; G.cam.x = ship.x; G.cam.y = landing.y0 - 200; if (G.applyCam) G.applyCam(); } if (G.flyTo) G.flyTo(ship.x, landing.y0 - 70, 1.12, 1.9); }
   { const s2 = G.step; G.step = function (dt) { s2(dt); if (!landing) return; const W = G.W, k = landing, sh = k.ship; if (!W || (W.works || []).indexOf(sh) < 0) { landing = null; return; }
-      const u = clamp((W.t - k.t0) / k.T, 0, 1); sh.lifting = true; sh.y = k.y0 - (1 - u) * (1 - u) * 640; k.u = u; if (u >= 1) { sh.y = k.y0; sh.lifting = false; landing = null; if (G.R) G.R.shake = 0.35; if (G.sfx) G.sfx('meteor'); } }; }
+      const u = clamp((W.t - k.t0) / k.T, 0, 1); let allDown = u >= 1; if (!k.down) { sh.lifting = true; sh.y = k.y0 - (1 - u) * (1 - u) * 640; } k.u = u;
+      (k.mates || []).forEach(function (m) { if (m.down || (W.works || []).indexOf(m.ship) < 0) { m.down = true; return; } const um = clamp((W.t - k.t0 - m.d) / k.T, 0, 1); m.u = um; m.ship.lifting = true; m.ship.y = m.y0 - (1 - um) * (1 - um) * 640; if (um >= 1) { m.ship.y = m.y0; m.ship.lifting = false; m.down = true; if (G.R) G.R.shake = Math.max(G.R.shake || 0, 0.2); } else allDown = false; });
+      if (u >= 1 && !k.down) { k.down = true; sh.y = k.y0; sh.lifting = false; if (G.R) G.R.shake = 0.35; if (G.sfx) G.sfx('meteor'); } if (allDown) landing = null; }; }
   G.on('went-aboard', function (c, ship) { if (G.mode === 'play') { FXB.push({ x: c.x, y: c.y, ship: ship, t0: now(), id: c.id, in: true }); if (G.sfx) G.sfx('click'); } });
   G.on('stepped-out', function (c) { const sh = F.shipOf(); if (G.mode === 'play' && sh) { FXB.push({ x: c.goTo ? sh.x + (c.goTo.x - sh.x) * 0.25 : sh.x + 40, y: sh.y + 50, ship: sh, t0: now(), id: c.id, in: false }); if (G.sfx) G.sfx('click'); } });
   /** boarding and stepping out, made plain: a ramp at the ship while they board, a call over it, and each one seen going in (or coming out) as a spark with its number */
@@ -12245,7 +12300,8 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       if (u < 0.6) { const g = ctx.createRadialGradient(px, py, 0, px, py, 16); g.addColorStop(0, 'rgba(255,245,200,0.95)'); g.addColorStop(1, 'rgba(246,211,101,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, 16, 0, TAU); ctx.fill(); ctx.fillStyle = '#fff3c8'; ctx.beginPath(); ctx.arc(px, py, 4, 0, TAU); ctx.fill(); }
       const a = Math.min(1, (1 - u) * 3), ty = (k.in ? hy : ay) - 34 - u * 22, txt = '#' + k.id + (k.in ? '  aboard ✓' : '  steps out'); ctx.font = '800 12px system-ui, sans-serif'; const tw = ctx.measureText(txt).width + 18, tx = k.in ? hx : ax; ctx.fillStyle = 'rgba(9,18,30,' + 0.88 * a + ')'; G.roundRect(ctx, tx - tw / 2, ty - 11, tw, 22, 11); ctx.fill(); ctx.fillStyle = 'rgba(' + (k.in ? '154,240,208' : '246,211,101') + ',' + a + ')'; ctx.fillText(txt, tx, ty + 0.5); }
     // coming down: its fire under it
-    if (landing && (G.W.works || []).indexOf(landing.ship) >= 0 && G.rocketFx) { const sh = landing.ship, S = sh.bp.S || 70; G.rocketFx.feed({ id: 'land', x: sh.x, y: sh.y + S * 0.34, ground: landing.y0 + S * 0.45 + 4, power: 0.6 + 0.4 * (1 - (landing.u || 0)), size: 26 }); }
+    if (landing && (G.W.works || []).indexOf(landing.ship) >= 0 && G.rocketFx) { const sh = landing.ship, S = sh.bp.S || 70; if (!landing.down) G.rocketFx.feed({ id: 'land', x: sh.x, y: sh.y + S * 0.34, ground: landing.y0 + S * 0.45 + 4, power: 0.6 + 0.4 * (1 - (landing.u || 0)), size: 26 });
+      (landing.mates || []).forEach(function (m, k) { if (!m.down && (m.u || 0) > 0) G.rocketFx.feed({ id: 'landm' + k, x: m.ship.x, y: m.ship.y + S * 0.34, ground: m.y0 + S * 0.45 + 4, power: 0.6 + 0.4 * (1 - (m.u || 0)), size: 26 }); }); }
     else if (landing && (G.W.works || []).indexOf(landing.ship) >= 0) { const sh = landing.ship, S = sh.bp.S || 70, x = sx(sh.x), y = sy(sh.y + S * 0.5), Lf = (70 + 150 * (1 - (landing.u || 0))) * v.scale * (0.8 + 0.25 * Math.sin(t * 29)), w = S * 0.28 * v.scale, fg = ctx.createLinearGradient(0, y, 0, y + Lf); fg.addColorStop(0, 'rgba(255,250,220,0.95)'); fg.addColorStop(0.3, 'rgba(255,190,90,0.85)'); fg.addColorStop(1, 'rgba(255,110,60,0)'); ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(x - w, y - 4); ctx.quadraticCurveTo(x, y + Lf * 1.5, x + w, y - 4); ctx.closePath(); ctx.fill();
       const gy = sy(landing.y0 + S * 0.55); for (let i = 0; i < 12; i++) { const q = (t * 0.9 + i / 12) % 1, side = i % 2 ? 1 : -1; ctx.fillStyle = 'rgba(232,238,248,' + 0.3 * (1 - q) * (landing.u || 0) + ')'; ctx.beginPath(); ctx.arc(x + side * (10 + 120 * q) * v.scale, gy - q * 14 * v.scale, (12 + 30 * q) * v.scale, 0, TAU); ctx.fill(); } }
     ctx.restore();
@@ -12425,7 +12481,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   if (typeof document === 'undefined') return;
   const TAU = 6.2832, P = [], MAX = 460, FEED = [], LAST = {};
   const rnd = Math.random, clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
-  const SPR = {};
+  const SPR = {}; let PALE = 1;
   /** a soft, lumpy puff of one colour (drawn once): lighter on top, shaded underneath */
   function puff(rgb) {
     if (SPR[rgb]) return SPR[rgb]; const c = document.createElement('canvas'); c.width = c.height = 96; const x = c.getContext('2d');
@@ -12461,8 +12517,8 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const body = function (len, wd, c0, c1) { if (len < 2) return; const g = ctx.createLinearGradient(0, f.y, 0, f.y + len); g.addColorStop(0, c0); g.addColorStop(1, c1); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(f.x - wd * 0.55, f.y - 2); ctx.bezierCurveTo(f.x - wd * 1.25, f.y + len * 0.28, f.x - wd * 0.5, f.y + len * 0.74, f.x + Math.sin(t * 31 + len) * wd * 0.12, f.y + len); ctx.bezierCurveTo(f.x + wd * 0.5, f.y + len * 0.74, f.x + wd * 1.25, f.y + len * 0.28, f.x + wd * 0.55, f.y - 2); ctx.closePath(); ctx.fill(); };
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     // the light it throws: on the ground, and round its mouth
-    { const fall = clamp(1 - h / 460, 0, 1) * pw; if (fall > 0.02) { const rx = (150 + 190 * pw) * (0.6 + 0.4 * fall); ctx.save(); ctx.translate(f.x, f.ground + 6); ctx.scale(1, 0.36); const g = ctx.createRadialGradient(0, 0, 4, 0, 0, rx); g.addColorStop(0, 'rgba(255,196,120,' + 0.38 * fall + ')'); g.addColorStop(0.45, 'rgba(255,140,60,' + 0.17 * fall + ')'); g.addColorStop(1, 'rgba(255,110,40,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, TAU); ctx.fill(); ctx.restore(); }
-      const g2 = ctx.createRadialGradient(f.x, f.y + s * 0.4, 1, f.x, f.y + s * 0.4, s * (2 + 2.6 * pw)); g2.addColorStop(0, 'rgba(255,190,110,' + 0.3 * pw + ')'); g2.addColorStop(1, 'rgba(255,120,50,0)'); ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(f.x, f.y + s * 0.4, s * (2 + 2.6 * pw), 0, TAU); ctx.fill(); }
+    { const fall = clamp(1 - h / 460, 0, 1) * pw; if (fall > 0.02) { const rx = (150 + 190 * pw) * (0.6 + 0.4 * fall); ctx.save(); ctx.translate(f.x, f.ground + 6); ctx.scale(1, 0.36); const g = ctx.createRadialGradient(0, 0, 4, 0, 0, rx); g.addColorStop(0, 'rgba(255,196,120,' + 0.38 * fall * PALE + ')'); g.addColorStop(0.45, 'rgba(255,140,60,' + 0.17 * fall * PALE + ')'); g.addColorStop(1, 'rgba(255,110,40,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, TAU); ctx.fill(); ctx.restore(); }
+      const g2 = ctx.createRadialGradient(f.x, f.y + s * 0.4, 1, f.x, f.y + s * 0.4, s * (2 + 2.6 * pw)); g2.addColorStop(0, 'rgba(255,190,110,' + 0.3 * pw * PALE + ')'); g2.addColorStop(1, 'rgba(255,120,50,0)'); ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(f.x, f.y + s * 0.4, s * (2 + 2.6 * pw), 0, TAU); ctx.fill(); }
     body(L, w * 1.5, 'rgba(255,170,70,' + 0.62 * pw + ')', 'rgba(255,70,20,0)');
     body(L * 0.74, w * 0.95, 'rgba(255,232,160,' + 0.85 * pw + ')', 'rgba(255,150,50,0)');
     body(L * 0.46, w * 0.5, 'rgba(255,255,255,0.96)', 'rgba(170,215,255,0)');
@@ -12480,7 +12536,9 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     for (const k in LAST) if (now - LAST[k].at > 600) delete LAST[k];
     step(dt);
     const s = v.scale * v.dpr; ctx.save(); ctx.setTransform(s, 0, 0, s, v.ox * v.dpr, v.oy * v.dpr); ctx.imageSmoothingEnabled = true;
-    const grey = puff('224,226,234'), dark = puff('122,124,138'), hot = puff('255,170,90'), dust = puff(dustRgb());
+    // (over pale ground, snow or light sand, white smoke would be lost: there it is greyer, and its fire's glare is held back)
+    const gm = G.art && G.art.ground && G.W && !G.W.title ? G.art.ground(G.W) : null, lum = gm ? gm.mean[0] * 0.3 + gm.mean[1] * 0.55 + gm.mean[2] * 0.15 : 110, pale = lum > 150;
+    const grey = puff(pale ? '176,182,198' : '224,226,234'), dark = puff(pale ? '84,90,108' : '122,124,138'), hot = puff('255,170,90'), dust = puff(dustRgb()); PALE = pale ? 0.6 : 1;
     // dust lowest, then smoke (the oldest first), then the fire, then the sparks
     for (let pass = 0; pass < 2; pass++) for (let i = 0; i < P.length; i++) { const p = P[i]; if (p.k === 2 || (p.k === 1) !== (pass === 0)) continue; const u = p.t / p.life, a = Math.min(1, u * 9) * (u < 0.45 ? 1 : (1 - u) / 0.55), d = p.r * 2;
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot || 0);
@@ -12578,7 +12636,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       '<div class="tabs" id="gtabs"><button data-m="look" class="on">BEAUTY</button><button data-m="whole">WHOLE</button>' + (G.MARKS_X || []).map(function (m) { return '<button data-m="mx_' + m.id + '">' + m.label.toUpperCase() + '</button>'; }).join('') + '<button data-m="fit">FITNESS</button><button data-m="room">ROOM</button><button data-m="body">PARTS</button><button data-m="size">SIZE</button><button data-m="skill">SKILL</button><button data-m="pop">POP</button><button data-m="genes">GENES</button></div>' +
       '<canvas id="graph" width="560" height="184"></canvas><div class="gnote" id="gnote"></div><button class="gnote" id="aiLine" style="min-height:0;color:var(--gold);background:none;border:0;padding:0;font:inherit;font-size:11px;line-height:1.3;text-align:left;cursor:pointer;text-decoration:underline dotted;display:block" title="See what each kind of AI use cost"></button><div class="ilabel">What changed</div><div class="log" id="mutLog"></div></div>';
     refs.panel = p;
-    if (window.innerWidth < 720) p.classList.add('min');
+    if (window.innerWidth < 720 || window.innerHeight <= 520) p.classList.add('min');      // (on a small screen it starts folded)
     $('panelToggle').onclick = function () { p.classList.toggle('min'); G.sfx('click'); };
     const tabs = $('gtabs').children;
     for (let i = 0; i < tabs.length; i++) tabs[i].onclick = function () {
@@ -13303,7 +13361,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     if (ph.love > 0.3) add('\u2665 ' + FOOD[ph.fav], 'Its body is made for ' + FOOD[ph.fav] + ' food: it gets more from it.', 'g');
     if (ph.love > 0.3 && ph.bane >= 0) add('\u2715 ' + FOOD[ph.bane] + (c.ill ? ' \u00d7' + c.ill : ''), FOOD[ph.bane] + ' food makes it ill' + (c.ill ? ' (it has found that out ' + c.ill + (c.ill === 1 ? ' time)' : ' times)') : '') + '.', 'r');
     if (G.FLAT) { if (ph.home) add('breathes air', 'It breathes air and walks: one of the two ways of living on a star.'); }
-    else if (L.land > 0.3) add('on the shore', 'It spends its days on the land.'); else if (L.shore > 0.3) add('by the shore', 'It keeps to the water by the shore.'); else if (L.deep > 0.5) add('the dark deep', 'It lives in the dark deep.'); else if ((c.liveT || 0) > 3) add('open water', 'It lives in open water.');
+    else if (L.land > 0.3) add('in the open air', 'It lives in the open air.'); else if (L.shore > 0.3) add('near the air-breathers', 'It keeps near the air-breathers.'); else if (L.deep > 0.5) add('the dark places', 'It keeps to the dark places.'); else if ((c.liveT || 0) > 3) add('open ground', 'It glides over open ground.');
     if (c.lessons > 3 && c.learned > 0.05) add('learned \u00d7' + c.lessons, 'It has learned from ' + c.lessons + ' meals and mishaps in its own life.', 'v');
     if (c.bornKnowing > 0.05) add('born knowing', 'It was born knowing some of what its parents had learned.', 'v');
     if (c.taught > 2) add('taught by elders', 'It has been learning from its elders.', 'v');
@@ -13641,7 +13699,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     }
     if (z.haven) { const n = Math.min(G.HAVEN_ROOM || 3, Math.max(z.hvPrev || 0, z.hvNow || 0)); return { t: 'shelters marvels · ' + n + ' of ' + (G.HAVEN_ROOM || 3) + ' places taken', tone: 'good', bar: null }; }
     if (p.nut > 0.2) { const u = G.usedBy ? G.usedBy(z) : null; return { t: 'feeds the star' + (u ? ' · ' + pct(u.can) + ' can eat it' : '') + (z.near ? ' · ' + z.near + ' here' : ''), tone: 'good', bar: null }; }
-    const what = Math.abs(p.heat) > 0.3 ? (p.heat > 0 ? 'warms the water' : 'chills the water') : Math.abs(p.light) > 0.3 ? (p.light > 0 ? 'lights the water' : 'darkens the water') : p.sticky > 0.3 ? 'slows what touches it' : p.pull ? (p.pull > 0 ? 'draws creatures in' : 'drives creatures away') : p.hard > 0.3 ? 'blocks the way' : 'drifts';
+    const what = Math.abs(p.heat) > 0.3 ? (p.heat > 0 ? 'warms the air' : 'chills the air') : Math.abs(p.light) > 0.3 ? (p.light > 0 ? 'lights the air' : 'darkens the air') : p.sticky > 0.3 ? 'slows what touches it' : p.pull ? (p.pull > 0 ? 'draws creatures in' : 'drives creatures away') : p.hard > 0.3 ? 'blocks the way' : 'drifts';
     return { t: what + (z.near ? ' · ' + z.near + ' here' : ''), tone: 'calm', bar: null };
   };
 })();
@@ -14877,7 +14935,8 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   C.GLYPH = { g: 'M3 7h10l-1.5 6h-7zM5 7c0-4.5 6-4.5 6 0', b: 'M3.5 3h7v3.2h-7zM7 6.2v8', f: 'M13 2.5L6 9.5M4 7.5l4.5 4.5M2.8 13.2l2.6-2.6', u: 'M8 2l5 2v4c0 3-2.5 5-5 6.2C5.5 13 3 11 3 8V4z' };
   const svg = function (job, colr) { return '<svg viewBox="0 0 16 16" width="15" height="15" style="flex:none"><path d="' + (C.GLYPH[job] || 'M8 4a4 4 0 100 8 4 4 0 000-8z') + '" fill="none" stroke="' + (colr || C.TEAM.mineHex) + '" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>'; };
   let sig = '', lastT = 0, tip = '', tipUntil = 0, folded = false, lastPick = { id: 0, t: 0 };
-  try { folded = localStorage.getItem('primordia.cmdFold') === '1'; C.rightChooses = localStorage.getItem('primordia.mouse') !== 'L'; } catch (e) { /* no storage: it stays open */ }
+  let foldSet = false;      // (on a small screen it starts folded, its header opens it: decided when the panel is first made, when the window has its real size)
+  try { const f0 = localStorage.getItem('primordia.cmdFold'); if (f0 !== null) { folded = f0 === '1'; foldSet = true; } C.rightChooses = localStorage.getItem('primordia.mouse') !== 'L'; } catch (e) { /* no storage: it stays open */ }
 
   const now = function () { return performance.now(); };
   /** is there a colony to command on what is being shown? */
@@ -14981,24 +15040,37 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     '#cmdPick{display:none;appearance:none;width:100%;margin-top:6px;height:26px;border:1px solid rgba(207,232,255,.24);background:rgba(7,18,31,.45);border-radius:9px;color:#dcecf8;font:700 11px system-ui;letter-spacing:.04em;cursor:pointer}#cmdPick.on{border-color:#f6d365;color:#ffe9a8}@media (pointer:coarse){#cmdPick{display:block}}' +
     '#cmd.short #cmdMap{display:none}#cmd.tiny .ckeys{display:none}#cmd.tiny .ctip{height:43px}#cmd.mini #cmdStar{display:none}#cmd.mini .cgrid button{height:46px}#cmd.mini .cgrid button img{width:28px;height:28px}' +
     '@media (min-width:721px){body.cmdLive #season{height:138px;box-sizing:border-box;overflow:hidden}body.cmdLive #season .cap{display:none}body.cmdLive #season .count{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:8px}' +
-    'body.cmdLive #zoom{left:276px}body.cmdLive .pop{left:340px}}' +
+    'body.cmdLive .pop{left:276px}}@media (min-width:721px) and (min-height:521px){body.cmdLive #zoom{flex-direction:row;padding:5px 7px}}' +      // (the zoom buttons: a row in the bottom bar, beside the menu, not floating over the star; refresh() sets them there)
     '#selbar{position:fixed;bottom:14px;left:660px;z-index:4;padding:8px 12px;border-radius:16px;display:flex;flex-direction:column;gap:5px;max-width:calc(100vw - 690px);font:12px system-ui,sans-serif;color:#dcecf8;border-color:rgba(' + C.TEAM.mine + ',.6)}#selbar.hide{display:none}' +
     '#selbar .s1{display:flex;align-items:center;gap:6px;flex-wrap:wrap;white-space:nowrap}#selbar .s1 b{font-size:12px;letter-spacing:.14em;color:' + C.TEAM.mineHex + '}#selbar .s1 .what{color:rgba(207,232,255,.85);overflow:hidden;text-overflow:ellipsis;max-width:260px}' +
     '#selbar button{appearance:none;border:1px solid rgba(207,232,255,.28);background:rgba(7,18,31,.5);color:#e8f4ff;border-radius:999px;padding:4px 10px;font:800 10.5px system-ui;letter-spacing:.08em;cursor:pointer;display:flex;align-items:center;gap:5px}#selbar button:hover{border-color:#33d6a6}#selbar button.on{border-color:#f6d365;color:#ffe9a8}#selbar button.x{padding:5px 8px}' +
     '#selbar .s2{font-size:10.5px;color:rgba(207,232,255,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-    '@media (max-width:1180px){#selbar{left:14px;bottom:76px;max-width:calc(100vw - 28px)}}@media (max-width:720px){#resbar{top:auto;bottom:70px;font-size:11px;padding:3px 8px}#resbar .r small{display:none}#cmd{top:auto;bottom:112px;left:7px}}';
+    '@media (max-width:1180px){#selbar{left:14px;bottom:76px;max-width:calc(100vw - 28px)}}' +
+    // a phone held upright: what there is in the store along the top, the seasons as a strip under it, the colony panel a sheet over the bottom menu (folded until its header is touched)
+    '@media (max-width:720px){#resbar{top:8px !important;bottom:auto;font-size:11px;padding:3px 6px;max-width:calc(100vw - 14px)}#resbar .r{padding:2px 4px;gap:3px}#resbar .r small{display:none}#resbar .r img{width:16px;height:16px}' +
+    'body.cmdLive #season{top:44px;height:auto}body.cmdLive #season .cap,body.cmdLive #season .count,body.cmdLive #season .gen span{display:none}body.cmdLive #season .gen{margin-bottom:3px}body.cmdLive #zoom{left:auto;top:146px}' +
+    '#cmd{top:auto;bottom:128px;left:7px;right:7px;width:auto;z-index:4}#cmd.fold{right:auto}#cmdStar,#cmdMap,#cmd .ckeys{display:none}#cmd .cgrid{grid-template-columns:repeat(7,1fr);gap:4px}#cmd .cgrid button{height:48px;font-size:8.5px}#cmd .cgrid button img{width:30px;height:30px}#cmd .ctip{height:30px}#cmd .crow{height:31px}#cmd .crow button{width:32px;height:28px}#cmd .crow .cw{width:38px;line-height:26px}}' +
+    // a phone on its side: the seasons shrink to their four signs, the store goes beside them, the colony panel opens as a wide sheet of two columns (roles, building)
+    '@media (max-height:520px) and (min-width:721px){body.cmdLive #season{width:300px;height:auto;padding:6px 8px}body.cmdLive #season .gen,body.cmdLive #season .cap,body.cmdLive #season .count,body.cmdLive #season .seg small{display:none}' +
+    '#resbar{left:320px;transform:none;top:8px !important;font-size:11px;padding:3px 6px}#resbar .r{padding:2px 4px;gap:3px}#resbar .r small{display:none}#resbar .r img{width:16px;height:16px}' +
+    '#cmd{top:98px;left:8px;width:calc(100vw - 84px);padding:6px 10px 8px}#cmd.fold{width:auto}#cmd .cb{display:grid;grid-template-columns:238px 1fr;gap:0 14px}#cmdStar,#cmdMap,#cmd .ckeys{display:none}#cmd .cA,#cmd .cB{min-width:0}#cmd .csec{margin:4px 0 2px}#cmd .crow{height:27px}' +
+    '#cmd .cB{display:grid;grid-template-columns:1.25fr 1fr;grid-template-rows:auto auto auto 1fr;gap:0 12px}#cmd .cB>.csec{grid-column:1;grid-row:1}#cmd .cB>.cgrid{grid-column:1;grid-row:2/span 3;align-self:start}#cmd .cB>#cmdPick{grid-column:2;grid-row:1;margin-top:2px}#cmd .cB>.cq{grid-column:2;grid-row:2}#cmd .cB>.ctip{grid-column:2;grid-row:3;height:56px}#cmd .cgrid button{height:44px}#cmd .cgrid button img{width:26px;height:26px}' +
+    '#panel.min{width:226px}' +
+    'body.cmdLive #zoom{left:auto;right:8px;top:auto;bottom:76px}}' +
+    // a narrow window: the store stands beside the season card, without its words
+    '@media (max-width:1250px) and (min-width:721px) and (min-height:521px){#resbar{left:428px;transform:none}#resbar .r{padding:2px 5px}#resbar .r small{display:none}}';
   const PICS = {}, ICON = {};
   const icon = C.icon = function (k) { if (ICON[k]) return ICON[k]; try { const cv = document.createElement('canvas'); cv.width = cv.height = 44; const x = cv.getContext('2d'); x.translate(22, 24); x.scale(2.1, 2.1); x.lineJoin = 'round'; G.matDraw(x, { x: 0, y: 0, k: k, s: 0.37 }, 0); ICON[k] = cv.toDataURL('image/png'); } catch (e) { ICON[k] = ''; } return ICON[k]; };
   const pic = C.pic = function (type) { if (PICS[type] !== undefined) return PICS[type]; let url = '';
     try { const A = G.art, s = A && A.sprite ? A.sprite(G.W, type === 'tower' ? 'tower' : type) : null; if (s) { const cv = document.createElement('canvas'); cv.width = cv.height = 88; const x = cv.getContext('2d'), k = Math.min(84 / s.w, 84 / s.h); x.imageSmoothingEnabled = true; x.drawImage(A.tinted(s, 'mine'), 44 - s.w * k / 2, 86 - s.h * k, s.w * k, s.h * k); return (PICS[type] = cv.toDataURL('image/png')); } } catch (e) { /* drawn the old way */ }      /* (as this star's people build it, if theirs is painted) */
     try { const t = type === 'tower' ? 'spire' : type, W = G.W, sp = W && (W.species || []).filter(function (s) { return !s.extinct; }).sort(function (a, b) { return b.n - a.n; })[0];
       const bp = G.blueprintFrom({ seed: 91 + BUILD.indexOf(type) * 8, type: t, S: t === 'house' ? 50 : t === 'ship' ? 70 : 84, hue: sp ? sp.hue : 190, spiky: 0, brain: 0.7, wet: false }, '22222222222222222222222222222222222222222222222222'); url = G.buildPic({ bp: bp }, 44); } catch (e) { url = ''; } return (PICS[type] = url); };
-  G.on('new-pond', function () { for (const k in PICS) delete PICS[k]; }); G.on('art', function () { for (const k in PICS) delete PICS[k]; });
+  G.on('new-pond', function () { for (const k in PICS) delete PICS[k]; }); G.on('art', function () { for (const k in PICS) delete PICS[k]; sig = ''; });      // (a painting has come: the buttons show it at once)
   const TIPS = { g: 'Gatherers fetch what lies about the star (stone, reed, shell) and lumen, and carry it to the Heart. Click the name to choose them all.', b: 'Builders raise what you order built, from the store and from what lies near; with nothing to build they wait in their yard. Click the name to choose them all.', f: 'Fighters stand in ranks on the muster ground, go for any enemy in sight, and attack what you send them against. Click the name to choose them all.', u: 'Guards stand at the post you give them and do not leave it. Click the name to choose them all.' };
   const mouseWords = function () { return C.rightChooses ? 'Right button: choose (click or drag). Left click: send them. Left-drag or W A S D: move the view.' : 'Left button: choose (click or drag). Right click: send them. Right-drag or W A S D: move the view.'; };
   let ui = null, fitKey = '', hoverB = '';
   function build() {
-    if (ui) return ui; const root = $('ui') || document.body;
+    if (ui) return ui; const root = $('ui') || document.body; if (!foldSet) { folded = window.innerWidth <= 720 || window.innerHeight <= 520; foldSet = true; }
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
     const res = document.createElement('div'); res.id = 'resbar'; res.className = 'glass';
     res.innerHTML = [0, 1, 2, 3].map(function (k) { return '<span class="r' + (k === 3 ? ' lum' : '') + '" id="res' + k + '" data-res="' + k + '" title="' + (k === 3 ? 'Lumen: the rare thing every star wants. Click to see all about it.' : G.RES[k].charAt(0).toUpperCase() + G.RES[k].slice(1) + ' in the store. Click to see all about it.') + '"><img alt="" src="' + icon(k) + '"><b>0</b><small>' + G.RES[k] + '</small></span>'; }).join('') +
@@ -15006,12 +15078,12 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     root.appendChild(res); res.addEventListener('click', function (e) { const r = e.target.closest ? e.target.closest('[data-res]') : null; if (r && C.cardOpen) C.cardOpen({ k: 'res', res: +r.dataset.res }); });
     const cmd = document.createElement('div'); cmd.id = 'cmd'; cmd.className = 'glass' + (folded ? ' fold' : '');
     cmd.innerHTML = '<div class="ch" id="cmdHead" title="Fold or unfold"><b id="cmdTitle">YOUR COLONY</b><small id="cmdStage" title="How far your colony has come: founded, growing, thriving, great. It grows as you build."></small><span id="cmdFoldMark">' + (folded ? '+' : '–') + '</span></div><div class="cb"><div id="cmdStar"></div><canvas id="cmdMap" width="460" height="208" title="The whole star. Yours are blue, enemies red. Click to go there."></canvas>' +
-      '<div class="csec"><span>ROLES</span><small title="Click a wanted number to switch that role between a fixed number and a share of your colony (%).">have · want (# or %)</small></div>' +
+      '<div class="cA"><div class="csec"><span>ROLES</span><small title="Click a wanted number to switch that role between a fixed number and a share of your colony (%).">have · want (# or %)</small></div>' +
       ORDER.map(function (k) { return '<div class="crow" data-job="' + k + '" title="' + esc(TIPS[k]) + '">' + svg(k) + '<span class="nm" data-all="' + k + '">' + JOBS[k].name + 's</span><span class="cn" id="cn' + k + '">0</span><button data-want="' + k + '" data-d="-1" aria-label="fewer ' + JOBS[k].many + '">−</button><span class="cw" id="cw' + k + '" data-mode="' + k + '">0</span><button data-want="' + k + '" data-d="1" aria-label="more ' + JOBS[k].many + '">+</button></div>'; }).join('') +
       '<div class="crow" title="Those with no role: they live by their own brains, as all of them used to.">' + svg('', '#9fb6c6') + '<span class="nm" data-all="">Free</span><span class="cn" id="cnfree">0</span><span style="width:82px;font-size:10px;color:rgba(207,232,255,.5);text-align:right;flex:none">no orders</span></div>' +
-      '<div class="csec"><span>BUILD</span><label title="When it is on, your colony grows by itself: it builds what it is short of for its numbers (homes, food, a meeting place, towers once raiders come, a spaceport) and keeps enough gatherers and builders. You can still order anything, and cancel what it plans."><input type="checkbox" id="cmdAuto">it grows by itself</label></div>' +
+      '</div><div class="cB"><div class="csec"><span>BUILD</span><label title="When it is on, your colony grows by itself: it builds what it is short of for its numbers (homes, food, a meeting place, towers once raiders come, a spaceport) and keeps enough gatherers and builders. You can still order anything, and cancel what it plans."><input type="checkbox" id="cmdAuto">it grows by itself</label></div>' +
       '<div class="cgrid">' + BUILD.map(function (t) { return '<button data-build="' + t + '" title="' + esc(G.BUILDABLE[t].name + ': ' + G.BUILDABLE[t].note) + '"><img alt="" data-pic="' + t + '"><span>' + esc(G.BUILDABLE[t].short || G.BUILDABLE[t].name) + '</span></button>'; }).join('') + '</div><button id="cmdPick" title="For a screen with no second button: press, then touch one of yours to choose it">Choose by touch</button>' +
-      '<div class="cq" id="cmdQ"></div><div class="ctip dim" id="cmdTip"></div><div class="ckeys"><span id="cmdKeys"></span> <a id="cmdSwap" title="Swap what the two mouse buttons do">swap</a></div></div>';
+      '<div class="cq" id="cmdQ"></div><div class="ctip dim" id="cmdTip"></div><div class="ckeys"><span id="cmdKeys"></span> <a id="cmdSwap" title="Swap what the two mouse buttons do">swap</a></div></div></div>';
     root.appendChild(cmd);
     cmd.addEventListener('click', function (e) {
       const t = e.target, b = t.closest ? t.closest('[data-want],[data-mode],[data-all],[data-build],[data-cancel],[data-found],[data-seeheart],#cmdHead,#cmdSwap,#cmdPick,#cmdMap') : null; if (!b) return;
@@ -15078,7 +15150,12 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   }
   function refresh() {
     const W = G.W, on = live(); build(); document.body.classList.toggle('cmdOpen', on && !folded); document.body.classList.toggle('cmdLive', on);
-    ui.res.style.display = on && G.heartOf(W) ? '' : 'none'; ui.cmd.style.display = on ? '' : 'none'; if (!on) { ui.sel.classList.add('hide'); return; }
+    ui.res.style.display = on && G.heartOf(W) ? '' : 'none'; ui.cmd.style.display = on ? '' : 'none';
+    { const tb = $('toolbar'), zm = $('zoom'), wide = on && window.innerWidth > 720 && window.innerHeight > 520 && tb && zm && tb.offsetWidth > 0;      // the zoom buttons stand at the end of the bottom menu, in its row; what you have chosen is said beyond them
+      if (wide) { const r = tb.getBoundingClientRect(), L = Math.round(r.right + 8) + 'px', B = Math.round(window.innerHeight - r.bottom + (r.height - zm.offsetHeight) / 2) + 'px'; if (zm.style.left !== L) zm.style.left = L; if (zm.style.bottom !== B) zm.style.bottom = B;
+        const sl = window.innerWidth > 1180 ? Math.round(r.right + 8 + zm.offsetWidth + 10) : 0; if (sl) { if (ui.sel.style.left !== sl + 'px') { ui.sel.style.left = sl + 'px'; ui.sel.style.maxWidth = 'calc(100vw - ' + (sl + 16) + 'px)'; } } else if (ui.sel.style.left) { ui.sel.style.left = ''; ui.sel.style.maxWidth = ''; } }
+      else if (zm && (zm.style.left || zm.style.bottom)) { zm.style.left = ''; zm.style.bottom = ''; } }
+    if (!on) { ui.sel.classList.add('hide'); return; }
     if (window.innerWidth > 720) { let y = 14; ['wish', 'wxnow', 'voybar', 'voypick'].forEach(function (id) { const e = $(id); if (e && !e.classList.contains('hide') && e.offsetHeight) { const r = e.getBoundingClientRect(); if (r.top < 140 && Math.abs((r.left + r.right) / 2 - window.innerWidth / 2) < 260) y = Math.max(y, r.bottom + 8); } }); if (ui.res.style.top !== y + 'px') ui.res.style.top = y + 'px'; }
     if (!folded && window.innerWidth > 720) { const tb = $('toolbar'), tbTop = tb && !tb.classList.contains('hide') && tb.offsetHeight ? tb.getBoundingClientRect().top : window.innerHeight - 70, key = window.innerHeight + ':' + Math.round(tbTop);
       if (key !== fitKey) { fitKey = key; const avail = tbTop - 8 - ui.cmd.getBoundingClientRect().top, V = [[0, 0, 0], [0, 1, 0], [1, 0, 0], [1, 1, 0], [1, 1, 1]];      /* (the fullest lay-out that fits: first without the keys, then without the small map, then smaller still) */
@@ -15254,7 +15331,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
         if (off < -4) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const near = Math.max(0, 1 + off / 720), g = ctx.createRadialGradient(r.x, r.y + 4, 4, r.x, r.y + 4, 150); g.addColorStop(0, 'rgba(255,170,90,' + 0.5 * near + ')'); g.addColorStop(1, 'rgba(255,120,60,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(r.x, r.y + 4, 150, 60, 0, 0, 6.2832); ctx.fill(); ctx.restore(); }
         if (r.state === 'land' && tt >= 2.6 && tt < 5.2) { const u = (tt - 2.6) / 2.6; ctx.strokeStyle = 'rgba(230,210,190,' + 0.55 * (1 - u) + ')'; ctx.lineWidth = 7 * (1 - u) + 1; ctx.beginPath(); ctx.ellipse(r.x, r.y + 6, 40 + 190 * u, 12 + 48 * u, 0, 0, 6.2832); ctx.stroke(); for (let q = 0; q < 10; q++) { const a = q * 0.628, d = 30 + 170 * u; ctx.fillStyle = 'rgba(200,180,160,' + 0.3 * (1 - u) + ')'; ctx.beginPath(); ctx.arc(r.x + Math.cos(a) * d, r.y + 6 + Math.sin(a) * d * 0.28 - 14 * Math.sin(u * 3.14), 9 + 10 * u, 0, 6.2832); ctx.fill(); } }
         if (r.state === 'on') { const a = 1.5708 + Math.sin(t * 0.7) * 0.9, L0 = 330; ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createLinearGradient(r.x, r.y - S, r.x + Math.cos(a) * L0, r.y - S + Math.sin(a) * L0 * 0.6 + S); g.addColorStop(0, 'rgba(255,90,110,0.30)'); g.addColorStop(1, 'rgba(255,90,110,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(r.x, r.y - S * 1.1); ctx.lineTo(r.x + Math.cos(a - 0.16) * L0, r.y + Math.sin(a - 0.16) * L0 * 0.6); ctx.lineTo(r.x + Math.cos(a + 0.16) * L0, r.y + Math.sin(a + 0.16) * L0 * 0.6); ctx.closePath(); ctx.fill(); ctx.restore(); }
-        if (!(G.art && G.art.draw && G.art.draw(ctx, W, 'ship', 'foe', r.x, r.y + off))) G.drawBlueprint(ctx, { x: r.x, y: r.y + off - S * 0.45, bp: bp }, false);      /* (their ship: painted, in their colour, where this star's buildings are painted) */
+        if (!(G.art && G.art.drawRaid && G.art.drawRaid(ctx, r, r.x, r.y + off, off < -4)) && !(G.art && G.art.draw && G.art.draw(ctx, W, 'ship', 'foe', r.x, r.y + off))) G.drawBlueprint(ctx, { x: r.x, y: r.y + off - S * 0.45, bp: bp }, false);      /* (their ship: painted, in their colour, where this star's buildings are painted) */
         label(ctx, r.x, r.y + off - (bp.top || S * 1.6) - 14 * inv, inv, 'RAIDERS OF ' + String(r.name).toUpperCase(), '#ff9db0', 10.5); } }
     if (!W.deed && G.drawHauls) G.drawHauls(ctx);      // what the gatherers carry (while a plan is on, the plan draws it)
     // the creatures: whose side each is on, what its trade is, what it holds, and how it stands in a fight
@@ -15513,7 +15590,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   function plaza(ctx, W, L, h, t) {
     const tier = h.tier | 0, x = h.x, y = h.y + h.bp.S * 0.45, R = 95 + 48 * tier, v = G.view;
     { const g = ctx.createRadialGradient(x, y, R * 0.2, x, y, R * 1.6); g.addColorStop(0, 'rgba(' + L.lite + ',0.20)'); g.addColorStop(0.7, 'rgba(' + L.lite + ',0.08)'); g.addColorStop(1, 'rgba(' + L.lite + ',0)'); ctx.save(); ctx.translate(x, y); ctx.scale(1.6, 0.86); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, 6.2832); ctx.fill(); ctx.restore(); }
-    if (tier >= 1 && v.scale > 0.4) { const n = Math.round(R * R / 330); for (let i = 1; i < n; i++) { const rr = R * Math.sqrt(i / n), a = i * 2.39996, px = x + Math.cos(a) * rr * 1.55, py = y + Math.sin(a) * rr * 0.82, s = 9 + 6 * rnd(i, 3), sq = 0.55; if (Math.abs(px - x) < h.bp.hw * 0.7 && py < y && py > y - 30) continue;
+    if (tier >= 1 && v.scale > 0.4 && !(G.art && G.art.ground && G.art.ground(W))) { const n = Math.round(R * R / 330);      /* (flagstones are drawn only on a drawn ground: on a painted one the Heart's own painted base is its paving) */ for (let i = 1; i < n; i++) { const rr = R * Math.sqrt(i / n), a = i * 2.39996, px = x + Math.cos(a) * rr * 1.55, py = y + Math.sin(a) * rr * 0.82, s = 9 + 6 * rnd(i, 3), sq = 0.55; if (Math.abs(px - x) < h.bp.hw * 0.7 && py < y && py > y - 30) continue;
         ctx.fillStyle = 'rgba(' + L.lite + ',' + (0.10 + 0.10 * rnd(i, 5)) + ')'; ctx.strokeStyle = 'rgba(' + L.dark + ',0.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(px, py, s, s * sq, rnd(i, 7) * 0.6 - 0.3, 0, 6.2832); ctx.fill(); ctx.stroke(); } }
     if (tier >= 1) { const n = 4 + tier * 3; for (let i = 0; i < n; i++) { const a = (i + 0.5) / n * 6.2832 + 0.2, px = x + Math.cos(a) * R * 1.62, py = y + Math.sin(a) * R * 0.88, fl = 0.8 + 0.2 * Math.sin(t * 5 + i * 1.7);
         ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(px + 4, py + 1, 7, 2, 0, 0, 6.2832); ctx.fill(); ctx.strokeStyle = '#16202e'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py - 20); ctx.stroke(); ctx.strokeStyle = '#9fb3c6'; ctx.lineWidth = 1.2; ctx.stroke();
@@ -15704,6 +15781,26 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   const ST = {}, MOMENTS = ['built', 'liftoff', 'landing', 'raid', 'grew'];
   let air = null, airName = '';
+  // every sound is MEASURED when it comes (nobody listens to it first): how long, how loud, how much silence before it starts and, for a loop, whether its end meets
+  // its beginning. So all of them play at one loudness, the air of a star quieter than what happens on it, and one that came out silent is left unused.
+  /** a loop whose end runs into its beginning: the last part of the sound is faded out over its first part faded in, and it begins after that part (as a WAV) */
+  function seamless(d, sr) { const X = Math.round(sr * 0.8), M = d.length - X, out = new Int16Array(M); for (let i = 0; i < M; i++) { let v = d[i + X]; const k = i - (M - X); if (k >= 0) { const t = k / X; v = v * Math.cos(t * 1.5708) + d[k] * Math.sin(t * 1.5708); } out[i] = Math.max(-32767, Math.min(32767, Math.round(v * 32767))); }
+    return wav(out, sr); }
+  /** a sound that begins with a silence, cut to where it begins */
+  function trimmed(d, sr, from) { const M = d.length - from, out = new Int16Array(M); for (let i = 0; i < M; i++) out[i] = Math.max(-32767, Math.min(32767, Math.round(d[i + from] * 32767 * Math.min(1, i / 200)))); return wav(out, sr); }
+  function wav(out, sr) { const M = out.length;
+    const hd = new DataView(new ArrayBuffer(44)), W = function (o, t) { for (let i = 0; i < t.length; i++) hd.setUint8(o + i, t.charCodeAt(i)); }; W(0, 'RIFF'); hd.setUint32(4, 36 + M * 2, true); W(8, 'WAVEfmt '); hd.setUint32(16, 16, true); hd.setUint16(20, 1, true); hd.setUint16(22, 1, true); hd.setUint32(24, sr, true); hd.setUint32(28, sr * 2, true); hd.setUint16(32, 2, true); hd.setUint16(34, 16, true); W(36, 'data'); hd.setUint32(40, M * 2, true);
+    const all = new Uint8Array(44 + M * 2); all.set(new Uint8Array(hd.buffer), 0); all.set(new Uint8Array(out.buffer), 44); let bin = ''; for (let i = 0; i < all.length; i += 32768) bin += String.fromCharCode.apply(null, all.subarray(i, i + 32768)); return 'data:audio/wav;base64,' + btoa(bin); }
+  function measure(b64, loop) {
+    return new Promise(function (res, rej) { try { const bin = atob(b64), buf = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i); const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext; if (!AC) return rej();
+      const done = function (a) { try { const d = a.getChannelData(0), n = d.length, sr = a.sampleRate; let sum = 0, peak = 0, lead = n; for (let i = 0; i < n; i++) { const v = d[i] < 0 ? -d[i] : d[i]; sum += v * v; if (v > peak) peak = v; if (lead === n && v > 0.02) lead = i; }
+          const w = Math.min(n >> 2, Math.round(sr * 0.25)), e = function (o0) { let q = 0; for (let i = 0; i < w; i++) q += d[o0 + i] * d[o0 + i]; return Math.sqrt(q / Math.max(1, w)); }, e0 = e(0), e1 = e(n - w);
+          const m = { secs: +(n / sr).toFixed(2), rms: +Math.sqrt(sum / Math.max(1, n)).toFixed(4), peak: +peak.toFixed(3), lead: +(lead / sr).toFixed(2), seam: +(Math.abs(e0 - e1) / Math.max(0.0001, e0 + e1)).toFixed(2) };
+          if (loop && n > sr * 3) { try { m.url = seamless(d, sr); m.seam0 = m.seam; m.seam = 0; } catch (e2) { /* it loops as it came */ } }
+          else if (!loop && lead > sr * 0.12 && lead < n - sr * 0.5) { try { m.url = trimmed(d, sr, Math.max(0, lead - Math.round(sr * 0.02))); m.lead0 = m.lead; m.lead = 0.02; } catch (e2) { /* it plays as it came */ } }      /* (a moment's sound must come AT its moment) */
+          res(m); } catch (er) { rej(er); } };
+      const pr = new AC(1, 44100, 44100).decodeAudioData(buf.buffer, done, rej); if (pr && pr.then) pr.then(done, rej); } catch (e) { rej(e); } });
+  }
   function ask(name) {
     const s = ST[name], now = Date.now(); if (s && (s.v === 'asked' || s.v === 'ready' || (s.v === 'none' && now - s.at < 120000))) return;
     if (!(G.host && G.host.ready) || !window.PXS) return;
@@ -15713,17 +15810,24 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       if (!r || !r.sound || !/^audio\/(mpeg|wav|ogg|mp4)$/.test(r.sound.mime) || typeof r.sound.b64 !== 'string' || r.sound.b64.length > 700000) { ST[name] = { v: 'none', at: Date.now() }; return; }
       if (G.ai && G.ai.tally) G.ai.tally('sound', r.source === 'leonardo' ? 'leonardo' : 'library', r.usd);
       const def = {}; def['fx:' + name] = 'data:' + r.sound.mime + ';base64,' + r.sound.b64;
-      try { PXS.define(def); ST[name] = { v: 'ready', at: Date.now() }; G.emit('fx-ready', name); } catch (e) { ST[name] = { v: 'none', at: Date.now() }; console.error(e); }
+      const ready = function (m) { if (m && (m.secs < 0.3 || m.rms < 0.004)) { ST[name] = { v: 'none', at: Date.now(), why: 'silent' }; return; }      /* (a sound that came out empty is not used: the game's own plain sound plays instead) */
+        if (m && m.url) { def['fx:' + name] = m.url; delete m.url; }      /* (the air of a star: made to loop without a seam) */
+        try { PXS.define(def); ST[name] = { v: 'ready', at: Date.now(), m: m || null, gain: m ? Math.max(0.25, Math.min(1, (name.indexOf('amb.') === 0 ? 0.05 : 0.11) / m.rms)) : (name.indexOf('amb.') === 0 ? 0.5 : 0.85) }; G.emit('fx-ready', name); } catch (e) { ST[name] = { v: 'none', at: Date.now() }; console.error(e); } };
+      measure(r.sound.b64, name.indexOf('amb.') === 0).then(ready, function () { ready(null); });
     }, function () { ST[name] = { v: 'none', at: Date.now() }; });
   }
   /** play the sound of a moment: true if it has one of its own (if not, it is asked for, and the caller's plain sound will do this time) */
-  G.fxSound = function (name, opts) { const s = ST[name]; if (s && s.v === 'ready' && window.PXS) { try { PXS.play('fx:' + name, opts || { volume: 0.85 }); } catch (e) { console.error(e); } return true; } ask(name); return false; };
+  G.fxSound = function (name, opts) { const s = ST[name]; if (s && s.v === 'ready' && window.PXS) { try { PXS.play('fx:' + name, { volume: (opts && opts.volume !== undefined ? opts.volume : 1) * s.gain }); } catch (e) { console.error(e); } return true; } ask(name); return false; };
+  /** what is known of each sound that has come: { name: { secs, rms, peak, lead (silence before it starts, s), seam (for a loop: how unlike its end is to its beginning, 0 the same), gain } } (for the tests: nobody here can hear) */
+  G.fxFacts = function () { const o = {}; for (const k in ST) if (ST[k].v === 'ready') o[k] = Object.assign({ gain: +ST[k].gain.toFixed(2) }, ST[k].m || {}); else if (ST[k].why) o[k] = { unused: ST[k].why }; return o; };
+  /** ask for a sound by name before it is wanted (so it is there when its moment comes) */
+  G.fxWant = ask;
   const quiet = function () { return G.mode !== 'play' || (G.isBlocked && G.isBlocked()); };
   // the air of the star you are on: it takes the place of the sound of water
   function airFor() {
     if (!window.PXS || !G.FLAT || !G.W || G.W.title || !G.terrainOf) return; const name = 'amb.' + G.terrainOf(G.W).id, s = ST[name];
     if (!s || s.v !== 'ready') { ask(name); return; } if (airName === name && air) return;
-    try { if (air && air.stop) air.stop(); if (G.hushWater) G.hushWater(); air = PXS.loop('fx:' + name, { volume: 0.5 }); airName = name; } catch (e) { console.error(e); }
+    try { if (air && air.stop) air.stop(); if (G.hushWater) G.hushWater(); air = PXS.loop('fx:' + name, { volume: s.gain }); airName = name; } catch (e) { console.error(e); }
   }
   G.on('fx-ready', function (name) { if (name.indexOf('amb.') === 0) airFor(); });
   G.on('begin', function () { setTimeout(function () { airFor(); MOMENTS.forEach(function (m, i) { setTimeout(function () { ask(m); }, 1500 + i * 400); }); }, 1200); });

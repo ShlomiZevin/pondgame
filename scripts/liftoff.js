@@ -10,6 +10,7 @@ const path = require('path');
   await page.waitForTimeout(2500);
   const fr = page.frames().find((f) => f !== page.mainFrame());
   await fr.locator('#tBegin').click(); await page.waitForTimeout(1200);
+  if (process.env.TERR) await fr.evaluate((id) => { const T = G.TERRAINS.filter((t) => t.id === id)[0]; if (T) G.terrainOf = function () { return T; }; }, process.env.TERR);
   await fr.evaluate(() => G.setSpeed(64)); await page.waitForTimeout(16000);
   console.log(await fr.evaluate(() => { G.setSpeed(1); const W = G.W; if (W.deed) G.deedStop('off'); window._log = []; G.on('deed-end', (d, how) => _log.push('END ' + d.title + ' ' + how)); G.on('mission-stage', (d, w) => _log.push('stage ' + w + ' at ' + Math.round(W.t)));
     const sp = W.species.filter((s) => !s.extinct).sort((a, b) => b.n - a.n)[0], sy = G.shoreY(W), mk = (type, S, x, base) => { const bp = G.blueprintFrom({ seed: 7, type, S, hue: sp.hue, spiky: 0, brain: 0.6, wet: false }, '2'.repeat(60)); const w = { name: 'Test ' + type, looks: 'made by hand for the test', x, y: base - S * 0.45, r: 80, until: W.t + 1e6, by: sp.name, hue: sp.hue, sp: sp.id, field: 0, plan: 'Test', gen: W.gen, bp }; (W.works = W.works || []).push(w); return w; };
