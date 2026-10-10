@@ -16,6 +16,7 @@
 //   POST /api/ai/story   { measured facts }  → { story }       what changed and why, in plain words
 //   POST /api/ai/paint   { sig, build, facts, colours, world } → { paint }  a painting of a kind of creature (only with LEONARDO_API_KEY)
 //   POST /api/art        { what, terrain, people?, libraryOnly? } → { art }  the ground of a star, or the buildings of its people, painted (kept for good; only with LEONARDO_API_KEY)
+//   POST /api/sfx        { name, libraryOnly? } → { sound }  what a moment on a star sounds like (built, liftoff, landing, raid, grew) or the air of a kind of star (amb.<terrain>)
 //   POST /api/ai/voice   { text, tone }      → { sound }       a line spoken aloud for a creature that talks (Leonardo dialogue-v3, kept per line)
 //   POST /api/ai/sound   { word, note }      → { sound }       a sound for a thing (only with LEONARDO_API_KEY)
 //   GET  /api/pond                           → { save, report } the player's pond, advanced to now
@@ -163,6 +164,11 @@ function createApp(opts = {}) {
       const body = await readJson(req, 2000);
       const r = await icons.forMarvel(body, { canGenerate: () => iconLimiter.take(who), onError: (e) => console.error('icon failed:', e.message) });
       return send(res, r.error ? (r.error === 'no_icon_yet' || r.error === 'no_painter' ? 404 : r.error === 'empty' ? 400 : 503) : 200, r);
+    }
+    if (route === 'POST /api/sfx') {      // the sound of a moment on a star, or of the star's own air (asked for once, then served from the library)
+      const body = await readJson(req, 1000);
+      const r = await sounds.forFx(String(body.name || ''), { libraryOnly: !!body.libraryOnly, canGenerate: () => soundLimiter.take(who), onError: (e) => console.error('sfx failed:', e.message) });
+      return send(res, r.error ? (r.error === 'not_made' || r.error === 'no_sound' ? 404 : r.error === 'empty' ? 400 : 503) : 200, r);
     }
     if (route === 'POST /api/art') {      // the look of a star: its ground, its people's buildings (asked for once, then served from the library)
       const body = await readJson(req, 4000);

@@ -184,7 +184,7 @@
     huts: { name: 'Farm', what: 'huts round a store of food', res: { feed: 0.25, size: 0.075 }, note: 'It feeds those who live round it.' },
     wall: { name: 'Wall', what: 'a ring of posts to live inside', res: { solid: true, size: 0.075 }, note: 'Only your own may pass it.' },
     tower: { name: 'Tower', what: 'a watchtower that strikes at enemies', res: { pull: 0.22, size: 0.07, tower: true }, cost: [0, 0, 0, 3], note: 'It strikes at any enemy that comes near. Its eye is cut from 3 lumen.' },
-    port: { name: 'Spaceport', what: 'a spaceport on the shore, to build a spaceship on', res: { port: true, size: 0.085 }, note: 'The pad a spaceship is built on.' },
+    port: { name: 'Spaceport', what: 'a spaceport, to build a spaceship on', res: { port: true, size: 0.085 }, note: 'The pad a spaceship is built on.' },
     ship: { name: 'Starship', what: 'a spaceship on the spaceport', res: { ship: true, size: 0.06 }, note: 'It carries a crew to another star. It needs a spaceport.' } };
   /** may this be built there? '' if so, else why not */
   G.buildOk = function (type, x, y) {

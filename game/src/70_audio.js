@@ -36,6 +36,8 @@
       ambient = PXS.loop('loop/underwater', { speed: 0.2 });
     } catch (e) { console.error(e); }
   };
+  /** the sound of water stops (a star has its own air: 71_sounds.js) */
+  G.hushWater = function () { try { if (ambient && ambient.stop) ambient.stop(); } catch (e) { console.error(e); } ambient = null; };
   G.stopSound = function () {
     started = false;
     try { if (ambient) ambient.stop(); ambient = null; PXS.stopMusic(); PXS.stopSfx(); } catch (e) { console.error(e); }

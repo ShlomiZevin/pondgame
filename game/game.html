@@ -6954,7 +6954,7 @@ function initRender() {
   G.on('birth', function (c, from, mate) {
     if (G.speed > 4) { if (c.muts.length) c.flash = 1; return; }
     const col = c.muts.length ? PAL.rose : PAL.frost;
-    ring(c.x, c.y, col, c.ph.r * 3.2, 0.8);
+    if (!G.FLAT) ring(c.x, c.y, col, c.ph.r * 3.2, 0.8);      // (on a star a birth is a few sparks: forty rings each spring would hide the colony)
     sparkle(c.x, c.y, col, 4, 40);
     if (from && G.speed <= 4) {
       fx({ k: 'link', x: from.x, y: from.y, c: c, col: PAL.gold, t: 0, life: 1.2 });
@@ -7490,7 +7490,7 @@ function drawCharacter(ctx, c, x, y, scale, t, opt) {
   ctx.restore();
   if (ph.mv && G.drawMarvel) G.drawMarvel(ctx, c, x, y, r, t, alpha);      // a marvel: aura, sparks, its sign, and what it is doing
   // what it is going through, said with one small sign over its head
-  if (G.speed <= 8 && alpha > 0.5 && !opt.noSigns) {
+  if (G.speed <= 8 && alpha > 0.5 && !opt.noSigns && (!G.FLAT || opt.live || G.view.scale >= 1.9)) {      // (on a star: only close up, or over the one you chose)
     const hy = y - hop - r * 254 / R.SIDE * 0.92, sign = scared ? '!' : c.pois > 0.3 ? 'x_x' : c.chill > 0.05 ? '*brr*' : c.hot > 0.05 ? '~phew~' : c.gasp > 0.7 && id % 4 === 0 ? 'o O' : still ? 'z z' : '';
     if (sign) { ctx.save(); ctx.font = '700 ' + Math.round(Math.max(9, r * (sign.length > 2 ? 0.36 : 0.55))) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,18,31,0.8)'; ctx.fillStyle = scared ? PAL.gold : c.pois > 0.3 ? PAL.algae : c.chill > 0.05 ? PAL.frost : c.hot > 0.05 ? PAL.rose : PAL.frost; const by2 = hy - 4 * Math.sin(t * 3 + id); ctx.strokeText(sign, x + r * 0.5, by2); ctx.fillText(sign, x + r * 0.5, by2); ctx.restore(); }
   }
@@ -9648,7 +9648,7 @@ G.addSystem({
       const has = function (t) { return mine.some(function (w) { return w.bp.type === t; }); }, threatened = armed > 0 || fierce - own > W.cre.length * 0.3, hungry = e / n < 0.5;
       const type = wantPort ? 'port' : wantShip ? 'ship' : houses < wantH && (mine.length >= may || houses < mine.length * 2) ? 'house' : !mine.length ? (hungry ? 'huts' : 'hall') : threatened && !has('wall') ? 'wall' : hungry && !has('huts') ? 'huts' : !has('spire') ? 'spire' : !has('huts') ? 'huts' : !has('hall') ? 'hall' : 'wall', nw = String(s.name).split(' '), first = nw.length >= 3 ? nw[nw.length - 2] : nw[0];      /* first a place of their own; then what they are short of */
       const name = first + ' ' + { wall: 'Ring', huts: 'Huts', hall: 'Hall', spire: 'Tower', house: 'House', ship: 'Starship', port: 'Spaceport' }[type] + (type === 'house' && houses ? ' ' + (houses + 1) : ''), why = type === 'port' ? 'they have seen the lights of other stars, far off in space' : type === 'ship' ? 'their spaceport stands ready' : type === 'house' ? 'there are more of them than there are roofs' : type === 'wall' ? (armed ? 'something armed is loose on the star' : 'fierce strangers are all about them') : type === 'huts' ? 'they are going hungry' : mine.length ? 'their place has room for more' : 'they have no place of their own';
-      G.deedStart({ kind: s.name, title: name, say: '', what: 'build ' + (type === 'port' ? 'a spaceport on the shore, to build a spaceship on' : type === 'ship' ? 'a spaceship on their spaceport, to fly to another star' : type === 'house' ? 'a house for a family, beside the others' : type === 'wall' ? 'a ring of posts to live inside' : type === 'huts' ? 'huts round a store of food' : type === 'hall' ? 'a hall to gather in' : 'a tower to be seen from afar'), why: why, share: 0.6, own: true,
+      G.deedStart({ kind: s.name, title: name, say: '', what: 'build ' + (type === 'port' ? 'a spaceport, to build a spaceship on' : type === 'ship' ? 'a spaceship on their spaceport, to fly to another star' : type === 'house' ? 'a house for a family, beside the others' : type === 'wall' ? 'a ring of posts to live inside' : type === 'huts' ? 'huts round a store of food' : type === 'hall' ? 'a hall to gather in' : 'a tower to be seen from afar'), why: why, share: 0.6, own: true,
         steps: [{ do: 'gather', secs: 5, cry: '' }, { do: 'build', secs: 34, cry: '' }], place: (function () { const L = G.leaderOf ? G.leaderOf(s.id) : null; if (type === 'port') return { x: x / n < W.ww / 2 ? 0.13 : 0.87, y: ((G.shoreY ? G.shoreY(W) : W.wh * 0.25) - 46) / W.wh };      /* on the land, at the border of the pond, just above the waterline: in plain sight, and within reach of those in the shallows */ if (type === 'ship') return { x: G.dockOf(port).x / W.ww, y: port.y / W.wh }; const sy0 = G.shoreY ? G.shoreY(W) : W.wh * 0.25, px = clamp((L ? L.x : x / n) / W.ww, 0.12, 0.88), py = (L ? L.y : y / n); if (py <= sy0) return { x: px, y: clamp(py / W.wh, 0.05, 0.85) };      /* a kind of the land builds on the land, where it lives */
           const u = (s.id * 0.6180339887) % 1; return { x: px, y: (sy0 + (W.wh - 90 - sy0) * (0.12 + 0.8 * u)) / W.wh }; })(),      /* a kind of the water builds at a depth of its own, anywhere from just under the shore down to the floor: the pond is built on all over, not only along its shore (its later buildings stand beside its first) */      /* where their leader is, if they have one; else in the midst of them */
         result: { name: name, looks: 'made of what lay about the star', stuff: 'rock', shape: 'circle', size: type === 'house' ? 0.04 : type === 'ship' ? 0.06 : type === 'port' ? 0.085 : 0.075, ship: type === 'ship', port: type === 'port', at: type === 'ship' ? { x: G.dockOf(port).x, y: G.dockOf(port).y } : type === 'port' ? (function () { const sy = G.shoreY ? G.shoreY(W) : W.wh * 0.25, busy = function (px) { return (W.works || []).some(function (w) { return w.bp && Math.abs(w.x - px) < 330 && w.y < sy + 60; }); }, L = W.ww * 0.13, R = W.ww * 0.87, first = x / n < W.ww / 2 ? L : R, other = first === L ? R : L; return { x: busy(first) && !busy(other) ? other : first, y: sy - 44 }; })() : undefined,      /* a port stands on the land at the border of the pond, its foot just above the waterline, on whichever side is free; a ship stands on its port */ house: type === 'house', solid: type === 'wall', feed: type === 'huts' ? 0.25 : 0, slow: 0, hurt: 0, pull: type === 'spire' ? 0.22 : type === 'hall' ? 0.08 : 0, life: 240 } });
@@ -10567,7 +10567,7 @@ G.addSystem({
     huts: { name: 'Farm', what: 'huts round a store of food', res: { feed: 0.25, size: 0.075 }, note: 'It feeds those who live round it.' },
     wall: { name: 'Wall', what: 'a ring of posts to live inside', res: { solid: true, size: 0.075 }, note: 'Only your own may pass it.' },
     tower: { name: 'Tower', what: 'a watchtower that strikes at enemies', res: { pull: 0.22, size: 0.07, tower: true }, cost: [0, 0, 0, 3], note: 'It strikes at any enemy that comes near. Its eye is cut from 3 lumen.' },
-    port: { name: 'Spaceport', what: 'a spaceport on the shore, to build a spaceship on', res: { port: true, size: 0.085 }, note: 'The pad a spaceship is built on.' },
+    port: { name: 'Spaceport', what: 'a spaceport, to build a spaceship on', res: { port: true, size: 0.085 }, note: 'The pad a spaceship is built on.' },
     ship: { name: 'Starship', what: 'a spaceship on the spaceport', res: { ship: true, size: 0.06 }, note: 'It carries a crew to another star. It needs a spaceport.' } };
   /** may this be built there? '' if so, else why not */
   G.buildOk = function (type, x, y) {
@@ -11078,7 +11078,7 @@ G.addSystem({
     else if (want < g * 0.6) to = Math.max(want, g * 0.985);                 // and draws in again, slowly, if they turn small
     if (to) { if (typeof document === 'undefined' || G.mode !== 'play') G.pondGrowTo(to); else { if (to > g) G.emit('pond-grew', to); aim = to; } }
     const now = v.grow || 1;
-    if (G.mode === 'play' && to > g * 1.02) { told = now; if (G.toast) (G.note || G.toast)('The star is growing', why === 'deed' ? 'They went out and did something together, and the mist at the edges drew back. There is more water now.' : 'Its creatures needed more room, so the mist at the edges is drawing back. There is more water now.'); why = ''; if (G.log) G.log('disc', 'The star grew', 'It is now ' + now.toFixed(1) + ' times as wide as it began.'); }
+    if (G.mode === 'play' && to > g * 1.02) { told = now; if (G.toast) (G.note || G.toast)('The star is growing', why === 'deed' ? 'They went out and did something together, and the mist at the edges drew back. There is more ground now.' : 'Its creatures needed more room, so the mist at the edges is drawing back. There is more ground now.'); why = ''; if (G.log) G.log('disc', 'The star grew', 'It is now ' + now.toFixed(1) + ' times as wide as it began.'); }
   });
   // a new pond starts small again
   { const new0 = G.newWorld; G.newWorld = function (opts) { const v = G.view; if (v.grow && v.grow !== 1) { v.grow = 1; if (G.canvas) G.resize(); else { v.ww = v.ww * 1400 / v.wh; v.wh = 1400; } } told = 1; return new0(opts); }; }
@@ -12113,7 +12113,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   /** the ship in flight: it points where it flies, its engine burning behind it */
   /** the ship comes down where it is to stand: the view goes to it, it descends on its fire, and those aboard step out after (57x_far.js lets them out one by one) */
   let landing = null; const FXB = [];
-  function land(ship) { if (!ship) return; const W = G.W; landing = { ship: ship, y0: ship.y, t0: W.t, T: 2.8 }; ship.lifting = true; ship.y = landing.y0 - 640; if (G.cam) { G.cam.z = 0.3; G.cam.x = ship.x; G.cam.y = landing.y0 - 200; if (G.applyCam) G.applyCam(); } if (G.flyTo) G.flyTo(ship.x, landing.y0 - 70, 1.12, 1.9); }
+  function land(ship) { if (!ship) return; const W = G.W; landing = { ship: ship, y0: ship.y, t0: W.t, T: 2.8 }; G.emit('ship-landing', ship); ship.lifting = true; ship.y = landing.y0 - 640; if (G.cam) { G.cam.z = 0.3; G.cam.x = ship.x; G.cam.y = landing.y0 - 200; if (G.applyCam) G.applyCam(); } if (G.flyTo) G.flyTo(ship.x, landing.y0 - 70, 1.12, 1.9); }
   { const s2 = G.step; G.step = function (dt) { s2(dt); if (!landing) return; const W = G.W, k = landing, sh = k.ship; if (!W || (W.works || []).indexOf(sh) < 0) { landing = null; return; }
       const u = clamp((W.t - k.t0) / k.T, 0, 1); sh.lifting = true; sh.y = k.y0 - (1 - u) * (1 - u) * 640; k.u = u; if (u >= 1) { sh.y = k.y0; sh.lifting = false; landing = null; if (G.R) G.R.shake = 0.35; if (G.sfx) G.sfx('meteor'); } }; }
   G.on('went-aboard', function (c, ship) { if (G.mode === 'play') { FXB.push({ x: c.x, y: c.y, ship: ship, t0: now(), id: c.id, in: true }); if (G.sfx) G.sfx('click'); } });
@@ -14764,6 +14764,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     '#cmd .ctip{margin-top:6px;height:57px;overflow:hidden;font-size:11px;line-height:1.3;color:#ffe9a8}#cmd .ctip.dim{color:rgba(207,232,255,.55)}#cmd .ctip.goal{color:#9dffcf}' +
     '#cmd .ckeys{margin-top:5px;height:26px;overflow:hidden;font-size:9.5px;line-height:13px;color:rgba(207,232,255,.5)}#cmd .ckeys a{color:#ffe9a8;cursor:pointer;text-decoration:underline}' +
     '#cmd label{display:flex;align-items:center;gap:4px;cursor:pointer;font:600 9.5px system-ui;letter-spacing:.02em;text-transform:none;color:rgba(207,232,255,.7)}#cmd label input{margin:0;accent-color:#33d6a6}' +
+    '#cmdPick{display:none;appearance:none;width:100%;margin-top:6px;height:26px;border:1px solid rgba(207,232,255,.24);background:rgba(7,18,31,.45);border-radius:9px;color:#dcecf8;font:700 11px system-ui;letter-spacing:.04em;cursor:pointer}#cmdPick.on{border-color:#f6d365;color:#ffe9a8}@media (pointer:coarse){#cmdPick{display:block}}' +
     '#cmd.short #cmdMap{display:none}#cmd.tiny .ckeys{display:none}#cmd.tiny .ctip{height:43px}#cmd.mini #cmdStar{display:none}#cmd.mini .cgrid button{height:46px}#cmd.mini .cgrid button img{width:28px;height:28px}' +
     '@media (min-width:721px){body.cmdLive #season{height:138px;box-sizing:border-box;overflow:hidden}body.cmdLive #season .cap{display:none}body.cmdLive #season .count{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:8px}' +
     'body.cmdLive #zoom{left:276px}body.cmdLive .pop{left:340px}}' +
@@ -14795,7 +14796,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       ORDER.map(function (k) { return '<div class="crow" data-job="' + k + '" title="' + esc(TIPS[k]) + '">' + svg(k) + '<span class="nm" data-all="' + k + '">' + JOBS[k].name + 's</span><span class="cn" id="cn' + k + '">0</span><button data-want="' + k + '" data-d="-1" aria-label="fewer ' + JOBS[k].many + '">−</button><span class="cw" id="cw' + k + '">0</span><button data-want="' + k + '" data-d="1" aria-label="more ' + JOBS[k].many + '">+</button></div>'; }).join('') +
       '<div class="crow" title="Those with no trade: they live by their own brains, as all of them used to.">' + svg('', '#9fb6c6') + '<span class="nm" data-all="">Free</span><span class="cn" id="cnfree">0</span><span style="width:82px;font-size:10px;color:rgba(207,232,255,.5);text-align:right;flex:none">no orders</span></div>' +
       '<div class="csec"><span>BUILD</span><label title="When it is on, the kinds of your star also build what they themselves decide on, as they always did."><input type="checkbox" id="cmdAuto">they build too</label></div>' +
-      '<div class="cgrid">' + BUILD.map(function (t) { return '<button data-build="' + t + '" title="' + esc(G.BUILDABLE[t].name + ': ' + G.BUILDABLE[t].note) + '"><img alt="" data-pic="' + t + '"><span>' + esc(G.BUILDABLE[t].name) + '</span></button>'; }).join('') + '<button id="cmdPick" title="For a screen with no second button: press, then touch one of yours to choose it">CHOOSE<br>BY TOUCH</button></div>' +
+      '<div class="cgrid">' + BUILD.map(function (t) { return '<button data-build="' + t + '" title="' + esc(G.BUILDABLE[t].name + ': ' + G.BUILDABLE[t].note) + '"><img alt="" data-pic="' + t + '"><span>' + esc(G.BUILDABLE[t].name) + '</span></button>'; }).join('') + '</div><button id="cmdPick" title="For a screen with no second button: press, then touch one of yours to choose it">Choose by touch</button>' +
       '<div class="cq" id="cmdQ"></div><div class="ctip dim" id="cmdTip"></div><div class="ckeys"><span id="cmdKeys"></span> <a id="cmdSwap" title="Swap what the two mouse buttons do">swap</a></div></div>';
     root.appendChild(cmd);
     cmd.addEventListener('click', function (e) {
@@ -15440,6 +15441,8 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       ambient = PXS.loop('loop/underwater', { speed: 0.2 });
     } catch (e) { console.error(e); }
   };
+  /** the sound of water stops (a star has its own air: 71_sounds.js) */
+  G.hushWater = function () { try { if (ambient && ambient.stop) ambient.stop(); } catch (e) { console.error(e); } ambient = null; };
   G.stopSound = function () {
     started = false;
     try { if (ambient) ambient.stop(); ambient = null; PXS.stopMusic(); PXS.stopSfx(); } catch (e) { console.error(e); }
@@ -15466,6 +15469,50 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       G.on('speed', function (s) { if (ambient && ambient.set) { try { ambient.set({ speed: s === 0 ? 0 : s >= 16 ? 0.7 : 0.2 }); } catch (e) { console.error(e); } } });
     },
   });
+})();
+
+</script>
+<script data-part="sounds">
+// ── What a star sounds like ──
+// The moments of a colony (a building finished, a ship lifting off or coming down, a raid, the colony growing) and the AIR of each kind of star are sounds made
+// by a sound model, asked of the server by NAME (the server writes what is asked of the model), made once and kept for good. Until one has come, and wherever
+// there is no model to ask, the game's own plain sounds play as before (70_audio.js): nothing here is needed for the game to be heard.
+(function () {
+  'use strict';
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  const ST = {}, MOMENTS = ['built', 'liftoff', 'landing', 'raid', 'grew'];
+  let air = null, airName = '';
+  function ask(name) {
+    const s = ST[name], now = Date.now(); if (s && (s.v === 'asked' || s.v === 'ready' || (s.v === 'none' && now - s.at < 120000))) return;
+    if (!(G.host && G.host.ready) || !window.PXS) return;
+    const pay = !!(G.host.caps && G.host.caps.ai && G.ai.provider === 'server' && G.ai.sound !== false && G.ai.hasFuel() && G.ai.allow('sound'));
+    ST[name] = { v: 'asked', at: now };
+    G.host.call('sfx', { name: name, libraryOnly: !pay }, 120000).then(function (r) {
+      if (!r || !r.sound || !/^audio\/(mpeg|wav|ogg|mp4)$/.test(r.sound.mime) || typeof r.sound.b64 !== 'string' || r.sound.b64.length > 700000) { ST[name] = { v: 'none', at: Date.now() }; return; }
+      if (G.ai && G.ai.tally) G.ai.tally('sound', r.source === 'leonardo' ? 'leonardo' : 'library', r.usd);
+      const def = {}; def['fx:' + name] = 'data:' + r.sound.mime + ';base64,' + r.sound.b64;
+      try { PXS.define(def); ST[name] = { v: 'ready', at: Date.now() }; G.emit('fx-ready', name); } catch (e) { ST[name] = { v: 'none', at: Date.now() }; console.error(e); }
+    }, function () { ST[name] = { v: 'none', at: Date.now() }; });
+  }
+  /** play the sound of a moment: true if it has one of its own (if not, it is asked for, and the caller's plain sound will do this time) */
+  G.fxSound = function (name, opts) { const s = ST[name]; if (s && s.v === 'ready' && window.PXS) { try { PXS.play('fx:' + name, opts || { volume: 0.85 }); } catch (e) { console.error(e); } return true; } ask(name); return false; };
+  const quiet = function () { return G.mode !== 'play' || (G.isBlocked && G.isBlocked()); };
+  // the air of the star you are on: it takes the place of the sound of water
+  function airFor() {
+    if (!window.PXS || !G.FLAT || !G.W || G.W.title || !G.terrainOf) return; const name = 'amb.' + G.terrainOf(G.W).id, s = ST[name];
+    if (!s || s.v !== 'ready') { ask(name); return; } if (airName === name && air) return;
+    try { if (air && air.stop) air.stop(); if (G.hushWater) G.hushWater(); air = PXS.loop('fx:' + name, { volume: 0.5 }); airName = name; } catch (e) { console.error(e); }
+  }
+  G.on('fx-ready', function (name) { if (name.indexOf('amb.') === 0) airFor(); });
+  G.on('begin', function () { setTimeout(function () { airFor(); MOMENTS.forEach(function (m, i) { setTimeout(function () { ask(m); }, 1500 + i * 400); }); }, 1200); });
+  G.on('arrived', function () { setTimeout(airFor, 800); });
+  G.on('new-pond', function () { try { if (air && air.stop) air.stop(); } catch (e) { /* gone already */ } air = null; airName = ''; setTimeout(airFor, 1500); });
+  // the moments
+  G.on('deed-end', function (d, how) { if (quiet() || !d || !d.bp || how !== 'done' || G.speed > 16) return; G.fxSound('built', { volume: 0.8 }); });
+  G.on('mission-stage', function (d, what) { if (quiet()) return; if (what === 'liftoff') G.fxSound('liftoff', { volume: 0.9 }); });
+  G.on('ship-landing', function () { if (!quiet()) G.fxSound('landing', { volume: 0.9 }); });
+  G.on('raid-warn', function () { if (!quiet()) G.fxSound('raid', { volume: 0.85 }); });
+  G.on('colony-tier', function () { if (!quiet()) G.fxSound('grew', { volume: 0.85 }); });
 })();
 
 </script>

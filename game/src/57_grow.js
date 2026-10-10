@@ -33,7 +33,7 @@
     else if (want < g * 0.6) to = Math.max(want, g * 0.985);                 // and draws in again, slowly, if they turn small
     if (to) { if (typeof document === 'undefined' || G.mode !== 'play') G.pondGrowTo(to); else { if (to > g) G.emit('pond-grew', to); aim = to; } }
     const now = v.grow || 1;
-    if (G.mode === 'play' && to > g * 1.02) { told = now; if (G.toast) (G.note || G.toast)('The star is growing', why === 'deed' ? 'They went out and did something together, and the mist at the edges drew back. There is more water now.' : 'Its creatures needed more room, so the mist at the edges is drawing back. There is more water now.'); why = ''; if (G.log) G.log('disc', 'The star grew', 'It is now ' + now.toFixed(1) + ' times as wide as it began.'); }
+    if (G.mode === 'play' && to > g * 1.02) { told = now; if (G.toast) (G.note || G.toast)('The star is growing', why === 'deed' ? 'They went out and did something together, and the mist at the edges drew back. There is more ground now.' : 'Its creatures needed more room, so the mist at the edges is drawing back. There is more ground now.'); why = ''; if (G.log) G.log('disc', 'The star grew', 'It is now ' + now.toFixed(1) + ' times as wide as it began.'); }
   });
   // a new pond starts small again
   { const new0 = G.newWorld; G.newWorld = function (opts) { const v = G.view; if (v.grow && v.grow !== 1) { v.grow = 1; if (G.canvas) G.resize(); else { v.ww = v.ww * 1400 / v.wh; v.wh = 1400; } } told = 1; return new0(opts); }; }

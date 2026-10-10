@@ -91,7 +91,7 @@ function initRender() {
   G.on('birth', function (c, from, mate) {
     if (G.speed > 4) { if (c.muts.length) c.flash = 1; return; }
     const col = c.muts.length ? PAL.rose : PAL.frost;
-    ring(c.x, c.y, col, c.ph.r * 3.2, 0.8);
+    if (!G.FLAT) ring(c.x, c.y, col, c.ph.r * 3.2, 0.8);      // (on a star a birth is a few sparks: forty rings each spring would hide the colony)
     sparkle(c.x, c.y, col, 4, 40);
     if (from && G.speed <= 4) {
       fx({ k: 'link', x: from.x, y: from.y, c: c, col: PAL.gold, t: 0, life: 1.2 });
@@ -627,7 +627,7 @@ function drawCharacter(ctx, c, x, y, scale, t, opt) {
   ctx.restore();
   if (ph.mv && G.drawMarvel) G.drawMarvel(ctx, c, x, y, r, t, alpha);      // a marvel: aura, sparks, its sign, and what it is doing
   // what it is going through, said with one small sign over its head
-  if (G.speed <= 8 && alpha > 0.5 && !opt.noSigns) {
+  if (G.speed <= 8 && alpha > 0.5 && !opt.noSigns && (!G.FLAT || opt.live || G.view.scale >= 1.9)) {      // (on a star: only close up, or over the one you chose)
     const hy = y - hop - r * 254 / R.SIDE * 0.92, sign = scared ? '!' : c.pois > 0.3 ? 'x_x' : c.chill > 0.05 ? '*brr*' : c.hot > 0.05 ? '~phew~' : c.gasp > 0.7 && id % 4 === 0 ? 'o O' : still ? 'z z' : '';
     if (sign) { ctx.save(); ctx.font = '700 ' + Math.round(Math.max(9, r * (sign.length > 2 ? 0.36 : 0.55))) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,18,31,0.8)'; ctx.fillStyle = scared ? PAL.gold : c.pois > 0.3 ? PAL.algae : c.chill > 0.05 ? PAL.frost : c.hot > 0.05 ? PAL.rose : PAL.frost; const by2 = hy - 4 * Math.sin(t * 3 + id); ctx.strokeText(sign, x + r * 0.5, by2); ctx.fillText(sign, x + r * 0.5, by2); ctx.restore(); }
   }

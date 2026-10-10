@@ -235,7 +235,7 @@
   /** the ship in flight: it points where it flies, its engine burning behind it */
   /** the ship comes down where it is to stand: the view goes to it, it descends on its fire, and those aboard step out after (57x_far.js lets them out one by one) */
   let landing = null; const FXB = [];
-  function land(ship) { if (!ship) return; const W = G.W; landing = { ship: ship, y0: ship.y, t0: W.t, T: 2.8 }; ship.lifting = true; ship.y = landing.y0 - 640; if (G.cam) { G.cam.z = 0.3; G.cam.x = ship.x; G.cam.y = landing.y0 - 200; if (G.applyCam) G.applyCam(); } if (G.flyTo) G.flyTo(ship.x, landing.y0 - 70, 1.12, 1.9); }
+  function land(ship) { if (!ship) return; const W = G.W; landing = { ship: ship, y0: ship.y, t0: W.t, T: 2.8 }; G.emit('ship-landing', ship); ship.lifting = true; ship.y = landing.y0 - 640; if (G.cam) { G.cam.z = 0.3; G.cam.x = ship.x; G.cam.y = landing.y0 - 200; if (G.applyCam) G.applyCam(); } if (G.flyTo) G.flyTo(ship.x, landing.y0 - 70, 1.12, 1.9); }
   { const s2 = G.step; G.step = function (dt) { s2(dt); if (!landing) return; const W = G.W, k = landing, sh = k.ship; if (!W || (W.works || []).indexOf(sh) < 0) { landing = null; return; }
       const u = clamp((W.t - k.t0) / k.T, 0, 1); sh.lifting = true; sh.y = k.y0 - (1 - u) * (1 - u) * 640; k.u = u; if (u >= 1) { sh.y = k.y0; sh.lifting = false; landing = null; if (G.R) G.R.shake = 0.35; if (G.sfx) G.sfx('meteor'); } }; }
   G.on('went-aboard', function (c, ship) { if (G.mode === 'play') { FXB.push({ x: c.x, y: c.y, ship: ship, t0: now(), id: c.id, in: true }); if (G.sfx) G.sfx('click'); } });
