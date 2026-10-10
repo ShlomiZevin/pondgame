@@ -288,8 +288,8 @@ function drawFood() {
     const o = f[i];
     if (o.dead) continue;
     const tw = 0.75 + 0.25 * Math.sin(t * 2.2 + o.ph);
-    const s = 6 + o.v * 0.25;
-    ctx.globalAlpha = tw * 0.8;
+    const s = (6 + o.v * 0.25) * (G.FLAT ? 0.72 : 1);
+    ctx.globalAlpha = tw * (G.FLAT ? 0.5 : 0.8);
     ctx.drawImage(foodHaloSprite(o.tag), o.x - s, o.y - s, s * 2, s * 2);
   }
   ctx.globalAlpha = 1;

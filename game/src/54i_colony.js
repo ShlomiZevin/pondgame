@@ -37,6 +37,12 @@
     (W.works = W.works || []).unshift(h); colony(W);
     return h;
   };
+  // ── what the colony has become: a camp, a village, a town, a city. It shows in its Heart, which grows with it (and never shrinks) ──
+  G.TIERS = ['Camp', 'Village', 'Town', 'City'];
+  function tierOf(W) { let n = 0; const Wk = W.works || []; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (w.bp && w.bp.type !== 'heart' && !w.visitor && !w.enemy && !w.fall && G.buildCount(w)[0] >= G.buildCount(w)[2] * 0.7) n++; } return n >= 9 ? 3 : n >= 5 ? 2 : n >= 2 ? 1 : 0; }
+  function grow(W, col) { const h = G.heartOf(W); if (!h) return; const tr = Math.max(col.tier | 0, tierOf(W)); if (tr > (col.tier | 0)) { const was = col.tier | 0; col.tier = tr; G.emit('colony-tier', tr, was); }
+    if ((h.tier | 0) === tr || h.ruin) return; const c = G.buildCount(h); if (c[0] < c[2]) return;      // (a Heart that is being mended is not added to)
+    const S = 74 + tr * 4; h.bp = G.blueprintFrom({ seed: h.bp.seed, type: 'heart', S: S, hue: h.bp.hue, spiky: 0, brain: 0.6, wet: true, tier: tr }, '22222222222222222222222222222222222222222222222222'); h.tier = tr; h.r = 80 + tr * 22; h.y = heartY(W, S); h.grewT = W.t; G.emit('heart-grew', h, tr); }
   /** where a carrier sets its load down (and a builder takes one up) */
   const dropAt = G.storeAt = function (W) { const h = G.heartOf(W); if (!h) return null; const sy = shoreOf(W); return { x: h.x + (h.bp.hw || 60) + 34, y: G.FLAT ? h.y + h.bp.S * 0.45 - 2 : sy + (W.wh - sy) * 0.03 + 4 }; };
 
@@ -220,7 +226,7 @@
   let acc = 0;
   { const s1 = G.step; G.step = function (dt) { s1(dt); const W = G.W; if (!W || W.title || W.extinct) return; const col = colony(W);
       if (!W.farOf || (G.starHeld && G.starHeld(W))) G.ensureHeart(W);
-      acc += dt; if (acc >= 1.2) { acc = 0; for (let q = 0; q < 6; q++) staff(W, col); startBuild(W, col); mend(W, col); const h = G.heartOf(W); if (h) { h.x = clamp(h.x, 200, W.ww - 200); h.y = heartY(W, h.bp.S); } }
+      acc += dt; if (acc >= 1.2) { acc = 0; for (let q = 0; q < 6; q++) staff(W, col); startBuild(W, col); mend(W, col); grow(W, col); const h = G.heartOf(W); if (h) { h.x = clamp(h.x, 200, W.ww - 200); h.y = heartY(W, h.bp.S); } }
       let foes = null, yours = null, gone = false, anyFoe = false; towers(W, dt); for (let i = 0; i < W.cre.length; i++) if (W.cre[i].team === 1 && !W.cre[i].dead) { anyFoe = true; break; }
       const theirs = G.foeHeart ? G.foeHeart(W) : null;
       for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue; if (c.cool2 > 0) c.cool2 -= dt;

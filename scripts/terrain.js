@@ -13,7 +13,7 @@ const path = require('path');
   const ids = await fr.evaluate(() => G.TERRAINS.map((t) => t.id));
   for (const id of ids) {
     await fr.evaluate((id) => { const T = G.TERRAINS.filter((t) => t.id === id)[0]; G.terrainOf = function () { return T; }; G.camHome(); G.select(null); }, id);
-    await page.waitForTimeout(700); await page.screenshot({ path: path.join(__dirname, 'terrain-' + id + '.png') }); console.log('shot ' + id);
+    await page.waitForTimeout(3200); await page.screenshot({ path: path.join(__dirname, "terrain-" + id + ".png") }); console.log('shot ' + id);
   }
   await fr.evaluate(() => { const h = G.heartOf(G.W); G.focusOn(h.x, h.y - 60, 2); }); await page.waitForTimeout(600); await page.screenshot({ path: path.join(__dirname, 'terrain-close.png') });
   console.log(errs.slice(0, 8).join('\n') || 'no errors');
