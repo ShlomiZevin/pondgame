@@ -37,8 +37,9 @@
     (W.works = W.works || []).unshift(h); colony(W);
     return h;
   };
-  // ── what the colony has become: a camp, a village, a town, a city. It shows in its Heart, which grows with it (and never shrinks) ──
-  G.TIERS = ['Camp', 'Village', 'Town', 'City'];
+  // ── how far the colony has come. It shows in its Heart, which grows with it (and never shrinks) ──
+  // (The four steps are named for GROWTH, not for what people build: nobody knows what these creatures are, and a word like "village" would say they are us.)
+  G.TIERS = ['Founded', 'Growing', 'Thriving', 'Great'];
   function tierOf(W) { let n = 0; const Wk = W.works || []; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (w.bp && w.bp.type !== 'heart' && !w.visitor && !w.enemy && !w.fall && G.buildCount(w)[0] >= G.buildCount(w)[2] * 0.7) n++; } return n >= 9 ? 3 : n >= 5 ? 2 : n >= 2 ? 1 : 0; }
   function grow(W, col) { const h = G.heartOf(W); if (!h) return; const tr = Math.max(col.tier | 0, tierOf(W)); if (tr > (col.tier | 0)) { const was = col.tier | 0; col.tier = tr; G.emit('colony-tier', tr, was); }
     if ((h.tier | 0) === tr || h.ruin) return; const c = G.buildCount(h); if (c[0] < c[2]) return;      // (a Heart that is being mended is not added to)

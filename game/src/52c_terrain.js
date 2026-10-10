@@ -24,6 +24,8 @@
   const idOf = function (W) { return G.terrainOf ? G.terrainOf(W).id : 'reef'; };
   /** the colours of the star being shown */
   G.terrainLook = function (W) { return LOOK[idOf(W || G.W)] || LOOK.reef; };
+  /** the colours of a kind of star, by its name */
+  G.terrainColours = function (id) { return LOOK[id] || null; };
   const fr = function (v) { return v - Math.floor(v); };
   function rnd(seed, i, k) { return fr(Math.sin(i * 127.1 + k * 311.7 + (seed % 9973) * 0.731) * 43758.5453); }
   function hash2(ix, iy, s) { let h = (Math.imul(ix, 374761393) + Math.imul(iy, 668265263) + Math.imul(s, 1274126177)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
@@ -38,7 +40,11 @@
     const id = idOf(W), L = LOOK[id] || LOOK.reef, seed = (W.seed >>> 0) % 100000, w = Math.ceil((W.ww + 2 * MARGIN) * k), h = Math.ceil((W.wh + 2 * MARGIN) * k), cx = W.ww / 2, cy = W.wh / 2;
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const em = (id === 'ember' || id === 'crystal') ? document.createElement('canvas') : null; if (em) { em.width = w; em.height = h; }
     const H = new Float32Array(w * h), R = new Float32Array(w * h), sites = G.sitesOf ? G.sitesOf(W) : [], cen = G.centreOf ? G.centreOf(W) : { x: cx, y: cy };
-    const job = { k: k, w: w, h: h, cv: cv, em: em, row: 0, phase: 0, done: false, id: id };
+    // (If this star's ground has been PAINTED (53_art.js), the painting itself is drawn as the ground, sharp at any distance (see G.drawBasin), and this map is
+    //  only what goes OVER it: `cv` is its LIGHT (the heights lighting it from the north-west, and broad patches a little lighter and darker so the squares of the
+    //  painting cannot be told), `tint` is what the star's places and its own nature colour into it. Both are soft, so they are made small and quickly.)
+    const art = G.art && G.art.ground ? G.art.ground(W) : null, AM = art ? art.mean : null, tint = art ? document.createElement('canvas') : null; if (tint) { tint.width = w; tint.height = h; }
+    const job = { k: k, w: w, h: h, cv: cv, em: em, tint: tint, row: 0, phase: 0, done: false, id: id, art: !!art };
     const wx = function (px) { return px / k - MARGIN; }, wy = function (py) { return py / k - MARGIN; };
     job.run = function (ms) {
       const t0 = performance.now();
@@ -53,24 +59,27 @@
           const n = L.craters; for (let i = 0; i < n; i++) { const X = (rnd(seed, i, 51) - 0.5) * (W.ww + 200), Y = (rnd(seed, i, 52) - 0.5) * (W.wh + 200), r = (26 + rnd(seed, i, 53) * rnd(seed, i, 54) * 110), dep = 0.10 + rnd(seed, i, 55) * 0.12; if (Math.hypot(X - (cen.x - cx), Y - (cen.y - cy)) < 330 + r) continue;
             const px0 = Math.max(0, Math.floor((X + cx + MARGIN - r * 1.4) * k)), px1 = Math.min(w - 1, Math.ceil((X + cx + MARGIN + r * 1.4) * k)), py0 = Math.max(0, Math.floor((Y + cy + MARGIN - r * 1.4) * k)), py1 = Math.min(h - 1, Math.ceil((Y + cy + MARGIN + r * 1.4) * k));
             for (let y = py0; y <= py1; y++) for (let x = px0; x <= px1; x++) { const d = Math.hypot(wx(x) - cx - X, (wy(y) - cy - Y) * 1.25) / r; if (d < 1.4) H[y * w + x] += d < 1 ? -dep * (1 - d * d) + dep * 0.35 * d * d * d * d : dep * 0.35 * (1 - (d - 1) / 0.4); } }
-          for (let i = 0; i < H.length; i++) { const v = Math.max(0, Math.min(0.999, H[i])), t = v * 5, fl = Math.floor(t), s = (fl + sstep(0.32, 0.68, t - fl)) / 5; H[i] = v + (s - v) * L.terrace; }
+          for (let i = 0; i < H.length; i++) { const v = Math.max(0, Math.min(0.999, H[i])), t = v * 5, fl = Math.floor(t), s = (fl + sstep(0.32, 0.68, t - fl)) / 5; H[i] = v + (s - v) * L.terrace * (art ? 0.12 : 1); }
           job.phase = 2;
         } else {      // colour: by height, lit from the north-west, with what this terrain adds; the places of the star tinted in
-          const y = job.row, img = job.img || (job.img = cv.getContext('2d').createImageData(w, 1)), D = img.data, E = em ? (job.eimg || (job.eimg = em.getContext('2d').createImageData(w, 1))) : null, ED = E ? E.data : null, Yw = wy(y), ramp = L.ramp;
+          const y = job.row, img = job.img || (job.img = cv.getContext('2d').createImageData(w, 1)), D = img.data, TI = tint ? (job.timg || (job.timg = tint.getContext('2d').createImageData(w, 1))) : null, TD = TI ? TI.data : null, E = em ? (job.eimg || (job.eimg = em.getContext('2d').createImageData(w, 1))) : null, ED = E ? E.data : null, Yw = wy(y), ramp = L.ramp;
           for (let x = 0; x < w; x++) { const i = y * w + x, v = H[i], rg = R[i], Xw = wx(x);
-            const a = H[Math.max(0, y - 1) * w + Math.max(0, x - 1)], b = H[Math.min(h - 1, y + 1) * w + Math.min(w - 1, x + 1)]; let light = 1 + (a - b) * 11 * Math.min(1.6, 0.75 / k); light = Math.max(0.5, Math.min(1.55, light));
-            const t = Math.max(0, Math.min(3.999, v * 4)), q = Math.floor(t), f = t - q, c0 = ramp[q], c1 = ramp[q + 1]; let r = c0[0] + (c1[0] - c0[0]) * f, g = c0[1] + (c1[1] - c0[1]) * f, bl = c0[2] + (c1[2] - c0[2]) * f, e = 0;
-            if (id === 'ember') { const lv = sstep(0.83, 0.93, rg) * sstep(0.62, 0.45, v); if (lv > 0) { r += (255 - r) * lv; g += (120 - g) * lv; bl += (30 - bl) * lv; e = lv; light = 1 + (light - 1) * (1 - lv); } }
-            else if (id === 'frost') { const cvs = sstep(0.88, 0.96, rg); r += (14 - r) * cvs * 0.85; g += (52 - g) * cvs * 0.85; bl += (104 - bl) * cvs * 0.85; }
-            else if (id === 'marsh') { const pl = sstep(0.36, 0.27, v); if (pl > 0) { r += (6 - r) * pl; g += (18 - g) * pl; bl += (30 - bl) * pl; light = 1 + (light - 1) * (1 - pl) + pl * 0.25 * sstep(0.6, 0.9, vnoise(Xw / 14, Yw / 5, seed + 77)); } }
-            else if (id === 'crystal') { const vn = sstep(0.9, 0.97, rg); r += (150 - r) * vn * 0.5; g += (225 - g) * vn * 0.5; bl += (255 - bl) * vn * 0.5; e = vn * 0.6; if (hash2(x, y, seed + 3) > 0.9988) e = 1; }
+            const a = H[Math.max(0, y - 1) * w + Math.max(0, x - 1)], b = H[Math.min(h - 1, y + 1) * w + Math.min(w - 1, x + 1)]; let light = 1 + (a - b) * (AM ? 7.5 * k : 11 * Math.min(1.6, 0.75 / k)); light = Math.max(0.5, Math.min(1.55, light));
+            const t = Math.max(0, Math.min(3.999, v * 4)), q = Math.floor(t), f = t - q, c0 = ramp[q], c1 = ramp[q + 1]; let r = c0[0] + (c1[0] - c0[0]) * f, g = c0[1] + (c1[1] - c0[1]) * f, bl = c0[2] + (c1[2] - c0[2]) * f, e = 0, kp = 1, tn = 1;      /* (kp: how much of the ground's own colour is left under what is tinted into it) */
+            if (AM) { r = AM[0]; g = AM[1]; bl = AM[2]; tn = 0.82 + 0.34 * fbm(Xw / 430 + 9, Yw / 430 + 3, seed + 70, 3); }
+            if (id === 'ember') { const lv = sstep(0.83, 0.93, rg) * sstep(0.62, 0.45, v); if (lv > 0) { r += (255 - r) * lv; g += (120 - g) * lv; bl += (30 - bl) * lv; kp *= 1 - lv; e = lv; light = 1 + (light - 1) * (1 - lv); } }
+            else if (id === 'frost') { const cvs = AM ? sstep(0.93, 0.985, rg) * 0.5 : sstep(0.88, 0.96, rg);      /* (on painted ice: thin, and only a shade bluer) */ r += (14 - r) * cvs * 0.85; g += (52 - g) * cvs * 0.85; bl += (104 - bl) * cvs * 0.85; kp *= 1 - cvs * 0.85; }
+            else if (id === 'marsh') { const pl = sstep(0.36, 0.27, v); if (pl > 0) { r += (6 - r) * pl; g += (18 - g) * pl; bl += (30 - bl) * pl; kp *= 1 - pl; light = 1 + (light - 1) * (1 - pl) + pl * 0.25 * sstep(0.6, 0.9, vnoise(Xw / 14, Yw / 5, seed + 77)); } }
+            else if (id === 'crystal') { const vn = AM ? sstep(0.94, 0.99, rg) * 0.55 : sstep(0.9, 0.97, rg);      /* (on painted ground: thinner, fainter veins) */ r += (150 - r) * vn * 0.5; g += (225 - g) * vn * 0.5; bl += (255 - bl) * vn * 0.5; kp *= 1 - vn * 0.5; e = vn * 0.6; if (hash2(x, y, seed + 3) > 0.9988) e = 1; }
             else if (id === 'reef') { light += (vnoise(Xw / 520, Yw / 34, seed + 61) - 0.5) * 0.16; }
             for (let s = 0; s < sites.length; s++) { const S = sites[s], d = Math.hypot(Xw - S.x, (Yw - S.y) / 0.8) / S.r; if (d > 1.25) continue; const m = sstep(1.25, 0.7, d) * (0.75 + 0.5 * vnoise(Xw / 26, Yw / 26, seed + 90));
-              if (S.k === 'grove') { r += (26 - r) * m * 0.6; g += (112 - g) * m * 0.6; bl += (70 - bl) * m * 0.6; } else if (S.k === 'quarry') { r += (104 - r) * m * 0.55; g += (110 - g) * m * 0.55; bl += (122 - bl) * m * 0.55; light = 1 + (light - 1) * (1 + m); } else if (S.k === 'reeds') { r += (96 - r) * m * 0.5; g += (124 - g) * m * 0.5; bl += (52 - bl) * m * 0.5; } else if (S.k === 'shells') { r += (190 - r) * m * 0.42; g += (172 - g) * m * 0.42; bl += (136 - bl) * m * 0.42; } }
-            { const dc = Math.hypot(Xw - cen.x, (Yw - cen.y + 10) * 1.6), m = sstep(330, 120, dc) * 0.16; r += (ramp[3][0] - r) * m; g += (ramp[3][1] - g) * m; bl += (ramp[3][2] - bl) * m; }      // (the trodden ground of the colony)
-            const gr = (hash2(x, y, seed + 1) - 0.5) * 12, o = x * 4; D[o] = r * light + gr; D[o + 1] = g * light + gr; D[o + 2] = bl * light + gr; D[o + 3] = 255;
+              if (S.k === 'grove') { const q = m * (AM ? 0.46 : 0.6); r += (26 - r) * q; g += (112 - g) * q; bl += (70 - bl) * q; kp *= 1 - q; } else if (S.k === 'quarry') { const q = m * (AM ? 0.4 : 0.55); r += (104 - r) * q; g += (110 - g) * q; bl += (122 - bl) * q; kp *= 1 - q; light = 1 + (light - 1) * (1 + m); } else if (S.k === 'reeds') { const q = m * (AM ? 0.38 : 0.5); r += (96 - r) * q; g += (124 - g) * q; bl += (52 - bl) * q; kp *= 1 - q; } else if (S.k === 'shells') { const q = m * (AM ? 0.34 : 0.42); r += (190 - r) * q; g += (172 - g) * q; bl += (136 - bl) * q; kp *= 1 - q; } }
+            { const dc = Math.hypot(Xw - cen.x, (Yw - cen.y + 10) * 1.6), m = sstep(330, 120, dc) * 0.16, tr = AM ? [AM[0] * 1.16, AM[1] * 1.14, AM[2] * 1.1] : ramp[3]; r += (tr[0] - r) * m; g += (tr[1] - g) * m; bl += (tr[2] - bl) * m; kp *= 1 - m; }      // (the trodden ground of the colony)
+            const gr = (hash2(x, y, seed + 1) - 0.5) * 12, o = x * 4;
+            if (AM) { const al = 1 - kp, sh = Math.max(0, Math.min(255, light * tn * 127.5)); D[o] = D[o + 1] = D[o + 2] = sh; D[o + 3] = 255; if (al > 0.004) { TD[o] = (r - AM[0] * kp) / al; TD[o + 1] = (g - AM[1] * kp) / al; TD[o + 2] = (bl - AM[2] * kp) / al; TD[o + 3] = al * 255; } else TD[o + 3] = 0; }
+            else { D[o] = r * light + gr; D[o + 1] = g * light + gr; D[o + 2] = bl * light + gr; D[o + 3] = 255; }
             if (ED) { if (id === 'ember') { ED[o] = 255; ED[o + 1] = 150; ED[o + 2] = 50; } else { ED[o] = 170; ED[o + 1] = 235; ED[o + 2] = 255; } ED[o + 3] = e * 255; } }
-          cv.getContext('2d').putImageData(img, 0, y); if (E) em.getContext('2d').putImageData(E, 0, y);
+          cv.getContext('2d').putImageData(img, 0, y); if (TI) tint.getContext('2d').putImageData(TI, 0, y); if (E) em.getContext('2d').putImageData(E, 0, y);
           if (++job.row >= h) job.done = true;
         }
       }
@@ -80,9 +89,9 @@
   }
   let MAP = null;      // { key, lo, hi, job }
   function mapFor(W) {
-    const key = (W.seed >>> 0) + ':' + idOf(W) + ':' + Math.round(W.ww) + ':' + Math.round(W.wh);
-    if (!MAP || MAP.key !== key) { const lo = startJob(W, 0.22); lo.run(400); MAP = { key: key, lo: lo, hi: null, job: startJob(W, 0.8) }; }
-    if (MAP.job) { if (MAP.job.run(7)) { MAP.hi = MAP.job; MAP.job = null; } }
+    const art = G.art && G.art.ground ? G.art.ground(W) : null, key = (W.seed >>> 0) + ':' + idOf(W) + ':' + Math.round(W.ww) + ':' + Math.round(W.wh) + (art ? ':painted' : '');
+    if (!MAP || MAP.key !== key) { if (art) MAP = { key: key, lo: null, hi: null, job: startJob(W, 0.36), art: art }; else { const lo = startJob(W, 0.22); lo.run(400); MAP = { key: key, lo: lo, hi: null, job: startJob(W, 0.8) }; } }
+    if (MAP.job) { if (MAP.job.run(MAP.art ? 11 : 7)) { MAP.hi = MAP.job; MAP.job = null; } }
     return MAP;
   }
   let TILE = null;
@@ -96,13 +105,48 @@
   function clump(ctx, L, x, y, s, t, i) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(x + s * 0.2, y + s * 0.2, s, s * 0.22, 0, 0, 6.2832); ctx.fill(); for (let b = -2; b <= 2; b++) { const sw = Math.sin(t * 1.1 + i + b) * 2.5, hh = s * (1.1 - Math.abs(b) * 0.18); ctx.strokeStyle = b % 2 ? 'rgba(90,170,80,0.95)' : 'rgba(140,210,96,0.95)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + b * s * 0.2, y + s * 0.15); ctx.quadraticCurveTo(x + b * s * 0.3, y - hh * 0.5, x + b * s * 0.42 + sw, y - hh); ctx.stroke(); } }
   function prop(ctx, id, L, x, y, s, v, t, i) { if (id === 'crystal') { if (v < 0.6) spires(ctx, L, x, y, s * 0.85, v, t, i); else rock(ctx, L, x, y, s * 0.7, v); } else if (id === 'ember') { if (v < 0.4) vent(ctx, L, x, y, s * 0.8, t, i); else rock(ctx, L, x, y, s * 0.8, v); } else if (id === 'frost') { if (v < 0.6) shards(ctx, L, x, y, s * 0.85, v); else rock(ctx, L, x, y, s * 0.7, v); } else if (id === 'marsh') { if (v < 0.7) clump(ctx, L, x, y, s * 0.8, t, i); else rock(ctx, L, x, y, s * 0.6, v); } else rock(ctx, L, x, y, s * (0.6 + v * 0.5), v); }
 
+  // ── on a painted star, what stands on the ground is painted too (53_art.js: G.art.nature) ──
+  // Where each thing stands is the star's own (from its seed, and where its places are): rocks about the star, stone at the quarry, reeds in the reed bed, shells in
+  // the shell bed, bushes round the feeding grounds, crystals where lumen grows. Each casts a shadow, and takes its turn among the creatures (G.upright), so a creature
+  // walks behind a rock and before it.
+  let SCN = null;
+  function scenery(W, seed) {
+    const key = seed + ':' + Math.round(W.ww) + ':' + Math.round(W.wh); if (SCN && SCN.key === key) return SCN.L;
+    const L = [], e = (G.sideEdge ? G.sideEdge(W) : 40) + 10, span = W.ww - 2 * e, top = 40, bot = W.wh - 26, mid = G.centreOf ? G.centreOf(W) : { x: W.ww / 2, y: W.wh / 2 }, S = G.sitesOf ? G.sitesOf(W) : [];
+    const n = Math.round(16 + span * (bot - top) / 120000);
+    for (let i = 0; i < n; i++) { const x = e + rnd(seed, i, 21) * span, y = top + rnd(seed, i, 22) * (bot - top), v = rnd(seed, i, 24); if (Math.hypot(x - mid.x, (y - mid.y) * 1.4) < 400 || (G.siteAt && G.siteAt(W, x, y, 50))) continue; L.push({ k: v < 0.7 ? 'rock' : 'quarry', x: x, y: y, w: 46 + rnd(seed, i, 23) * 60, f: i % 2 }); }
+    S.forEach(function (s, si) { const ry = s.r * 0.8;
+      if (s.k === 'grove') for (let q = 0; q < 14; q++) { const a = q * 0.449 + rnd(seed, si * 31 + q, 71), d = 0.86 + 0.2 * rnd(seed, si * 31 + q, 72); L.push({ k: 'plant', x: s.x + Math.cos(a) * s.r * d, y: s.y + Math.sin(a) * ry * d, w: 40 + 26 * rnd(seed, si * 31 + q, 73), f: q % 2 }); }
+      else if (s.k === 'quarry') for (let q = 0; q < 9; q++) { const a = q * 0.698 + 0.3, d = q % 3 ? 0.9 : 0.45; L.push({ k: q % 4 === 3 ? 'rock' : 'quarry', x: s.x + Math.cos(a) * s.r * d, y: s.y + Math.sin(a) * ry * d, w: 52 + 40 * rnd(seed, q, 81), f: q % 2 }); }
+      else if (s.k === 'reeds') for (let q = 0; q < 13; q++) { const a = rnd(seed, q, 91) * 6.2832, d = Math.sqrt(rnd(seed, q, 92)) * 0.92; L.push({ k: 'reeds', x: s.x + Math.cos(a) * s.r * d, y: s.y + Math.sin(a) * ry * d, w: 40 + 26 * rnd(seed, q, 93), f: q % 2 }); }
+      else if (s.k === 'shells') for (let q = 0; q < 8; q++) { const a = rnd(seed, q, 95) * 6.2832, d = Math.sqrt(rnd(seed, q, 96)) * 0.86; L.push({ k: 'shells', x: s.x + Math.cos(a) * s.r * d, y: s.y + Math.sin(a) * ry * d, w: 38 + 22 * rnd(seed, q, 97), f: q % 2 }); } });
+    SCN = { key: key, L: L }; return L;
+  }
+  function thing(ctx, q) { const s = q.s, k = q.w / s.w; ctx.imageSmoothingEnabled = true; if (q.f) { ctx.translate(q.x, 0); ctx.scale(-1, 1); ctx.translate(-q.x, 0); } ctx.drawImage(s.cv, q.x - s.w * k / 2, q.y - s.h * k * 0.86, s.w * k, s.h * k); }
+  /** is this star's scenery painted? (then nothing here is drawn by hand; 68a_field.js asks, for its lumen) */
+  G.sceneryPainted = function (W) { return !!(G.art && G.art.nature && G.art.nature(W || G.W, 'rock')); };
+  function paintedScenery(ctx, W, seed, t, x0, y0, x1, y1) {
+    const A = G.art, L = scenery(W, seed);
+    const put = function (q, s) { if (!s || q.x + q.w < x0 || q.x - q.w > x1 || q.y + 30 < y0 || q.y - q.w * 1.6 > y1) return; ctx.fillStyle = 'rgba(0,0,0,0.30)'; ctx.beginPath(); ctx.ellipse(q.x + q.w * 0.16, q.y + q.w * 0.02, q.w * 0.5, q.w * 0.15, 0, 0, 6.2832); ctx.fill(); q.s = s; if (G.upright) G.upright(q.y, thing, q); else { ctx.save(); thing(ctx, q); ctx.restore(); } };
+    for (let i = 0; i < L.length; i++) put(L[i], A.nature(W, L[i].k));
+    const N = G.lumenNodes ? G.lumenNodes(W) : [], ls = A.nature(W, 'lumen');
+    for (let i = 0; i < N.length; i++) { const nd = N[i], full = nd.n0 ? Math.max(0, Math.min(1, nd.n / nd.n0)) : 0, q = nd._q || (nd._q = { f: i % 2 }); q.x = nd.x; q.y = nd.y + 10; q.w = nd.n > 0 ? 56 + 44 * full : 30; if (!ls) continue;
+      if (nd.n > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const R = 60 + 30 * full, g = ctx.createRadialGradient(q.x, q.y - 10, 4, q.x, q.y - 10, R); g.addColorStop(0, 'rgba(110,230,255,' + (0.16 + 0.06 * Math.sin(t * 2 + i * 1.7)) + ')'); g.addColorStop(1, 'rgba(110,230,255,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(q.x, q.y - 4, R, R * 0.55, 0, 0, 6.2832); ctx.fill(); ctx.restore(); }
+      put(q, ls); }
+  }
+
   /** the ground of the star: its relief map, what stands on it, and the scenery of its places (world space; under everything that lives) */
   G.drawBasin = function (ctx, W) {
     const id = idOf(W), L = LOOK[id] || LOOK.reef, seed = W.seed >>> 0, t = G.rt || 0, e = (G.sideEdge ? G.sideEdge(W) : 40) + 10, span = W.ww - 2 * e, top = 40, bot = W.wh - 26, v = G.view, mid0 = G.centreOf ? G.centreOf(W) : { x: W.ww / 2, y: W.wh / 2 };
     const x0 = -v.ox / v.scale - 120, x1 = x0 + v.w / v.scale + 240, y0 = -v.oy / v.scale - 120, y1 = y0 + v.h / v.scale + 240;
     ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     const M = mapFor(W), mp = M.hi || M.lo;
-    if (mp && mp.cv) { ctx.imageSmoothingEnabled = true; ctx.drawImage(mp.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN);
+    if (M.art) {      // a painted star: the painting is its ground; over it what is tinted into it, and its light
+      const A = M.art, gx0 = Math.max(-MARGIN, x0), gy0 = Math.max(-MARGIN, y0), gx1 = Math.min(W.ww + MARGIN, x1), gy1 = Math.min(W.wh + MARGIN, y1);
+      if (gx1 > gx0 && gy1 > gy0) { ctx.imageSmoothingEnabled = true; ctx.fillStyle = A.pat || (A.pat = ctx.createPattern(A.tile, 'repeat')); ctx.fillRect(gx0, gy0, gx1 - gx0, gy1 - gy0);
+        if (mp && mp.done && mp.tint) { ctx.drawImage(mp.tint, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.save(); ctx.globalCompositeOperation = 'hard-light'; ctx.drawImage(mp.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore();
+          if (mp.em) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.3 * Math.sin(t * 1.3); ctx.drawImage(mp.em, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore(); } } }
+    } else if (mp && mp.cv) { ctx.imageSmoothingEnabled = true; ctx.drawImage(mp.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN);
       if (mp.em && mp.done) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.3 * Math.sin(t * 1.3); ctx.drawImage(mp.em, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore(); }
       if (v.scale > 0.95) { const pat = ctx.createPattern(grainTile(), 'repeat'); if (pat) { ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = Math.min(0.5, (v.scale - 0.95) * 0.5); ctx.scale(0.6, 0.6); ctx.fillStyle = pat; ctx.fillRect(x0 / 0.6, y0 / 0.6, (x1 - x0) / 0.6, (y1 - y0) / 0.6); ctx.restore(); } } }
     // the slow shadows of clouds
@@ -111,8 +155,10 @@
     // the standing things, far ones first
     const n = Math.round(14 + span * (bot - top) / 150000), P = [];
     for (let i = 0; i < n; i++) { const x = e + rnd(seed, i, 21) * span, y = top + rnd(seed, i, 22) * (bot - top), s = 12 + rnd(seed, i, 23) * 20; if (x + s * 3 < x0 || x - s * 3 > x1 || y + s * 2 < y0 || y - s * 3 > y1) continue; if (Math.hypot(x - mid0.x, (y - mid0.y) * 1.4) < 380 || (G.siteAt && G.siteAt(W, x, y, 40))) continue; P.push([x, y, s, rnd(seed, i, 24), i]); }
-    P.sort(function (a, b) { return a[1] - b[1]; }).forEach(function (q) { prop(ctx, id, L, q[0], q[1], q[2], q[3], t, q[4]); });
-    sites(ctx, W, L, id, seed, t, x0, y0, x1, y1); beacons(ctx, W, L, seed, t);
+    const painted = !!(M.art && G.sceneryPainted(W));
+    if (painted) paintedScenery(ctx, W, seed, t, x0, y0, x1, y1);      // (on a painted star, drawn rocks would look pasted on: what stands there is painted too)
+    else { if (!M.art) P.sort(function (a, b) { return a[1] - b[1]; }).forEach(function (q) { prop(ctx, id, L, q[0], q[1], q[2], q[3], t, q[4]); }); sites(ctx, W, L, id, seed, t, x0, y0, x1, y1); }
+    beacons(ctx, W, L, seed, t);
     ctx.restore();
   };
 

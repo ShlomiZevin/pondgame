@@ -144,6 +144,7 @@
   const BODY = {}, FW = 320, FH = 192, FM = 150;
   let builtNow = 0, stamp = 0;      // the pond in its picture: wide, tall, and the margin round it
   let FMASK = null;
+  G.on('art', function () { for (const k in BODY) delete BODY[k]; });      // (a ground has been painted: the stars of that kind are drawn again)
   function bodyOf(p) {
     const key = p.i + ',' + p.j; if (BODY[key]) { BODY[key].used = stamp; return BODY[key]; }
     if (builtNow >= 1) return null;      /* one new picture a frame: a sky full of ponds coming into view fills in over a few frames and never stalls one */
@@ -155,10 +156,15 @@
     const pc = document.createElement('canvas'); pc.width = SW; pc.height = SH; const d = pc.getContext('2d'), shore = FH * (0.2 + 0.1 * hash(p.i, p.j, 210));
     d.save();      /* the water and the shore are painted right across the sheet: the ending below decides how far they are seen */
     const wg = d.createLinearGradient(0, FM, 0, FM + FH); wg.addColorStop(0, col(0, 55, 34, 1)); wg.addColorStop(0.5, col(8, 60, 24, 1)); wg.addColorStop(1, col(18, 65, 12, 1)); d.fillStyle = wg; d.fillRect(0, 0, SW, SH);
+    // (a star is ground, of its own kind: its painted ground where that is in hand, else its colours)
+    const tid = G.FLAT ? (p.home && G.W && !G.W.farOf && G.terrainOf ? G.terrainOf(G.W).id : p.terrain) : '', TL = tid && G.terrainColours ? G.terrainColours(tid) : null, GT = TL && G.art && G.art.groundTile ? G.art.groundTile(tid) : null;
+    if (TL) { if (GT) { d.save(); d.scale(0.28, 0.28); d.fillStyle = d.createPattern(GT, 'repeat'); d.fillRect(0, 0, SW / 0.28, SH / 0.28); d.restore(); } else { const gg = d.createLinearGradient(0, FM, SW * 0.4, FM + FH); gg.addColorStop(0, 'rgb(' + TL.ramp[3].join(',') + ')'); gg.addColorStop(1, 'rgb(' + TL.ramp[1].join(',') + ')'); d.fillStyle = gg; d.fillRect(0, 0, SW, SH); }
+      const sg = d.createLinearGradient(0, FM, SW, FM + FH); sg.addColorStop(0, 'rgba(255,255,255,0.10)'); sg.addColorStop(1, 'rgba(0,0,10,0.34)'); d.fillStyle = sg; d.fillRect(0, 0, SW, SH); }
     try { d.filter = 'blur(4.5px)'; } catch (e) { /* no blur here: the lights are simply sharper */ }
     // what lives in it, too far to make out: soft lights of many colours
     for (let k = 0; k < 46; k++) { const lx = FM + hash(p.i + k, p.j, 211) * FW, ly = FM + shore + hash(p.i, p.j + k, 212) * (FH - shore), big = hash(p.i - k, p.j, 213) < 0.2; d.fillStyle = 'hsla(' + ((h + 60 + k * 53) % 360) + ',90%,' + (big ? 70 : 76) + '%,' + (big ? 0.55 : 0.85) + ')'; d.beginPath(); d.arc(lx, ly, big ? 9 : 3 + 2.4 * hash(k, p.i, 214), 0, TAU); d.fill(); }
     // the shore along the top, with its uneven waterline
+    if (TL) { d.filter = 'none'; d.restore(); d.save(); d.beginPath(); d.rect(0, 0, 0, 0); d.clip(); }      /* (a star has no shore: nothing more is painted on it) */
     d.fillStyle = col(-115 + 30 * hash(p.i, p.j, 215), 38, 58, 1); d.beginPath(); d.moveTo(0, 0); d.lineTo(SW, 0); d.lineTo(SW, FM + shore);
     for (let q = 24; q >= 0; q--) d.lineTo(SW * q / 24, FM + shore + Math.sin(q * 1.3 + p.i) * 3.2 + Math.sin(q * 0.5 + p.j) * 2.8); d.closePath(); d.fill();
     for (let k = 0; k < 16; k++) { d.fillStyle = 'hsla(' + ((h + 100 + k * 71) % 360) + ',75%,68%,0.8)'; d.beginPath(); d.arc(FM + hash(k, p.j, 216) * FW, FM + hash(p.i, k, 217) * shore * 0.9, 2.8, 0, TAU); d.fill(); }
@@ -185,7 +191,7 @@
     const k = pr * 2 / FH, w = (FW + 2 * FM) * k, hh = (FH + 2 * FM) * k, hw2 = FW * k / 2, hh2 = FH * k / 2;
     // seen small (or while its picture is still to be made) a far pond is a few strokes: a glow, its water, its shore
     const pic = pr >= 11 ? bodyOf(p) : null;
-    if (!pic) { ctx.fillStyle = col(0, 85, 60, 0.16); ctx.beginPath(); ctx.arc(px, py, pr * 2.4, 0, TAU); ctx.fill(); ctx.fillStyle = col(8, 60, 30, 0.95); ctx.fillRect(px - hw2 * 0.9, py - hh2 * 0.8, hw2 * 1.8, hh2 * 1.6); ctx.fillStyle = col(-115, 40, 58, 0.95); ctx.fillRect(px - hw2 * 0.9, py - hh2 * 0.8, hw2 * 1.8, hh2 * 0.42); if (pr < 11) return; }
+    if (!pic) { ctx.fillStyle = col(0, 85, 60, 0.16); ctx.beginPath(); ctx.arc(px, py, pr * 2.4, 0, TAU); ctx.fill(); { const tid = G.FLAT ? (p.home && G.W && !G.W.farOf && G.terrainOf ? G.terrainOf(G.W).id : p.terrain) : '', TL = tid && G.terrainColours ? G.terrainColours(tid) : null; if (TL) { ctx.fillStyle = 'rgb(' + TL.ramp[3].join(',') + ')'; G.roundRect(ctx, px - hw2 * 0.9, py - hh2 * 0.8, hw2 * 1.8, hh2 * 1.6, Math.min(hw2, hh2) * 0.5); ctx.fill(); }      /* (a star far off: a speck of its own ground's colour) */ else { ctx.fillStyle = col(8, 60, 30, 0.95); ctx.fillRect(px - hw2 * 0.9, py - hh2 * 0.8, hw2 * 1.8, hh2 * 1.6); ctx.fillStyle = col(-115, 40, 58, 0.95); ctx.fillRect(px - hw2 * 0.9, py - hh2 * 0.8, hw2 * 1.8, hh2 * 0.42); } } if (pr < 11) return; }
     else ctx.drawImage(pic, px - w / 2, py - hh / 2, w, hh);
     if (pr > 9) {
       // a few of its lights wander, and grains of it drift slowly off into space

@@ -7096,8 +7096,8 @@ function drawShore() {
   ctx.stroke();
   ctx.restore();
 }
-function drawDustFar() { dust(R.far, 1, 1); }
-function drawDustNear() { dust(R.near, 2.2, 1); }
+function drawDustFar() { if (G.FLAT && G.W && !G.W.title) return; dust(R.far, 1, 1); }      // (motes drift in water, not over a star's ground)
+function drawDustNear() { if (G.FLAT && G.W && !G.W.title) return; dust(R.near, 2.2, 1); }
 
 // ── layer 4: zones from the things you add ──
 function zoneColor(z, a) { return G.hsl(z.hue, 80, 62, a); }
@@ -7579,7 +7579,7 @@ function drawCreatures() {
   beginWorld(ctx);
   const cre = W.cre.slice().sort(function (p, q) { return p.y - q.y; });      // back to front: the nearer ones stand in front
   const season = W.season;
-  const showBars = season === 2 || (season === 3 && W.st < 3.5);
+  const showBars = (season === 2 || (season === 3 && W.st < 3.5)) && (!G.FLAT || G.view.scale >= 1.25);      // (on a star: only close up, where a bar can be told from its neighbour's)
   const crowd = clamp01(130 / (cre.length + 1));
   const vw = G.view, vx0 = -vw.ox / vw.scale, vy0 = -vw.oy / vw.scale, vx1 = vx0 + vw.w / vw.scale, vy1 = vy0 + vw.h / vw.scale;
   const fdt = G.frameDt || 0.016;
@@ -7590,6 +7590,7 @@ function drawCreatures() {
     const c = cre[i];
     let x = c.px + (c.x - c.px) * a, y = c.py + (c.y - c.py) * a;
     c.rx = x; c.ry = y;
+    if (G.drawUprights) G.drawUprights(ctx, c.y);      // (the buildings that stand behind it are drawn first: 54h_look.js)
     if (c.inShip) continue;      // it has gone aboard a ship: it is inside it
     let alpha = 1;
     if (c.doomed && season === 3) {
@@ -7598,7 +7599,7 @@ function drawCreatures() {
     }
     if (c.birthT > 0) c.birthT = Math.max(0, c.birthT - 0.016 * 1.6 * (G.speed > 1 ? 4 : 1));
     // gold ring on parents
-    if (c.parentFlag && season === 0 && W.births.length) {
+    if (c.parentFlag && season === 0 && W.births.length && !G.FLAT) {
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = G.rgba(PAL.gold, 0.35 + 0.25 * Math.sin(t * 5 + c.id));
       ctx.lineWidth = 2;
@@ -7624,13 +7625,13 @@ function drawCreatures() {
       c.strike -= 0.03;
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = G.rgba(PAL.gold, Math.max(0, c.strike)); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, c.ph.r * 1.5, 0, 6.2832); ctx.stroke(); ctx.restore();
     }
-    if (c.doomed && season === 3) {
+    if (c.doomed && season === 3 && !G.FLAT) {
       ctx.save();
       ctx.strokeStyle = G.rgba(PAL.frost, 0.6 * alpha); ctx.setLineDash([3, 4]); ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(x, y, c.ph.r * 1.45, 0, 6.2832); ctx.stroke();
       ctx.restore();
     }
-    if (c.colony) {
+    if (c.colony && !G.FLAT) {
       ctx.save(); ctx.strokeStyle = G.rgba(PAL.rose, 0.16); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(x, y, c.ph.r * 1.3, 0, 6.2832); ctx.stroke(); ctx.restore();
     }
@@ -7646,6 +7647,7 @@ function drawCreatures() {
       roundRect(ctx, x, y, Math.max(2, w * f), 4, 2); ctx.fill();
     }
   }
+  if (G.drawUprights) G.drawUprights(ctx, 1e9);      // (the buildings in front of every creature)
   if (R.ping) {
     const p = R.ping, c = p.c;
     p.t += G.frameDt || 0.016;
@@ -7719,7 +7721,7 @@ function drawEffects() {
       ctx.beginPath(); ctx.moveTo(e.x, yy + s); ctx.bezierCurveTo(e.x - s * 1.6, yy - s * 0.4, e.x - s * 0.5, yy - s * 1.4, e.x, yy - s * 0.4); ctx.bezierCurveTo(e.x + s * 0.5, yy - s * 1.4, e.x + s * 1.6, yy - s * 0.4, e.x, yy + s); ctx.fill();
     } else if (e.k === 'link') {
       const c = e.c;
-      if (c && !c.dead && Math.abs(c.x - e.x) < 160 && Math.abs(c.y - e.y) < 160) {
+      if (!G.FLAT && c && !c.dead && Math.abs(c.x - e.x) < 160 && Math.abs(c.y - e.y) < 160) {
         ctx.globalAlpha = (1 - u) * 0.55; ctx.strokeStyle = e.col; ctx.lineWidth = 1.6;
         ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo((c.rx === undefined ? c.x : c.rx), (c.ry === undefined ? c.y : c.ry)); ctx.stroke();
       }
@@ -7804,7 +7806,7 @@ function drawVignette() {
   const ctx = G.ctx, v = G.view;
   screenSpace(ctx);
   const g = ctx.createRadialGradient(v.w / 2, v.h / 2, Math.min(v.w, v.h) * 0.42, v.w / 2, v.h / 2, Math.max(v.w, v.h) * 0.75);
-  g.addColorStop(0, 'rgba(7,18,31,0)'); g.addColorStop(1, 'rgba(7,18,31,0.72)');
+  g.addColorStop(0, 'rgba(7,18,31,0)'); g.addColorStop(1, 'rgba(7,18,31,' + (G.FLAT && G.W && !G.W.title ? 0.42 : 0.72) + ')');      // (a star stands in daylight: its corners are only a little darker)
   ctx.fillStyle = g; ctx.fillRect(0, 0, v.w, v.h);
 }
 
@@ -7932,11 +7934,11 @@ G.addSystem({
   const RED = '#ff5d7a', GOLD = '#f6d365', INK = '#14202e';
   const px = function (c) { return c.rx === undefined ? c.x : c.rx; }, py = function (c) { return c.ry === undefined ? c.y : c.ry; };
   const on = function () { return G.mode === 'play' && G.speed > 0 && G.speed <= 16; };
-  const words = function () { return G.speed <= 4 && G.view.scale >= 0.55; };      // and only when the creatures are large enough on the screen for a word to belong to one
+  const words = function () { return G.speed <= 4 && G.view.scale >= (G.FLAT ? 1.2 : 0.55); };      // and only when the creatures are large enough on the screen for a word to belong to one
   const add = function (e) { e.t0 = G.rt || 0; if (FX.length >= MAX) FX.shift(); FX.push(e); return e; };
   const CAUSE = { starved: 'starved', selected: 'winter took it', plague: 'sickness', fought: 'killed', eaten: 'eaten', zone: 'poisoned', old: 'old age' };
 
-  G.on('fight', function (a, b) { if (!on()) return; add({ k: 'hit', a: a, b: b, T: 1.0, txt: words() ? 'bites' : '' }); });
+  G.on('fight', function (a, b) { if (!on() || G.FLAT) return;      /* (on a star a fight is shown by 68a_field.js: blades, sparks, the two colours; no arrow from one to the other) */ add({ k: 'hit', a: a, b: b, T: 1.0, txt: words() ? 'bites' : '' }); });
   G.on('death', function (c, cause, by) {
     if (!on()) return;
     const x = px(c), y = py(c), r = c.ph.r, hue = c.g.f ? c.g.f.hue : c.g.t[2];
@@ -8298,6 +8300,8 @@ G.addSystem({
   const idOf = function (W) { return G.terrainOf ? G.terrainOf(W).id : 'reef'; };
   /** the colours of the star being shown */
   G.terrainLook = function (W) { return LOOK[idOf(W || G.W)] || LOOK.reef; };
+  /** the colours of a kind of star, by its name */
+  G.terrainColours = function (id) { return LOOK[id] || null; };
   const fr = function (v) { return v - Math.floor(v); };
   function rnd(seed, i, k) { return fr(Math.sin(i * 127.1 + k * 311.7 + (seed % 9973) * 0.731) * 43758.5453); }
   function hash2(ix, iy, s) { let h = (Math.imul(ix, 374761393) + Math.imul(iy, 668265263) + Math.imul(s, 1274126177)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
@@ -8312,7 +8316,11 @@ G.addSystem({
     const id = idOf(W), L = LOOK[id] || LOOK.reef, seed = (W.seed >>> 0) % 100000, w = Math.ceil((W.ww + 2 * MARGIN) * k), h = Math.ceil((W.wh + 2 * MARGIN) * k), cx = W.ww / 2, cy = W.wh / 2;
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const em = (id === 'ember' || id === 'crystal') ? document.createElement('canvas') : null; if (em) { em.width = w; em.height = h; }
     const H = new Float32Array(w * h), R = new Float32Array(w * h), sites = G.sitesOf ? G.sitesOf(W) : [], cen = G.centreOf ? G.centreOf(W) : { x: cx, y: cy };
-    const job = { k: k, w: w, h: h, cv: cv, em: em, row: 0, phase: 0, done: false, id: id };
+    // (If this star's ground has been PAINTED (53_art.js), the painting itself is drawn as the ground, sharp at any distance (see G.drawBasin), and this map is
+    //  only what goes OVER it: `cv` is its LIGHT (the heights lighting it from the north-west, and broad patches a little lighter and darker so the squares of the
+    //  painting cannot be told), `tint` is what the star's places and its own nature colour into it. Both are soft, so they are made small and quickly.)
+    const art = G.art && G.art.ground ? G.art.ground(W) : null, AM = art ? art.mean : null, tint = art ? document.createElement('canvas') : null; if (tint) { tint.width = w; tint.height = h; }
+    const job = { k: k, w: w, h: h, cv: cv, em: em, tint: tint, row: 0, phase: 0, done: false, id: id, art: !!art };
     const wx = function (px) { return px / k - MARGIN; }, wy = function (py) { return py / k - MARGIN; };
     job.run = function (ms) {
       const t0 = performance.now();
@@ -8327,24 +8335,27 @@ G.addSystem({
           const n = L.craters; for (let i = 0; i < n; i++) { const X = (rnd(seed, i, 51) - 0.5) * (W.ww + 200), Y = (rnd(seed, i, 52) - 0.5) * (W.wh + 200), r = (26 + rnd(seed, i, 53) * rnd(seed, i, 54) * 110), dep = 0.10 + rnd(seed, i, 55) * 0.12; if (Math.hypot(X - (cen.x - cx), Y - (cen.y - cy)) < 330 + r) continue;
             const px0 = Math.max(0, Math.floor((X + cx + MARGIN - r * 1.4) * k)), px1 = Math.min(w - 1, Math.ceil((X + cx + MARGIN + r * 1.4) * k)), py0 = Math.max(0, Math.floor((Y + cy + MARGIN - r * 1.4) * k)), py1 = Math.min(h - 1, Math.ceil((Y + cy + MARGIN + r * 1.4) * k));
             for (let y = py0; y <= py1; y++) for (let x = px0; x <= px1; x++) { const d = Math.hypot(wx(x) - cx - X, (wy(y) - cy - Y) * 1.25) / r; if (d < 1.4) H[y * w + x] += d < 1 ? -dep * (1 - d * d) + dep * 0.35 * d * d * d * d : dep * 0.35 * (1 - (d - 1) / 0.4); } }
-          for (let i = 0; i < H.length; i++) { const v = Math.max(0, Math.min(0.999, H[i])), t = v * 5, fl = Math.floor(t), s = (fl + sstep(0.32, 0.68, t - fl)) / 5; H[i] = v + (s - v) * L.terrace; }
+          for (let i = 0; i < H.length; i++) { const v = Math.max(0, Math.min(0.999, H[i])), t = v * 5, fl = Math.floor(t), s = (fl + sstep(0.32, 0.68, t - fl)) / 5; H[i] = v + (s - v) * L.terrace * (art ? 0.12 : 1); }
           job.phase = 2;
         } else {      // colour: by height, lit from the north-west, with what this terrain adds; the places of the star tinted in
-          const y = job.row, img = job.img || (job.img = cv.getContext('2d').createImageData(w, 1)), D = img.data, E = em ? (job.eimg || (job.eimg = em.getContext('2d').createImageData(w, 1))) : null, ED = E ? E.data : null, Yw = wy(y), ramp = L.ramp;
+          const y = job.row, img = job.img || (job.img = cv.getContext('2d').createImageData(w, 1)), D = img.data, TI = tint ? (job.timg || (job.timg = tint.getContext('2d').createImageData(w, 1))) : null, TD = TI ? TI.data : null, E = em ? (job.eimg || (job.eimg = em.getContext('2d').createImageData(w, 1))) : null, ED = E ? E.data : null, Yw = wy(y), ramp = L.ramp;
           for (let x = 0; x < w; x++) { const i = y * w + x, v = H[i], rg = R[i], Xw = wx(x);
-            const a = H[Math.max(0, y - 1) * w + Math.max(0, x - 1)], b = H[Math.min(h - 1, y + 1) * w + Math.min(w - 1, x + 1)]; let light = 1 + (a - b) * 11 * Math.min(1.6, 0.75 / k); light = Math.max(0.5, Math.min(1.55, light));
-            const t = Math.max(0, Math.min(3.999, v * 4)), q = Math.floor(t), f = t - q, c0 = ramp[q], c1 = ramp[q + 1]; let r = c0[0] + (c1[0] - c0[0]) * f, g = c0[1] + (c1[1] - c0[1]) * f, bl = c0[2] + (c1[2] - c0[2]) * f, e = 0;
-            if (id === 'ember') { const lv = sstep(0.83, 0.93, rg) * sstep(0.62, 0.45, v); if (lv > 0) { r += (255 - r) * lv; g += (120 - g) * lv; bl += (30 - bl) * lv; e = lv; light = 1 + (light - 1) * (1 - lv); } }
-            else if (id === 'frost') { const cvs = sstep(0.88, 0.96, rg); r += (14 - r) * cvs * 0.85; g += (52 - g) * cvs * 0.85; bl += (104 - bl) * cvs * 0.85; }
-            else if (id === 'marsh') { const pl = sstep(0.36, 0.27, v); if (pl > 0) { r += (6 - r) * pl; g += (18 - g) * pl; bl += (30 - bl) * pl; light = 1 + (light - 1) * (1 - pl) + pl * 0.25 * sstep(0.6, 0.9, vnoise(Xw / 14, Yw / 5, seed + 77)); } }
-            else if (id === 'crystal') { const vn = sstep(0.9, 0.97, rg); r += (150 - r) * vn * 0.5; g += (225 - g) * vn * 0.5; bl += (255 - bl) * vn * 0.5; e = vn * 0.6; if (hash2(x, y, seed + 3) > 0.9988) e = 1; }
+            const a = H[Math.max(0, y - 1) * w + Math.max(0, x - 1)], b = H[Math.min(h - 1, y + 1) * w + Math.min(w - 1, x + 1)]; let light = 1 + (a - b) * (AM ? 7.5 * k : 11 * Math.min(1.6, 0.75 / k)); light = Math.max(0.5, Math.min(1.55, light));
+            const t = Math.max(0, Math.min(3.999, v * 4)), q = Math.floor(t), f = t - q, c0 = ramp[q], c1 = ramp[q + 1]; let r = c0[0] + (c1[0] - c0[0]) * f, g = c0[1] + (c1[1] - c0[1]) * f, bl = c0[2] + (c1[2] - c0[2]) * f, e = 0, kp = 1, tn = 1;      /* (kp: how much of the ground's own colour is left under what is tinted into it) */
+            if (AM) { r = AM[0]; g = AM[1]; bl = AM[2]; tn = 0.82 + 0.34 * fbm(Xw / 430 + 9, Yw / 430 + 3, seed + 70, 3); }
+            if (id === 'ember') { const lv = sstep(0.83, 0.93, rg) * sstep(0.62, 0.45, v); if (lv > 0) { r += (255 - r) * lv; g += (120 - g) * lv; bl += (30 - bl) * lv; kp *= 1 - lv; e = lv; light = 1 + (light - 1) * (1 - lv); } }
+            else if (id === 'frost') { const cvs = AM ? sstep(0.93, 0.985, rg) * 0.5 : sstep(0.88, 0.96, rg);      /* (on painted ice: thin, and only a shade bluer) */ r += (14 - r) * cvs * 0.85; g += (52 - g) * cvs * 0.85; bl += (104 - bl) * cvs * 0.85; kp *= 1 - cvs * 0.85; }
+            else if (id === 'marsh') { const pl = sstep(0.36, 0.27, v); if (pl > 0) { r += (6 - r) * pl; g += (18 - g) * pl; bl += (30 - bl) * pl; kp *= 1 - pl; light = 1 + (light - 1) * (1 - pl) + pl * 0.25 * sstep(0.6, 0.9, vnoise(Xw / 14, Yw / 5, seed + 77)); } }
+            else if (id === 'crystal') { const vn = AM ? sstep(0.94, 0.99, rg) * 0.55 : sstep(0.9, 0.97, rg);      /* (on painted ground: thinner, fainter veins) */ r += (150 - r) * vn * 0.5; g += (225 - g) * vn * 0.5; bl += (255 - bl) * vn * 0.5; kp *= 1 - vn * 0.5; e = vn * 0.6; if (hash2(x, y, seed + 3) > 0.9988) e = 1; }
             else if (id === 'reef') { light += (vnoise(Xw / 520, Yw / 34, seed + 61) - 0.5) * 0.16; }
             for (let s = 0; s < sites.length; s++) { const S = sites[s], d = Math.hypot(Xw - S.x, (Yw - S.y) / 0.8) / S.r; if (d > 1.25) continue; const m = sstep(1.25, 0.7, d) * (0.75 + 0.5 * vnoise(Xw / 26, Yw / 26, seed + 90));
-              if (S.k === 'grove') { r += (26 - r) * m * 0.6; g += (112 - g) * m * 0.6; bl += (70 - bl) * m * 0.6; } else if (S.k === 'quarry') { r += (104 - r) * m * 0.55; g += (110 - g) * m * 0.55; bl += (122 - bl) * m * 0.55; light = 1 + (light - 1) * (1 + m); } else if (S.k === 'reeds') { r += (96 - r) * m * 0.5; g += (124 - g) * m * 0.5; bl += (52 - bl) * m * 0.5; } else if (S.k === 'shells') { r += (190 - r) * m * 0.42; g += (172 - g) * m * 0.42; bl += (136 - bl) * m * 0.42; } }
-            { const dc = Math.hypot(Xw - cen.x, (Yw - cen.y + 10) * 1.6), m = sstep(330, 120, dc) * 0.16; r += (ramp[3][0] - r) * m; g += (ramp[3][1] - g) * m; bl += (ramp[3][2] - bl) * m; }      // (the trodden ground of the colony)
-            const gr = (hash2(x, y, seed + 1) - 0.5) * 12, o = x * 4; D[o] = r * light + gr; D[o + 1] = g * light + gr; D[o + 2] = bl * light + gr; D[o + 3] = 255;
+              if (S.k === 'grove') { const q = m * (AM ? 0.46 : 0.6); r += (26 - r) * q; g += (112 - g) * q; bl += (70 - bl) * q; kp *= 1 - q; } else if (S.k === 'quarry') { const q = m * (AM ? 0.4 : 0.55); r += (104 - r) * q; g += (110 - g) * q; bl += (122 - bl) * q; kp *= 1 - q; light = 1 + (light - 1) * (1 + m); } else if (S.k === 'reeds') { const q = m * (AM ? 0.38 : 0.5); r += (96 - r) * q; g += (124 - g) * q; bl += (52 - bl) * q; kp *= 1 - q; } else if (S.k === 'shells') { const q = m * (AM ? 0.34 : 0.42); r += (190 - r) * q; g += (172 - g) * q; bl += (136 - bl) * q; kp *= 1 - q; } }
+            { const dc = Math.hypot(Xw - cen.x, (Yw - cen.y + 10) * 1.6), m = sstep(330, 120, dc) * 0.16, tr = AM ? [AM[0] * 1.16, AM[1] * 1.14, AM[2] * 1.1] : ramp[3]; r += (tr[0] - r) * m; g += (tr[1] - g) * m; bl += (tr[2] - bl) * m; kp *= 1 - m; }      // (the trodden ground of the colony)
+            const gr = (hash2(x, y, seed + 1) - 0.5) * 12, o = x * 4;
+            if (AM) { const al = 1 - kp, sh = Math.max(0, Math.min(255, light * tn * 127.5)); D[o] = D[o + 1] = D[o + 2] = sh; D[o + 3] = 255; if (al > 0.004) { TD[o] = (r - AM[0] * kp) / al; TD[o + 1] = (g - AM[1] * kp) / al; TD[o + 2] = (bl - AM[2] * kp) / al; TD[o + 3] = al * 255; } else TD[o + 3] = 0; }
+            else { D[o] = r * light + gr; D[o + 1] = g * light + gr; D[o + 2] = bl * light + gr; D[o + 3] = 255; }
             if (ED) { if (id === 'ember') { ED[o] = 255; ED[o + 1] = 150; ED[o + 2] = 50; } else { ED[o] = 170; ED[o + 1] = 235; ED[o + 2] = 255; } ED[o + 3] = e * 255; } }
-          cv.getContext('2d').putImageData(img, 0, y); if (E) em.getContext('2d').putImageData(E, 0, y);
+          cv.getContext('2d').putImageData(img, 0, y); if (TI) tint.getContext('2d').putImageData(TI, 0, y); if (E) em.getContext('2d').putImageData(E, 0, y);
           if (++job.row >= h) job.done = true;
         }
       }
@@ -8354,9 +8365,9 @@ G.addSystem({
   }
   let MAP = null;      // { key, lo, hi, job }
   function mapFor(W) {
-    const key = (W.seed >>> 0) + ':' + idOf(W) + ':' + Math.round(W.ww) + ':' + Math.round(W.wh);
-    if (!MAP || MAP.key !== key) { const lo = startJob(W, 0.22); lo.run(400); MAP = { key: key, lo: lo, hi: null, job: startJob(W, 0.8) }; }
-    if (MAP.job) { if (MAP.job.run(7)) { MAP.hi = MAP.job; MAP.job = null; } }
+    const art = G.art && G.art.ground ? G.art.ground(W) : null, key = (W.seed >>> 0) + ':' + idOf(W) + ':' + Math.round(W.ww) + ':' + Math.round(W.wh) + (art ? ':painted' : '');
+    if (!MAP || MAP.key !== key) { if (art) MAP = { key: key, lo: null, hi: null, job: startJob(W, 0.36), art: art }; else { const lo = startJob(W, 0.22); lo.run(400); MAP = { key: key, lo: lo, hi: null, job: startJob(W, 0.8) }; } }
+    if (MAP.job) { if (MAP.job.run(MAP.art ? 11 : 7)) { MAP.hi = MAP.job; MAP.job = null; } }
     return MAP;
   }
   let TILE = null;
@@ -8370,13 +8381,48 @@ G.addSystem({
   function clump(ctx, L, x, y, s, t, i) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(x + s * 0.2, y + s * 0.2, s, s * 0.22, 0, 0, 6.2832); ctx.fill(); for (let b = -2; b <= 2; b++) { const sw = Math.sin(t * 1.1 + i + b) * 2.5, hh = s * (1.1 - Math.abs(b) * 0.18); ctx.strokeStyle = b % 2 ? 'rgba(90,170,80,0.95)' : 'rgba(140,210,96,0.95)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + b * s * 0.2, y + s * 0.15); ctx.quadraticCurveTo(x + b * s * 0.3, y - hh * 0.5, x + b * s * 0.42 + sw, y - hh); ctx.stroke(); } }
   function prop(ctx, id, L, x, y, s, v, t, i) { if (id === 'crystal') { if (v < 0.6) spires(ctx, L, x, y, s * 0.85, v, t, i); else rock(ctx, L, x, y, s * 0.7, v); } else if (id === 'ember') { if (v < 0.4) vent(ctx, L, x, y, s * 0.8, t, i); else rock(ctx, L, x, y, s * 0.8, v); } else if (id === 'frost') { if (v < 0.6) shards(ctx, L, x, y, s * 0.85, v); else rock(ctx, L, x, y, s * 0.7, v); } else if (id === 'marsh') { if (v < 0.7) clump(ctx, L, x, y, s * 0.8, t, i); else rock(ctx, L, x, y, s * 0.6, v); } else rock(ctx, L, x, y, s * (0.6 + v * 0.5), v); }
 
+  // ── on a painted star, what stands on the ground is painted too (53_art.js: G.art.nature) ──
+  // Where each thing stands is the star's own (from its seed, and where its places are): rocks about the star, stone at the quarry, reeds in the reed bed, shells in
+  // the shell bed, bushes round the feeding grounds, crystals where lumen grows. Each casts a shadow, and takes its turn among the creatures (G.upright), so a creature
+  // walks behind a rock and before it.
+  let SCN = null;
+  function scenery(W, seed) {
+    const key = seed + ':' + Math.round(W.ww) + ':' + Math.round(W.wh); if (SCN && SCN.key === key) return SCN.L;
+    const L = [], e = (G.sideEdge ? G.sideEdge(W) : 40) + 10, span = W.ww - 2 * e, top = 40, bot = W.wh - 26, mid = G.centreOf ? G.centreOf(W) : { x: W.ww / 2, y: W.wh / 2 }, S = G.sitesOf ? G.sitesOf(W) : [];
+    const n = Math.round(16 + span * (bot - top) / 120000);
+    for (let i = 0; i < n; i++) { const x = e + rnd(seed, i, 21) * span, y = top + rnd(seed, i, 22) * (bot - top), v = rnd(seed, i, 24); if (Math.hypot(x - mid.x, (y - mid.y) * 1.4) < 400 || (G.siteAt && G.siteAt(W, x, y, 50))) continue; L.push({ k: v < 0.7 ? 'rock' : 'quarry', x: x, y: y, w: 46 + rnd(seed, i, 23) * 60, f: i % 2 }); }
+    S.forEach(function (s, si) { const ry = s.r * 0.8;
+      if (s.k === 'grove') for (let q = 0; q < 14; q++) { const a = q * 0.449 + rnd(seed, si * 31 + q, 71), d = 0.86 + 0.2 * rnd(seed, si * 31 + q, 72); L.push({ k: 'plant', x: s.x + Math.cos(a) * s.r * d, y: s.y + Math.sin(a) * ry * d, w: 40 + 26 * rnd(seed, si * 31 + q, 73), f: q % 2 }); }
+      else if (s.k === 'quarry') for (let q = 0; q < 9; q++) { const a = q * 0.698 + 0.3, d = q % 3 ? 0.9 : 0.45; L.push({ k: q % 4 === 3 ? 'rock' : 'quarry', x: s.x + Math.cos(a) * s.r * d, y: s.y + Math.sin(a) * ry * d, w: 52 + 40 * rnd(seed, q, 81), f: q % 2 }); }
+      else if (s.k === 'reeds') for (let q = 0; q < 13; q++) { const a = rnd(seed, q, 91) * 6.2832, d = Math.sqrt(rnd(seed, q, 92)) * 0.92; L.push({ k: 'reeds', x: s.x + Math.cos(a) * s.r * d, y: s.y + Math.sin(a) * ry * d, w: 40 + 26 * rnd(seed, q, 93), f: q % 2 }); }
+      else if (s.k === 'shells') for (let q = 0; q < 8; q++) { const a = rnd(seed, q, 95) * 6.2832, d = Math.sqrt(rnd(seed, q, 96)) * 0.86; L.push({ k: 'shells', x: s.x + Math.cos(a) * s.r * d, y: s.y + Math.sin(a) * ry * d, w: 38 + 22 * rnd(seed, q, 97), f: q % 2 }); } });
+    SCN = { key: key, L: L }; return L;
+  }
+  function thing(ctx, q) { const s = q.s, k = q.w / s.w; ctx.imageSmoothingEnabled = true; if (q.f) { ctx.translate(q.x, 0); ctx.scale(-1, 1); ctx.translate(-q.x, 0); } ctx.drawImage(s.cv, q.x - s.w * k / 2, q.y - s.h * k * 0.86, s.w * k, s.h * k); }
+  /** is this star's scenery painted? (then nothing here is drawn by hand; 68a_field.js asks, for its lumen) */
+  G.sceneryPainted = function (W) { return !!(G.art && G.art.nature && G.art.nature(W || G.W, 'rock')); };
+  function paintedScenery(ctx, W, seed, t, x0, y0, x1, y1) {
+    const A = G.art, L = scenery(W, seed);
+    const put = function (q, s) { if (!s || q.x + q.w < x0 || q.x - q.w > x1 || q.y + 30 < y0 || q.y - q.w * 1.6 > y1) return; ctx.fillStyle = 'rgba(0,0,0,0.30)'; ctx.beginPath(); ctx.ellipse(q.x + q.w * 0.16, q.y + q.w * 0.02, q.w * 0.5, q.w * 0.15, 0, 0, 6.2832); ctx.fill(); q.s = s; if (G.upright) G.upright(q.y, thing, q); else { ctx.save(); thing(ctx, q); ctx.restore(); } };
+    for (let i = 0; i < L.length; i++) put(L[i], A.nature(W, L[i].k));
+    const N = G.lumenNodes ? G.lumenNodes(W) : [], ls = A.nature(W, 'lumen');
+    for (let i = 0; i < N.length; i++) { const nd = N[i], full = nd.n0 ? Math.max(0, Math.min(1, nd.n / nd.n0)) : 0, q = nd._q || (nd._q = { f: i % 2 }); q.x = nd.x; q.y = nd.y + 10; q.w = nd.n > 0 ? 56 + 44 * full : 30; if (!ls) continue;
+      if (nd.n > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const R = 60 + 30 * full, g = ctx.createRadialGradient(q.x, q.y - 10, 4, q.x, q.y - 10, R); g.addColorStop(0, 'rgba(110,230,255,' + (0.16 + 0.06 * Math.sin(t * 2 + i * 1.7)) + ')'); g.addColorStop(1, 'rgba(110,230,255,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(q.x, q.y - 4, R, R * 0.55, 0, 0, 6.2832); ctx.fill(); ctx.restore(); }
+      put(q, ls); }
+  }
+
   /** the ground of the star: its relief map, what stands on it, and the scenery of its places (world space; under everything that lives) */
   G.drawBasin = function (ctx, W) {
     const id = idOf(W), L = LOOK[id] || LOOK.reef, seed = W.seed >>> 0, t = G.rt || 0, e = (G.sideEdge ? G.sideEdge(W) : 40) + 10, span = W.ww - 2 * e, top = 40, bot = W.wh - 26, v = G.view, mid0 = G.centreOf ? G.centreOf(W) : { x: W.ww / 2, y: W.wh / 2 };
     const x0 = -v.ox / v.scale - 120, x1 = x0 + v.w / v.scale + 240, y0 = -v.oy / v.scale - 120, y1 = y0 + v.h / v.scale + 240;
     ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     const M = mapFor(W), mp = M.hi || M.lo;
-    if (mp && mp.cv) { ctx.imageSmoothingEnabled = true; ctx.drawImage(mp.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN);
+    if (M.art) {      // a painted star: the painting is its ground; over it what is tinted into it, and its light
+      const A = M.art, gx0 = Math.max(-MARGIN, x0), gy0 = Math.max(-MARGIN, y0), gx1 = Math.min(W.ww + MARGIN, x1), gy1 = Math.min(W.wh + MARGIN, y1);
+      if (gx1 > gx0 && gy1 > gy0) { ctx.imageSmoothingEnabled = true; ctx.fillStyle = A.pat || (A.pat = ctx.createPattern(A.tile, 'repeat')); ctx.fillRect(gx0, gy0, gx1 - gx0, gy1 - gy0);
+        if (mp && mp.done && mp.tint) { ctx.drawImage(mp.tint, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.save(); ctx.globalCompositeOperation = 'hard-light'; ctx.drawImage(mp.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore();
+          if (mp.em) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.3 * Math.sin(t * 1.3); ctx.drawImage(mp.em, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore(); } } }
+    } else if (mp && mp.cv) { ctx.imageSmoothingEnabled = true; ctx.drawImage(mp.cv, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN);
       if (mp.em && mp.done) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.3 * Math.sin(t * 1.3); ctx.drawImage(mp.em, -MARGIN, -MARGIN, W.ww + 2 * MARGIN, W.wh + 2 * MARGIN); ctx.restore(); }
       if (v.scale > 0.95) { const pat = ctx.createPattern(grainTile(), 'repeat'); if (pat) { ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = Math.min(0.5, (v.scale - 0.95) * 0.5); ctx.scale(0.6, 0.6); ctx.fillStyle = pat; ctx.fillRect(x0 / 0.6, y0 / 0.6, (x1 - x0) / 0.6, (y1 - y0) / 0.6); ctx.restore(); } } }
     // the slow shadows of clouds
@@ -8385,8 +8431,10 @@ G.addSystem({
     // the standing things, far ones first
     const n = Math.round(14 + span * (bot - top) / 150000), P = [];
     for (let i = 0; i < n; i++) { const x = e + rnd(seed, i, 21) * span, y = top + rnd(seed, i, 22) * (bot - top), s = 12 + rnd(seed, i, 23) * 20; if (x + s * 3 < x0 || x - s * 3 > x1 || y + s * 2 < y0 || y - s * 3 > y1) continue; if (Math.hypot(x - mid0.x, (y - mid0.y) * 1.4) < 380 || (G.siteAt && G.siteAt(W, x, y, 40))) continue; P.push([x, y, s, rnd(seed, i, 24), i]); }
-    P.sort(function (a, b) { return a[1] - b[1]; }).forEach(function (q) { prop(ctx, id, L, q[0], q[1], q[2], q[3], t, q[4]); });
-    sites(ctx, W, L, id, seed, t, x0, y0, x1, y1); beacons(ctx, W, L, seed, t);
+    const painted = !!(M.art && G.sceneryPainted(W));
+    if (painted) paintedScenery(ctx, W, seed, t, x0, y0, x1, y1);      // (on a painted star, drawn rocks would look pasted on: what stands there is painted too)
+    else { if (!M.art) P.sort(function (a, b) { return a[1] - b[1]; }).forEach(function (q) { prop(ctx, id, L, q[0], q[1], q[2], q[3], t, q[4]); }); sites(ctx, W, L, id, seed, t, x0, y0, x1, y1); }
+    beacons(ctx, W, L, seed, t);
     ctx.restore();
   };
 
@@ -8404,6 +8452,166 @@ G.addSystem({
   function beacons(ctx, W, L, seed, t) { const e = (G.sideEdge ? G.sideEdge(W) : 40) + 40; [[e + 30, 70], [W.ww - e - 30, 80], [e + 40, W.wh - 60], [W.ww - e - 40, W.wh - 70]].forEach(function (q, i) { const x = q[0], y = q[1], on = Math.sin(t * 2.4 + i * 2.1) > 0.2;
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(x + 5, y + 1, 11, 2.8, 0, 0, 6.2832); ctx.fill(); ctx.strokeStyle = 'rgba(16,24,36,0.95)'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x, y - 30); ctx.lineTo(x + 5, y); ctx.moveTo(x - 3.2, y - 11); ctx.lineTo(x + 3.2, y - 11); ctx.stroke(); ctx.strokeStyle = 'rgba(170,190,210,0.9)'; ctx.lineWidth = 1.3; ctx.stroke();
       if (on) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = L.glow; ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.arc(x, y - 32, 11, 0, 6.2832); ctx.fill(); ctx.restore(); } ctx.fillStyle = on ? L.glow : 'rgba(60,70,84,1)'; ctx.beginPath(); ctx.arc(x, y - 32, 2.6, 0, 6.2832); ctx.fill(); }); }
+})();
+
+</script>
+<script data-part="art">
+// ── The look of a star, as an image model imagined it ──
+// Nothing here is drawn beforehand. When a star first needs it, the server is asked for a PAINTING made from what that star and its people are:
+//     its GROUND         from the kind of star it is (a square seen from straight above; 52c_terrain.js lays it over the whole star)
+//     its ARCHITECTURE   from the bodies of the people who live there: what kind they are, what they have (horns, fins, shells, eyes),
+//                        their colours, their world. Two sheets of six buildings each: 'civic' (the Heart at its four stages, a house,
+//                        a hall) and 'works' (a farm, a defence tower, a ring wall, a beacon tower, a spaceport, a spaceship)
+// A painting is kept for good by the server, so the same star looks the same every time and nobody pays for one twice; what it cost is
+// written in the books like every other answer (kind 'art'). With no AI to ask, the server sends the nearest thing painted before; with
+// nothing painted at all, the game draws its buildings and its ground itself (54h_look.js, 52c_terrain.js), as it always could.
+// What is done HERE, by code, to what comes back:
+//     a sheet is LIFTED off its flat green ground and cut into its six buildings;
+//     the parts painted flat magenta are REPAINTED in the colour of whoever owns the building (yours blue, an enemy's red, others pale);
+//     each building gets a grey copy (set but not yet coloured), a shadow, and the line it stands on (the middle of its foundation).
+(function () {
+  'use strict';
+  if (typeof document === 'undefined') return;
+  const A = G.art = { n: 0 };
+  const GROUND = {}, SHEET = {}, ST = {};      // what has come, and what has been asked for, by the name the server keeps it under
+  const mk = function (w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  const norm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60); };
+  const CIVIC = { heart0: 1, heart1: 1, heart2: 1, heart3: 1, house: 1, hall: 1 };
+  /** the colour each owner's parts are repainted in */
+  A.TEAM = { mine: [38, 150, 255], foe: [255, 52, 70], other: [226, 230, 236] };
+  // (the budget of a star for its look: its ground and two sheets come to about six cents)
+  if (G.ai) { G.ai.gaps.art = 2500; G.ai.caps.art = 14; if (G.ai.LABEL) G.ai.LABEL.art = 'The look of the star: its ground and its people’s buildings, painted'; if (G.ai.budget) G.ai.budget.art = 0.30; }
+
+  function ask(key, info, done) {
+    const s = ST[key], now = Date.now();
+    if (s && (s.v === 'asked' || (s.v === 'have' && !(s.near && G.host && G.host.caps && G.host.caps.ai && now - s.at > 25000)) || (s.v === 'miss' && now - s.at < 90000))) return;
+    if (!(G.host && G.host.ready)) return;
+    const pay = !!(G.host.caps && G.host.caps.ai && G.ai.provider === 'server' && G.ai.hasFuel() && G.ai.allow('art'));
+    if (s && s.v === 'have' && !pay) { s.at = now; return; }      // (it has the nearest thing; its own will be asked for when a new picture may be paid for)
+    ST[key] = { v: 'asked', at: now };
+    G.host.call('art', Object.assign({ libraryOnly: !pay }, info), 240000).then(function (r) {
+      if (!r || !r.art || typeof r.art.b64 !== 'string' || !/^image\/(png|jpeg|webp)$/.test(r.art.mime)) { ST[key] = { v: s && s.v === 'have' ? 'have' : 'miss', at: Date.now(), near: s && s.near }; return; }
+      if (G.ai && G.ai.tally) G.ai.tally('art', r.source, r.usd);
+      const img = new Image();
+      img.onload = function () { try { done(img, r); ST[key] = { v: 'have', at: Date.now(), near: !!r.near }; A.n++; G.emit('art', key, r.source, !!r.near); } catch (e) { console.error(e); ST[key] = { v: 'miss', at: Date.now() }; } };
+      img.onerror = function () { ST[key] = { v: 'miss', at: Date.now() }; };
+      img.src = 'data:' + r.art.mime + ';base64,' + r.art.b64;
+    }, function () { ST[key] = { v: s && s.v === 'have' ? 'have' : 'miss', at: Date.now(), near: s && s.near }; });
+  }
+
+  // ── the ground ──
+  function groundOf(img) {
+    const n = 1024, cv = mk(n, n), x = cv.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, n, n);
+    const d = x.getImageData(0, 0, n, n).data; let r = 0, g = 0, b = 0; for (let i = 0; i < d.length; i += 4 * 97) { r += d[i]; g += d[i + 1]; b += d[i + 2]; } const m = d.length / (4 * 97);
+    // the painting, four times: itself and its three mirrors, so that laid side by side its edges always meet themselves
+    const t = mk(n * 2, n * 2), tx = t.getContext('2d'); [[0, 0, 1, 1], [2 * n, 0, -1, 1], [0, 2 * n, 1, -1], [2 * n, 2 * n, -1, -1]].forEach(function (q) { tx.save(); tx.translate(q[0], q[1]); tx.scale(q[2], q[3]); tx.drawImage(cv, 0, 0); tx.restore(); });
+    return { n: n, d: d, mean: [r / m, g / m, b / m], tile: t };
+  }
+  /** the painted ground of this star: { n, d (its pixels), mean (its colour) }, or null until it has come (it is asked for once) */
+  A.ground = function (W) {
+    W = W || G.W; if (!W || W.title || !G.terrainOf) return null;
+    const id = G.terrainOf(W).id, v = ((W.seed >>> 0) >>> 5) % 2, key = 'ground.' + id + '.' + v;
+    if (!GROUND[key] || (ST[key] && ST[key].near)) ask(key, { what: 'ground', terrain: id, variant: v }, function (img) { GROUND[key] = groundOf(img); });
+    return GROUND[key] || null;
+  };
+
+  // ── the people, and their buildings ──
+  /** the people whose way of building this star follows: decided once, the first time the star builds, and kept with the star */
+  A.people = function (W) {
+    W = W || G.W; if (!W || W.title) return null; if (W.arch && W.arch.kind) return W.arch;
+    const L = (W.species || []).filter(function (s) { return !s.extinct && s.rep && s.rep.f && s.n > 0; }).sort(function (a, b) { return b.n - a.n; }); if (!L.length || !G.form || !G.form.facts) return null;
+    const f = L[0].rep.f; let facts = [], kind = ''; try { facts = G.form.facts(f); kind = G.form.kind(f).full; } catch (e) { return null; } if (!kind) return null;
+    W.arch = { kind: String(kind).slice(0, 40), facts: facts.slice(0, -1).slice(0, 8), colours: String(facts[facts.length - 1] || '').slice(0, 60), gen: W.gen | 0 };
+    if (G.log) G.log('disc', 'A way of building', 'The buildings of this star follow the ' + W.arch.kind + ', who founded its colony.'); if (G.markDirty) G.markDirty();
+    return W.arch;
+  };
+  /** lift a sheet off its green ground and cut it into its buildings: { name: sprite } */
+  function cut(img, cells, key) {
+    const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, cv = mk(w, h), x = cv.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
+    const im = x.getImageData(0, 0, w, h), d = im.data, N = w * h, bg = new Uint8Array(N), st = [];
+    const mag = key === 'magenta';      // (things that may themselves be green stand on flat magenta instead)
+    const green = mag ? function (i) { const o = i * 4, r = d[o], g = d[o + 1], b = d[o + 2]; return r > 150 && b > 150 && g < 120 && (r < b ? r : b) - g > 70; } : function (i) { const o = i * 4, r = d[o], g = d[o + 1], b = d[o + 2]; return g > 150 && r < 130 && b < 130 && g - (r > b ? r : b) > 80; };
+    for (let i = 0; i < w; i++) st.push(i, (h - 1) * w + i); for (let j = 0; j < h; j++) st.push(j * w, j * w + w - 1);
+    while (st.length) { const i = st.pop(); if (bg[i] || !green(i)) continue; bg[i] = 1; const px = i % w; if (px > 0) st.push(i - 1); if (px < w - 1) st.push(i + 1); if (i >= w) st.push(i - w); if (i < N - w) st.push(i + w); }
+    for (let i = 0; i < N; i++) if (!bg[i]) { const o = i * 4; if (mag ? (d[o] > 205 && d[o + 2] > 205 && d[o + 1] < 80) : (d[o + 1] > 200 && d[o] < 90 && d[o + 2] < 90)) bg[i] = 1; }      // (green shut in by a building, a courtyard or the gap under an arch, goes too if it is as pure as the ground)
+    // what is left, piece by piece
+    const lab = new Int32Array(N), B = [null];
+    for (let s0 = 0; s0 < N; s0++) { if (bg[s0] || lab[s0]) continue; const id = B.length, b = { n: 0, x0: w, x1: 0, y0: h, y1: 0, sx: 0, sy: 0 }; lab[s0] = id; st.push(s0);
+      while (st.length) { const i = st.pop(), px = i % w, py = (i / w) | 0; b.n++; b.sx += px; b.sy += py; if (px < b.x0) b.x0 = px; if (px > b.x1) b.x1 = px; if (py < b.y0) b.y0 = py; if (py > b.y1) b.y1 = py;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const qx = px + dx, qy = py + dy; if (qx < 0 || qy < 0 || qx >= w || qy >= h) continue; const j = qy * w + qx; if (!bg[j] && !lab[j]) { lab[j] = id; st.push(j); } } }
+      B.push(b); }
+    // each big piece is the building of the cell its middle lies in; small loose bits (a lamp's head, a spark) go with the building nearest them; specks go
+    const cellOf = new Int8Array(B.length).fill(-1), big = [];
+    for (let i = 1; i < B.length; i++) { const b = B[i]; if (b.n > N * 0.004) { cellOf[i] = Math.min(2, Math.floor(b.sx / b.n / (w / 3))) + (b.sy / b.n < h / 2 ? 0 : 3); big.push(i); } }
+    for (let i = 1; i < B.length; i++) { const b = B[i]; if (cellOf[i] >= 0 || b.n < 26) continue; const cx = b.sx / b.n, cy = b.sy / b.n; let bd = 60 * 60, at = -1;
+      for (let q = 0; q < big.length; q++) { const g = B[big[q]], ddx = Math.max(g.x0 - cx, 0, cx - g.x1), ddy = Math.max(g.y0 - cy, 0, cy - g.y1), dd = ddx * ddx + ddy * ddy; if (dd < bd) { bd = dd; at = cellOf[big[q]]; } } cellOf[i] = at; }
+    // its rim: soft, and with no green in it
+    for (let i = 0; i < N; i++) { if (bg[i]) continue; const o = i * 4, px = i % w, py = (i / w) | 0, m = d[o] > d[o + 2] ? d[o] : d[o + 2];
+      const e1 = (px > 0 && bg[i - 1]) || (px < w - 1 && bg[i + 1]) || (py > 0 && bg[i - w]) || (py < h - 1 && bg[i + w]);
+      if (mag) { if (e1) { const sp = (d[o] < d[o + 2] ? d[o] : d[o + 2]) - d[o + 1]; if (sp > 0) { d[o] -= sp * 0.85; d[o + 2] -= sp * 0.85; } d[o + 3] = 150; } continue; }
+      if (e1) { if (d[o + 1] > m) d[o + 1] = m; d[o + 3] = 150; }
+      else if (d[o + 1] > m + 30 && ((px > 1 && bg[i - 2]) || (px < w - 2 && bg[i + 2]) || (py > 1 && bg[i - 2 * w]) || (py < h - 2 && bg[i + 2 * w]))) d[o + 1] = m + 10; }
+    const out = {};
+    for (let c = 0; c < 6; c++) { let x0 = w, x1 = 0, y0 = h, y1 = 0, any = false; for (let i = 1; i < B.length; i++) if (cellOf[i] === c) { const b = B[i]; any = true; if (b.x0 < x0) x0 = b.x0; if (b.x1 > x1) x1 = b.x1; if (b.y0 < y0) y0 = b.y0; if (b.y1 > y1) y1 = b.y1; }
+      if (!any || x1 - x0 < 30 || y1 - y0 < 30) continue;
+      const sw = x1 - x0 + 1, sh = y1 - y0 + 1, sc = mk(sw, sh), sx = sc.getContext('2d'), si = sx.createImageData(sw, sh), sd = si.data, ext = new Int32Array(sh), mid = new Float32Array(sh);
+      for (let yy = 0; yy < sh; yy++) { let a = -1, bq = -1; for (let xx = 0; xx < sw; xx++) { const i = (y0 + yy) * w + x0 + xx; if (bg[i] || cellOf[lab[i]] !== c) continue; const o = i * 4, p = (yy * sw + xx) * 4; sd[p] = d[o]; sd[p + 1] = d[o + 1]; sd[p + 2] = d[o + 2]; sd[p + 3] = d[o + 3]; if (a < 0) a = xx; bq = xx; } ext[yy] = a < 0 ? 0 : bq - a + 1; mid[yy] = a < 0 ? sw / 2 : (a + bq) / 2; }
+      sx.putImageData(si, 0, 0);
+      // the line it stands on: the middle of its foundation, which is the first of the widest rows of its lower part
+      let wm = 0; const from = Math.floor(sh * 0.5); for (let yy = from; yy < sh; yy++) if (ext[yy] > wm) wm = ext[yy]; let ay = Math.floor(sh * 0.8); for (let yy = from; yy < sh; yy++) if (ext[yy] >= wm * 0.985) { ay = yy; break; }
+      const nm = cells[c] || ('cell' + c);
+      out[nm] = { cv: sc, w: sw, h: sh, ax: nm === 'port' ? sw * 0.4 : mid[ay], ay: ay, t: {}, px: sd }; }      /* (a spaceport stands on the middle of its PAD, which is the left of its picture: a ship comes down there) */
+    return out;
+  }
+  /** the building `name` (heart0..3, house, hall, huts, tower, wall, spire, port, ship) as this star's people build it, or null until it has come */
+  A.sprite = function (W, name) {
+    W = W || G.W; const pe = A.people(W); if (!pe || !G.terrainOf) return null;
+    const part = CIVIC[name] ? 'civic' : 'works', id = G.terrainOf(W).id, key = part + '.' + id + '.' + norm(pe.kind);
+    if (!SHEET[key] || (ST[key] && ST[key].near)) ask(key, { what: part, terrain: id, people: { kind: pe.kind, facts: pe.facts, colours: pe.colours } }, function (img, r) { SHEET[key] = cut(img, (r.art && r.art.cells) || []); });
+    const s = SHEET[key]; return s ? s[name] || null : null;
+  };
+  /** what grows and lies on this kind of star, painted (lumen, quarry, reeds, shells, plant, rock), or null until it has come */
+  A.nature = function (W, name) {
+    W = W || G.W; if (!W || W.title || !G.terrainOf) return null; const id = G.terrainOf(W).id, key = 'nature.' + id + '.0';
+    if (!SHEET[key] || (ST[key] && ST[key].near)) ask(key, { what: 'nature', terrain: id }, function (img, r) { SHEET[key] = cut(img, (r.art && r.art.cells) || [], (r.art && r.art.bg) || 'magenta'); });
+    const s = SHEET[key]; return s ? s[name] || null : null;
+  };
+  /** the painted ground of a kind of star, if one is in hand (nothing is asked for): its picture four times, mirrored (for a star seen from space) */
+  A.groundTile = function (id) { for (const k in GROUND) if (k.indexOf('ground.' + id + '.') === 0) return GROUND[k].tile; return null; };
+  /** a ship in flight: the painting of this star's ship without the stand it was built on, drawn upright with its middle at 0, 0 and `size` tall: true if it could */
+  A.shipFlying = function (ctx, W, team, size) { const s = A.sprite(W, 'ship'); if (!s) return false; const cutY = Math.max(10, Math.round(s.ay - s.w * 0.1)), k = size / cutY; ctx.imageSmoothingEnabled = true; ctx.drawImage(A.tinted(s, team), 0, 0, s.w, cutY, -s.ax * k, -size / 2, s.w * k, size); return true; };
+  /** is a painting of this star's buildings there (or on its way)? */
+  A.on = function (W) { W = W || G.W; const pe = W && W.arch; if (!pe || !G.terrainOf) return false; const id = G.terrainOf(W).id; return !!SHEET['civic.' + id + '.' + norm(pe.kind)]; };
+
+  /** the building in its owner's colour: what was painted magenta is repainted ('mine', 'foe', 'other') */
+  A.tinted = function (s, team) {
+    if (s.t[team]) return s.t[team]; const T = A.TEAM[team] || A.TEAM.other, c = mk(s.w, s.h), x = c.getContext('2d'), im = x.createImageData(s.w, s.h), o = im.data, d = s.px, tr = T[0] / 255, tg = T[1] / 255, tb = T[2] / 255;
+    for (let i = 0; i < d.length; i += 4) { const r = d[i], g = d[i + 1], b = d[i + 2]; o[i + 3] = d[i + 3]; if (!d[i + 3]) continue;
+      const lo = r < b ? r : b, hi = r > b ? r : b;
+      if (lo > 70 && g < lo * 0.68 && hi - lo < hi * 0.42) { const m = (r + b) / 2, k = m - g; o[i] = g + k * tr; o[i + 1] = g + k * tg; o[i + 2] = g + k * tb; }      // (magenta = white + pure magenta: the white is kept, the magenta becomes the owner's colour)
+      else { o[i] = r; o[i + 1] = g; o[i + 2] = b; } }
+    x.putImageData(im, 0, 0); return (s.t[team] = c);
+  };
+  /** the same building set but not yet coloured: grey */
+  A.grey = function (s) {
+    if (s.g) return s.g; const c = mk(s.w, s.h), x = c.getContext('2d'), im = x.createImageData(s.w, s.h), o = im.data, d = s.px;
+    for (let i = 0; i < d.length; i += 4) { const l = d[i] * 0.3 + d[i + 1] * 0.52 + d[i + 2] * 0.18, v = l * 0.82 + 22; o[i] = v + (d[i] - l) * 0.1; o[i + 1] = v + (d[i + 1] - l) * 0.1; o[i + 2] = v + (d[i + 2] - l) * 0.1 + 6; o[i + 3] = d[i + 3]; }
+    x.putImageData(im, 0, 0); return (s.g = c);
+  };
+  /** its outline filled with one colour (its shadow in black; the plan of what is still to be built in its owner's colour) */
+  A.flat = function (s, rgb) {
+    const k = rgb.join(','); s.f = s.f || {}; if (s.f[k]) return s.f[k]; const pad = 8, c = mk(s.w + pad * 2, s.h + pad * 2), x = c.getContext('2d');
+    try { x.filter = 'blur(2.2px)'; } catch (e) { /* no blur: a hard edge */ } x.drawImage(s.cv, pad, pad); x.filter = 'none'; x.globalCompositeOperation = 'source-in'; x.fillStyle = 'rgb(' + k + ')'; x.fillRect(0, 0, c.width, c.height);
+    c.pad = pad; return (s.f[k] = c);
+  };
+  /** how wide each building stands on the star (its picture is fitted to this) */
+  A.WIDTH = { heart0: 150, heart1: 190, heart2: 246, heart3: 300, house: 124, hall: 214, huts: 200, tower: 112, wall: 230, spire: 108, port: 290, ship: 112 };
+  /** draw a building of this star at a point of the star (x, y: the middle of its foundation), in its owner's colour: true if it could */
+  A.draw = function (ctx, W, name, team, x, y, alpha) {
+    const s = A.sprite(W, name); if (!s) return false; const k = (A.WIDTH[name] || 150) / s.w;
+    ctx.save(); if (alpha !== undefined) ctx.globalAlpha *= alpha; ctx.imageSmoothingEnabled = true; ctx.drawImage(A.tinted(s, team), x - s.ax * k, y - s.ay * k, s.w * k, s.h * k); ctx.restore(); return true;
+  };
+  G.on('new-pond', function () { for (const k in ST) if (ST[k].v === 'miss') delete ST[k]; });
 })();
 
 </script>
@@ -8844,15 +9052,15 @@ G.addSystem({
     const label = function (x, y, a, b, hue) { ctx.save(); ctx.translate(x, y); ctx.scale(inv, inv); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 12.5px system-ui, sans-serif'; const w1 = ctx.measureText(a).width; ctx.font = '600 10.5px system-ui, sans-serif'; const tw = Math.max(w1, ctx.measureText(b).width) + 22; ctx.fillStyle = 'rgba(9,28,40,0.9)'; ctx.beginPath(); ctx.rect(-tw / 2, -21, tw, 42); ctx.fill(); ctx.strokeStyle = G.hsl(hue, 85, 68, 0.9); ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = '700 12.5px system-ui, sans-serif'; ctx.fillText(a, 0, -8); ctx.fillStyle = '#f6d365'; ctx.font = '600 10.5px system-ui, sans-serif'; ctx.fillText(b, 0, 9); ctx.restore(); };
     // what they have built
     const Wk = W.works || [], d0 = W.deed;
-    for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (w.away) continue;      /* (a ship that is away at another pond) */ const fade = clamp((w.until - W.t) / 12, 0, 1); ctx.globalAlpha = fade; if (w.bp && G.drawBlueprint) G.drawBlueprint(ctx, w, false); else if (w.fig && G.drawFigure) { const mw = Math.min(w.r * 1.5, 190), k = mw / 200; ctx.save(); ctx.translate(w.x, w.y + mw * 0.55); ctx.scale(k, k); G.drawFigure(ctx, w.fig, { p: {}, bite: 0, _fc: 1 }, 0); ctx.restore(); } else mound(ctx, w.x, w.y + w.r * 0.5, w.r, w.hue, 1); ctx.globalAlpha = 1; if (w.bp && w.bp.type === 'port' && Wk.some(function (q) { return q.bp && q.bp.type === 'ship' && !q.away && Math.abs(q.x - w.x) < 200; })) continue;      /* (a port with its ship on it: the ship's name says it) */ { let up = 0; for (let q = 0; q < i; q++) if (!(Wk[q].bp && Wk[q].bp.type === 'port') && Math.abs(Wk[q].x - w.x) < 190 && Math.abs(Wk[q].y - w.y) < 120) up++; w._up = up; } if (!(d0 && d0.voyage && d0.voyage.ship === w.name && d0.i >= 2) && (!G.FLAT || v.scale > 0.95 || w.enemy || (G.R && G.R.selThing === w))) label(w.x, (w.bp && G.buildTop ? w.y - G.buildTop(w) - 30 * inv : w.y - Math.min(w.r * 1.5, 190) * 0.7 - 34) - 46 * inv * (w._up || 0), w.name, 'built by the ' + w.by, w.hue); }
+    for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (w.away) continue;      /* (a ship that is away at another pond) */ const fade = clamp((w.until - W.t) / 12, 0, 1); ctx.globalAlpha = fade; if (w.bp && G.drawBlueprint) G.drawBlueprint(ctx, w, false); else if (w.fig && G.drawFigure) { const mw = Math.min(w.r * 1.5, 190), k = mw / 200; ctx.save(); ctx.translate(w.x, w.y + mw * 0.55); ctx.scale(k, k); G.drawFigure(ctx, w.fig, { p: {}, bite: 0, _fc: 1 }, 0); ctx.restore(); } else mound(ctx, w.x, w.y + w.r * 0.5, w.r, w.hue, 1); ctx.globalAlpha = 1; if (w.bp && w.bp.type === 'port' && Wk.some(function (q) { return q.bp && q.bp.type === 'ship' && !q.away && Math.abs(q.x - w.x) < 200; })) continue;      /* (a port with its ship on it: the ship's name says it) */ { let up = 0; for (let q = 0; q < i; q++) if (!(Wk[q].bp && Wk[q].bp.type === 'port') && Math.abs(Wk[q].x - w.x) < 190 && Math.abs(Wk[q].y - w.y) < 120) up++; w._up = up; } if (!(d0 && d0.voyage && d0.voyage.ship === w.name && d0.i >= 2) && (!G.FLAT || w.enemy || (G.R && G.R.selThing === w) || (function () { const p = G.input && G.input.ptr; if (!p || !p.inside || !w.bp) return false; const top = G.buildTop ? G.buildTop(w) : 80; return Math.abs(p.wx - w.x) < (w.bp.hw || 60) + 14 && p.wy > w.y - top - 10 && p.wy < w.y + w.bp.S * 0.45 + 30; })())) label(      /* (on a star a building says its name when the pointer is on it) */w.x, (w.bp && G.buildTop ? w.y - G.buildTop(w) - 30 * inv : w.y - Math.min(w.r * 1.5, 190) * 0.7 - 34) - 46 * inv * (w._up || 0), w.name, 'built by the ' + w.by, w.hue); }
     const d = W.deed;
     if (d) {
       const st = d.steps[d.i], M = members(d), R = d.result ? d.result.size * Math.min(W.ww, W.wh) : 60;
-      if (!d.voyage) { ctx.beginPath(); ctx.arc(d.x, d.y, R + 10, 0, TAU); ctx.strokeStyle = G.hsl(d.hue, 85, 70, 0.5 + 0.25 * Math.sin(t * 3)); ctx.lineWidth = 2.5; ctx.setLineDash([9, 8]); ctx.lineDashOffset = -t * 18; ctx.stroke(); ctx.setLineDash([]); }
+      if (!d.voyage && !(G.FLAT && d.bp)) { ctx.beginPath(); ctx.arc(d.x, d.y, R + 10, 0, TAU); ctx.strokeStyle = G.hsl(d.hue, 85, 70, 0.5 + 0.25 * Math.sin(t * 3)); ctx.lineWidth = 2.5; ctx.setLineDash([9, 8]); ctx.lineDashOffset = -t * 18; ctx.stroke(); ctx.setLineDash([]); }
       if (d.bp && G.drawBlueprint) G.drawBlueprint(ctx, d, true); else if (d.progress > 0.02) mound(ctx, d.x, d.y + R * 0.4, R * 0.8, d.hue, d.progress);
       if (G.drawHauls) G.drawHauls(ctx);
       for (let k = 0; k < M.length; k++) {
-        const c = M[k], top = c.y - c.ph.r * 3.4;
+        const c = M[k], top = c.y - c.ph.r * 3.4; if (G.FLAT && d.bp) continue;      /* (on a star the builders wear their trade already: no flag as well) */
         ctx.strokeStyle = '#14202e'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(c.x + c.ph.r * 0.9, c.y - c.ph.r * 1.2); ctx.lineTo(c.x + c.ph.r * 0.9, top); ctx.stroke();      // each carries a little flag
         ctx.beginPath(); ctx.moveTo(c.x + c.ph.r * 0.9, top); ctx.lineTo(c.x + c.ph.r * 0.9 + 9 + Math.sin(t * 6 + k) * 1.5, top + 4); ctx.lineTo(c.x + c.ph.r * 0.9, top + 8); ctx.closePath(); ctx.fillStyle = G.hsl(d.hue, 90, 62, 1); ctx.fill(); ctx.stroke();
         if (c.carry && !(c.haul >= 0)) { ctx.beginPath(); ctx.arc(c.x - c.ph.r * 0.8, c.y - c.ph.r * 2.6, 4, 0, TAU); ctx.fillStyle = '#f6d365'; ctx.fill(); ctx.stroke(); }
@@ -9121,7 +9329,7 @@ G.addSystem({
       add('onion', 0, -S * 0.14 - bh, bw * 0.78, S * 0.7, 2, [20, 62, 58]); add('circ', 0, -S * 0.14 - bh - S * 0.16, S * 0.26, S * 0.26, 2, [50, 95, 74]);
       add('drop', -bw * 0.5, -S * 0.14 - bh * 0.92, S * 0.16, S * 0.22, 2, [14, 34, 82]); add('drop', bw * 0.5, -S * 0.14 - bh * 0.92, S * 0.16, S * 0.22, 2, [14, 34, 82]);
       add('flag', 0, -S * 0.14 - bh - S * 0.7, S * 0.24, S * 0.34, 1, [0, 85, 60]);
-      const tier = o.tier | 0;      // (what the colony has become: 1 a village, 2 a town, 3 a city; each adds to the Heart)
+      const tier = o.tier | 0;      // (how far the colony has come: growing, thriving, great; each step adds to the Heart)
       if (tier >= 1) { [-1, 1].forEach(function (d) { add('rect', d * bw * 0.82, 0, S * 0.5, S * 0.3, 0, [0, 30, 48]); add('dome', d * bw * 0.82, -S * 0.3, S * 0.56, S * 0.32, 2, [20, 62, 58]); add('window', d * bw * 0.82, -S * 0.06, S * 0.16, S * 0.2, 2, [14, 34, 82]); add('circ', d * bw * 0.82, -S * 0.66, S * 0.1, S * 0.1, 2, [50, 95, 74]); }); }
       if (tier >= 2) { [-1, 1].forEach(function (d) { add('rect', d * bw * 1.2, 0, S * 0.3, S * 1.05, 0, [0, 26, 44]); add('window', d * bw * 1.2, -S * 0.5, S * 0.13, S * 0.2, 2, [14, 34, 82]); add('onion', d * bw * 1.2, -S * 1.05, S * 0.4, S * 0.46, 2, [20, 62, 58]); add('circ', d * bw * 1.2, -S * 1.56, S * 0.09, S * 0.09, 2, [50, 95, 74]); add('beam', d * bw * 0.98, -S * 0.72, S * 0.4, S * 0.07, 1, [35, 60, 56]); }); add('circ', 0, -S * 0.14 - bh - S * 0.16, S * 0.4, S * 0.4, 2, [50, 95, 80]); }
       if (tier >= 3) { [-1, 1].forEach(function (d) { add('rect', d * bw * 1.58, 0, S * 0.24, S * 1.5, 0, [0, 22, 40]); add('window', d * bw * 1.58, -S * 0.9, S * 0.11, S * 0.18, 2, [14, 34, 82]); add('tri', d * bw * 1.58, -S * 1.5, S * 0.34, S * 0.5, 2, [20, 66, 60]); add('flag', d * bw * 1.58, -S * 2.0, S * 0.2, S * 0.28, 1, [0, 85, 60]); add('beam', d * bw * 1.38, -S * 1.0, S * 0.42, S * 0.07, 1, [35, 60, 56]); }); add('rect', 0, 0, bw * 3.5, S * 0.08, 0, [0, 14, 36]); add('drop', 0, -S * 0.14 - bh - S * 1.05, S * 0.2, S * 0.3, 2, [50, 95, 82]); }
@@ -9199,7 +9407,7 @@ G.addSystem({
   function houseStyle(W, spId, wet) { const H = W.houseStyle || {}; let id = spId; if (wet === false) { for (let k = 0; k < 6 && id; k++) { if (H[id + 0.5]) return H[id + 0.5]; const s = G.speciesById(id); id = s ? s.parent : 0; } return null; } for (let k = 0; k < 6 && id; k++) { if (H[id]) return H[id]; const s = G.speciesById(id); id = s ? s.parent : 0; } return null; }
   function askDesign(W, d) {
     if (d.result && d.result.house) { const b0 = blueprint(d), st = houseStyle(W, d.sp, b0.wet); if (st) { const base = b0, P = G.designFrom(st, base.S, 14); if (P) { base.P = P; base.designed = true; base.about = st.about || ''; settle(base, true); d.design = base; return; } } }      /* (a village: every house of a kind is the same house) */
-    if (typeof document === 'undefined' || !live() || !G.ai.allow('deed')) { d.design = false; return; }
+    if (typeof document === 'undefined' || !live() || (G.art && G.art.on && G.art.on(G.W)) || !G.ai.allow('deed')) { d.design = false; return; }      /* (where this star's buildings are PAINTED (53_art.js) a design of pieces would never be seen: it is not paid for) */
     const base = blueprint(d), sp = G.speciesById(d.sp), f = sp && sp.rep ? sp.rep.f : null, r = d.result || {}, house = !!(r.house), maxN = house ? Math.round(6 + 5 * base.brain) : Math.round(12 + 26 * base.brain);
     const near = (W.works || []).filter(function (w) { return w.bp && !w.fall && Math.hypot(w.x - d.x, w.y - d.y) < 900; }).slice(-5).map(function (w) { return { name: w.name, by: w.by, what: w.bp.about || w.looks || '' }; });
     const wet = base.wet !== false, where = r.ship || r.port ? '' : wet ? ' WHERE IT STANDS: UNDER WATER, on the floor of the star. Build it as underwater things are built: shell, coral and stone; rounded domes and bubbles, arches, fronds and fins that sway in the current; low, wide and anchored to the floor. Nothing that belongs in dry air: no thatch, no chimney, no flag on a pole.' : ' WHERE IT STANDS: ON DRY LAND, in the open air above the water. Build it as land things are built: reed, wood and stone; walls and posts under a pitched or pointed roof that sheds rain, steps, a smoke-hole, a flag. Taller and lighter than what is built under water; no bubbles, no fronds.';
@@ -9624,10 +9832,10 @@ G.addSystem({
   G.didIt = function (c, key, words, to) {
     did[key] = (did[key] || 0) + 1;
     if (typeof document === 'undefined' || G.mode !== 'play' || !c || c.dead || G.speed > 4 || (G.pondAsleep && G.pondAsleep())) return;
-    const now = performance.now(); if (now - (lastOf[key] || 0) < 9000 || M.length >= 2) return; lastOf[key] = now;
+    const now = performance.now(); if (now - (lastOf[key] || 0) < 9000 || M.length >= (G.FLAT ? 1 : 2)) return; lastOf[key] = now;
     const sp = G.speciesById(c.sp), tx = to ? to.x : c.x, ty = to ? to.y : c.y, verb = { attack: 'attacks', hunt: 'ate', build: 'sets a piece', strike: 'strikes back', help: 'goes to help' }[key] || '';
     const m = { id: ++seq, c: c, key: key, words: words, who: sp ? sp.name : c.team === 1 ? 'raider' : 'creature', el: c.el ? Float32Array.from(c.el) : null, t0: now, to: to && !to.dead ? to : null, tx: tx, ty: ty, verb: verb };
-    M.push(m); mark(m, 3.4);      // it is shown in the pond as it happens
+    M.push(m); if (!G.FLAT) mark(m, 3.4);      // it is shown in the pond as it happens (on a star: only when you press SEE)
     draw();
   };
   /** an arrow in the pond from the one who did it to what it was done to, with a word on it, for a few seconds */
@@ -9678,9 +9886,9 @@ G.addSystem({
     ui(); const now = performance.now();
     for (let i = M.length - 1; i >= 0; i--) if (now - M[i].t0 > 9000 || M[i].c.dead) M.splice(i, 1);
     const hide = G.mode !== 'play' || (G.ui && G.ui.modal) || (G.pondAsleep && G.pondAsleep());
-    const al = document.getElementById('mvalert'), up = al && !al.classList.contains('hide'), base = up ? Math.round(window.innerHeight - al.getBoundingClientRect().top + 10) : 150;
+    const al = document.getElementById('mvalert'), up = al && !al.classList.contains('hide'), nt = document.getElementById('note'), nup = nt && nt.style.opacity === '1', base = up ? Math.round(window.innerHeight - al.getBoundingClientRect().top + 10) : nup ? Math.max(150, Math.round(window.innerHeight - nt.getBoundingClientRect().top + 10)) : 150;
     if (said && !said.classList.contains('hide')) { if (now - saidT > 5200 || hide) said.classList.add('hide'); else said.style.bottom = (base + box.offsetHeight + (box.offsetHeight ? 8 : 0)) + 'px'; }
-    const hb0 = document.getElementById('rarebox'), s = hide ? '' : M.map(function (m) { return m.id; }).join(',') + (hb0 && !hb0.classList.contains('hide') ? 'h' : ''); if (s === sig) return; sig = s;
+    const hb0 = document.getElementById('rarebox'), s = hide ? '' : M.map(function (m) { return m.id; }).join(',') + (hb0 && !hb0.classList.contains('hide') ? 'h' : '') + ':' + base; if (s === sig) return; sig = s;
     box.style.bottom = base + 'px';
     { const hb = document.getElementById('rarebox'), open = hb && !hb.classList.contains('hide') && window.innerWidth > 900, w = Math.min(620, window.innerWidth - 28), x = open ? Math.max(window.innerWidth / 2, hb.getBoundingClientRect().right + 12 + w / 2) : 0; box.style.left = x ? Math.round(x) + 'px' : ''; if (said) said.style.left = x ? Math.round(x) + 'px' : ''; }      /* (beside the NOW panel when that is open, never under it) */
     box.innerHTML = hide ? '' : M.map(function (m) { return '<div class="mo glass" data-id="' + m.id + '"><span class="tx" data-act="see" title="Go and see it">A <b>' + esc(m.who) + '</b> ' + esc(m.words) + '</span><button class="s" data-act="see" title="Go and see it on the star">SEE</button><button class="g" data-act="g" title="Good: it, and those of its kind who saw, will do more of this">♥ GOOD</button><button class="b" data-act="b" title="Bad: they will do less of this">✕ BAD</button><button class="q" data-act="q" title="What you have taught this star">?</button></div>'; }).join('');
@@ -10085,20 +10293,30 @@ G.addSystem({
   };
 
   // ── a building as it stands on the star ──
-  // (Only what is drawn on the star itself: a building's picture on a card stays plain.) Round the pieces its builders set, a building has:
-  //   · a PLATFORM under it, edged with light in its owner's colour (yours blue, an enemy's red, another people's pale), so whose it is can be seen;
-  //   · a SHADOW thrown to the south-east, like everything else on the star;
-  //   · while it is being built, the pieces still to come shown as a HOLOGRAM that the builders fill in, with sparks where a piece has just been set;
-  //   · a BEACON at its top once it is whole; and SMOKE and FIRE when it has been knocked about.
+  // (Only what is drawn on the star itself: a building's picture on a card stays plain.) A building is drawn in two goes:
+  //   · what lies on the GROUND under it, drawn with the ground: the earth round it worn pale by coming and going, and its SHADOW, thrown to
+  //     the south-east like every shadow on the star;
+  //   · the building ITSELF, drawn among the creatures, each thing in its turn from the back of the star to the front: so a creature that
+  //     walks behind a building is hidden by it, and one that walks before it is not (50_render.js asks for them, creature by creature).
+  // If this star's people have had their way of building PAINTED (53_art.js), the building is its painting: it rises from the ground up as
+  // its pieces are set (grey until they are coloured, the part still to come shown as a plan of light), and the parts painted in the team
+  // colour are its owner's (yours blue, an enemy's red). If not, it is drawn from its pieces as before, on a platform edged with its owner's colour.
   G.holoPieces = true;
   const TEAMC = { mine: '70,200,255', foe: '255,64,88', other: '214,224,236' };
   const ownerOf = function (o) { const W = G.W; return o.enemy ? 'foe' : (!W.farOf || (G.starHeld && G.starHeld(W)) || o.visitor) ? 'mine' : 'other'; };
   function shadowOf(K) { if (K.sh) return K.sh; const c = document.createElement('canvas'); c.width = K.cv.width; c.height = K.cv.height; const x = c.getContext('2d'); x.drawImage(K.cv, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height); return (K.sh = c); }
-  const drawK = G.drawBlueprint;
-  G.drawBlueprint = function (ctx, o, building) {
-    const bp = o && o.bp; if (!bp || !G.W || ctx !== G.ctx || (o.name === undefined && o.title === undefined)) return drawK(ctx, o, building);
-    const W = G.W, t = G.rt || 0, b = baseOf(o), S = bp.S, hw = bp.hw || 60, top = bp.top || S * 1.4, col = TEAMC[ownerOf(o)], P = bp.P, ring = bp.type === 'wall' && !bp.designed, pad = bp.type !== 'ship' && bp.type !== 'port' && !ring;
-    try {
+  const drawK = G.drawBlueprint, SHOWN = new WeakMap(), fr = function (v) { return v - Math.floor(v); };
+  /** the painting this building is shown by, if its star's people have theirs: { s, name, k (star units to a pixel of it) } */
+  function artOf(o) { const A = G.art, bp = o.bp; if (!A || !A.sprite || !bp) return null; const t = bp.type, name = t === 'heart' ? (o.enemy ? 'heart2' : 'heart' + Math.min(3, Math.max(o.tier | 0, bp.tier | 0))) : t === 'spire' ? (o.tower || (o.result && o.result.tower) ? 'tower' : 'spire') : t; if (!A.WIDTH[name]) return null; const s = A.sprite(G.W, name); return s ? { s: s, name: name, k: A.WIDTH[name] / s.w } : null; }
+  G.buildArt = artOf;
+  const prog = function (bp) { let a = 0, c = 0; const P = bp.P; for (let i = 0; i < P.length; i++) { if (P[i].st > 0) a++; if (P[i].st > 1) c++; } return [a / Math.max(1, P.length), c / Math.max(1, P.length)]; };
+  { const bt0 = G.buildTop; if (bt0) G.buildTop = function (o) { let a = null; try { a = o && o.bp && G.W && !G.W.title && (o.name !== undefined || o.title !== undefined) ? artOf(o) : null; } catch (e) { a = null; } return a ? a.s.ay * a.k - o.bp.S * 0.45 + 6 : bt0(o); }; }
+  function groundPart(ctx, o, building, art) {
+    const W = G.W, bp = o.bp, t = G.rt || 0, b = baseOf(o), S = bp.S, hw = bp.hw || 60, top = bp.top || S * 1.4, col = TEAMC[ownerOf(o)], P = bp.P, ring = bp.type === 'wall' && !bp.designed, pad = bp.type !== 'ship' && bp.type !== 'port' && !ring, TL = G.terrainLook ? G.terrainLook(W) : null;
+    if (art) { const sp = art.s, k = art.k, half = sp.w * k / 2, pr = prog(bp), f = building ? pr[0] : Math.max(pr[0], 0.1), a0 = ctx.globalAlpha;
+      if (TL && bp.type !== 'ship') { const rx = half * 1.5, ry = rx * 0.5; ctx.save(); ctx.translate(b[0], b[1] + sp.h * k * 0.03); ctx.scale(1, ry / rx); const g = ctx.createRadialGradient(0, 0, rx * 0.4, 0, 0, rx); g.addColorStop(0, 'rgba(' + TL.lite + ',0.24)'); g.addColorStop(0.7, 'rgba(' + TL.lite + ',0.10)'); g.addColorStop(1, 'rgba(' + TL.lite + ',0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, TAU); ctx.fill(); ctx.restore(); }
+      if (!o.lifting && f > 0.02) { const sh = G.art.flat(sp, [0, 0, 0]), pd = sh.pad, cutY = Math.floor(sp.h * (1 - f)); ctx.save(); ctx.translate(b[0], b[1]); ctx.transform(1, 0, -0.62, -0.2, 0, 0); ctx.globalAlpha = a0 * 0.4; ctx.drawImage(sh, 0, pd + cutY, sh.width, sp.h - cutY + pd, (-sp.ax - pd) * k, (cutY - sp.ay) * k, sh.width * k, (sp.h - cutY + pd) * k); ctx.restore(); }
+      return; }
       // its shadow
       const K = !building ? KEPT.get(bp) : null; if (K && K.cv && !o.lifting) { ctx.save(); ctx.translate(b[0], b[1]); ctx.transform(1, 0, -0.62, -0.24, 0, 0); ctx.globalAlpha = 0.3; ctx.drawImage(shadowOf(K), -K.box[0], -K.box[1], K.box[2], K.box[3]); ctx.restore(); }
       // its platform
@@ -10113,9 +10331,30 @@ G.addSystem({
       if (building) { ctx.save(); ctx.translate(b[0], b[1]); const scan = (t * 0.6) % 1; for (let i = 0; i < P.length; i++) { const p = P[i]; if (p.st !== 0) continue; ctx.beginPath(); if (p.s === 'lamp') ctx.arc(p.x, p.y, p.w / 2, 0, TAU); else if (p.s === 'flag') ctx.rect(p.x - 1, p.y - p.h, p.w, p.h); else path(ctx, p, p.w, p.h, t);
             ctx.fillStyle = 'rgba(' + col + ',' + (0.07 + 0.04 * Math.sin(t * 3 + i)) + ')'; ctx.fill(); ctx.strokeStyle = 'rgba(' + col + ',0.5)'; ctx.lineWidth = 1.1; ctx.stroke(); }
           ctx.save(); ctx.globalCompositeOperation = 'lighter'; const sy = -top * scan, g = ctx.createLinearGradient(0, sy - 10, 0, sy + 10); g.addColorStop(0, 'rgba(' + col + ',0)'); g.addColorStop(0.5, 'rgba(' + col + ',0.22)'); g.addColorStop(1, 'rgba(' + col + ',0)'); ctx.fillStyle = g; ctx.fillRect(-hw - 10, sy - 10, hw * 2 + 20, 20); ctx.restore(); ctx.restore(); }
-    } catch (e) { if (!G.drawBlueprint.err) { G.drawBlueprint.err = 1; console.error(e); } }
+  }
+  function artUp(ctx, o, building, art) {
+    const W = G.W, bp = o.bp, t = G.rt || 0, b = baseOf(o), team = ownerOf(o), col = TEAMC[team], sp = art.s, k = art.k, pr = prog(bp), A0 = ctx.globalAlpha, P = bp.P;
+    let sh = SHOWN.get(bp); if (!sh) { sh = { f: building ? 0 : pr[0], c: building ? 0 : pr[1] }; SHOWN.set(bp, sh); } const dt = Math.min(0.1, G.frameDt || 0.016); sh.f += (pr[0] - sh.f) * Math.min(1, dt * 3); sh.c += (pr[1] - sh.c) * Math.min(1, dt * 3);
+    const f = Math.abs(pr[0] - sh.f) < 0.004 ? pr[0] : sh.f, c = Math.min(f, Math.abs(pr[1] - sh.c) < 0.004 ? pr[1] : sh.c);
+    const x0 = b[0] - sp.ax * k, y0 = b[1] - sp.ay * k, yF = Math.round(sp.h * (1 - f)), yC = Math.round(sp.h * (1 - c)), lineY = y0 + yF * k, wide = sp.w * k;
+    const part = function (img, ya, yb, a, off) { if (yb - ya < 1) return; ctx.globalAlpha = A0 * a; const o2 = off || 0; ctx.drawImage(img, 0, ya + o2, img.width, yb - ya, x0 - o2 * k, y0 + ya * k, img.width * k, (yb - ya) * k); };
+    ctx.save(); ctx.imageSmoothingEnabled = true;
+    if (yF > 0) {
+      if (building) { const fl = G.art.flat(sp, col.split(',').map(Number)); part(fl, 0, yF, 0.2 + 0.05 * Math.sin(t * 3), fl.pad); part(G.art.grey(sp), 0, yF, 0.2); }      /* (what is still to come: its plan, in its owner's light) */
+      else { part(G.art.flat(sp, [20, 18, 18]), 0, yF, 0.34, 8); part(G.art.grey(sp), 0, yF, 0.3); } }      /* (what has been knocked down: a burnt shell) */
+    part(G.art.grey(sp), yF, yC, 1); part(G.art.tinted(sp, team), yC, o.lifting ? Math.max(yC, Math.round(sp.ay - sp.w * 0.1)) : sp.h, 1); ctx.globalAlpha = A0;      /* (a ship in the air has left the stand it was built on) */
+    if (building && yF > 0 && f > 0) { ctx.globalCompositeOperation = 'lighter'; const g = ctx.createLinearGradient(0, lineY - 7, 0, lineY + 7); g.addColorStop(0, 'rgba(' + col + ',0)'); g.addColorStop(0.5, 'rgba(' + col + ',0.5)'); g.addColorStop(1, 'rgba(' + col + ',0)'); ctx.fillStyle = g; ctx.fillRect(x0, lineY - 7, wide, 14);
+      for (let i = 0; i < P.length; i++) { const p = P[i], age = p.t0 === undefined ? 9 : W.t - p.t0; if (p.st > 0 && age >= 0 && age < 0.9) { const u = age / 0.9, px = x0 + wide * (0.2 + 0.6 * fr(i * 0.618 + 0.3)); ctx.strokeStyle = 'rgba(255,230,170,' + (1 - u) + ')'; ctx.lineWidth = 1.6; ctx.beginPath(); for (let q = 0; q < 7; q++) { const an = q * 0.9 + i, r0 = 3 + 10 * u, r1 = 8 + 24 * u; ctx.moveTo(px + Math.cos(an) * r0, lineY + Math.sin(an) * r0); ctx.lineTo(px + Math.cos(an) * r1, lineY + Math.sin(an) * r1 + 10 * u * u); } ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,' + (1 - u) + ')'; ctx.beginPath(); ctx.arc(px, lineY, 5 * (1 - u), 0, TAU); ctx.fill(); } }
+      ctx.globalCompositeOperation = 'source-over'; }
+    if (!building && yF > 0 && (o.dmg || o.hitT !== undefined || o.ruin || o.fall)) { const hot = o.hitT !== undefined && W.t - o.hitT < 25;
+      for (let m = 0; m < 3; m++) { const px = x0 + wide * (0.25 + 0.25 * m), py = Math.min(lineY + 10, b[1] - 8); for (let q = 0; q < 4; q++) { const u = ((t * 0.28 + q / 4 + m * 0.37) % 1); ctx.fillStyle = 'rgba(40,40,46,' + 0.4 * (1 - u) + ')'; ctx.beginPath(); ctx.arc(px + Math.sin(u * 4 + q + m) * 9, py - u * 80, 7 + u * 15, 0, TAU); ctx.fill(); }
+        if (hot) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; for (let q = 0; q < 3; q++) { const fl = 0.6 + 0.4 * Math.sin(t * 13 + q * 2 + m), fx = px + (q - 1) * 7; ctx.fillStyle = 'rgba(255,' + Math.round(120 + 80 * fl) + ',40,' + 0.75 * fl + ')'; ctx.beginPath(); ctx.moveTo(fx - 6, py); ctx.quadraticCurveTo(fx + Math.sin(t * 9 + q) * 4, py - 24 * fl, fx + 6, py); ctx.closePath(); ctx.fill(); } ctx.restore(); } } }
+    if (building && o.pile && G.matDraw) { const px = clamp(b[0] + wide / 2 + 26, 30, W.ww - 30), py = b[1] + 8; let n = 0; for (let q = 0; q < 3; q++) for (let j = 0; j < Math.min(6, o.pile[q]); j++) { G.matDraw(ctx, { x: px + ((n % 4) - 1.5) * 9, y: py - Math.floor(n / 4) * 7, k: q, s: (n * 0.37) % 1 }, 0); n++; } }
+    ctx.restore();
+  }
+  function plainUp(ctx, o, building) {
+    const W = G.W, bp = o.bp, t = G.rt || 0, b = baseOf(o), S = bp.S, hw = bp.hw || 60, top = bp.top || S * 1.4, col = TEAMC[ownerOf(o)], P = bp.P, ring = bp.type === 'wall' && !bp.designed, pad = bp.type !== 'ship' && bp.type !== 'port' && !ring;
     drawK(ctx, o, building);
-    try {
       ctx.save(); ctx.translate(b[0], b[1]);
       if (building) { for (let i = 0; i < P.length; i++) { const p = P[i], age = p.t0 === undefined ? 9 : W.t - p.t0; if (p.st > 0 && age >= 0 && age < 0.9) { const u = age / 0.9; ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(255,230,170,' + (1 - u) + ')'; ctx.lineWidth = 1.6; ctx.beginPath(); for (let q = 0; q < 7; q++) { const a = q * 0.9 + i, r0 = 3 + 10 * u, r1 = 8 + 24 * u; ctx.moveTo(p.x + Math.cos(a) * r0, p.y - p.h * 0.5 + Math.sin(a) * r0); ctx.lineTo(p.x + Math.cos(a) * r1, p.y - p.h * 0.5 + Math.sin(a) * r1 + 10 * u * u); } ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,' + (1 - u) + ')'; ctx.beginPath(); ctx.arc(p.x, p.y - p.h * 0.5, 5 * (1 - u), 0, TAU); ctx.fill(); ctx.restore(); } } }
       else { let have = 0; for (let i = 0; i < P.length; i++) if (P[i].st > 0) have++;
@@ -10124,7 +10363,19 @@ G.addSystem({
           miss.forEach(function (p, k) { for (let q = 0; q < 4; q++) { const u = ((t * 0.28 + q / 4 + k * 0.37) % 1), px = p.x + Math.sin(u * 4 + q + k) * 9, py = p.y - p.h * 0.4 - u * 70; ctx.fillStyle = 'rgba(40,40,46,' + 0.38 * (1 - u) + ')'; ctx.beginPath(); ctx.arc(px, py, 6 + u * 13, 0, TAU); ctx.fill(); }
             if (hot) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; for (let q = 0; q < 3; q++) { const fl = 0.6 + 0.4 * Math.sin(t * 13 + q * 2 + k), fx = p.x + (q - 1) * 6; ctx.fillStyle = 'rgba(255,' + Math.round(120 + 80 * fl) + ',40,' + 0.75 * fl + ')'; ctx.beginPath(); ctx.moveTo(fx - 5, p.y - p.h * 0.3); ctx.quadraticCurveTo(fx + Math.sin(t * 9 + q) * 4, p.y - p.h * 0.3 - 20 * fl, fx + 5, p.y - p.h * 0.3); ctx.closePath(); ctx.fill(); } ctx.restore(); } }); } }
       ctx.restore();
-    } catch (e) { if (!G.drawBlueprint.err2) { G.drawBlueprint.err2 = 1; console.error(e); } }
+  }
+  const UP = [];      // the buildings waiting for their turn among the creatures, this frame: back ones first
+  G.drawBlueprint = function (ctx, o, building) {
+    const bp = o && o.bp; if (!bp || !G.W || ctx !== G.ctx || (o.name === undefined && o.title === undefined)) return drawK(ctx, o, building);
+    let art = null; try { art = artOf(o); groundPart(ctx, o, building, art); } catch (e) { if (!G.drawBlueprint.err) { G.drawBlueprint.err = 1; console.error(e); } }
+    const u = { o: o, b: building, a: ctx.globalAlpha, y: baseOf(o)[1] + (bp.type === 'ship' ? (o.lifting ? 1e6 : 90) : 0), art: art };      /* (a ship stands ON its port, so it is drawn after it; in the air, after everything) */ let i = UP.length; while (i > 0 && UP[i - 1].y > u.y) i--; UP.splice(i, 0, u);
+    if (UP.length > 700) G.drawUprights(ctx, 1e9);
+  };
+  /** anything else that stands up from the ground takes its turn among the creatures and the buildings too: fn(ctx, arg) is called when it comes */
+  G.upright = function (y, fn, arg) { const u = { y: y, fn: fn, arg: arg, a: 1 }; let lo = 0, hi = UP.length; while (lo < hi) { const m = (lo + hi) >> 1; if (UP[m].y > y) hi = m; else lo = m + 1; } UP.splice(lo, 0, u); if (UP.length > 700) G.drawUprights(G.ctx, 1e9); };
+  /** draw the buildings that stand behind the line y (50_render.js: before each creature, and once more after the last) */
+  G.drawUprights = function (ctx, y) {
+    while (UP.length && UP[0].y <= y) { const u = UP.shift(); ctx.save(); ctx.globalAlpha = u.a; try { if (u.fn) u.fn(ctx, u.arg); else if (u.art) artUp(ctx, u.o, u.b, u.art); else plainUp(ctx, u.o, u.b); } catch (e) { if (!G.drawBlueprint.err2) { G.drawBlueprint.err2 = 1; console.error(e); } } ctx.restore(); }
   };
 })();
 
@@ -10169,8 +10420,9 @@ G.addSystem({
     (W.works = W.works || []).unshift(h); colony(W);
     return h;
   };
-  // ── what the colony has become: a camp, a village, a town, a city. It shows in its Heart, which grows with it (and never shrinks) ──
-  G.TIERS = ['Camp', 'Village', 'Town', 'City'];
+  // ── how far the colony has come. It shows in its Heart, which grows with it (and never shrinks) ──
+  // (The four steps are named for GROWTH, not for what people build: nobody knows what these creatures are, and a word like "village" would say they are us.)
+  G.TIERS = ['Founded', 'Growing', 'Thriving', 'Great'];
   function tierOf(W) { let n = 0; const Wk = W.works || []; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (w.bp && w.bp.type !== 'heart' && !w.visitor && !w.enemy && !w.fall && G.buildCount(w)[0] >= G.buildCount(w)[2] * 0.7) n++; } return n >= 9 ? 3 : n >= 5 ? 2 : n >= 2 ? 1 : 0; }
   function grow(W, col) { const h = G.heartOf(W); if (!h) return; const tr = Math.max(col.tier | 0, tierOf(W)); if (tr > (col.tier | 0)) { const was = col.tier | 0; col.tier = tr; G.emit('colony-tier', tr, was); }
     if ((h.tier | 0) === tr || h.ruin) return; const c = G.buildCount(h); if (c[0] < c[2]) return;      // (a Heart that is being mended is not added to)
@@ -10468,7 +10720,7 @@ G.addSystem({
       let at, name;
       if (job === 'f') { at = p ? { x: p.x, y: levelY(W, 0, p.y, 12), set: 1 } : G.musterAt(W); name = p ? 'FIGHTERS’ POST' : 'MUSTER GROUND'; }
       else if (job === 'b') { at = spot(W, 'yard'); name = 'BUILDERS’ YARD'; }
-      else { at = p ? { x: p.x, y: levelY(W, 0, p.y, 12) } : { x: H.x, y: H.y + 84 }; name = 'GUARD POST'; }
+      else { at = p ? { x: p.x, y: levelY(W, 0, p.y, 12) } : { x: H.x, y: H.y + 124 }; name = 'GUARD POST'; }
       if (!at) continue; const face = at.x >= H.x ? 0 : Math.PI, e = edge(W) + 40;
       // each keeps the place it has (so the group does not shuffle whenever one of them dies); a newcomer takes the first empty one
       const used = {}; let top = 0; L.forEach(function (c) { if (c.slotG === k && c.slotI >= 0 && !used[c.slotI] && c.slotI < n + 2) { used[c.slotI] = 1; } else { c.slotG = k; c.slotI = -1; } });
@@ -10737,7 +10989,7 @@ G.addSystem({
     box.classList.remove('hide'); box.classList.remove('shut');
     // it stands above the bottom menu, beside the zoom buttons, and may be as tall as the room up to the season card
     { const tb = document.getElementById('toolbar'), se = document.getElementById('season'), top = se && !se.classList.contains('hide') ? se.getBoundingClientRect().bottom + 10 : 14, bot = tb ? tb.getBoundingClientRect().top - 10 : window.innerHeight - 90;
-      if (window.innerWidth > 720) { box.style.top = 'auto'; box.style.bottom = Math.round(window.innerHeight - bot) + 'px'; box.style.left = '78px'; box.style.transform = 'none'; const hgt = Math.max(280, Math.min(640, Math.round(bot - top))); box.style.height = hgt + 'px'; box.style.maxHeight = hgt + 'px'; } else { box.style.height = '';      /* (always the same height: what is in it scrolls, the panel itself does not jump about) */ box.style.top = ''; box.style.bottom = ''; box.style.left = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
+      if (window.innerWidth > 720) { box.style.top = 'auto'; box.style.bottom = Math.round(window.innerHeight - bot) + 'px'; box.style.left = (document.body.classList.contains('cmdLive') ? 340 : 78) + 'px';      /* (beside the colony panel and the zoom buttons, never over them) */ box.style.transform = 'none'; const hgt = Math.max(280, Math.min(640, Math.round(bot - top))); box.style.height = hgt + 'px'; box.style.maxHeight = hgt + 'px'; } else { box.style.height = '';      /* (always the same height: what is in it scrolls, the panel itself does not jump about) */ box.style.top = ''; box.style.bottom = ''; box.style.left = ''; box.style.transform = ''; box.style.maxHeight = ''; } }
     box.style.zIndex = '9';
     const ps = parts.map(function (p) { return p.sig || ''; }).join('~');
     if (s2 + tab + open + bo + ps === sig) return; sig = s2 + tab + open + bo + ps;
@@ -11397,6 +11649,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   const BODY = {}, FW = 320, FH = 192, FM = 150;
   let builtNow = 0, stamp = 0;      // the pond in its picture: wide, tall, and the margin round it
   let FMASK = null;
+  G.on('art', function () { for (const k in BODY) delete BODY[k]; });      // (a ground has been painted: the stars of that kind are drawn again)
   function bodyOf(p) {
     const key = p.i + ',' + p.j; if (BODY[key]) { BODY[key].used = stamp; return BODY[key]; }
     if (builtNow >= 1) return null;      /* one new picture a frame: a sky full of ponds coming into view fills in over a few frames and never stalls one */
@@ -11408,10 +11661,15 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const pc = document.createElement('canvas'); pc.width = SW; pc.height = SH; const d = pc.getContext('2d'), shore = FH * (0.2 + 0.1 * hash(p.i, p.j, 210));
     d.save();      /* the water and the shore are painted right across the sheet: the ending below decides how far they are seen */
     const wg = d.createLinearGradient(0, FM, 0, FM + FH); wg.addColorStop(0, col(0, 55, 34, 1)); wg.addColorStop(0.5, col(8, 60, 24, 1)); wg.addColorStop(1, col(18, 65, 12, 1)); d.fillStyle = wg; d.fillRect(0, 0, SW, SH);
+    // (a star is ground, of its own kind: its painted ground where that is in hand, else its colours)
+    const tid = G.FLAT ? (p.home && G.W && !G.W.farOf && G.terrainOf ? G.terrainOf(G.W).id : p.terrain) : '', TL = tid && G.terrainColours ? G.terrainColours(tid) : null, GT = TL && G.art && G.art.groundTile ? G.art.groundTile(tid) : null;
+    if (TL) { if (GT) { d.save(); d.scale(0.28, 0.28); d.fillStyle = d.createPattern(GT, 'repeat'); d.fillRect(0, 0, SW / 0.28, SH / 0.28); d.restore(); } else { const gg = d.createLinearGradient(0, FM, SW * 0.4, FM + FH); gg.addColorStop(0, 'rgb(' + TL.ramp[3].join(',') + ')'); gg.addColorStop(1, 'rgb(' + TL.ramp[1].join(',') + ')'); d.fillStyle = gg; d.fillRect(0, 0, SW, SH); }
+      const sg = d.createLinearGradient(0, FM, SW, FM + FH); sg.addColorStop(0, 'rgba(255,255,255,0.10)'); sg.addColorStop(1, 'rgba(0,0,10,0.34)'); d.fillStyle = sg; d.fillRect(0, 0, SW, SH); }
     try { d.filter = 'blur(4.5px)'; } catch (e) { /* no blur here: the lights are simply sharper */ }
     // what lives in it, too far to make out: soft lights of many colours
     for (let k = 0; k < 46; k++) { const lx = FM + hash(p.i + k, p.j, 211) * FW, ly = FM + shore + hash(p.i, p.j + k, 212) * (FH - shore), big = hash(p.i - k, p.j, 213) < 0.2; d.fillStyle = 'hsla(' + ((h + 60 + k * 53) % 360) + ',90%,' + (big ? 70 : 76) + '%,' + (big ? 0.55 : 0.85) + ')'; d.beginPath(); d.arc(lx, ly, big ? 9 : 3 + 2.4 * hash(k, p.i, 214), 0, TAU); d.fill(); }
     // the shore along the top, with its uneven waterline
+    if (TL) { d.filter = 'none'; d.restore(); d.save(); d.beginPath(); d.rect(0, 0, 0, 0); d.clip(); }      /* (a star has no shore: nothing more is painted on it) */
     d.fillStyle = col(-115 + 30 * hash(p.i, p.j, 215), 38, 58, 1); d.beginPath(); d.moveTo(0, 0); d.lineTo(SW, 0); d.lineTo(SW, FM + shore);
     for (let q = 24; q >= 0; q--) d.lineTo(SW * q / 24, FM + shore + Math.sin(q * 1.3 + p.i) * 3.2 + Math.sin(q * 0.5 + p.j) * 2.8); d.closePath(); d.fill();
     for (let k = 0; k < 16; k++) { d.fillStyle = 'hsla(' + ((h + 100 + k * 71) % 360) + ',75%,68%,0.8)'; d.beginPath(); d.arc(FM + hash(k, p.j, 216) * FW, FM + hash(p.i, k, 217) * shore * 0.9, 2.8, 0, TAU); d.fill(); }
@@ -11438,7 +11696,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const k = pr * 2 / FH, w = (FW + 2 * FM) * k, hh = (FH + 2 * FM) * k, hw2 = FW * k / 2, hh2 = FH * k / 2;
     // seen small (or while its picture is still to be made) a far pond is a few strokes: a glow, its water, its shore
     const pic = pr >= 11 ? bodyOf(p) : null;
-    if (!pic) { ctx.fillStyle = col(0, 85, 60, 0.16); ctx.beginPath(); ctx.arc(px, py, pr * 2.4, 0, TAU); ctx.fill(); ctx.fillStyle = col(8, 60, 30, 0.95); ctx.fillRect(px - hw2 * 0.9, py - hh2 * 0.8, hw2 * 1.8, hh2 * 1.6); ctx.fillStyle = col(-115, 40, 58, 0.95); ctx.fillRect(px - hw2 * 0.9, py - hh2 * 0.8, hw2 * 1.8, hh2 * 0.42); if (pr < 11) return; }
+    if (!pic) { ctx.fillStyle = col(0, 85, 60, 0.16); ctx.beginPath(); ctx.arc(px, py, pr * 2.4, 0, TAU); ctx.fill(); { const tid = G.FLAT ? (p.home && G.W && !G.W.farOf && G.terrainOf ? G.terrainOf(G.W).id : p.terrain) : '', TL = tid && G.terrainColours ? G.terrainColours(tid) : null; if (TL) { ctx.fillStyle = 'rgb(' + TL.ramp[3].join(',') + ')'; G.roundRect(ctx, px - hw2 * 0.9, py - hh2 * 0.8, hw2 * 1.8, hh2 * 1.6, Math.min(hw2, hh2) * 0.5); ctx.fill(); }      /* (a star far off: a speck of its own ground's colour) */ else { ctx.fillStyle = col(8, 60, 30, 0.95); ctx.fillRect(px - hw2 * 0.9, py - hh2 * 0.8, hw2 * 1.8, hh2 * 1.6); ctx.fillStyle = col(-115, 40, 58, 0.95); ctx.fillRect(px - hw2 * 0.9, py - hh2 * 0.8, hw2 * 1.8, hh2 * 0.42); } } if (pr < 11) return; }
     else ctx.drawImage(pic, px - w / 2, py - hh / 2, w, hh);
     if (pr > 9) {
       // a few of its lights wander, and grains of it drift slowly off into space
@@ -11866,12 +12124,13 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); ctx.lineCap = 'round'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     if (d && !flight) { const st = d.steps[d.i], ship = shipOfPlan(d); if (ship && (st.do === 'gather' || st.do === 'board')) { const S = ship.bp.S || 70, bx = sx(ship.x), by = sy(ship.y + S * 0.45), M = members(d), inN = M.filter(function (c) { return c.inShip; }).length;
         // the ramp, and the ring that says: here
-        ctx.strokeStyle = 'rgba(246,211,101,' + (0.55 + 0.3 * Math.sin(t * 4)) + ')'; ctx.lineWidth = 2.5; ctx.setLineDash([7, 7]); ctx.lineDashOffset = -t * 26; ctx.beginPath(); ctx.ellipse(bx, by, (S * 1.25) * v.scale, (S * 0.5) * v.scale, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
-        ctx.strokeStyle = '#14202e'; ctx.lineWidth = 7 * v.scale + 2; ctx.beginPath(); ctx.moveTo(bx + S * 0.2 * v.scale, by - S * 0.34 * v.scale); ctx.lineTo(bx + S * 0.95 * v.scale, by + 4); ctx.stroke(); ctx.strokeStyle = '#f6d365'; ctx.lineWidth = 4 * v.scale + 1; ctx.stroke();
+        if (!G.FLAT) { ctx.strokeStyle = 'rgba(246,211,101,' + (0.55 + 0.3 * Math.sin(t * 4)) + ')'; ctx.lineWidth = 2.5; ctx.setLineDash([7, 7]); ctx.lineDashOffset = -t * 26; ctx.beginPath(); ctx.ellipse(bx, by, (S * 1.25) * v.scale, (S * 0.5) * v.scale, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+        else { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(bx, by, 4, bx, by, S * 1.5 * v.scale); g.addColorStop(0, 'rgba(246,211,101,' + (0.30 + 0.12 * Math.sin(t * 4)) + ')'); g.addColorStop(1, 'rgba(246,211,101,0)'); ctx.translate(bx, by); ctx.scale(1, 0.42); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, S * 1.5 * v.scale, 0, TAU); ctx.fill(); ctx.restore(); }      /* (on a star: a pool of light under the ship, no ring) */
+        if (!(G.buildArt && G.buildArt(ship))) { ctx.strokeStyle = '#14202e'; ctx.lineWidth = 7 * v.scale + 2; ctx.beginPath(); ctx.moveTo(bx + S * 0.2 * v.scale, by - S * 0.34 * v.scale); ctx.lineTo(bx + S * 0.95 * v.scale, by + 4); ctx.stroke(); ctx.strokeStyle = '#f6d365'; ctx.lineWidth = 4 * v.scale + 1; ctx.stroke(); }
         // the call, over the ship
         const top = sy(ship.y + S * 0.45 - (ship.bp.top || S * 1.6)) - 42, txt = st.do === 'gather' ? 'CREW TO THE SHIP' : 'BOARDING  ' + inN + ' / ' + M.length; ctx.font = '800 13px system-ui, sans-serif'; const tw = ctx.measureText(txt).width + 26; ctx.fillStyle = 'rgba(9,18,30,0.9)'; G.roundRect(ctx, bx - tw / 2, top - 13, tw, 26, 13); ctx.fill(); ctx.strokeStyle = '#f6d365'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = '#f6d365'; ctx.fillText(txt, bx, top + 0.5);
         // a line from each of them to the ship, so it is seen where they are going
-        ctx.lineWidth = 1.6; ctx.setLineDash([3, 8]); ctx.lineDashOffset = -t * 30; for (let i = 0; i < M.length; i++) { const c = M[i]; if (c.inShip) continue; const cx = sx(c.rx === undefined ? c.x : c.rx), cy = sy(c.ry === undefined ? c.y : c.ry); if (Math.hypot(cx - bx, cy - by) < 40) continue; ctx.strokeStyle = 'rgba(246,211,101,0.6)'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(bx, by - S * 0.2 * v.scale); ctx.stroke(); } ctx.setLineDash([]); } }
+        ctx.lineWidth = 1.6; ctx.setLineDash([3, 8]); ctx.lineDashOffset = -t * 30; for (let i = 0; i < M.length && !G.FLAT; i++) { const c = M[i]; if (c.inShip) continue; const cx = sx(c.rx === undefined ? c.x : c.rx), cy = sy(c.ry === undefined ? c.y : c.ry); if (Math.hypot(cx - bx, cy - by) < 40) continue; ctx.strokeStyle = 'rgba(246,211,101,0.6)'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(bx, by - S * 0.2 * v.scale); ctx.stroke(); } ctx.setLineDash([]); } }
     for (let i = FXB.length - 1; i >= 0; i--) { const k = FXB[i], u = (t - k.t0) / 1.25; if (u >= 1) { FXB.splice(i, 1); continue; } const S = k.ship.bp.S || 70, hx = sx(k.ship.x), hy = sy(k.ship.y + S * 0.1), ax = sx(k.x), ay = sy(k.y), q = Math.min(1, u / 0.55), e = k.in ? q : 1 - q, px = ax + (hx - ax) * e, py = ay + (hy - ay) * e - Math.sin(e * 3.1416) * 34;
       if (u < 0.6) { const g = ctx.createRadialGradient(px, py, 0, px, py, 16); g.addColorStop(0, 'rgba(255,245,200,0.95)'); g.addColorStop(1, 'rgba(246,211,101,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, 16, 0, TAU); ctx.fill(); ctx.fillStyle = '#fff3c8'; ctx.beginPath(); ctx.arc(px, py, 4, 0, TAU); ctx.fill(); }
       const a = Math.min(1, (1 - u) * 3), ty = (k.in ? hy : ay) - 34 - u * 22, txt = '#' + k.id + (k.in ? '  aboard ✓' : '  steps out'); ctx.font = '800 12px system-ui, sans-serif'; const tw = ctx.measureText(txt).width + 18, tx = k.in ? hx : ax; ctx.fillStyle = 'rgba(9,18,30,' + 0.88 * a + ')'; G.roundRect(ctx, tx - tw / 2, ty - 11, tw, 22, 11); ctx.fill(); ctx.fillStyle = 'rgba(' + (k.in ? '154,240,208' : '246,211,101') + ',' + a + ')'; ctx.fillText(txt, tx, ty + 0.5); }
@@ -11885,7 +12144,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     ctx.save(); ctx.translate(sx, sy); ctx.rotate(hd + Math.sin(t * 1.7) * 0.03);
     const fl = size * (0.45 + 0.2 * Math.sin(t * 31) + 0.11 * Math.sin(t * 17)), w = size * 0.16, fg = ctx.createLinearGradient(0, size * 0.5, 0, size * 0.5 + fl * 1.6); fg.addColorStop(0, 'rgba(255,250,220,0.95)'); fg.addColorStop(0.35, 'rgba(255,190,90,0.85)'); fg.addColorStop(1, 'rgba(255,110,60,0)');
     ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(-w, size * 0.46); ctx.quadraticCurveTo(0, size * 0.55 + fl * 1.9, w, size * 0.46); ctx.closePath(); ctx.fill();
-    try { ctx.translate(0, size * 0.5); ctx.scale(k, k); G.drawBlueprint(ctx, { x: 0, y: -S * 0.45, bp: bp }, false); } catch (e) { console.error(e); }
+    try { if (!(G.art && G.art.shipFlying && G.art.shipFlying(ctx, G.W, 'mine', size))) { ctx.translate(0, size * 0.5); ctx.scale(k, k); G.drawBlueprint(ctx, { x: 0, y: -S * 0.45, bp: bp }, false); } } catch (e) { console.error(e); }      /* (the ship as this star's people paint it, where they do: 53_art.js) */
     ctx.restore();
   }
   /** smoke and fire under the ship, and the count in great numbers */
@@ -14491,8 +14750,8 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   const css = '#resbar{position:fixed;left:50%;top:14px;transform:translateX(-50%);display:flex;gap:2px;align-items:center;padding:5px 10px;border-radius:999px;z-index:3;white-space:nowrap;font:700 13px system-ui,sans-serif;color:#e8f4ff}' +
     '#resbar .r{display:flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;cursor:pointer}#resbar .r:hover{background:rgba(207,232,255,.1)}#resbar .r img{width:20px;height:20px}#resbar .r b{display:inline-block;min-width:22px;text-align:right}#resbar .r small{font:600 10px system-ui;letter-spacing:.08em;color:rgba(207,232,255,.6);text-transform:uppercase}#resbar .r.lum{color:#8ef0ff}#resbar .sep{width:1px;height:18px;background:rgba(207,232,255,.2);margin:0 4px}' +
     '#resbar .r.warn{cursor:default}@keyframes cmdPulse{50%{opacity:.55}}' +
-    '#cmd{position:fixed;left:14px;top:244px;width:250px;box-sizing:border-box;padding:9px 10px 10px;z-index:2;font:12px system-ui,sans-serif;color:#dcecf8;user-select:none}' +
-    '#cmd .ch{display:flex;align-items:center;justify-content:space-between;cursor:pointer;height:16px}#cmd .ch b{font-size:12px;letter-spacing:.2em;color:#f6d365;text-shadow:0 0 10px rgba(246,211,101,.5)}#cmd .ch span{font-size:16px;line-height:14px;color:rgba(207,232,255,.7);padding:0 4px}' +
+    '#cmd{position:fixed;left:14px;top:160px;width:250px;box-sizing:border-box;padding:9px 10px 10px;z-index:2;font:12px system-ui,sans-serif;color:#dcecf8;user-select:none}' +
+    '#cmd .ch{display:flex;align-items:center;justify-content:space-between;cursor:pointer;height:16px}#cmd .ch b{font-size:12px;letter-spacing:.2em;color:#f6d365;text-shadow:0 0 10px rgba(246,211,101,.5)}#cmd .ch span{font-size:16px;line-height:14px;color:rgba(207,232,255,.7);padding:0 4px}#cmd .ch small{flex:1;margin-left:8px;font:700 10px system-ui;letter-spacing:.1em;text-transform:uppercase;color:#9dffcf;white-space:nowrap}#cmd.fold .ch small{display:none}#cmd.fold .ch b{margin-right:10px}' +
     '#cmd.fold .cb{display:none}#cmd.fold{width:auto}' +
     '#cmdStar{height:62px;overflow:hidden;margin-top:6px}#cmdMap{display:block;width:230px;height:104px;margin-top:6px;border-radius:9px;border:1px solid rgba(207,232,255,.22);cursor:pointer;background:#0b1622}' +
     '#cmd .csec{margin:8px 0 3px;height:13px;font:700 10px system-ui;letter-spacing:.16em;color:rgba(207,232,255,.6);display:flex;justify-content:space-between;align-items:center}#cmd .csec small{font:600 9.5px system-ui;letter-spacing:.04em;text-transform:none;color:rgba(207,232,255,.5)}' +
@@ -14505,8 +14764,9 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     '#cmd .ctip{margin-top:6px;height:57px;overflow:hidden;font-size:11px;line-height:1.3;color:#ffe9a8}#cmd .ctip.dim{color:rgba(207,232,255,.55)}#cmd .ctip.goal{color:#9dffcf}' +
     '#cmd .ckeys{margin-top:5px;height:26px;overflow:hidden;font-size:9.5px;line-height:13px;color:rgba(207,232,255,.5)}#cmd .ckeys a{color:#ffe9a8;cursor:pointer;text-decoration:underline}' +
     '#cmd label{display:flex;align-items:center;gap:4px;cursor:pointer;font:600 9.5px system-ui;letter-spacing:.02em;text-transform:none;color:rgba(207,232,255,.7)}#cmd label input{margin:0;accent-color:#33d6a6}' +
-    '#cmd.short #cmdMap{display:none}#cmd.tiny .ckeys{display:none}#cmd.tiny .ctip{height:43px}' +
-    'body.cmdOpen #zoom{left:276px}@media (min-width:1100px){body.cmdOpen #rarebox{left:276px}}' +
+    '#cmd.short #cmdMap{display:none}#cmd.tiny .ckeys{display:none}#cmd.tiny .ctip{height:43px}#cmd.mini #cmdStar{display:none}#cmd.mini .cgrid button{height:46px}#cmd.mini .cgrid button img{width:28px;height:28px}' +
+    '@media (min-width:721px){body.cmdLive #season{height:138px;box-sizing:border-box;overflow:hidden}body.cmdLive #season .cap{display:none}body.cmdLive #season .count{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:8px}' +
+    'body.cmdLive #zoom{left:276px}body.cmdLive .pop{left:340px}}' +
     '#selbar{position:fixed;bottom:14px;left:660px;z-index:4;padding:8px 12px;border-radius:16px;display:flex;flex-direction:column;gap:5px;max-width:calc(100vw - 690px);font:12px system-ui,sans-serif;color:#dcecf8;border-color:rgba(' + C.TEAM.mine + ',.6)}#selbar.hide{display:none}' +
     '#selbar .s1{display:flex;align-items:center;gap:6px;flex-wrap:wrap;white-space:nowrap}#selbar .s1 b{font-size:12px;letter-spacing:.14em;color:' + C.TEAM.mineHex + '}#selbar .s1 .what{color:rgba(207,232,255,.85);overflow:hidden;text-overflow:ellipsis;max-width:260px}' +
     '#selbar button{appearance:none;border:1px solid rgba(207,232,255,.28);background:rgba(7,18,31,.5);color:#e8f4ff;border-radius:999px;padding:4px 10px;font:800 10.5px system-ui;letter-spacing:.08em;cursor:pointer;display:flex;align-items:center;gap:5px}#selbar button:hover{border-color:#33d6a6}#selbar button.on{border-color:#f6d365;color:#ffe9a8}#selbar button.x{padding:5px 8px}' +
@@ -14514,12 +14774,14 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     '@media (max-width:1180px){#selbar{left:14px;bottom:76px;max-width:calc(100vw - 28px)}}@media (max-width:720px){#resbar{top:auto;bottom:70px;font-size:11px;padding:3px 8px}#resbar .r small{display:none}#cmd{top:auto;bottom:112px;left:7px}}';
   const PICS = {}, ICON = {};
   const icon = C.icon = function (k) { if (ICON[k]) return ICON[k]; try { const cv = document.createElement('canvas'); cv.width = cv.height = 44; const x = cv.getContext('2d'); x.translate(22, 24); x.scale(2.1, 2.1); x.lineJoin = 'round'; G.matDraw(x, { x: 0, y: 0, k: k, s: 0.37 }, 0); ICON[k] = cv.toDataURL('image/png'); } catch (e) { ICON[k] = ''; } return ICON[k]; };
-  const pic = C.pic = function (type) { if (PICS[type] !== undefined) return PICS[type]; let url = ''; try { const t = type === 'tower' ? 'spire' : type, W = G.W, sp = W && (W.species || []).filter(function (s) { return !s.extinct; }).sort(function (a, b) { return b.n - a.n; })[0];
+  const pic = C.pic = function (type) { if (PICS[type] !== undefined) return PICS[type]; let url = '';
+    try { const A = G.art, s = A && A.sprite ? A.sprite(G.W, type === 'tower' ? 'tower' : type) : null; if (s) { const cv = document.createElement('canvas'); cv.width = cv.height = 88; const x = cv.getContext('2d'), k = Math.min(84 / s.w, 84 / s.h); x.imageSmoothingEnabled = true; x.drawImage(A.tinted(s, 'mine'), 44 - s.w * k / 2, 86 - s.h * k, s.w * k, s.h * k); return (PICS[type] = cv.toDataURL('image/png')); } } catch (e) { /* drawn the old way */ }      /* (as this star's people build it, if theirs is painted) */
+    try { const t = type === 'tower' ? 'spire' : type, W = G.W, sp = W && (W.species || []).filter(function (s) { return !s.extinct; }).sort(function (a, b) { return b.n - a.n; })[0];
       const bp = G.blueprintFrom({ seed: 91 + BUILD.indexOf(type) * 8, type: t, S: t === 'house' ? 50 : t === 'ship' ? 70 : 84, hue: sp ? sp.hue : 190, spiky: 0, brain: 0.7, wet: false }, '22222222222222222222222222222222222222222222222222'); url = G.buildPic({ bp: bp }, 44); } catch (e) { url = ''; } return (PICS[type] = url); };
-  G.on('new-pond', function () { for (const k in PICS) delete PICS[k]; });
+  G.on('new-pond', function () { for (const k in PICS) delete PICS[k]; }); G.on('art', function () { for (const k in PICS) delete PICS[k]; });
   const TIPS = { g: 'Gatherers fetch what lies about the star (stone, reed, shell) and lumen, and carry it to the Heart. Click the name to choose them all.', b: 'Builders raise what you order built, from the store and from what lies near; with nothing to build they wait in their yard. Click the name to choose them all.', f: 'Fighters stand in ranks on the muster ground, go for any enemy in sight, and attack what you send them against. Click the name to choose them all.', u: 'Guards stand at the post you give them and do not leave it. Click the name to choose them all.' };
   const mouseWords = function () { return C.rightChooses ? 'Right button: choose (click or drag). Left click: send them. Left-drag or W A S D: move the view.' : 'Left button: choose (click or drag). Right click: send them. Right-drag or W A S D: move the view.'; };
-  let ui = null;
+  let ui = null, fitKey = '';
   function build() {
     if (ui) return ui; const root = $('ui') || document.body;
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
@@ -14528,7 +14790,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       '<span class="sep"></span><span class="r" id="resPop" style="cursor:default" title="How many live on your star (and how many of them work)"><b>0</b><small>alive</small></span><span class="r warn" id="resRaid" style="display:none"><small style="color:#ffd0a8"></small></span>';
     root.appendChild(res); res.addEventListener('click', function (e) { const r = e.target.closest ? e.target.closest('[data-res]') : null; if (r && C.cardOpen) C.cardOpen({ k: 'res', res: +r.dataset.res }); });
     const cmd = document.createElement('div'); cmd.id = 'cmd'; cmd.className = 'glass' + (folded ? ' fold' : '');
-    cmd.innerHTML = '<div class="ch" id="cmdHead" title="Fold or unfold"><b id="cmdTitle">YOUR COLONY</b><span id="cmdFoldMark">' + (folded ? '+' : '–') + '</span></div><div class="cb"><div id="cmdStar"></div><canvas id="cmdMap" width="460" height="208" title="The whole star. Yours are blue, enemies red. Click to go there."></canvas>' +
+    cmd.innerHTML = '<div class="ch" id="cmdHead" title="Fold or unfold"><b id="cmdTitle">YOUR COLONY</b><small id="cmdStage" title="How far your colony has come: founded, growing, thriving, great. It grows as you build."></small><span id="cmdFoldMark">' + (folded ? '+' : '–') + '</span></div><div class="cb"><div id="cmdStar"></div><canvas id="cmdMap" width="460" height="208" title="The whole star. Yours are blue, enemies red. Click to go there."></canvas>' +
       '<div class="csec"><span>TRADES</span><small>have · want</small></div>' +
       ORDER.map(function (k) { return '<div class="crow" data-job="' + k + '" title="' + esc(TIPS[k]) + '">' + svg(k) + '<span class="nm" data-all="' + k + '">' + JOBS[k].name + 's</span><span class="cn" id="cn' + k + '">0</span><button data-want="' + k + '" data-d="-1" aria-label="fewer ' + JOBS[k].many + '">−</button><span class="cw" id="cw' + k + '">0</span><button data-want="' + k + '" data-d="1" aria-label="more ' + JOBS[k].many + '">+</button></div>'; }).join('') +
       '<div class="crow" title="Those with no trade: they live by their own brains, as all of them used to.">' + svg('', '#9fb6c6') + '<span class="nm" data-all="">Free</span><span class="cn" id="cnfree">0</span><span style="width:82px;font-size:10px;color:rgba(207,232,255,.5);text-align:right;flex:none">no orders</span></div>' +
@@ -14594,10 +14856,14 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     return 'Every rival near you has fallen. The stars are yours.';
   }
   function refresh() {
-    const W = G.W, on = live(); build(); document.body.classList.toggle('cmdOpen', on && !folded);
+    const W = G.W, on = live(); build(); document.body.classList.toggle('cmdOpen', on && !folded); document.body.classList.toggle('cmdLive', on);
     ui.res.style.display = on && G.heartOf(W) ? '' : 'none'; ui.cmd.style.display = on ? '' : 'none'; if (!on) { ui.sel.classList.add('hide'); return; }
     if (window.innerWidth > 720) { let y = 14; ['wish', 'wxnow', 'voybar', 'voypick'].forEach(function (id) { const e = $(id); if (e && !e.classList.contains('hide') && e.offsetHeight) { const r = e.getBoundingClientRect(); if (r.top < 140 && Math.abs((r.left + r.right) / 2 - window.innerWidth / 2) < 260) y = Math.max(y, r.bottom + 8); } }); if (ui.res.style.top !== y + 'px') ui.res.style.top = y + 'px'; }
-    ui.cmd.classList.toggle('short', window.innerHeight < 900); ui.cmd.classList.toggle('tiny', window.innerHeight < 790);
+    if (!folded && window.innerWidth > 720) { const tb = $('toolbar'), tbTop = tb && !tb.classList.contains('hide') && tb.offsetHeight ? tb.getBoundingClientRect().top : window.innerHeight - 70, key = window.innerHeight + ':' + Math.round(tbTop);
+      if (key !== fitKey) { fitKey = key; const avail = tbTop - 8 - ui.cmd.getBoundingClientRect().top, V = [[0, 0, 0], [0, 1, 0], [1, 0, 0], [1, 1, 0], [1, 1, 1]];      /* (the fullest lay-out that fits: first without the keys, then without the small map, then smaller still) */
+        for (let i = 0; i < V.length; i++) { ui.cmd.classList.toggle('short', !!V[i][0]); ui.cmd.classList.toggle('tiny', !!V[i][1]); ui.cmd.classList.toggle('mini', !!V[i][2]); if (ui.cmd.offsetHeight <= avail) break; } }
+      const se = $('season'), ct = $('capTitle'), cx = $('capText'); if (se && ct && cx) { const tt = ct.textContent + ': ' + cx.textContent; if (se.title !== tt) se.title = tt; } }      /* (what the season is about, now said when the pointer rests on its card) */
+    else { const se = $('season'), ct = $('capTitle'), cx = $('capText'); if (se && ct && cx) { const tt = ct.textContent + ': ' + cx.textContent; if (se.title !== tt) se.title = tt; } }
     C.sel = C.sel.filter(mine); if (!folded) drawMap();
     const col = G.colony(W), n = G.jobCount(W), hp = G.heartOf(W), hc = hp ? G.buildCount(hp) : [0, 0, 1];
     const selSig = C.sel.length + ':' + C.sel.map(function (c) { return c.job || '-'; }).join('');
@@ -14608,7 +14874,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     $('resPop').querySelector('b').textContent = n.all; $('resPop').title = n.all + ' live on your star: ' + (n.all - n.free) + ' work, ' + n.free + ' are free.';
     { const w = $('resRaid'), r = col.raid; w.style.display = r && r.state === 'warn' ? '' : 'none'; if (r && r.state === 'warn') { w.querySelector('small').textContent = 'raid next spring: ~' + r.n; w.title = G.raidText(W) + '.'; } }
     ORDER.forEach(function (k) { const a = $('cn' + k); a.textContent = n[k]; a.classList.toggle('low', n[k] < (col.want[k] | 0)); $('cw' + k).textContent = col.want[k] | 0; });
-    { const tn = G.TIERS && !W.farOf ? G.TIERS[col.tier | 0] : ''; $('cmdTitle').textContent = tn ? 'YOUR ' + tn.toUpperCase() : 'YOUR COLONY'; }
+    { const tn = G.TIERS && !W.farOf ? G.TIERS[col.tier | 0] : '', e = $('cmdStage'); if (e && e.textContent !== tn) e.textContent = tn; }
     $('cnfree').textContent = n.free; $('cmdAuto').checked = col.auto !== false; $('cmdKeys').textContent = mouseWords(); $('cmdPick').classList.toggle('on', C.pick);
     const imgs = ui.cmd.querySelectorAll('img[data-pic]'); for (let i = 0; i < imgs.length; i++) { const u = pic(imgs[i].dataset.pic); if (u && imgs[i].getAttribute('src') !== u) imgs[i].src = u; }
     const bs = ui.cmd.querySelectorAll('[data-build]'); for (let i = 0; i < bs.length; i++) { const t = bs[i].dataset.build, K = G.BUILDABLE[t]; bs[i].classList.toggle('on', C.placing === t); bs[i].classList.toggle('no', !!(K.cost && K.cost.some(function (v, q) { return v > col.stock[q]; })) || (t === 'ship' && !!G.buildOk('ship', 0, 0))); }
@@ -14638,7 +14904,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
   let hitSaid = 0;
   G.on('work-hit', function (w, by) { if (G.mode !== 'play' || !w.bp) return; w.hitAt = now(); if (w.bp.type === 'heart' && !w.enemy && by && by.team && now() - hitSaid > 25000) { hitSaid = now(); G.banner('Raid', 'Your Heart is under attack! Choose your fighters (click the word Fighters in the colony panel) and click the enemy.', 7000); if (G.log) G.log('sel', 'The Heart is under attack', 'Raiders are breaking it piece by piece. If it falls they take everything in the store.'); } });
   G.on('heart-fell', function (h, by, taken) { if (G.mode !== 'play') return; const got = (taken || []).map(function (n, k) { return n ? n + ' ' + G.RES[k] : ''; }).filter(Boolean).join(', '); G.banner('The Heart has fallen', 'The raiders broke your Heart' + (got ? ' and took what was in the store: ' + got : '') + '. They are going home. Your builders will raise it again.', 8000); if (G.log) G.log('sel', 'The Heart has fallen', (got ? 'Taken from the store: ' + got + '. ' : '') + 'Your builders will raise it again, piece by piece.'); });
-  G.on('colony-tier', function (tr, was) { if (G.mode !== 'play' || !G.TIERS) return; G.banner('Your colony grows', 'Your ' + G.TIERS[was].toLowerCase() + ' is a ' + G.TIERS[tr].toLowerCase() + ' now. The Heart is built up to match, its ground is paved wider, and its reach grows.', 9000); if (G.log) G.log('disc', 'A ' + G.TIERS[tr].toLowerCase(), 'What was a ' + G.TIERS[was].toLowerCase() + ' has become a ' + G.TIERS[tr].toLowerCase() + '.'); sig = ''; });
+  G.on('colony-tier', function (tr, was) { if (G.mode !== 'play' || !G.TIERS) return; G.banner('Your colony grows', 'Your colony was ' + G.TIERS[was].toLowerCase() + ': it is ' + G.TIERS[tr].toLowerCase() + ' now. The Heart is built up to match, its ground is paved wider, and its reach grows.', 9000); if (G.log) G.log('disc', 'A ' + G.TIERS[tr].toLowerCase(), 'What was a ' + G.TIERS[was].toLowerCase() + ' has become a ' + G.TIERS[tr].toLowerCase() + '.'); sig = ''; });
   G.on('heart-whole', function () { if (G.mode === 'play' && G.note) G.note('The Heart', 'The Heart is whole again.'); });
   G.on('build-started', function (o) { if (G.mode === 'play') say('Your builders have started on the ' + o.name + '.', 6); });
   G.on('deed-end', function (d, how) { if (G.mode === 'play' && d && d.ordered) { say(how === 'done' ? 'The ' + d.title + ' is finished.' : 'The ' + d.title + ' was given up: too few builders came to it.', 8); sig = ''; } });
@@ -14745,14 +15011,14 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     // the places of the star, by name (their ground is drawn with the terrain)
     if (v.scale > 0.36 && G.sitesOf) G.sitesOf(W).forEach(function (q) { if (q.k === 'lumen' || q.x < vx0 - 160 || q.x > vx1 + 160 || q.y < vy0 - 160 || q.y > vy1 + 160) return; label(ctx, q.x, q.y - q.r * 0.8 - 12 * inv, inv, q.name, q.k === 'grove' ? 'rgba(170,255,205,0.9)' : q.k === 'quarry' ? '#d5dbe4' : q.k === 'reeds' ? '#cfe58a' : '#f3d9a8', 9.5); });
     // lumen
-    const N = G.lumenNodes(W); for (let i = 0; i < N.length; i++) { const q = N[i]; if (q.x < vx0 - 100 || q.x > vx1 + 100 || q.y < vy0 - 100 || q.y > vy1 + 120) continue; C.drawLumen(ctx, q.x, q.y, q.n, q.n0, t, i); if (v.scale > 0.4) label(ctx, q.x, q.y + 20 * inv + 6, inv, q.n > 0 ? 'LUMEN ' + q.n : 'lumen: growing back', q.n > 0 ? '#8ef0ff' : 'rgba(207,232,255,.6)', 10); }
+    const N = G.lumenNodes(W); for (let i = 0; i < N.length; i++) { const q = N[i]; if (q.x < vx0 - 100 || q.x > vx1 + 100 || q.y < vy0 - 100 || q.y > vy1 + 120) continue; if (!(G.sceneryPainted && G.sceneryPainted(W))) C.drawLumen(ctx, q.x, q.y, q.n, q.n0, t, i);      /* (on a painted star its crystals are painted: 52c_terrain.js) */ if (v.scale > 0.4) label(ctx, q.x, q.y + 20 * inv + 6, inv, q.n > 0 ? 'LUMEN ' + q.n : 'lumen: growing back', q.n > 0 ? '#8ef0ff' : 'rgba(207,232,255,.6)', 10); }
     // the store, beside the Heart: what is in it lies there to be seen
     const st = G.storeAt(W), hp = G.heartOf(W);
     if (st) { for (let k = 0; k < 4; k++) { const n = Math.min(10, Math.ceil(col.stock[k] / (k === 3 ? 2 : 5))); for (let j = 0; j < n; j++) G.matDraw(ctx, { x: st.x - 22 + k * 15 + (j % 2) * 6, y: st.y - 2 - Math.floor(j / 2) * 5, k: k, s: (j * 0.31 + k * 0.17) % 1 }, t); } }
     if (hp) { const c = G.buildCount(hp), y0 = hp.y + hp.bp.S * 0.45 + 12 * inv; if (c[0] < c[2] || hp.ruin || T - (hp.hitAt || 0) < 4000) { const w = 70 * inv, hh = 6 * inv; ctx.fillStyle = 'rgba(7,18,31,0.8)'; ctx.fillRect(hp.x - w / 2 - inv, y0 - inv, w + 2 * inv, hh + 2 * inv); ctx.fillStyle = TEAM.mineHex; ctx.fillRect(hp.x - w / 2, y0, w * c[0] / c[2], hh); if (hp.ruin) label(ctx, hp.x, y0 - 13 * inv, inv, 'rising: your builders raise it', '#ffe9a8', 10); } }
     { const fh = G.foeHeart ? G.foeHeart(W) : null; if (fh) { const c = G.buildCount(fh), y0 = fh.y + fh.bp.S * 0.45 + 12 * inv, w = 70 * inv, hh = 6 * inv; ctx.fillStyle = 'rgba(7,18,31,0.8)'; ctx.fillRect(fh.x - w / 2 - inv, y0 - inv, w + 2 * inv, hh + 2 * inv); ctx.fillStyle = TEAM.foeHex; ctx.fillRect(fh.x - w / 2, y0, w * c[0] / c[2], hh); label(ctx, fh.x, y0 + 17 * inv, inv, 'THEIR HEART', '#ff9db0', 10.5); } }
     // what is waiting to be built; and, while a place is being chosen, the lots and the thing itself
-    col.queue.forEach(function (q) { if (q.type === 'ship') return; ctx.strokeStyle = 'rgba(' + TEAM.mine + ',' + (0.6 + 0.2 * Math.sin(t * 3)) + ')'; ctx.lineWidth = 2 * inv; ctx.setLineDash([8 * inv, 7 * inv]); ctx.beginPath(); ctx.ellipse(q.x, q.y - 34, 52, 44, 0, 0, 6.2832); ctx.stroke(); ctx.setLineDash([]); label(ctx, q.x, q.y + 12 * inv, inv, q.name + ': to be built', '#bfe9ff', 10); });
+    col.queue.forEach(function (q) { if (q.type === 'ship') return; { const g = ctx.createRadialGradient(q.x, q.y, 4, q.x, q.y, 60); g.addColorStop(0, 'rgba(' + TEAM.mine + ',' + (0.26 + 0.08 * Math.sin(t * 3)) + ')'); g.addColorStop(1, 'rgba(' + TEAM.mine + ',0)'); ctx.save(); ctx.translate(q.x, q.y); ctx.scale(1, 0.45); ctx.translate(-q.x, -q.y); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.x, q.y, 60, 0, 6.2832); ctx.fill(); ctx.restore(); }      /* (a soft mark where it will stand: no line round it) */ label(ctx, q.x, q.y + 12 * inv, inv, q.name + ': to be built', '#bfe9ff', 10); });
     if (C.placing) { const tp = C.placing;
       if (tp !== 'port' && tp !== 'ship' && G.lotsIn) G.lotsIn(W, vx0, vy0, vx1, vy1, tp).forEach(function (q) { if (!q.free) return; ctx.fillStyle = 'rgba(' + TEAM.mine + ',0.13)'; ctx.beginPath(); ctx.ellipse(q.x, q.y - 4, 34, 13, 0, 0, 6.2832); ctx.fill(); ctx.fillStyle = 'rgba(' + TEAM.mine + ',0.75)'; ctx.beginPath(); ctx.arc(q.x, q.y - 4, Math.max(2.4, 3 * inv), 0, 6.2832); ctx.fill(); });      /* (each free lot: a soft mark on the ground) */
       if (G.input.ptr.inside) { const p = C.placeAt(G.input.ptr.wx, G.input.ptr.wy), why = G.buildOk(tp, p.x, p.y), okc = why ? TEAM.foe : '110,240,168'; ctx.fillStyle = 'rgba(' + okc + ',0.16)'; ctx.strokeStyle = 'rgba(' + okc + ',0.9)'; ctx.lineWidth = 2 * inv; ctx.beginPath(); ctx.ellipse(p.x, p.y - 34, 56, 46, 0, 0, 6.2832); ctx.fill(); ctx.stroke();
@@ -14765,7 +15031,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
         if (off < -4) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const near = Math.max(0, 1 + off / 720), g = ctx.createRadialGradient(r.x, r.y + 4, 4, r.x, r.y + 4, 150); g.addColorStop(0, 'rgba(255,170,90,' + 0.5 * near + ')'); g.addColorStop(1, 'rgba(255,120,60,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(r.x, r.y + 4, 150, 60, 0, 0, 6.2832); ctx.fill(); ctx.restore(); }
         if (r.state === 'land' && tt >= 2.6 && tt < 5.2) { const u = (tt - 2.6) / 2.6; ctx.strokeStyle = 'rgba(230,210,190,' + 0.55 * (1 - u) + ')'; ctx.lineWidth = 7 * (1 - u) + 1; ctx.beginPath(); ctx.ellipse(r.x, r.y + 6, 40 + 190 * u, 12 + 48 * u, 0, 0, 6.2832); ctx.stroke(); for (let q = 0; q < 10; q++) { const a = q * 0.628, d = 30 + 170 * u; ctx.fillStyle = 'rgba(200,180,160,' + 0.3 * (1 - u) + ')'; ctx.beginPath(); ctx.arc(r.x + Math.cos(a) * d, r.y + 6 + Math.sin(a) * d * 0.28 - 14 * Math.sin(u * 3.14), 9 + 10 * u, 0, 6.2832); ctx.fill(); } }
         if (r.state === 'on') { const a = 1.5708 + Math.sin(t * 0.7) * 0.9, L0 = 330; ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createLinearGradient(r.x, r.y - S, r.x + Math.cos(a) * L0, r.y - S + Math.sin(a) * L0 * 0.6 + S); g.addColorStop(0, 'rgba(255,90,110,0.30)'); g.addColorStop(1, 'rgba(255,90,110,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(r.x, r.y - S * 1.1); ctx.lineTo(r.x + Math.cos(a - 0.16) * L0, r.y + Math.sin(a - 0.16) * L0 * 0.6); ctx.lineTo(r.x + Math.cos(a + 0.16) * L0, r.y + Math.sin(a + 0.16) * L0 * 0.6); ctx.closePath(); ctx.fill(); ctx.restore(); }
-        G.drawBlueprint(ctx, { x: r.x, y: r.y + off - S * 0.45, bp: bp }, false);
+        if (!(G.art && G.art.draw && G.art.draw(ctx, W, 'ship', 'foe', r.x, r.y + off))) G.drawBlueprint(ctx, { x: r.x, y: r.y + off - S * 0.45, bp: bp }, false);      /* (their ship: painted, in their colour, where this star's buildings are painted) */
         label(ctx, r.x, r.y + off - (bp.top || S * 1.6) - 14 * inv, inv, 'RAIDERS OF ' + String(r.name).toUpperCase(), '#ff9db0', 10.5); } }
     if (!W.deed && G.drawHauls) G.drawHauls(ctx);      // what the gatherers carry (while a plan is on, the plan draws it)
     // the creatures: whose side each is on, what its trade is, what it holds, and how it stands in a fight
@@ -14773,7 +15039,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
       if (x < vx0 - 60 || x > vx1 + 60 || y < vy0 - 40 || y > vy1 + 90) continue;
       const foe = c.team === 1, soldier = c.job === 'f' || c.job === 'u', hot = (c.hitT !== undefined && W.t - c.hitT < 6) || (c.swT !== undefined && W.t - c.swT < 6), isSel = chosen.has(c), ym = y - mid(c), yt = y - top(c);
       if (!foe && !c.job && !isSel && !hot) continue;
-      if (foe || soldier || hot || isSel) { const colr = foe ? TEAM.foe : TEAM.mine; ctx.fillStyle = 'rgba(' + colr + ',' + (foe ? 0.3 : 0.22) + ')'; ctx.strokeStyle = 'rgba(' + colr + ',0.95)'; ctx.lineWidth = Math.max(1.6, 1.9 * inv); ctx.beginPath(); ctx.ellipse(x, y + r * 0.1, r * 1.45 + 3, r * 0.55 + 2, 0, 0, 6.2832); ctx.fill(); ctx.stroke(); }
+      if (foe || hot || isSel) { const colr = foe ? TEAM.foe : TEAM.mine;      /* (a disc of its side's colour under an enemy, under anyone in a fight, under those you chose: not under every soldier standing at ease) */ ctx.fillStyle = 'rgba(' + colr + ',' + (foe ? 0.3 : 0.22) + ')'; ctx.strokeStyle = 'rgba(' + colr + ',0.95)'; ctx.lineWidth = Math.max(1.6, 1.9 * inv); ctx.beginPath(); ctx.ellipse(x, y + r * 0.1, r * 1.45 + 3, r * 0.55 + 2, 0, 0, 6.2832); ctx.fill(); ctx.stroke(); }
       if (isSel) { ctx.strokeStyle = 'rgba(255,255,255,' + (0.8 + 0.2 * Math.sin(t * 6)) + ')'; ctx.lineWidth = Math.max(2, 2.3 * inv); ctx.beginPath(); ctx.ellipse(x, y + r * 0.1, r * 1.75 + 5, r * 0.7 + 3.5, 0, 0, 6.2832); ctx.stroke(); }
       if ((foe || (soldier && !c.hungry)) && !c.asleep && v.scale > 0.3) weapon(ctx, c, x, ym, r, foe ? TEAM.foe : TEAM.mine, W, inv, foe);
       if (foe) foeBadge(ctx, x, yt - 9 * inv - 4, inv, t); else if (c.job) { if (v.scale > 0.34) badge(ctx, x, yt - 9 * inv - 3, inv, c.job, c.hungry); else { ctx.fillStyle = TEAM.mineHex; ctx.fillRect(x - 2.5 * inv, yt - 6 * inv, 5 * inv, 5 * inv); } }
@@ -14784,7 +15050,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     for (let i = HIT.length - 1; i >= 0; i--) { const h = HIT[i], u = (T - h.t0) / 380; if (u >= 1) { HIT.splice(i, 1); continue; } ctx.strokeStyle = 'rgba(' + h.col + ',' + (1 - u) + ')'; ctx.lineWidth = Math.max(1.6, 2 * inv); ctx.beginPath(); for (let q = 0; q < 8; q++) { const a = q * 0.785 + h.a, r0 = 4 + 16 * u, r1 = 9 + 30 * u; ctx.moveTo(h.x + Math.cos(a) * r0, h.y + Math.sin(a) * r0); ctx.lineTo(h.x + Math.cos(a) * r1, h.y + Math.sin(a) * r1); } ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,' + 0.8 * (1 - u) + ')'; ctx.beginPath(); ctx.arc(h.x, h.y, 6 * (1 - u) + 1, 0, 6.2832); ctx.fill();
       if (h.n && u < 0.9) { ctx.save(); ctx.translate(h.x + h.dx * (10 + 16 * u), h.y - 16 - 30 * u); ctx.scale(inv, inv); ctx.font = '900 14px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(7,18,31,0.9)'; ctx.fillStyle = h.mineHurt ? '#ff8a9c' : '#ffffff'; ctx.globalAlpha = Math.min(1, (1 - u) * 2.5); ctx.strokeText('-' + h.n, 0, 0); ctx.fillText('-' + h.n, 0, 0); ctx.restore(); } }
     for (let i = SHARD.length - 1; i >= 0; i--) { const p = SHARD[i], u = (T - p.t0) / 1100; if (u >= 1) { SHARD.splice(i, 1); continue; } const px = p.x + p.vx * u * 46, py = p.y + p.vy * u * 46 + 60 * u * u; ctx.fillStyle = 'rgba(' + p.col + ',' + (1 - u) + ')'; ctx.save(); ctx.translate(px, py); ctx.rotate(p.a + u * 6); ctx.fillRect(-3.2 * (1 - u * 0.5), -1.6, 6.4 * (1 - u * 0.5), 3.2); ctx.restore(); }
-    { const Wk = W.works || []; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.tower || !w.bp || w.enemy) continue; const ty = w.y + w.bp.S * 0.45 - (w.bp.top || 100), g = 0.6 + 0.4 * Math.sin(t * 3 + i); ctx.save(); ctx.globalCompositeOperation = 'lighter'; const gr = ctx.createRadialGradient(w.x, ty, 1, w.x, ty, 26); gr.addColorStop(0, 'rgba(' + TEAM.mine + ',' + 0.55 * g + ')'); gr.addColorStop(1, 'rgba(' + TEAM.mine + ',0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(w.x, ty, 26, 0, 6.2832); ctx.fill(); ctx.restore(); ctx.fillStyle = '#e8fbff'; ctx.beginPath(); ctx.arc(w.x, ty, 3, 0, 6.2832); ctx.fill(); } }
+    { const Wk = W.works || []; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.tower || !w.bp || w.enemy || (G.buildArt && G.buildArt(w))) continue;      /* (a painted tower's eye is in its painting) */ const ty = w.y + w.bp.S * 0.45 - (w.bp.top || 100), g = 0.6 + 0.4 * Math.sin(t * 3 + i); ctx.save(); ctx.globalCompositeOperation = 'lighter'; const gr = ctx.createRadialGradient(w.x, ty, 1, w.x, ty, 26); gr.addColorStop(0, 'rgba(' + TEAM.mine + ',' + 0.55 * g + ')'); gr.addColorStop(1, 'rgba(' + TEAM.mine + ',0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(w.x, ty, 26, 0, 6.2832); ctx.fill(); ctx.restore(); ctx.fillStyle = '#e8fbff'; ctx.beginPath(); ctx.arc(w.x, ty, 3, 0, 6.2832); ctx.fill(); } }
     for (let i = GONE.length - 1; i >= 0; i--) { const g = GONE[i], u = (T - g.t0) / 900; if (u >= 1) { GONE.splice(i, 1); continue; } ctx.strokeStyle = 'rgba(' + g.col + ',' + (1 - u) + ')'; ctx.lineWidth = Math.max(2, 3 * inv) * (1 - u) + 1; ctx.beginPath(); ctx.arc(g.x, g.y, 8 + 44 * u, 0, 6.2832); ctx.stroke(); const z = 9 * (1 - u * 0.5); ctx.lineWidth = Math.max(2.4, 3 * inv); ctx.beginPath(); ctx.moveTo(g.x - z, g.y - z); ctx.lineTo(g.x + z, g.y + z); ctx.moveTo(g.x + z, g.y - z); ctx.lineTo(g.x - z, g.y + z); ctx.stroke(); }
     for (let i = FX.length - 1; i >= 0; i--) { const f = FX[i], u = (T - f.t0) / 900; if (u >= 1) { FX.splice(i, 1); continue; } const a = 1 - u;
       if (f.from && u < 0.5) { ctx.strokeStyle = 'rgba(' + f.col + ',' + 0.5 * (1 - u * 2) + ')'; ctx.lineWidth = 1.5 * inv; ctx.beginPath(); for (let k = 0; k < f.from.length && k < 40; k++) { ctx.moveTo(f.from[k].x, f.from[k].y); ctx.lineTo(f.x, f.y); } ctx.stroke(); }
@@ -14988,7 +15254,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
 //                       (yours blue; a rival's, on its own star, red)
 //     its PATHS         nobody lays a road. Where creatures walk again and again the ground wears pale, so paths appear by themselves between
 //                       the Heart, the deposits and the feeding grounds, and fade again where nobody goes any more
-//     its PLAZA         the ground round the Heart is paved, wider with each step the colony takes (camp, village, town, city), and lit
+//     its PLAZA         the ground round the Heart is paved, wider with each step the colony takes (founded, growing, thriving, great), and lit
 //                       at night-coloured hours by lamps round it
 //     its BATTLEFIELDS  where a fight was, the ground stays scorched for a while
 // Nothing here is kept in the save: the paths wear in again within a minute or two of play.
@@ -15016,7 +15282,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const Wk = (W.works || []).filter(function (w) { return w.bp && !w.visitor && !w.away && !w.fall && reach(w) > 0; }), x = st.terr.getContext('2d'), im = x.createImageData(st.gw, st.gh), D = im.data, gw = st.gw, gh = st.gh;
     const B = Wk.map(function (w) { return { x: w.x, y: w.y + w.bp.S * 0.45 - 20, r: reach(w), foe: !!w.enemy }; });
     if (B.length) for (let gy = 0; gy < gh; gy++) { const wy = (gy + 0.5) * CELL; for (let gx = 0; gx < gw; gx++) { const wx = (gx + 0.5) * CELL; let fm = 0, ff = 0; for (let i = 0; i < B.length; i++) { const b = B[i], dy = (wy - b.y) * 1.3, dx = wx - b.x; if (dx > b.r || dx < -b.r || dy > b.r || dy < -b.r) continue; const f = 1 - Math.sqrt(dx * dx + dy * dy) / b.r; if (b.foe) { if (f > ff) ff = f; } else if (f > fm) fm = f; }
-        const f = Math.max(fm, ff); if (f <= 0) continue; const c = ff > fm ? FOE : MINE, o = (gy * gw + gx) * 4, edge = Math.max(0, 1 - Math.abs(f - 0.07) / 0.07); D[o] = c[0]; D[o + 1] = c[1]; D[o + 2] = c[2]; D[o + 3] = (0.075 * sstep(0, 0.14, f) + 0.36 * edge * edge) * 255; } }
+        const f = Math.max(fm, ff); if (f <= 0) continue; const c = ff > fm ? FOE : MINE, o = (gy * gw + gx) * 4, edge = Math.max(0, 1 - Math.abs(f - 0.07) / 0.07); D[o] = c[0]; D[o + 1] = c[1]; D[o + 2] = c[2]; D[o + 3] = (0.05 * sstep(0, 0.14, f) + 0.15 * edge * edge) * 255; } }
     x.putImageData(im, 0, 0);
   }
 
@@ -15076,6 +15342,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     watch: 0.50,     // the watcher grading living creatures        0.4 cents
     judge: 0.30, check: 0.10,
     organ: 0.20, design: 0.20, plan: 0.20, paint: 0.15, story: 0.25, ideas: 0.10,
+    art: 0.30,       // the look of the star: its ground and its people's buildings, painted     2 cents a picture, about three to a star
   };
   A.budgetDefault = 0.20;
   const ALIAS = { 'mutation-ideas': 'ideas' };
@@ -15215,7 +15482,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     const W = G.W;
     if (!W || W.title) return null;
     const out = {
-      v: 1, at: Date.now(), farOf: W.farOf || undefined, def: W.def === undefined ? undefined : [W.def | 0, W.defLeft | 0, W.defOut | 0], lumenRich: W.lumenRich, colony: W.col ? { stock: W.col.stock, got: W.col.got, want: W.col.want, rally: W.col.rally, auto: W.col.auto, queue: (W.col.queue || []).slice(0, 12), nodes: W.col.nodes, nextQ: W.col.nextQ, foes: W.col.foes, fell: W.col.fell, peace: W.col.peace, tier: W.col.tier | 0, nextRaid: W.col.nextRaid, raidN: W.col.raidN, fellNow: W.col.fellNow, raid: W.col.raid ? (function (r) { return { id: r.id, key: r.key, i: r.i, j: r.j, name: r.name, hue: r.hue, n: r.n, landGen: r.landGen, landed: r.landed, state: r.state, out: r.out, t0: r.t0, x: r.x, y: r.y, seed: r.seed, how: r.how, loot: r.loot, tired: r.tired, wornOut: r.wornOut }; })(W.col.raid) : undefined } : W.colKeep || undefined, craft: W.craft || undefined, far: G.voyCollect ? undefined : W.farKeep || undefined, hstyle: W.houseStyle || undefined, taught: W.taught || undefined, works: (W.works || []).filter(function (w) { return w.bp; }).sort(function (a, b) { return (a.bp.type === 'heart' ? 1 : 0) - (b.bp.type === 'heart' ? 1 : 0); }).slice(-24).map(function (w) { const b = w.bp; return { fl: (w.tower ? 1 : 0) + (w.enemy ? 2 : 0) + (w.ruin ? 4 : 0) || undefined, n: w.name, l: w.looks, x: Math.round(w.x), y: Math.round(w.y), r: Math.round(w.r), by: w.by, hue: Math.round(w.hue || 0), sp: w.sp || 0, plan: w.plan, what: w.what, why: w.why, gen: w.gen, b: [b.seed, b.type, Math.round(b.S), Math.round(b.hue), b.spiky, +b.brain.toFixed(2), b.wet === false ? 0 : 1], pk: G.blueprintPack ? G.blueprintPack(b) || undefined : undefined, st: b.P.map(function (p) { return p.st; }).join('') }; }), room: +(W.room || 0).toFixed(1), shore: +(W.shore || G.SHORE0).toFixed(3), rich: +(W.richS || 1).toFixed(3), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
+      v: 1, at: Date.now(), farOf: W.farOf || undefined, def: W.def === undefined ? undefined : [W.def | 0, W.defLeft | 0, W.defOut | 0], arch: W.arch && W.arch.kind ? { kind: W.arch.kind, facts: W.arch.facts, colours: W.arch.colours, gen: W.arch.gen } : undefined, lumenRich: W.lumenRich, colony: W.col ? { stock: W.col.stock, got: W.col.got, want: W.col.want, rally: W.col.rally, auto: W.col.auto, queue: (W.col.queue || []).slice(0, 12), nodes: W.col.nodes, nextQ: W.col.nextQ, foes: W.col.foes, fell: W.col.fell, peace: W.col.peace, tier: W.col.tier | 0, nextRaid: W.col.nextRaid, raidN: W.col.raidN, fellNow: W.col.fellNow, raid: W.col.raid ? (function (r) { return { id: r.id, key: r.key, i: r.i, j: r.j, name: r.name, hue: r.hue, n: r.n, landGen: r.landGen, landed: r.landed, state: r.state, out: r.out, t0: r.t0, x: r.x, y: r.y, seed: r.seed, how: r.how, loot: r.loot, tired: r.tired, wornOut: r.wornOut }; })(W.col.raid) : undefined } : W.colKeep || undefined, craft: W.craft || undefined, far: G.voyCollect ? undefined : W.farKeep || undefined, hstyle: W.houseStyle || undefined, taught: W.taught || undefined, works: (W.works || []).filter(function (w) { return w.bp; }).sort(function (a, b) { return (a.bp.type === 'heart' ? 1 : 0) - (b.bp.type === 'heart' ? 1 : 0); }).slice(-24).map(function (w) { const b = w.bp; return { fl: (w.tower ? 1 : 0) + (w.enemy ? 2 : 0) + (w.ruin ? 4 : 0) || undefined, n: w.name, l: w.looks, x: Math.round(w.x), y: Math.round(w.y), r: Math.round(w.r), by: w.by, hue: Math.round(w.hue || 0), sp: w.sp || 0, plan: w.plan, what: w.what, why: w.why, gen: w.gen, b: [b.seed, b.type, Math.round(b.S), Math.round(b.hue), b.spiky, +b.brain.toFixed(2), b.wet === false ? 0 : 1], pk: G.blueprintPack ? G.blueprintPack(b) || undefined : undefined, st: b.P.map(function (p) { return p.st; }).join('') }; }), room: +(W.room || 0).toFixed(1), shore: +(W.shore || G.SHORE0).toFixed(3), rich: +(W.richS || 1).toFixed(3), seed: W.seed, ww: Math.round(W.ww), wh: Math.round(W.wh), gen: W.gen, season: W.season, st: Math.round(W.st * 10) / 10, t: Math.round(W.t),
       set: W.set, disc: W.disc, nextSp: W.nextSp, ai: G.ai && G.ai.model ? G.ai.model : '', drawn: G.ai && G.ai.drawn ? 1 : 0, spend: G.ai ? G.ai.life : {},
       hist: W.hist.slice(-120).map(function (h) { return [h.gen, +h.avg.toFixed(3), +h.best.toFixed(2), h.pop, +h.genes.toFixed(1), +h.intake.toFixed(0), h.species, +(h.look || 0).toFixed(3), +(h.lookTop || 0).toFixed(2), +(h.whole || 0).toFixed(3), +(h.wholeTop || 0).toFixed(2), +(h.body || 0).toFixed(1), +(h.bodyTop || 0).toFixed(1), +(h.size || 0).toFixed(1), +(h.sizeTop || 0).toFixed(1), (G.MARKS_X || []).map(function (m) { const q = h.mx && h.mx[m.id]; return q ? [+q[0].toFixed(3), +q[1].toFixed(2)] : 0; }), +(h.room || 0).toFixed(1)]; }),
       discLog: W.discLog.slice(-40),
@@ -15367,7 +15634,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     G.newWorld({ seed: num(d.seed, 1, 4e9, 1) });
     const W = G.W;
     W.gen = Math.floor(num(d.gen, 1, 1e6, 1));
-    if (typeof d.farOf === 'string') W.farOf = d.farOf.slice(0, 40); if (Array.isArray(d.def)) { W.def = Math.floor(num(d.def[0], 0, 40, 4)); W.defLeft = Math.floor(num(d.def[1], 0, 80, 0)); W.defOut = Math.floor(num(d.def[2], 0, 200, 0)); } if (d.lumenRich !== undefined) W.lumenRich = num(d.lumenRich, 0, 5, 1);
+    if (typeof d.farOf === 'string') W.farOf = d.farOf.slice(0, 40); if (d.arch && typeof d.arch.kind === 'string') W.arch = { kind: d.arch.kind.slice(0, 40), facts: (Array.isArray(d.arch.facts) ? d.arch.facts : []).slice(0, 8).map(function (q) { return String(q).slice(0, 60); }), colours: String(d.arch.colours || '').slice(0, 60), gen: d.arch.gen | 0 };      /* (the people whose way of building this star follows: 53_art.js) */ if (Array.isArray(d.def)) { W.def = Math.floor(num(d.def[0], 0, 40, 4)); W.defLeft = Math.floor(num(d.def[1], 0, 80, 0)); W.defOut = Math.floor(num(d.def[2], 0, 200, 0)); } if (d.lumenRich !== undefined) W.lumenRich = num(d.lumenRich, 0, 5, 1);
     if (d.colony && typeof d.colony === 'object' && !G.colony) W.colKeep = d.colony;      // (the colony's own code is not running here, as on the server while you are away: what was saved of it is carried through untouched)
     if (d.colony && typeof d.colony === 'object' && G.colony) { const c0 = G.colony(W), q = d.colony, n4 = function (a) { return Array.isArray(a) ? [0, 1, 2, 3].map(function (i) { return Math.floor(num(a[i], 0, 1e7, 0)); }) : [0, 0, 0, 0]; };
       c0.stock = n4(q.stock); c0.got = n4(q.got); ['g', 'b', 'f', 'u'].forEach(function (k) { c0.want[k] = Math.floor(num(q.want && q.want[k], 0, 400, 0)); }); c0.auto = q.auto !== false; c0.nextQ = Math.floor(num(q.nextQ, 0, 1e6, 0));

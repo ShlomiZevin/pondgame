@@ -14,11 +14,11 @@
   const RED = '#ff5d7a', GOLD = '#f6d365', INK = '#14202e';
   const px = function (c) { return c.rx === undefined ? c.x : c.rx; }, py = function (c) { return c.ry === undefined ? c.y : c.ry; };
   const on = function () { return G.mode === 'play' && G.speed > 0 && G.speed <= 16; };
-  const words = function () { return G.speed <= 4 && G.view.scale >= 0.55; };      // and only when the creatures are large enough on the screen for a word to belong to one
+  const words = function () { return G.speed <= 4 && G.view.scale >= (G.FLAT ? 1.2 : 0.55); };      // and only when the creatures are large enough on the screen for a word to belong to one
   const add = function (e) { e.t0 = G.rt || 0; if (FX.length >= MAX) FX.shift(); FX.push(e); return e; };
   const CAUSE = { starved: 'starved', selected: 'winter took it', plague: 'sickness', fought: 'killed', eaten: 'eaten', zone: 'poisoned', old: 'old age' };
 
-  G.on('fight', function (a, b) { if (!on()) return; add({ k: 'hit', a: a, b: b, T: 1.0, txt: words() ? 'bites' : '' }); });
+  G.on('fight', function (a, b) { if (!on() || G.FLAT) return;      /* (on a star a fight is shown by 68a_field.js: blades, sparks, the two colours; no arrow from one to the other) */ add({ k: 'hit', a: a, b: b, T: 1.0, txt: words() ? 'bites' : '' }); });
   G.on('death', function (c, cause, by) {
     if (!on()) return;
     const x = px(c), y = py(c), r = c.ph.r, hue = c.g.f ? c.g.f.hue : c.g.t[2];

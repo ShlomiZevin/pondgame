@@ -4,7 +4,7 @@
 //                       (yours blue; a rival's, on its own star, red)
 //     its PATHS         nobody lays a road. Where creatures walk again and again the ground wears pale, so paths appear by themselves between
 //                       the Heart, the deposits and the feeding grounds, and fade again where nobody goes any more
-//     its PLAZA         the ground round the Heart is paved, wider with each step the colony takes (camp, village, town, city), and lit
+//     its PLAZA         the ground round the Heart is paved, wider with each step the colony takes (founded, growing, thriving, great), and lit
 //                       at night-coloured hours by lamps round it
 //     its BATTLEFIELDS  where a fight was, the ground stays scorched for a while
 // Nothing here is kept in the save: the paths wear in again within a minute or two of play.
@@ -32,7 +32,7 @@
     const Wk = (W.works || []).filter(function (w) { return w.bp && !w.visitor && !w.away && !w.fall && reach(w) > 0; }), x = st.terr.getContext('2d'), im = x.createImageData(st.gw, st.gh), D = im.data, gw = st.gw, gh = st.gh;
     const B = Wk.map(function (w) { return { x: w.x, y: w.y + w.bp.S * 0.45 - 20, r: reach(w), foe: !!w.enemy }; });
     if (B.length) for (let gy = 0; gy < gh; gy++) { const wy = (gy + 0.5) * CELL; for (let gx = 0; gx < gw; gx++) { const wx = (gx + 0.5) * CELL; let fm = 0, ff = 0; for (let i = 0; i < B.length; i++) { const b = B[i], dy = (wy - b.y) * 1.3, dx = wx - b.x; if (dx > b.r || dx < -b.r || dy > b.r || dy < -b.r) continue; const f = 1 - Math.sqrt(dx * dx + dy * dy) / b.r; if (b.foe) { if (f > ff) ff = f; } else if (f > fm) fm = f; }
-        const f = Math.max(fm, ff); if (f <= 0) continue; const c = ff > fm ? FOE : MINE, o = (gy * gw + gx) * 4, edge = Math.max(0, 1 - Math.abs(f - 0.07) / 0.07); D[o] = c[0]; D[o + 1] = c[1]; D[o + 2] = c[2]; D[o + 3] = (0.075 * sstep(0, 0.14, f) + 0.36 * edge * edge) * 255; } }
+        const f = Math.max(fm, ff); if (f <= 0) continue; const c = ff > fm ? FOE : MINE, o = (gy * gw + gx) * 4, edge = Math.max(0, 1 - Math.abs(f - 0.07) / 0.07); D[o] = c[0]; D[o + 1] = c[1]; D[o + 2] = c[2]; D[o + 3] = (0.05 * sstep(0, 0.14, f) + 0.15 * edge * edge) * 255; } }
     x.putImageData(im, 0, 0);
   }
 

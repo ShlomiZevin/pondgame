@@ -23,6 +23,7 @@
     watch: 0.50,     // the watcher grading living creatures        0.4 cents
     judge: 0.30, check: 0.10,
     organ: 0.20, design: 0.20, plan: 0.20, paint: 0.15, story: 0.25, ideas: 0.10,
+    art: 0.30,       // the look of the star: its ground and its people's buildings, painted     2 cents a picture, about three to a star
   };
   A.budgetDefault = 0.20;
   const ALIAS = { 'mutation-ideas': 'ideas' };

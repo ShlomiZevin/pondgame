@@ -63,7 +63,7 @@
       let at, name;
       if (job === 'f') { at = p ? { x: p.x, y: levelY(W, 0, p.y, 12), set: 1 } : G.musterAt(W); name = p ? 'FIGHTERS’ POST' : 'MUSTER GROUND'; }
       else if (job === 'b') { at = spot(W, 'yard'); name = 'BUILDERS’ YARD'; }
-      else { at = p ? { x: p.x, y: levelY(W, 0, p.y, 12) } : { x: H.x, y: H.y + 84 }; name = 'GUARD POST'; }
+      else { at = p ? { x: p.x, y: levelY(W, 0, p.y, 12) } : { x: H.x, y: H.y + 124 }; name = 'GUARD POST'; }
       if (!at) continue; const face = at.x >= H.x ? 0 : Math.PI, e = edge(W) + 40;
       // each keeps the place it has (so the group does not shuffle whenever one of them dies); a newcomer takes the first empty one
       const used = {}; let top = 0; L.forEach(function (c) { if (c.slotG === k && c.slotI >= 0 && !used[c.slotI] && c.slotI < n + 2) { used[c.slotI] = 1; } else { c.slotG = k; c.slotI = -1; } });

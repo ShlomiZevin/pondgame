@@ -233,8 +233,8 @@ function drawShore() {
   ctx.stroke();
   ctx.restore();
 }
-function drawDustFar() { dust(R.far, 1, 1); }
-function drawDustNear() { dust(R.near, 2.2, 1); }
+function drawDustFar() { if (G.FLAT && G.W && !G.W.title) return; dust(R.far, 1, 1); }      // (motes drift in water, not over a star's ground)
+function drawDustNear() { if (G.FLAT && G.W && !G.W.title) return; dust(R.near, 2.2, 1); }
 
 // ── layer 4: zones from the things you add ──
 function zoneColor(z, a) { return G.hsl(z.hue, 80, 62, a); }
@@ -716,7 +716,7 @@ function drawCreatures() {
   beginWorld(ctx);
   const cre = W.cre.slice().sort(function (p, q) { return p.y - q.y; });      // back to front: the nearer ones stand in front
   const season = W.season;
-  const showBars = season === 2 || (season === 3 && W.st < 3.5);
+  const showBars = (season === 2 || (season === 3 && W.st < 3.5)) && (!G.FLAT || G.view.scale >= 1.25);      // (on a star: only close up, where a bar can be told from its neighbour's)
   const crowd = clamp01(130 / (cre.length + 1));
   const vw = G.view, vx0 = -vw.ox / vw.scale, vy0 = -vw.oy / vw.scale, vx1 = vx0 + vw.w / vw.scale, vy1 = vy0 + vw.h / vw.scale;
   const fdt = G.frameDt || 0.016;
@@ -727,6 +727,7 @@ function drawCreatures() {
     const c = cre[i];
     let x = c.px + (c.x - c.px) * a, y = c.py + (c.y - c.py) * a;
     c.rx = x; c.ry = y;
+    if (G.drawUprights) G.drawUprights(ctx, c.y);      // (the buildings that stand behind it are drawn first: 54h_look.js)
     if (c.inShip) continue;      // it has gone aboard a ship: it is inside it
     let alpha = 1;
     if (c.doomed && season === 3) {
@@ -735,7 +736,7 @@ function drawCreatures() {
     }
     if (c.birthT > 0) c.birthT = Math.max(0, c.birthT - 0.016 * 1.6 * (G.speed > 1 ? 4 : 1));
     // gold ring on parents
-    if (c.parentFlag && season === 0 && W.births.length) {
+    if (c.parentFlag && season === 0 && W.births.length && !G.FLAT) {
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = G.rgba(PAL.gold, 0.35 + 0.25 * Math.sin(t * 5 + c.id));
       ctx.lineWidth = 2;
@@ -761,13 +762,13 @@ function drawCreatures() {
       c.strike -= 0.03;
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = G.rgba(PAL.gold, Math.max(0, c.strike)); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, c.ph.r * 1.5, 0, 6.2832); ctx.stroke(); ctx.restore();
     }
-    if (c.doomed && season === 3) {
+    if (c.doomed && season === 3 && !G.FLAT) {
       ctx.save();
       ctx.strokeStyle = G.rgba(PAL.frost, 0.6 * alpha); ctx.setLineDash([3, 4]); ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(x, y, c.ph.r * 1.45, 0, 6.2832); ctx.stroke();
       ctx.restore();
     }
-    if (c.colony) {
+    if (c.colony && !G.FLAT) {
       ctx.save(); ctx.strokeStyle = G.rgba(PAL.rose, 0.16); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(x, y, c.ph.r * 1.3, 0, 6.2832); ctx.stroke(); ctx.restore();
     }
@@ -783,6 +784,7 @@ function drawCreatures() {
       roundRect(ctx, x, y, Math.max(2, w * f), 4, 2); ctx.fill();
     }
   }
+  if (G.drawUprights) G.drawUprights(ctx, 1e9);      // (the buildings in front of every creature)
   if (R.ping) {
     const p = R.ping, c = p.c;
     p.t += G.frameDt || 0.016;
@@ -856,7 +858,7 @@ function drawEffects() {
       ctx.beginPath(); ctx.moveTo(e.x, yy + s); ctx.bezierCurveTo(e.x - s * 1.6, yy - s * 0.4, e.x - s * 0.5, yy - s * 1.4, e.x, yy - s * 0.4); ctx.bezierCurveTo(e.x + s * 0.5, yy - s * 1.4, e.x + s * 1.6, yy - s * 0.4, e.x, yy + s); ctx.fill();
     } else if (e.k === 'link') {
       const c = e.c;
-      if (c && !c.dead && Math.abs(c.x - e.x) < 160 && Math.abs(c.y - e.y) < 160) {
+      if (!G.FLAT && c && !c.dead && Math.abs(c.x - e.x) < 160 && Math.abs(c.y - e.y) < 160) {
         ctx.globalAlpha = (1 - u) * 0.55; ctx.strokeStyle = e.col; ctx.lineWidth = 1.6;
         ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo((c.rx === undefined ? c.x : c.rx), (c.ry === undefined ? c.y : c.ry)); ctx.stroke();
       }
@@ -941,7 +943,7 @@ function drawVignette() {
   const ctx = G.ctx, v = G.view;
   screenSpace(ctx);
   const g = ctx.createRadialGradient(v.w / 2, v.h / 2, Math.min(v.w, v.h) * 0.42, v.w / 2, v.h / 2, Math.max(v.w, v.h) * 0.75);
-  g.addColorStop(0, 'rgba(7,18,31,0)'); g.addColorStop(1, 'rgba(7,18,31,0.72)');
+  g.addColorStop(0, 'rgba(7,18,31,0)'); g.addColorStop(1, 'rgba(7,18,31,' + (G.FLAT && G.W && !G.W.title ? 0.42 : 0.72) + ')');      // (a star stands in daylight: its corners are only a little darker)
   ctx.fillStyle = g; ctx.fillRect(0, 0, v.w, v.h);
 }
 

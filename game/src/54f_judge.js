@@ -60,10 +60,10 @@
   G.didIt = function (c, key, words, to) {
     did[key] = (did[key] || 0) + 1;
     if (typeof document === 'undefined' || G.mode !== 'play' || !c || c.dead || G.speed > 4 || (G.pondAsleep && G.pondAsleep())) return;
-    const now = performance.now(); if (now - (lastOf[key] || 0) < 9000 || M.length >= 2) return; lastOf[key] = now;
+    const now = performance.now(); if (now - (lastOf[key] || 0) < 9000 || M.length >= (G.FLAT ? 1 : 2)) return; lastOf[key] = now;
     const sp = G.speciesById(c.sp), tx = to ? to.x : c.x, ty = to ? to.y : c.y, verb = { attack: 'attacks', hunt: 'ate', build: 'sets a piece', strike: 'strikes back', help: 'goes to help' }[key] || '';
     const m = { id: ++seq, c: c, key: key, words: words, who: sp ? sp.name : c.team === 1 ? 'raider' : 'creature', el: c.el ? Float32Array.from(c.el) : null, t0: now, to: to && !to.dead ? to : null, tx: tx, ty: ty, verb: verb };
-    M.push(m); mark(m, 3.4);      // it is shown in the pond as it happens
+    M.push(m); if (!G.FLAT) mark(m, 3.4);      // it is shown in the pond as it happens (on a star: only when you press SEE)
     draw();
   };
   /** an arrow in the pond from the one who did it to what it was done to, with a word on it, for a few seconds */
@@ -114,9 +114,9 @@
     ui(); const now = performance.now();
     for (let i = M.length - 1; i >= 0; i--) if (now - M[i].t0 > 9000 || M[i].c.dead) M.splice(i, 1);
     const hide = G.mode !== 'play' || (G.ui && G.ui.modal) || (G.pondAsleep && G.pondAsleep());
-    const al = document.getElementById('mvalert'), up = al && !al.classList.contains('hide'), base = up ? Math.round(window.innerHeight - al.getBoundingClientRect().top + 10) : 150;
+    const al = document.getElementById('mvalert'), up = al && !al.classList.contains('hide'), nt = document.getElementById('note'), nup = nt && nt.style.opacity === '1', base = up ? Math.round(window.innerHeight - al.getBoundingClientRect().top + 10) : nup ? Math.max(150, Math.round(window.innerHeight - nt.getBoundingClientRect().top + 10)) : 150;
     if (said && !said.classList.contains('hide')) { if (now - saidT > 5200 || hide) said.classList.add('hide'); else said.style.bottom = (base + box.offsetHeight + (box.offsetHeight ? 8 : 0)) + 'px'; }
-    const hb0 = document.getElementById('rarebox'), s = hide ? '' : M.map(function (m) { return m.id; }).join(',') + (hb0 && !hb0.classList.contains('hide') ? 'h' : ''); if (s === sig) return; sig = s;
+    const hb0 = document.getElementById('rarebox'), s = hide ? '' : M.map(function (m) { return m.id; }).join(',') + (hb0 && !hb0.classList.contains('hide') ? 'h' : '') + ':' + base; if (s === sig) return; sig = s;
     box.style.bottom = base + 'px';
     { const hb = document.getElementById('rarebox'), open = hb && !hb.classList.contains('hide') && window.innerWidth > 900, w = Math.min(620, window.innerWidth - 28), x = open ? Math.max(window.innerWidth / 2, hb.getBoundingClientRect().right + 12 + w / 2) : 0; box.style.left = x ? Math.round(x) + 'px' : ''; if (said) said.style.left = x ? Math.round(x) + 'px' : ''; }      /* (beside the NOW panel when that is open, never under it) */
     box.innerHTML = hide ? '' : M.map(function (m) { return '<div class="mo glass" data-id="' + m.id + '"><span class="tx" data-act="see" title="Go and see it">A <b>' + esc(m.who) + '</b> ' + esc(m.words) + '</span><button class="s" data-act="see" title="Go and see it on the star">SEE</button><button class="g" data-act="g" title="Good: it, and those of its kind who saw, will do more of this">♥ GOOD</button><button class="b" data-act="b" title="Bad: they will do less of this">✕ BAD</button><button class="q" data-act="q" title="What you have taught this star">?</button></div>'; }).join('');

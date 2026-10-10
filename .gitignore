@@ -14,3 +14,6 @@ scripts/*.png
 # screenshots made by tests
 test/*.png
 scripts/*.jpg
+
+# trial pictures from the image model, and what they cost (scripts/art-try.js)
+scripts/art/

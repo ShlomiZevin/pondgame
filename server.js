@@ -15,6 +15,7 @@
 //   POST /api/ai/event   { text }            → { event }       free text → something that happens
 //   POST /api/ai/story   { measured facts }  → { story }       what changed and why, in plain words
 //   POST /api/ai/paint   { sig, build, facts, colours, world } → { paint }  a painting of a kind of creature (only with LEONARDO_API_KEY)
+//   POST /api/art        { what, terrain, people?, libraryOnly? } → { art }  the ground of a star, or the buildings of its people, painted (kept for good; only with LEONARDO_API_KEY)
 //   POST /api/ai/voice   { text, tone }      → { sound }       a line spoken aloud for a creature that talks (Leonardo dialogue-v3, kept per line)
 //   POST /api/ai/sound   { word, note }      → { sound }       a sound for a thing (only with LEONARDO_API_KEY)
 //   GET  /api/pond                           → { save, report } the player's pond, advanced to now
@@ -39,6 +40,7 @@ const { createIcons } = require('./lib/icon');
 const { createOffline } = require('./lib/offline');
 const { createSounds } = require('./lib/sound');
 const { createPainter } = require('./lib/paint');
+const { createArt } = require('./lib/art');
 
 // A local key file, never committed: primordia-server/.env.local  (KEY=value lines). The real environment always wins.
 function loadEnv() {
@@ -86,6 +88,8 @@ function createApp(opts = {}) {
   const painter = opts.painter || createPainter({ store, apiKey: opts.leonardoKey });
   const paintLimiter = createLimiter(Number(process.env.PRIMORDIA_PAINTS_PER_HOUR) || 30);
   const icons = opts.icons || createIcons({ store, apiKey: opts.leonardoKey });
+  const art = opts.art || createArt({ store, apiKey: opts.leonardoKey });
+  const artLimiter = createLimiter(Number(process.env.PRIMORDIA_ART_PER_HOUR) || 24);
   const iconLimiter = createLimiter(Number(process.env.PRIMORDIA_ICONS_PER_HOUR) || 12);
   const soundLimiter = createLimiter(opts.soundsPerHour || Number(process.env.PRIMORDIA_SOUNDS_PER_HOUR) || 20);
   const ponds = createPonds({ store, now: opts.now, away: opts.away });
@@ -159,6 +163,11 @@ function createApp(opts = {}) {
       const body = await readJson(req, 2000);
       const r = await icons.forMarvel(body, { canGenerate: () => iconLimiter.take(who), onError: (e) => console.error('icon failed:', e.message) });
       return send(res, r.error ? (r.error === 'no_icon_yet' || r.error === 'no_painter' ? 404 : r.error === 'empty' ? 400 : 503) : 200, r);
+    }
+    if (route === 'POST /api/art') {      // the look of a star: its ground, its people's buildings (asked for once, then served from the library)
+      const body = await readJson(req, 4000);
+      const r = await art.forStar(body, { canGenerate: () => artLimiter.take(who), onError: (e) => console.error('art failed:', e.message) });
+      return send(res, r.error ? (r.error === 'not_made' || r.error === 'no_painter' ? 404 : r.error === 'empty' ? 400 : 503) : 200, r);
     }
     if (route === 'POST /api/ai/paint') {
       const body = await readJson(req, 4000);
