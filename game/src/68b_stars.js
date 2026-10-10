@@ -10,7 +10,7 @@
 
   /** a star's card on the map of space: its heading and what is said of it */
   G.starLine = function (p) {
-    const s = G.starOf(p), t = s.terrain, rich = '<b style="color:' + RCOL[s.res] + '">' + RES[s.res] + '</b>';
+    const s = G.starOf(p), t = s.terrain, rich = '<span style="font-weight:800;color:' + RCOL[s.res] + '">' + RES[s.res] + '</span>';      // (a span: on the star's card a <b> is a line of its own)
     let html = '<span style="color:rgba(207,232,255,.9)">' + esc(t.name) + ': ' + esc(t.words) + '. Rich in ' + rich + '.</span><br>';
     if (s.held) html += '<span style="color:#9dffcf">It is yours. It sends you ' + YEARLY[s.res] + ' ' + RES[s.res] + ' every year.</span>';
     else if (s.rival) { const n = raidsBy(s.key); html += '<span style="color:#ff9db0">A rival colony holds it' + (n ? ', and has raided you ' + (n === 1 ? 'once' : n + ' times') : ', and will raid you') + '. Land fighters there and break its Heart: the star, and its ' + RES[s.res] + ', are yours.</span>'; }

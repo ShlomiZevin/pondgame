@@ -9544,7 +9544,7 @@ G.addSystem({
     if (typeof document === 'undefined' || G.mode !== 'play' || !c || c.dead || G.speed > 4 || (G.pondAsleep && G.pondAsleep())) return;
     const now = performance.now(); if (now - (lastOf[key] || 0) < 9000 || M.length >= 2) return; lastOf[key] = now;
     const sp = G.speciesById(c.sp), tx = to ? to.x : c.x, ty = to ? to.y : c.y, verb = { attack: 'attacks', hunt: 'ate', build: 'sets a piece', strike: 'strikes back', help: 'goes to help' }[key] || '';
-    const m = { id: ++seq, c: c, key: key, words: words, who: sp ? sp.name : 'A creature', el: c.el ? Float32Array.from(c.el) : null, t0: now, to: to && !to.dead ? to : null, tx: tx, ty: ty, verb: verb };
+    const m = { id: ++seq, c: c, key: key, words: words, who: sp ? sp.name : c.team === 1 ? 'raider' : 'creature', el: c.el ? Float32Array.from(c.el) : null, t0: now, to: to && !to.dead ? to : null, tx: tx, ty: ty, verb: verb };
     M.push(m); mark(m, 3.4);      // it is shown in the pond as it happens
     draw();
   };
@@ -10130,7 +10130,7 @@ G.addSystem({
   /** a finished tower strikes at the nearest raider in reach, every moment and a half */
   function towers(W, dt) { const Wk = W.works || []; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.tower || !w.bp || w.enemy) continue; w.zapT = (w.zapT || 0) - dt; if (w.zapT > 0) continue; w.zapT = 0.5;
       const n = G.buildCount(w); if (n[0] < n[2] * 0.7) continue; let best = null, bd = 300 * 300; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (c.team !== 1 || c.dead || c.inShip) continue; const d = (c.x - w.x) * (c.x - w.x) + (c.y - w.y) * (c.y - w.y); if (d < bd) { bd = d; best = c; } }
-      if (!best) continue; w.zapT = 1.5; best.E -= 13; best.flash = 1; w.zaps = (w.zaps || 0) + 1; G.emit('tower-zap', w, best); if (best.E <= 0) { w.kills = (w.kills || 0) + 1; G.killCreature(best, 'fought', null); G.emit('tower-kill', w, best); } } }
+      if (!best) continue; w.zapT = 1.3; best.E -= 16; best.flash = 1; w.zaps = (w.zaps || 0) + 1; G.emit('tower-zap', w, best); if (best.E <= 0) { w.kills = (w.kills || 0) + 1; G.killCreature(best, 'fought', null); G.emit('tower-kill', w, best); } } }
   G.on('scored', function () { const W = G.W; if (!W || !W.col || !W.col.nodes || W.gen % 2) return; W.col.nodes.forEach(function (q) { if (q.n < q.n0) q.n++; }); });      // (lumen grows back, a piece every other year)
   // raiders are not the star's own: its winter does not choose among them (a raid that is not beaten wears itself out in three years)
   G.on('winter', function () { const W = G.W; if (W && !(G.foeHeart && G.foeHeart(W))) W.cre.forEach(function (c) { if (hostile(c) && W.gen - c.born < 3) c.doomed = false; }); });
@@ -14319,7 +14319,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
     // the store, beside the Heart: what is in it lies there to be seen
     const st = G.storeAt(W), hp = G.heartOf(W);
     if (st) { for (let k = 0; k < 4; k++) { const n = Math.min(10, Math.ceil(col.stock[k] / (k === 3 ? 2 : 5))); for (let j = 0; j < n; j++) G.matDraw(ctx, { x: st.x - 22 + k * 15 + (j % 2) * 6, y: st.y - 2 - Math.floor(j / 2) * 5, k: k, s: (j * 0.31 + k * 0.17) % 1 }, t); } }
-    if (hp) { const c = G.buildCount(hp), top = hp.y + hp.bp.S * 0.45 + 12 * inv; if (c[0] < c[2] || hp.ruin || T - (hp.hitAt || 0) < 4000) { const w = 70 * inv, hh = 6 * inv; ctx.fillStyle = 'rgba(7,18,31,0.75)'; ctx.fillRect(hp.x - w / 2, top, w, hh); ctx.fillStyle = c[0] / c[2] > 0.5 ? '#6ef0a8' : c[0] / c[2] > 0.25 ? '#f6d365' : '#ff5d73'; ctx.fillRect(hp.x - w / 2, top, w * c[0] / c[2], hh); if (hp.ruin) label(ctx, hp.x, top - 13 * inv, inv, 'being raised again', '#ffe9a8', 10); } }
+    if (hp) { const c = G.buildCount(hp), top = hp.y + hp.bp.S * 0.45 + 12 * inv; if (c[0] < c[2] || hp.ruin || T - (hp.hitAt || 0) < 4000) { const w = 70 * inv, hh = 6 * inv; ctx.fillStyle = 'rgba(7,18,31,0.75)'; ctx.fillRect(hp.x - w / 2, top, w, hh); ctx.fillStyle = c[0] / c[2] > 0.5 ? '#6ef0a8' : c[0] / c[2] > 0.25 ? '#f6d365' : '#ff5d73'; ctx.fillRect(hp.x - w / 2, top, w * c[0] / c[2], hh); if (hp.ruin) label(ctx, hp.x, top - 13 * inv, inv, 'rising: your builders raise it', '#ffe9a8', 10); } }
     { const fh = G.foeHeart ? G.foeHeart(W) : null; if (fh) { const c = G.buildCount(fh), top = fh.y + fh.bp.S * 0.45 + 12 * inv, w = 70 * inv, hh = 6 * inv; ctx.fillStyle = 'rgba(7,18,31,0.75)'; ctx.fillRect(fh.x - w / 2, top, w, hh); ctx.fillStyle = '#ff5d73'; ctx.fillRect(fh.x - w / 2, top, w * c[0] / c[2], hh); label(ctx, fh.x, top + 17 * inv, inv, 'THEIR HEART', '#ff9db0', 10.5); } }
     // what is waiting to be built, and the place being chosen for something
     col.queue.forEach(function (q) { if (q.type === 'ship') return; ctx.strokeStyle = 'rgba(255,154,76,' + (0.55 + 0.2 * Math.sin(t * 3)) + ')'; ctx.lineWidth = 2 * inv; ctx.setLineDash([8 * inv, 7 * inv]); ctx.beginPath(); ctx.ellipse(q.x, q.y - 34, 52, 44, 0, 0, 6.2832); ctx.stroke(); ctx.setLineDash([]); label(ctx, q.x, q.y + 12 * inv, inv, q.name + ': to be built', '#ffd0a8', 10); });
@@ -14409,7 +14409,7 @@ G.DUST_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
 
   /** a star's card on the map of space: its heading and what is said of it */
   G.starLine = function (p) {
-    const s = G.starOf(p), t = s.terrain, rich = '<b style="color:' + RCOL[s.res] + '">' + RES[s.res] + '</b>';
+    const s = G.starOf(p), t = s.terrain, rich = '<span style="font-weight:800;color:' + RCOL[s.res] + '">' + RES[s.res] + '</span>';      // (a span: on the star's card a <b> is a line of its own)
     let html = '<span style="color:rgba(207,232,255,.9)">' + esc(t.name) + ': ' + esc(t.words) + '. Rich in ' + rich + '.</span><br>';
     if (s.held) html += '<span style="color:#9dffcf">It is yours. It sends you ' + YEARLY[s.res] + ' ' + RES[s.res] + ' every year.</span>';
     else if (s.rival) { const n = raidsBy(s.key); html += '<span style="color:#ff9db0">A rival colony holds it' + (n ? ', and has raided you ' + (n === 1 ? 'once' : n + ' times') : ', and will raid you') + '. Land fighters there and break its Heart: the star, and its ' + RES[s.res] + ', are yours.</span>'; }

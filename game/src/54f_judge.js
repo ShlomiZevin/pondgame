@@ -62,7 +62,7 @@
     if (typeof document === 'undefined' || G.mode !== 'play' || !c || c.dead || G.speed > 4 || (G.pondAsleep && G.pondAsleep())) return;
     const now = performance.now(); if (now - (lastOf[key] || 0) < 9000 || M.length >= 2) return; lastOf[key] = now;
     const sp = G.speciesById(c.sp), tx = to ? to.x : c.x, ty = to ? to.y : c.y, verb = { attack: 'attacks', hunt: 'ate', build: 'sets a piece', strike: 'strikes back', help: 'goes to help' }[key] || '';
-    const m = { id: ++seq, c: c, key: key, words: words, who: sp ? sp.name : 'A creature', el: c.el ? Float32Array.from(c.el) : null, t0: now, to: to && !to.dead ? to : null, tx: tx, ty: ty, verb: verb };
+    const m = { id: ++seq, c: c, key: key, words: words, who: sp ? sp.name : c.team === 1 ? 'raider' : 'creature', el: c.el ? Float32Array.from(c.el) : null, t0: now, to: to && !to.dead ? to : null, tx: tx, ty: ty, verb: verb };
     M.push(m); mark(m, 3.4);      // it is shown in the pond as it happens
     draw();
   };

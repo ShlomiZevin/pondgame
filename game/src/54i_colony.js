@@ -122,7 +122,7 @@
   /** a finished tower strikes at the nearest raider in reach, every moment and a half */
   function towers(W, dt) { const Wk = W.works || []; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.tower || !w.bp || w.enemy) continue; w.zapT = (w.zapT || 0) - dt; if (w.zapT > 0) continue; w.zapT = 0.5;
       const n = G.buildCount(w); if (n[0] < n[2] * 0.7) continue; let best = null, bd = 300 * 300; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (c.team !== 1 || c.dead || c.inShip) continue; const d = (c.x - w.x) * (c.x - w.x) + (c.y - w.y) * (c.y - w.y); if (d < bd) { bd = d; best = c; } }
-      if (!best) continue; w.zapT = 1.5; best.E -= 13; best.flash = 1; w.zaps = (w.zaps || 0) + 1; G.emit('tower-zap', w, best); if (best.E <= 0) { w.kills = (w.kills || 0) + 1; G.killCreature(best, 'fought', null); G.emit('tower-kill', w, best); } } }
+      if (!best) continue; w.zapT = 1.3; best.E -= 16; best.flash = 1; w.zaps = (w.zaps || 0) + 1; G.emit('tower-zap', w, best); if (best.E <= 0) { w.kills = (w.kills || 0) + 1; G.killCreature(best, 'fought', null); G.emit('tower-kill', w, best); } } }
   G.on('scored', function () { const W = G.W; if (!W || !W.col || !W.col.nodes || W.gen % 2) return; W.col.nodes.forEach(function (q) { if (q.n < q.n0) q.n++; }); });      // (lumen grows back, a piece every other year)
   // raiders are not the star's own: its winter does not choose among them (a raid that is not beaten wears itself out in three years)
   G.on('winter', function () { const W = G.W; if (W && !(G.foeHeart && G.foeHeart(W))) W.cre.forEach(function (c) { if (hostile(c) && W.gen - c.born < 3) c.doomed = false; }); });
