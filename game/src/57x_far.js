@@ -70,8 +70,14 @@
   F.shipOf = function () { const Wk = (G.W && G.W.works) || []; for (let i = Wk.length - 1; i >= 0; i--) if (Wk[i].bp && Wk[i].bp.type === 'ship' && !Wk[i].away && whole(Wk[i])) return Wk[i]; return null; };
   /** the far pond you are IN right now (null at home, and null while you are watching your own pond with the ship away) */
   F.there = function () { return F.visiting && F.here !== 'home' ? F.visiting : null; };
-  /** how many a ship carries, and how many times you may ADD where it lands: a bigger ship, more of both */
-  F.holdOf = function (ship) { const n = ship && ship.bp ? ship.bp.P.length : 6; return { crew: clamp(2 + Math.floor(n / 4), 2, 6), adds: clamp(1 + Math.floor(n / 6), 1, 4) }; };
+  /** the ships of your own that stand ready on the star you are in: a fleet (the last built first, as F.shipOf has it) */
+  F.fleet = function () { const Wk = (G.W && G.W.works) || [], out = []; for (let i = Wk.length - 1; i >= 0; i--) if (Wk[i].bp && Wk[i].bp.type === 'ship' && !Wk[i].away && !Wk[i].visitor && !Wk[i].enemy && whole(Wk[i])) out.push(Wk[i]); return out; };
+  /** how many ships fly together: all that stand ready and that there is lumen for (where lumen is what they fly on); where you are visiting, as many as came */
+  F.fleetN = function () { if (F.fleetFix) return F.fleetFix; if (F.visiting) return Math.max(1, F.visiting.fleetN | 0); const n = F.fleet().length, W = G.W, c = W && !W.farOf && W.col && G.FUEL ? W.col : null; return Math.max(1, Math.min(n, c ? Math.floor(c.stock[3] / G.FUEL) : n)); };
+  /** the ships that fly with this one (it leads) */
+  F.mates = function (ship) { if (F.visiting) return []; return F.fleet().filter(function (w) { return w !== ship; }).slice(0, F.fleetN() - 1); };
+  /** how many the ships carry between them, and how many times you may ADD where they land: a bigger ship, more ships, more of both */
+  F.holdOf = function (ship) { const n = ship && ship.bp ? ship.bp.P.length : 6, k = F.fleetN(); return { crew: Math.min(24, clamp(2 + Math.floor(n / 4), 2, 6) * k), adds: Math.min(8, clamp(1 + Math.floor(n / 6), 1, 4) * k), ships: k }; };
   /** who goes aboard is theirs to decide: the leader of the ship's builders, then those who built it with their own hands, then those of their kind nearest it.
    *  Each comes back as the creature, with `c.crewWhy` saying why it goes ('their leader', 'built it', 'of their kind'). */
   F.crewFor = function (ship) {
@@ -104,10 +110,10 @@
     if (G.cam && G.W) { G.cam.z = 1; G.cam.x = G.W.ww / 2; G.cam.y = G.W.wh / 2; if (G.applyCam) G.applyCam(); }
   }
   const shipPack = function (w) { const bp = clone(w.bp); bp.P.forEach(function (q) { delete q.t0; q.st = 2; }); return { name: w.name, looks: w.looks, by: w.by, hue: w.hue, sp: w.sp || 0, r: w.r, gen: w.gen, plan: w.plan, bp: bp }; };      /* (the moment each piece was set belongs to the pond it was set in) */
-  function landShip(pk, mark) {
+  function landShip(pk, mark, dx) {
     const W = G.W, sy = G.shoreY ? G.shoreY(W) : W.wh * 0.25; W.works = W.works || [];
     let w = null; for (let i = 0; i < W.works.length; i++) if (W.works[i].bp && W.works[i].bp.type === 'ship' && W.works[i].name === pk.name) w = W.works[i];
-    if (!w) { w = { name: pk.name, looks: pk.looks, x: W.ww * 0.84, y: Math.max(90, sy - 70),      /* it comes down on the land, at the border of the pond, in plain sight */ r: pk.r || 60, until: W.t + 1e7, by: pk.by, hue: pk.hue, sp: 0, field: 0, plan: pk.plan, gen: W.gen, bp: clone(pk.bp) }; w.bp.P.forEach(function (q) { q.st = 2; }); W.works.push(w); }
+    if (!w) { w = { name: pk.name, looks: pk.looks, x: W.ww * 0.84 + (dx || 0), y: Math.max(90, sy - 70) + (dx ? 46 : 0),      /* it comes down on the land, at the border of the pond, in plain sight */ r: pk.r || 60, until: W.t + 1e7, by: pk.by, hue: pk.hue, sp: 0, field: 0, plan: pk.plan, gen: W.gen, bp: clone(pk.bp) }; w.bp.P.forEach(function (q) { q.st = 2; }); W.works.push(w); }
     if (mark) w.visitor = 1;
     return w;
   }
@@ -118,14 +124,14 @@
     const packs = crew.filter(function (c) { return c && !c.dead; }).map(function (c) { return { g: G.packGenome(c.g), name: nameOfCre(c), led: (c.fol || 0) >= 3 ? c.fol : 0 }; });
     if (!packs.length) return null;
     crew.forEach(function (c) { const i = W.cre.indexOf(c); if (i >= 0) W.cre.splice(i, 1); });      // they are gone from here: they are aboard
-    const pk = shipPack(ship), hold = F.holdOf(ship), hues = W.species.filter(function (s) { return !s.extinct && s.n > 0; }).sort(function (a, b) { return b.n - a.n; });
+    const mates = F.mates(ship).map(shipPack), pk = shipPack(ship), hold = F.holdOf(ship), hues = W.species.filter(function (s) { return !s.extinct && s.n > 0; }).sort(function (a, b) { return b.n - a.n; });
     F.homeLook = { hue: hues.length ? hues[0].hue : 190, kinds: Math.max(1, Math.min(4, hues.length)), gen: W.gen, n: W.cre.length };
     F.homeBlob = G.collectWorld(); if (!F.homeBlob) return null;
     const key = F.key(p), rec = F.book[key] || (F.book[key] = { name: p.name, hue: p.hue, visits: 0, mine: 0 });
     swap(function () { if (rec.blob && G.validSave(rec.blob)) G.applySave(rec.blob); else F.make(p); });
     rec.visits = (rec.visits || 0) + 1; rec.name = p.name; rec.hue = p.hue;
-    F.warTo = null; F.here = 'far'; F.origin = { i: p.i, j: p.j }; F.visiting = { key: key, i: p.i, j: p.j, name: p.name, hue: p.hue, adds: hold.adds, adds0: hold.adds, ship: pk, crew0: packs.length, mood: F.moodWords(p) };
-    const W2 = G.W, sh = landShip(pk, true), out = [];
+    F.warTo = null; F.here = 'far'; F.origin = { i: p.i, j: p.j }; F.visiting = { key: key, i: p.i, j: p.j, name: p.name, hue: p.hue, adds: hold.adds, adds0: hold.adds, ship: pk, mates: mates, fleetN: mates.length + 1, crew0: packs.length, mood: F.moodWords(p) };
+    const W2 = G.W, sh = landShip(pk, true), out = []; mates.forEach(function (m, k) { landShip(m, true, -(k + 1) * 130); });      /* (its mates come down beside it) */
     // they leave the ship and swim out to where the people of the pond are (most of the way: the meeting is left to both sides)
     const meet = (function () { const sy2 = G.shoreY ? G.shoreY(W2) : sh.y + 70; let x = 0, y = 0, n = 0; W2.cre.forEach(function (c) { if (!c.dead) { x += c.x; y += c.y; n++; } }); if (!n) return { x: sh.x - 140, y: sy2 + 70 }; return { x: sh.x + (x / n - sh.x) * 0.7, y: Math.max(sy2 + 60, sy2 + 60 + (y / n - sy2 - 60) * 0.7) }; })();
     packs.forEach(function (m, k) { const g = G.unpackGenome(m.g); if (!g) return; const c = G.dropCreature(g, sh.x, sh.y); c.guestName = m.name; c.fromPond = 1; c.line = 1; c.crew = 1; c.E = c.ph.Emax; c.inShip = true; c.outAt = W2.t + 3.8 + k * 1.2; c.goTo = { x: meet.x + (k - (packs.length - 1) / 2) * 56, y: meet.y + (k % 2) * 34, until: W2.t + 20 + k }; out.push(c); });
@@ -161,10 +167,10 @@
       const W = G.W, all = W.works; W.works = (all || []).filter(function (w) { return !w.visitor; }); rec.mine = lineN(); rec.gen = W.gen; rec.alive = W.cre.length; rec.at = Date.now(); rec.blob = slim(G.collectWorld()); W.works = all;
       if (!rec.blob) return false; const home = F.homeBlob;
       swap(function () { G.applySave(home); }); F.origin = null; F.here = 'home';
-      (G.W.works || []).forEach(function (w) { if (w.bp && w.bp.type === 'ship' && w.name === V.ship.name) w.away = 1; });      // its place at home stands empty: it is away
+      { const gone = {}; gone[V.ship.name] = 1; (V.mates || []).forEach(function (m) { gone[m.name] = 1; }); (G.W.works || []).forEach(function (w) { if (w.bp && w.bp.type === 'ship' && gone[w.name]) w.away = 1; }); }      // their places at home stand empty: they are away
     } else {
       const blob = G.collectWorld(); if (!blob || !rec.blob) return false; F.homeBlob = blob;
-      swap(function () { G.applySave(rec.blob); }); F.origin = { i: V.i, j: V.j }; F.here = 'far'; if (V.ship) landShip(V.ship, true); G.W.farOf = V.key;
+      swap(function () { G.applySave(rec.blob); }); F.origin = { i: V.i, j: V.j }; F.here = 'far'; if (V.ship) landShip(V.ship, true); (V.mates || []).forEach(function (m, k) { landShip(m, true, -(k + 1) * 130); }); G.W.farOf = V.key;
     }
     G.emit('looked', where, V); if (G.markDirty) G.markDirty();
     return true;

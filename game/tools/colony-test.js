@@ -30,10 +30,11 @@ for (const seed of seeds) {
   // a star left to itself, to compare with
   G.newWorld({ seed }); G.founderPond(); G.mode = 'play'; G.speed = 1; until(() => G.W.gen > gens, 1e6); const freeN = G.W.extinct ? 0 : alive().length;
   // the same star, commanded
-  G.newWorld({ seed }); G.founderPond(); G.mode = 'play'; G.speed = 1; until(() => G.W.gen > 12, 1e6);
+  G.newWorld({ seed }); G.founderPond(); G.mode = 'play'; G.speed = 1; { const c0 = G.colony(G.W); c0.share = {}; c0.auto = false; }      /* (fixed numbers, and nothing built but what is ordered: what is measured here is what a player commands) */ until(() => G.W.gen > 12, 1e6);
   const W = G.W, col = G.colony(W), r = { seed, freeN }; R.push(r);
   const h = G.heartOf(W), sy = G.shoreY(W); r.heart = !!h; r.heartIn = h ? Math.hypot(h.x - W.ww / 2, h.y + h.bp.S * 0.45 - (W.wh / 2 + 30)) : -1;
-  Object.assign(col.want, WANT); const g0 = W.gen; let looks = 0, full = 0; const fitG = [];
+  col.share = {}; col.auto = false; col.raid = null; W.cre = W.cre.filter((c) => c.team !== 1); col.nextRaid = Math.max(col.nextRaid || 0, W.gen + 3); Object.assign(col.want, WANT); const g0 = W.gen;      /* (and no raid in the first moments: while enemies are on the star the ranks fill slowly, which is not what is measured here) */      // (fixed numbers, and nothing built but what is ordered: what is measured here is what a player commands)
+  let looks = 0, full = 0; const fitG = [];
   run(20); r.n0 = G.jobCount(W); r.apt0 = mean(alive().filter((c) => c.job === 'g').map((c) => G.jobFit(c, 'g')));
   // 5. an order to build: somewhere it is allowed
   let spot = G.lotsIn(W, 0, 0, W.ww, W.wh, 'house').filter((q) => q.free)[3] || null;      // (one of the lots)
@@ -63,6 +64,11 @@ for (const seed of seeds) {
       const foes = []; for (let i = 0; i < 6; i++) foes.push(G.foeDrop(big.g, hh.x - 60 + i * 24, hh.y + hh.bp.S * 0.45 + 300, 1)); foes.forEach((c) => { c.E = c.ph.Emax * 0.7; });
       let low = p0, hi = p0; run(90, () => { const hq = G.heartOf(W3); if (hq && !fell) { const n = G.buildCount(hq)[0]; if (n > hi) { hi = n; low = n; }      /* (the Heart may be built up while it stands: what counts is what is knocked off it) */ low = Math.min(low, n); } if (fell) low = 0; }); if (fell) run(30); return { slain, lost, left: foes.filter((c) => !c.dead && !c.gone).length, pieces: hi - low, gone: fell > 0, stock: c3.stock.slice(0, 3).reduce((a, b) => a + b, 0), home: big.ph.home, why, at: foes.map((c) => Math.round(c.x - hh.x) + ',' + Math.round(c.y - G.shoreY(W3))).join(' ') }; };
     const homes = [0, 1].filter((h) => alive().filter((c) => c.ph.home === h).length >= 8); r.raids = homes.map((h) => ({ home: h, def: raidOnce(true, h), undef: raidOnce(false, h) })); }
+  // 11. left to itself, a colony grows itself: it builds for its numbers, and its gatherers and builders are a share of it
+  { G.newWorld({ seed }); G.founderPond(); G.mode = 'play'; G.speed = 1; G.colony(G.W).peace = true; let peak = 0; until(() => { if (G.W.cre.length > peak) peak = G.W.cre.length; return G.W.gen > 46; }, 1e6);
+    const W6 = G.W, c6 = G.colony(W6), by = {}, jc = G.jobCount(W6); (W6.works || []).forEach((w) => { if (w.bp) by[w.bp.type] = (by[w.bp.type] || 0) + 1; });
+    r.self = { extinct: !!W6.extinct, N: jc.all, peak, by, g: jc.g, b: jc.b, wantG: c6.want.g, share: JSON.stringify(c6.share || {}), names: (W6.works || []).map((w) => w.name).join(', ') };
+    console.log('   left to itself for 46 generations: ' + jc.all + ' alive (most at once ' + peak + '), ' + JSON.stringify(by) + ', ' + jc.g + ' gatherers and ' + jc.b + ' builders (shares ' + r.self.share + ')'); }
   // 10. a raid comes of itself
   { G.applySave(JSON.parse(JSON.stringify(savedAll))); G.mode = 'play'; const W4 = G.W, c4 = G.colony(W4), ev = []; ['raid-warn', 'raid-land', 'raid-over', 'raid-gone'].forEach((e) => G.on(e, (q, how) => { if (G.W === W4 || ev.live) ev.push(e + (how && typeof how === 'string' ? ':' + how : '')); }));
     ev.live = 1; W4.cre = W4.cre.filter((c) => c.team !== 1); c4.nextRaid = W4.gen + 1; c4.raid = null; const g0r = W4.gen; until(() => c4.raid && c4.raid.state === 'on', 32 * 4); const rd = c4.raid, said = rd ? rd.n : 0, came = W4.cre.filter((c) => c.team && !c.dead).length + 0, landedGen = rd ? rd.landed - g0r : -1;
@@ -81,6 +87,7 @@ for (const seed of seeds) {
 }
 
 console.log('\nCHECKS over ' + seeds.length + ' stars of ' + gens + ' generations:');
+check(R.every((r) => r.self.extinct || ((r.self.by.house || 0) >= 2 && (r.self.by.huts || 0) >= 1 && (r.self.by.hall || 0) >= 1 && (r.self.by.house || 0) <= Math.ceil(r.self.peak / 9) + 1 && r.self.g >= Math.max(1, Math.round(r.self.N * 0.06)))), '11. left to itself a colony grows itself: ' + R.map((r) => r.self.extinct ? 'extinct' : r.self.N + ' alive, ' + (r.self.by.house || 0) + ' homes, ' + (r.self.by.huts || 0) + ' food gardens, ' + (r.self.by.hall || 0) + ' meeting places, ' + r.self.g + ' gatherers').join(' | ') + ' (homes for its numbers, a garden, a meeting place, gatherers a share of it)');
 check(R.every((r) => r.heart && r.heartIn >= 0 && r.heartIn < 3), '1. the Heart stands in the middle of the star (' + R.map((r) => r.heartIn.toFixed(1) + ' from it').join(', ') + ')');
 check(R.every((r) => r.order.atSlot >= 0.6 && r.order.inGrove >= 0.35 && r.order.matsIn >= 0.9), '1b. order: ' + R.map((r) => Math.round(100 * r.order.atSlot) + '% of fighters, guards and waiting builders stand in their places; ' + Math.round(100 * r.order.inGrove) + '% of the food is in the feeding grounds; ' + Math.round(100 * r.order.matsIn) + '% of the stone and reed lies in its deposit').join(' | ') + ' (at least 60%, 35%, 90%)');
 check(R.every((r) => ['g', 'b', 'f', 'u'].every((k) => r.n0[k] >= WANT[k] - 1 && r.n0[k] <= WANT[k])), '2. trades are filled within 20 s: ' + R.map((r) => ['g', 'b', 'f', 'u'].map((k) => r.n0[k] + '/' + WANT[k]).join(' ')).join('; '));
@@ -92,7 +99,7 @@ const RA = [].concat(...R.map((r) => r.raids)), side = (q) => (q.home ? 'land' :
 { const beaten = mean(RA.map((q) => 6 - q.def.left)); check(RA.length >= R.length && beaten >= 4 && RA.every((q) => q.def.pieces < q.undef.pieces && !q.def.gone), '6. defended, the Heart stands and loses less than undefended, and ' + beaten.toFixed(1) + ' of 6 raiders are beaten on average (at least 4): ' + RA.map((q) => side(q) + ': ' + q.def.slain + ' slain, ' + q.def.left + ' left, ' + q.def.lost + ' of yours lost, ' + q.def.pieces + ' pieces').join('; ')); }
 if (0) check(false, '6. defended: ' + RA.map((q) => side(q) + ': ' + q.def.slain + ' of 6 raiders slain, ' + q.def.left + ' left, ' + q.def.lost + ' of yours lost, ' + q.def.pieces + ' pieces of the Heart').join('; '));
 check(RA.every((q) => q.undef.pieces >= 3), '6. ... undefended: ' + RA.map((q) => side(q) + ': ' + q.undef.pieces + ' pieces lost' + (q.undef.gone ? ' (the Heart fell, ' + q.undef.stock + ' left in the store, ' + q.undef.left + ' raiders still there)' : '')).join('; ') + ' (at least 3)');
-check(RA.every((q) => !q.undef.gone || (q.undef.stock < 12 && q.undef.left === 0)), '6. ... a fallen Heart: the store is plundered and the raiders go home');
+check(RA.every((q) => !q.undef.gone || (q.undef.stock < 20 && q.undef.left === 0)), '6. ... a fallen Heart: the store is plundered and the raiders go home (what is in it half a minute later, brought in since: ' + RA.map((q) => q.undef.stock).join(', ') + ', under 20)');
 check(mean(R.map((r) => r.kids[0])) > mean(R.map((r) => r.kids[1])) * 0.85, '7. work is rewarded: the best gatherers had ' + mean(R.map((r) => r.kids[0])).toFixed(2) + ' children each, the worst ' + mean(R.map((r) => r.kids[1])).toFixed(2));
 check(R.every((r) => r.kept), '8. it is kept through saving (' + R.map((r) => r.keptWhy).join(' | ') + ')');
 check(R.every((r) => !r.extinct && r.n >= r.freeN * 0.45), '9. nature is left alone: ' + R.map((r) => r.n + ' alive against ' + r.freeN + ' left to itself').join(', ') + ' (at least 45%)');

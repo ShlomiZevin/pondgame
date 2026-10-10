@@ -70,7 +70,7 @@
   G.unitTags = function (c, add) {
     if (c.team === 1) add('ENEMY', (c.raid ? 'A raider from another star: it has come for your Heart.' : 'It fights for a rival colony.') + ' Choose your fighters and click it to attack.', 'r');
     else if (c.team === 2) add('of this star', 'One of this star\'s own people: not yours to command, and nobody\'s enemy.');
-    else if (c.job && G.JOBS[c.job]) add(G.JOBS[c.job].name.toLowerCase() + (c.hungry ? ' (feeding)' : ''), G.jobText ? G.jobText(c) + ' Born into the trade, or named to it by you.' : '', 'g');
+    else if (c.job && G.JOBS[c.job]) add(G.JOBS[c.job].name.toLowerCase() + (c.hungry ? ' (feeding)' : ''), G.jobText ? G.jobText(c) + ' Born into the role, or named to it by you.' : '', 'g');
   };
   let last = 0;
   G.addSystem({ name: 'cards', update: function () { if (!cur) return; const T = performance.now(); if (T - last > 300) { last = T; try { if (G.R && G.R.sel) { C.cardClose(); return; } render(); } catch (e) { console.error(e); } } } });

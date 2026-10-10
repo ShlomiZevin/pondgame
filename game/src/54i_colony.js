@@ -18,7 +18,20 @@
   const JOBS = G.JOBS = { g: { name: 'Gatherer', many: 'gatherers', doing: 'gathering', hue: 42 }, b: { name: 'Builder', many: 'builders', doing: 'building', hue: 28 }, f: { name: 'Fighter', many: 'fighters', doing: 'fighting', hue: 350 }, u: { name: 'Guard', many: 'guards', doing: 'standing guard', hue: 205 } };
   const RES = G.RES = ['stone', 'reed', 'shell', 'lumen'];
   /** the colony of a star: what is in its store, how many of each trade are wanted, where the fighters rally, what is waiting to be built */
-  const colony = G.colony = function (W) { W = W || G.W; return W.col || (W.col = { stock: [0, 0, 0, 0], got: [0, 0, 0, 0], want: W.farOf ? { g: 0, b: 0, f: 0, u: 0 } : { g: 4, b: 2, f: 0, u: 0 }, rally: null, queue: [], auto: true, nodes: null }); };      // (a colony organises itself a little from the start: a few gatherers and two builders; the rest is yours to say)
+  const colony = G.colony = function (W) { W = W || G.W; return W.col || (W.col = { stock: [0, 0, 0, 0], got: [0, 0, 0, 0], want: W.farOf ? { g: 0, b: 0, f: 0, u: 0 } : { g: 4, b: 2, f: 0, u: 0 }, share: W.farOf ? {} : { g: 10, b: 5 }, rally: null, queue: [], auto: true, nodes: null }); };      // (a colony organises itself a little from the start: one in ten gathers, one in twenty builds; the rest is yours to say)
+  // ── how many of each trade: a NUMBER, or a SHARE of the colony ──
+  // `col.want[k]` is how many are wanted now. A trade may be set as a share instead (`col.share[k]`, in hundredths of the colony): then its number follows the
+  // colony's size by itself, as the colony grows and shrinks (counted gently, so a spring of births does not send everyone changing trades).
+  function shares(W, col, n) {
+    const S = col.share; if (!S) return; col.nS = col.nS ? col.nS + (n.all - col.nS) * 0.2 : n.all;
+    for (const k in S) { if (typeof S[k] !== 'number' || col.want[k] === undefined) continue; let w = S[k] > 0 ? Math.max(1, Math.round(col.nS * S[k] / 100)) : 0; if (k === 'b' && (col.queue.length || (W.deed && W.deed.ordered))) w = Math.max(w, 3); col.want[k] = w; }
+  }
+  /** is this trade set as a share of the colony? (else as a number) */
+  G.tradeShare = function (job) { const S = colony().share; return S && typeof S[job] === 'number' ? S[job] : null; };
+  /** set a trade as a share (hundredths of the colony) or, with pct null, as the number it stands at now */
+  G.tradeSet = function (job, pct, num) { const W = G.W, col = colony(W), n = G.jobCount(W); col.share = col.share || {}; if (col.want[job] === undefined) return;
+    if (pct === null || pct === undefined) { delete col.share[job]; if (typeof num === 'number') col.want[job] = clamp(Math.round(num), 0, Math.max(0, n.all - 2)); }
+    else { col.share[job] = clamp(Math.round(pct), 0, 60); shares(W, col, n); } if (G.markDirty) G.markDirty(); };
   const mine = function (c) { return !c.team; };      // of your colony (team 1: an enemy; team 2: the people of another star, who are nobody's enemy)
   const hostile = function (c) { return c.team === 1; };
   const shoreOf = function (W) { return G.shoreY ? G.shoreY(W) : W.wh * 0.25; };
@@ -157,7 +170,7 @@
   G.jobCount = function (W) { W = W || G.W; const n = { g: 0, b: 0, f: 0, u: 0, free: 0, all: 0 }; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c)) continue; n.all++; if (c.job && n[c.job] !== undefined) n[c.job]++; else n.free++; } return n; };
   const setJob = G.setJob = function (c, job, pinned) { if (c.job === job) { if (pinned) c.pin = true; return; } c.job = job || ''; c.pin = !!pinned && !!job; c.gj = null; c.hungry = false; if (job !== 'f') c.raze = null; if (c.haul >= 0 && !c.deedId) c.haul = -1; c.foe = null; if (!job) { c.post = null; c.area = null; } c.score = 0; G.emit('job', c, job); };
   function staff(W, col) {
-    const n = G.jobCount(W), keys = ['f', 'u', 'b', 'g']; let room = W.gen < 5 ? 0 : Math.max(0, Math.floor(n.all * 0.6) - 4);      // (no more than six in ten work, and nobody in a star's first years: the rest must live and breed)
+    const n = G.jobCount(W), keys = ['f', 'u', 'b', 'g']; if (!W.farOf && (W.t - (col.shT || -9) > 1 || W.t < (col.shT || 0))) { col.shT = W.t; shares(W, col, n); } let room = W.gen < 5 ? 0 : Math.max(0, Math.floor(n.all * 0.6) - 4);      // (no more than six in ten work, and nobody in a star's first years: the rest must live and breed)
     for (let q = 0; q < keys.length; q++) { const k = keys[q], want = W.farOf ? Math.min(col.want[k] | 0, n.all) : Math.min(col.want[k] | 0, room); room -= want;
       if (n[k] < want && (k === 'f' || k === 'u') && W.t - (col.warT || -99) < 2.5 && W.cre.some(function (o) { return o.team === 1 && !o.dead; })) continue;      // (while enemies are on the star the ranks are made up slowly)
       if (n[k] < want) { if (k === 'f' || k === 'u') col.warT = W.t; let best = null, bs = -1e9; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c) || c.job || c.deedId || c.inShip || (c.stranger !== undefined && !W.farOf) || c.age < 0) continue; const s = APT[k](c) + (c.E / c.ph.Emax) * 0.2; if (s > bs) { bs = s; best = c; } } if (best) { setJob(best, k, false); return; } }
@@ -178,23 +191,33 @@
   });
 
   // ── what is waiting to be built: one thing at a time, by the builders ──
+  // (What each is CALLED is the plainest word for what it does, one that would fit any creature: nobody knows what these are, and "house", "hall", "farm" would say they
+  //  are us. `short` is what its button says; `does` is said in full the moment the pointer is on the button. The keys are what a building IS in the plans.)
   const KINDS = G.BUILDABLE = {
-    house: { name: 'House', what: 'a house for a family', res: { house: true, size: 0.04 }, note: 'Tired ones come home to it and sleep sheltered.' },
-    hall: { name: 'Hall', what: 'a hall to gather in', res: { pull: 0.08, size: 0.075 }, note: 'A place of their own: it draws them together.' },
-    huts: { name: 'Farm', what: 'huts round a store of food', res: { feed: 0.25, size: 0.075 }, note: 'It feeds those who live round it.' },
-    wall: { name: 'Wall', what: 'a ring of posts to live inside', res: { solid: true, size: 0.075 }, note: 'Only your own may pass it.' },
-    tower: { name: 'Tower', what: 'a watchtower that strikes at enemies', res: { pull: 0.22, size: 0.07, tower: true }, cost: [0, 0, 0, 3], note: 'It strikes at any enemy that comes near. Its eye is cut from 3 lumen.' },
-    port: { name: 'Spaceport', what: 'a spaceport, to build a spaceship on', res: { port: true, size: 0.085 }, note: 'The pad a spaceship is built on.' },
-    ship: { name: 'Starship', what: 'a spaceship on the spaceport', res: { ship: true, size: 0.06 }, note: 'It carries a crew to another star. It needs a spaceport.' } };
+    house: { name: 'Home', what: 'a home to rest in', res: { house: true, size: 0.04 }, note: 'Tired ones come back to it and sleep safe.', does: 'HOME: where they rest. Tired ones come back to it and sleep safe.' },
+    hall: { name: 'Meeting place', short: 'Meeting', what: 'a place to come together', res: { pull: 0.08, size: 0.075 }, note: 'A place of their own: it draws them together.', does: 'MEETING PLACE: where they come together. It keeps your colony close round it.' },
+    huts: { name: 'Food garden', short: 'Food', what: 'a garden where food is grown and kept', res: { feed: 0.25, size: 0.075 }, note: 'It feeds those who live round it.', does: 'FOOD GARDEN: food is grown and kept here. It feeds those who live round it.' },
+    wall: { name: 'Wall', what: 'a ring wall to live inside', res: { solid: true, size: 0.075 }, note: 'Only your own may pass it.', does: 'WALL: a ring to live inside. Only your own may pass it.' },
+    tower: { name: 'Tower', what: 'a tower that strikes at enemies', res: { pull: 0.22, size: 0.07, tower: true }, cost: [0, 0, 0, 3], note: 'It strikes at any enemy that comes near. Its eye is cut from 3 lumen.', does: 'TOWER: it strikes at any enemy that comes near, by itself. Costs 3 lumen.' },
+    port: { name: 'Spaceport', what: 'a spaceport, to build a spaceship on', res: { port: true, size: 0.085 }, note: 'The pad a spaceship is built on.', does: 'SPACEPORT: the pad a starship is built on. One to a star.' },
+    ship: { name: 'Starship', what: 'a spaceship on the spaceport', res: { ship: true, size: 0.06 }, note: 'It carries a crew to another star. It needs a spaceport.', does: 'STARSHIP: it carries a crew to another star (4 lumen a flight). It needs a spaceport.' } };
+  G.MAXPORTS = 4;      // (and so four starships: a fleet)
+  const HALF = { house: 62, hall: 107, huts: 100, wall: 115, spire: 54, tower: 56, port: 145 };      // half the width each stands on the star (53_art.js fits its painting to the same)
   /** may this be built there? '' if so, else why not */
   G.buildOk = function (type, x, y) {
     const W = G.W, K = KINDS[type]; if (!W || !K) return 'unknown'; const sy = shoreOf(W), Wk = W.works || [], e = (G.sideEdge ? G.sideEdge(W) : 40) + 70;
-    if (type === 'ship') { const port = Wk.filter(function (w) { return w.bp && w.bp.type === 'port' && !w.fall; })[0]; if (!port) return 'It needs a spaceport first.'; if (Wk.some(function (w) { return w.bp && w.bp.type === 'ship' && !w.visitor; })) return 'There is a ship already.'; return ''; }
-    if (type === 'port') { if (Wk.some(function (w) { return w.bp && w.bp.type === 'port'; })) return 'There is a spaceport already.'; if (!G.FLAT && y > sy - 30) return 'A spaceport stands on the high ground.'; }
+    const colq = colony(W).queue || [], dOrd = W.deed && W.deed.ordered && W.deed.result ? W.deed.result : null, cnt = function (t) { return Wk.filter(function (w) { return w.bp && w.bp.type === t && !w.visitor && !w.enemy && !w.fall; }).length + colq.filter(function (q) { return q.type === t; }).length + (dOrd && dOrd[t] ? 1 : 0); };
+    if (type === 'ship') { const ports = Wk.filter(function (w) { return w.bp && w.bp.type === 'port' && !w.fall && !w.enemy; }).length; if (!ports) return 'It needs a spaceport first.'; if (cnt('ship') >= ports) return 'Every spaceport has its ship. For another ship, build another spaceport.'; return ''; }
+    if (type === 'port') { if (cnt('port') >= G.MAXPORTS) return 'A star holds ' + G.MAXPORTS + ' spaceports at most.'; if (!G.FLAT && y > sy - 30) return 'A spaceport stands on the high ground.'; }
     if (x < e || x > W.ww - e) return 'Too near the edge.';
     if (G.FLAT) { if (y < 150) return 'Too near the edge.'; if (y > W.wh - 60) return 'Too near the edge.'; { const N = colony(W).nodes || []; for (let q = 0; q < N.length; q++) if (Math.abs(N[q].x - x) < 130 && y > N[q].y - 90 && y < N[q].y + 190) return 'Lumen grows there: nothing is built on it.'; } const st = G.siteAt ? G.siteAt(W, x, y - 40, 70) : null; if (st) return 'That is ' + (st.k === 'grove' ? 'a feeding ground' : st.k === 'lumen' ? 'where lumen grows' : 'the ' + st.name.toLowerCase()) + ': nothing is built on it.'; }
     else if (type !== 'port') { if (y > sy) { if (y < sy + 250) return 'Too near the rim: on the low ground, build further down.'; if (y > W.wh - 70) return 'Too near the edge.'; } else { if (y > sy - 46) return 'Too near the rim.'; if (y < 170) return 'Too near the top.'; } }
     { const g = G.onGround ? G.onGround(W, x, y) : null; if (g) return 'That is the ' + g.name.toLowerCase() + ': nothing is built on it.'; }
+    if (G.FLAT) {      // (room for each as wide as it really stands on the star: a spaceport is wide, a tower is not)
+      const half = function (t, w) { return t === 'heart' ? 96 + 20 * ((w && (w.tier | 0)) || 0) : HALF[t === 'spire' && w && w.tower ? 'tower' : t] || 70; }, a = half(type === 'tower' ? 'tower' : type, null);
+      for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.bp || w.bp.type === 'ship') continue; const b = half(w.bp.type, w); if (Math.abs(w.x - x) < (a + b) * 0.92 && Math.abs(w.y + w.bp.S * 0.45 - y) < (a + b) * 0.8) return 'Too near the ' + w.name + '.'; }
+      if (colq.some(function (q) { if (q.type === 'ship') return false; const b = half(q.type === 'tower' ? 'tower' : q.type, null); return Math.abs(q.x - x) < (a + b) * 0.92 && Math.abs(q.y - y) < (a + b) * 0.8; })) return 'Something is already to be built there.';
+      return ''; }
     for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (w.bp && Math.abs(w.x - x) < (w.bp.hw || 60) + 90 && Math.abs(w.y - y) < 150) return 'Too near the ' + w.name + '.'; }
     if ((colony(W).queue || []).some(function (q) { return Math.abs(q.x - x) < 170 && Math.abs(q.y - y) < 150; })) return 'Something is already to be built there.';
     return '';
@@ -208,15 +231,70 @@
   G.buildCancel = function (id) { const col = colony(); const i = col.queue.findIndex(function (q) { return q.id === id; }); if (i >= 0) { const K = KINDS[col.queue[i].type]; if (K && K.cost) for (let q = 0; q < 4; q++) col.stock[q] += K.cost[q] || 0; col.queue.splice(i, 1); G.emit('build-cancelled', id); } };
   function startBuild(W, col) {
     const o = col.queue[0]; if (!o || W.deed || !G.deedStart) return; const B = W.cre.filter(function (c) { return !c.dead && mine(c) && c.job === 'b' && !c.deedId && !c.hungry; }); if (B.length < 2) return;
-    if (o.type === 'ship') { const port = (W.works || []).filter(function (w) { return w.bp && w.bp.type === 'port' && !w.fall; })[0]; if (!port || G.buildCount(port)[0] < G.buildCount(port)[2]) { if (!port) col.queue.shift(); return; } const dk = G.dockOf(port); o.x = dk.x; o.y = dk.y; o.at = { x: dk.x, y: dk.y }; }
+    if (o.type === 'ship') { const Wk = W.works || [], ships = Wk.filter(function (w) { return w.bp && w.bp.type === 'ship' && !w.visitor; }), ports = Wk.filter(function (w) { return w.bp && w.bp.type === 'port' && !w.fall && !w.enemy; });
+      const free = ports.filter(function (pt) { const dk = G.dockOf(pt); return !ships.some(function (s) { return Math.abs(s.x - dk.x) < 80 && Math.abs(s.y + s.bp.S * 0.45 - dk.y) < 110; }); }), port = free.filter(function (pt) { return G.buildCount(pt)[0] >= G.buildCount(pt)[2]; })[0];      /* (a ship is built on a spaceport that stands whole and empty) */
+      if (!port) { if (!ports.length || (!free.length && !ports.some(function (pt) { return G.buildCount(pt)[0] < G.buildCount(pt)[2]; }))) col.queue.shift(); return; } const dk = G.dockOf(port); o.x = dk.x; o.y = dk.y; o.at = { x: dk.x, y: dk.y }; }
     const K = KINDS[o.type], bySp = {}; B.forEach(function (c) { bySp[c.sp] = (bySp[c.sp] || 0) + 1; }); let spId = 0, bn = -1; for (const k in bySp) if (bySp[k] > bn && +k) { bn = bySp[k]; spId = +k; }
     const sp = (spId && G.speciesById(spId)) || W.species.filter(function (s) { return !s.extinct; }).sort(function (a, b) { return b.n - a.n; })[0]; if (!sp) return;
-    const res = Object.assign({ name: o.name, looks: 'ordered by you, raised by your builders', stuff: 'rock', shape: 'circle', size: 0.075, solid: false, feed: 0, slow: 0, hurt: 0, pull: 0, life: 240, type: o.type === 'tower' ? 'spire' : o.type, ordered: true }, K.res);
+    const res = Object.assign({ name: o.name, looks: o.auto ? 'raised by your builders, as the colony itself decided' : 'ordered by you, raised by your builders', stuff: 'rock', shape: 'circle', size: 0.075, solid: false, feed: 0, slow: 0, hurt: 0, pull: 0, life: 240, type: o.type === 'tower' ? 'spire' : o.type, ordered: true }, K.res);
     if (o.at) res.at = o.at; else if (o.type !== 'ship') res.at = { x: o.x, y: o.y };
-    const d = G.deedStart({ kind: sp.name, title: o.name, say: '', what: 'build ' + K.what, why: 'you ordered it', share: 0.5, own: true, steps: [{ do: 'gather', secs: 3, cry: '' }, { do: 'build', secs: 46, cry: '' }], place: { x: o.x / W.ww, y: o.y / W.wh }, result: res });
+    const d = G.deedStart({ kind: sp.name, title: o.name, say: '', what: 'build ' + K.what, why: o.why || 'you ordered it', share: 0.5, own: true, steps: [{ do: 'gather', secs: 3, cry: '' }, { do: 'build', secs: 46, cry: '' }], place: { x: o.x / W.ww, y: o.y / W.wh }, result: res });
     if (!d || d.title !== o.name) return;
-    W.cre.forEach(function (c) { if (c.deedId === d.id) c.deedId = 0; }); B.slice(0, 12).forEach(function (c, j) { c.deedId = d.id; c.deedJ = j; }); d.n0 = Math.min(12, B.length); d.ordered = o.id; col.queue.shift(); G.emit('build-started', o, d);
+    W.cre.forEach(function (c) { if (c.deedId === d.id) c.deedId = 0; }); B.slice(0, 12).forEach(function (c, j) { c.deedId = d.id; c.deedJ = j; }); d.n0 = Math.min(12, B.length); d.ordered = o.id; d.order = o; col.queue.shift(); G.emit('build-started', o, d);
   }
+  // an ordered building whose builders fell away (too few of them, for too long) is not forgotten: it waits its turn again, three times at most
+  G.on('deed-end', function (d, how) { const W = G.W; if (!W || !d || !d.order || how === 'done' || how === 'off') return; const col = colony(W), o = d.order; if ((o.tries | 0) >= 3) { if (G.log && G.mode === 'play') G.log('sel', o.name + ' was given up', 'Three times its builders were too few to raise it.'); return; } o.tries = (o.tries | 0) + 1; col.queue.unshift(o); G.emit('build-ordered', o); });
+  // ── the colony grows by itself ──
+  // Left alone, a colony builds what it is SHORT of for its numbers, as one society and not kind by kind. It counts itself and what stands, and orders the thing it
+  // lacks most (its builders then raise it, exactly as if you had ordered it; you may cancel it, or order anything yourself):
+  //     a HOME           for every nine or so of them
+  //     a FOOD GARDEN    for every thirty mouths, and one more while they go hungry
+  //     a MEETING PLACE  once there are eighteen of them, another for every sixty
+  //     a TOWER          once raiders have come: more, the more often they come (3 lumen each, from the store), set to the north, where raiders land
+  //     a WALL           once the Heart has fallen, or raiders have come three times
+  //     a SPACEPORT      once the colony has grown and there are thirty of them; then a STARSHIP on it
+  // Homes close in round the Heart, a garden goes toward a feeding ground, towers toward where the danger comes from: so the place makes sense to look at.
+  // (Hands enough for its numbers: gatherers and builders are a SHARE of the colony from the start, so they grow with it; see `shares` above.)
+  // The switch is `col.auto` (the box "it grows by itself" in the colony panel); off, nothing is built but what you order.
+  const standing = function (W, col, type) { let n = 0; const Wk = W.works || []; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.bp || w.enemy || w.fall || w.visitor) continue; if ((w.tower ? 'tower' : w.bp.type) === type) n++; }
+    n += col.queue.filter(function (q) { return q.type === type; }).length; const d = W.deed, r = d && d.ordered ? d.result : null; if (r && (r.tower ? 'tower' : r.port ? 'port' : r.ship ? 'ship' : r.house ? 'house' : r.type) === type) n++; return n; };
+  /** what your colony on this star needs for its numbers, and has: { N, fed, threat, list: [{ t, need, have, why }] } */
+  G.colonyNeeds = function (W) {
+    W = W || G.W; const col = colony(W); let N = 0, e = 0; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c)) continue; N++; e += c.E / c.ph.Emax; }
+    const fed = N ? e / N : 1, raids = col.raidN | 0, threat = raids > 0 || !!col.raid || (col.fell | 0) > 0, port = (W.works || []).filter(function (w) { return w.bp && w.bp.type === 'port' && !w.fall && !w.enemy; })[0], portWhole = !!port && G.buildCount(port)[0] >= G.buildCount(port)[2];
+    const L = [
+      { t: 'house', need: Math.min(18, Math.ceil(N / 9)), why: 'there are more of them than there are homes' },
+      { t: 'huts', need: N >= 14 ? Math.min(6, Math.ceil(N / 30) + (fed < 0.45 ? 1 : 0)) : 0, why: fed < 0.45 ? 'they are going hungry' : 'there are more mouths than the gardens feed' },
+      { t: 'hall', need: N >= 18 ? Math.min(3, Math.ceil(N / 60)) : 0, why: 'there are too many of them to have nowhere to come together' },
+      { t: 'tower', need: threat ? Math.min(4, 1 + Math.floor(raids / 2)) : 0, why: 'raiders have come, and will come again' },
+      { t: 'wall', need: (col.fell | 0) > 0 || raids >= 3 ? 1 : 0, why: 'the Heart has been struck at' },
+      { t: 'port', need: (col.tier | 0) >= 1 && W.gen >= 16 && N >= 30 ? 1 : 0, why: 'they have seen the lights of other stars, far off in space' },
+      { t: 'ship', need: portWhole ? 1 : 0, why: 'their spaceport stands ready' }];
+    L.forEach(function (q) { q.have = standing(W, col, q.t); });
+    return { N: N, fed: fed, threat: threat, list: L };
+  };
+  /** is it the colony (and not each kind for itself) that decides what is built on this star? */
+  G.colonyPlans = function (W) { W = W || G.W; return !!(G.FLAT && W && W.col && G.heartOf(W)); };
+  function placeFor(W, col, t, k) {
+    if (t === 'ship') return { x: 0, y: 0 }; const H = G.heartOf(W); if (!H || !G.lotPick) return null; const hx = H.x, hy = H.y + H.bp.S * 0.45; let tx = hx, ty = hy + 130;
+    if (t === 'huts') { const S = (G.sitesOf ? G.sitesOf(W) : []).filter(function (s) { return s.k === 'grove'; }).sort(function (a, b) { return Math.hypot(a.x - hx, a.y - hy) - Math.hypot(b.x - hx, b.y - hy); }), g = S.length ? S[k % S.length] : null; if (g) { tx = hx + (g.x - hx) * 0.55; ty = hy + (g.y - hy) * 0.55; } }
+    else if (t === 'tower') { tx = hx + (k % 2 ? 1 : -1) * (240 + 70 * Math.floor(k / 2)); ty = hy - 190; }
+    else if (t === 'hall') { tx = hx + (k % 2 ? -1 : 1) * 80; ty = hy + 250; }
+    else if (t === 'wall') { tx = hx; ty = hy - 280; }
+    else if (t === 'port') { tx = hx + (H.x < W.ww / 2 ? 1 : -1) * 560; ty = hy - 140; }
+    const p = G.lotPick(W, tx, ty, t); return p ? { x: p.x, y: p.y } : null;
+  }
+  let planT = 0;
+  function planGrowth(W, col, dt) {
+    planT += dt; if (planT < 14) return; planT = 0;
+    if (col.auto === false || !G.colonyPlans(W) || W.gen < 10 || G.mode === 'title') return; const h = G.heartOf(W); if (!h || h.ruin) return;
+    const nd = G.colonyNeeds(W), N = nd.N;
+    if (col.queue.length || W.deed || (W.works || []).length >= 40 || N < 9) return;
+    const L = nd.list.filter(function (q) { return q.need > q.have; }).sort(function (a, b) { return (b.need - b.have) / b.need - (a.need - a.have) / a.need; });      // (what it is shortest of comes first; equal, in the order above)
+    for (let i = 0; i < L.length; i++) { const q = L[i], at = placeFor(W, col, q.t, q.have); if (!at) continue; const o = G.buildOrder(q.t, at.x, at.y); if (!o || o.error) continue;
+      o.auto = true; o.why = q.why; G.emit('colony-plans', o, q); if (G.log) G.log('disc', 'The colony decided: ' + o.name, 'Why: ' + q.why + '. Its builders will raise it.'); return; }
+  }
+
   // an ordered building is the builders' work, whoever they are: nobody else is called in to make up the numbers
   { const s0 = G.step; G.step = function (dt) { s0(dt); const W = G.W; if (!W || W.title) return; const d = W.deed; if (d && d.ordered) { let n = 0; const used = {};
         for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.deedId !== d.id || c.dead) continue; if (c.job !== 'b' || c.team) { c.deedId = 0; c.bj = null; if (c.haul >= 0) c.haul = -1; continue; } n++; used[c.deedJ] = 1; }
@@ -227,7 +305,7 @@
   let acc = 0;
   { const s1 = G.step; G.step = function (dt) { s1(dt); const W = G.W; if (!W || W.title || W.extinct) return; const col = colony(W);
       if (!W.farOf || (G.starHeld && G.starHeld(W))) G.ensureHeart(W);
-      acc += dt; if (acc >= 1.2) { acc = 0; for (let q = 0; q < 6; q++) staff(W, col); startBuild(W, col); mend(W, col); grow(W, col); const h = G.heartOf(W); if (h) { h.x = clamp(h.x, 200, W.ww - 200); h.y = heartY(W, h.bp.S); } }
+      acc += dt; if (acc >= 1.2) { acc = 0; for (let q = 0; q < 6; q++) staff(W, col); planGrowth(W, col, 1.2); startBuild(W, col); mend(W, col); grow(W, col); const h = G.heartOf(W); if (h) { h.x = clamp(h.x, 200, W.ww - 200); h.y = heartY(W, h.bp.S); } }
       let foes = null, yours = null, gone = false, anyFoe = false; towers(W, dt); for (let i = 0; i < W.cre.length; i++) if (W.cre[i].team === 1 && !W.cre[i].dead) { anyFoe = true; break; }
       const theirs = G.foeHeart ? G.foeHeart(W) : null;
       for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue; if (c.cool2 > 0) c.cool2 -= dt;

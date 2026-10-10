@@ -45,7 +45,7 @@
   C.boxBtn = function () { return C.rightChooses ? 2 : 0; };
   C.set = function (list, add) { acted(); const s = add ? C.sel.filter(mine) : []; (list || []).forEach(function (c) { if (mine(c) && s.indexOf(c) < 0) s.push(c); }); C.sel = s; sig = ''; };
   C.clear = function () { C.sel = []; C.pick = false; sig = ''; };
-  C.all = function (job) { const W = G.W; if (!W) return; C.set(W.cre.filter(function (c) { return mine(c) && (job === '' ? !c.job : c.job === job); })); G.select(null); if (G.selectThing) G.selectThing(null); if (C.cardClose) C.cardClose(); if (!C.sel.length) say('Nobody has that trade yet. Press + to ask for some.'); };
+  C.all = function (job) { const W = G.W; if (!W) return; C.set(W.cre.filter(function (c) { return mine(c) && (job === '' ? !c.job : c.job === job); })); G.select(null); if (G.selectThing) G.selectThing(null); if (C.cardClose) C.cardClose(); if (!C.sel.length) say('Nobody has that role yet. Press + to ask for some.'); };
   C.escape = function () { if (C.placing) { C.placing = null; sig = ''; return true; } if (C.pick) { C.pick = false; sig = ''; return true; } if (C.cardClose && C.cardClose()) return true; if (C.sel.length) { C.clear(); return true; } return false; };
   G.on('box-select', function (b, add) {
     if (!live()) return; const W = G.W, got = [];
@@ -100,7 +100,7 @@
   // with the buttons swapped back: a click that chose one creature chooses it for orders too
   G.on('pond-click', function (c) { if (!live() || G.isBlocked() || C.rightChooses) return; const s = G.R.sel; if (s && mine(s)) C.set([s], c.shift); else if (!c.shift) C.clear(); });
   C.job = function (job) { C.sel = C.sel.filter(mine); if (!C.sel.length) return; G.assign(C.sel, job); say(C.sel.length === 1 ? 'It is ' + (job ? 'a ' + JOBS[job].name.toLowerCase() : 'free') + ' now.' : 'All ' + C.sel.length + ' are ' + (job ? JOBS[job].many : 'free') + ' now.' + (job ? ' Their children will be too.' : ''), 5); sig = ''; };
-  C.want = function (job, d) { const W = G.W; if (!W) return; acted(); const col = G.colony(W), n = G.jobCount(W); col.want[job] = G.clamp((col.want[job] | 0) + d, 0, Math.max(0, n.all - 2)); if (d < 0) W.cre.forEach(function (c) { if (c.job === job) c.pin = false; }); sig = ''; if (G.markDirty) G.markDirty(); };
+  C.want = function (job, d) { const W = G.W; if (!W) return; acted(); const col = G.colony(W), n = G.jobCount(W); { const sh = G.tradeShare ? G.tradeShare(job) : null; if (sh !== null) G.tradeSet(job, sh + d); else col.want[job] = G.clamp((col.want[job] | 0) + d, 0, Math.max(0, n.all - 2)); }      /* (a share goes up and down by hundredths of the colony; a number by ones) */ if (d < 0) W.cre.forEach(function (c) { if (c.job === job) c.pin = false; }); sig = ''; if (G.markDirty) G.markDirty(); };
   C.build = function (type) {
     const K = G.BUILDABLE[type]; if (!K || !live()) return; acted();
     if (type === 'ship') { const r = G.buildOrder('ship', 0, 0); say(r && r.error ? r.error : 'A starship is ordered. Your builders will raise it on the spaceport.', 6); sig = ''; return; }
@@ -117,7 +117,7 @@
     '#cmdStar{height:62px;overflow:hidden;margin-top:6px}#cmdMap{display:block;width:230px;height:104px;margin-top:6px;border-radius:9px;border:1px solid rgba(207,232,255,.22);cursor:pointer;background:#0b1622}' +
     '#cmd .csec{margin:8px 0 3px;height:13px;font:700 10px system-ui;letter-spacing:.16em;color:rgba(207,232,255,.6);display:flex;justify-content:space-between;align-items:center}#cmd .csec small{font:600 9.5px system-ui;letter-spacing:.04em;text-transform:none;color:rgba(207,232,255,.5)}' +
     '#cmd .crow{display:flex;align-items:center;gap:6px;height:26px;border-radius:8px;padding:0 4px}#cmd .crow:hover{background:rgba(207,232,255,.07)}' +
-    '#cmd .crow .nm{flex:1;font-weight:700;cursor:pointer;white-space:nowrap}#cmd .crow .nm:hover{text-decoration:underline}#cmd .crow .cn{width:28px;text-align:right;font-weight:800;font-size:13px;font-variant-numeric:tabular-nums}#cmd .crow .cw{width:24px;text-align:center;color:rgba(207,232,255,.75);font-weight:700;font-variant-numeric:tabular-nums}#cmd .crow .cn.low{color:#ffb86b}' +
+    '#cmd .crow .nm{flex:1;font-weight:700;cursor:pointer;white-space:nowrap}#cmd .crow .nm:hover{text-decoration:underline}#cmd .crow .cn{width:28px;text-align:right;font-weight:800;font-size:13px;font-variant-numeric:tabular-nums}#cmd .crow .cw{width:32px;text-align:center;color:rgba(207,232,255,.85);font-weight:700;font-variant-numeric:tabular-nums;cursor:pointer;border-radius:6px;line-height:20px;border:1px dashed rgba(207,232,255,.22)}#cmd .crow .cw:hover{border-color:#33d6a6}#cmd .crow .cw.pct{color:#9dffcf;border-color:rgba(157,255,207,.45)}#cmd .crow{gap:5px}#cmd .crow .cn.low{color:#ffb86b}' +
     '#cmd .crow button{appearance:none;width:23px;height:23px;border-radius:7px;border:1px solid rgba(207,232,255,.28);background:rgba(7,18,31,.5);color:#e8f4ff;font:800 14px system-ui;line-height:1;cursor:pointer;padding:0;flex:none}#cmd .crow button:hover{border-color:#33d6a6;box-shadow:inset 0 0 10px rgba(51,214,166,.35)}' +
     '#cmd .cgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}#cmd .cgrid button{appearance:none;height:54px;border:1px solid rgba(207,232,255,.24);background:rgba(7,18,31,.45);border-radius:9px;padding:2px 0 3px;cursor:pointer;color:#dcecf8;font:700 9.5px system-ui;letter-spacing:.03em;display:flex;flex-direction:column;align-items:center;gap:0;min-width:0;overflow:hidden}' +
     '#cmd .cgrid button img{width:36px;height:36px;display:block}#cmd .cgrid button:hover{border-color:#33d6a6;box-shadow:inset 0 0 12px rgba(51,214,166,.3)}#cmd .cgrid button.on{border-color:#f6d365;box-shadow:inset 0 0 14px rgba(246,211,101,.4)}#cmd .cgrid button.no{opacity:.42}' +
@@ -143,7 +143,7 @@
   G.on('new-pond', function () { for (const k in PICS) delete PICS[k]; }); G.on('art', function () { for (const k in PICS) delete PICS[k]; });
   const TIPS = { g: 'Gatherers fetch what lies about the star (stone, reed, shell) and lumen, and carry it to the Heart. Click the name to choose them all.', b: 'Builders raise what you order built, from the store and from what lies near; with nothing to build they wait in their yard. Click the name to choose them all.', f: 'Fighters stand in ranks on the muster ground, go for any enemy in sight, and attack what you send them against. Click the name to choose them all.', u: 'Guards stand at the post you give them and do not leave it. Click the name to choose them all.' };
   const mouseWords = function () { return C.rightChooses ? 'Right button: choose (click or drag). Left click: send them. Left-drag or W A S D: move the view.' : 'Left button: choose (click or drag). Right click: send them. Right-drag or W A S D: move the view.'; };
-  let ui = null, fitKey = '';
+  let ui = null, fitKey = '', hoverB = '';
   function build() {
     if (ui) return ui; const root = $('ui') || document.body;
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
@@ -153,29 +153,35 @@
     root.appendChild(res); res.addEventListener('click', function (e) { const r = e.target.closest ? e.target.closest('[data-res]') : null; if (r && C.cardOpen) C.cardOpen({ k: 'res', res: +r.dataset.res }); });
     const cmd = document.createElement('div'); cmd.id = 'cmd'; cmd.className = 'glass' + (folded ? ' fold' : '');
     cmd.innerHTML = '<div class="ch" id="cmdHead" title="Fold or unfold"><b id="cmdTitle">YOUR COLONY</b><small id="cmdStage" title="How far your colony has come: founded, growing, thriving, great. It grows as you build."></small><span id="cmdFoldMark">' + (folded ? '+' : '–') + '</span></div><div class="cb"><div id="cmdStar"></div><canvas id="cmdMap" width="460" height="208" title="The whole star. Yours are blue, enemies red. Click to go there."></canvas>' +
-      '<div class="csec"><span>TRADES</span><small>have · want</small></div>' +
-      ORDER.map(function (k) { return '<div class="crow" data-job="' + k + '" title="' + esc(TIPS[k]) + '">' + svg(k) + '<span class="nm" data-all="' + k + '">' + JOBS[k].name + 's</span><span class="cn" id="cn' + k + '">0</span><button data-want="' + k + '" data-d="-1" aria-label="fewer ' + JOBS[k].many + '">−</button><span class="cw" id="cw' + k + '">0</span><button data-want="' + k + '" data-d="1" aria-label="more ' + JOBS[k].many + '">+</button></div>'; }).join('') +
-      '<div class="crow" title="Those with no trade: they live by their own brains, as all of them used to.">' + svg('', '#9fb6c6') + '<span class="nm" data-all="">Free</span><span class="cn" id="cnfree">0</span><span style="width:82px;font-size:10px;color:rgba(207,232,255,.5);text-align:right;flex:none">no orders</span></div>' +
-      '<div class="csec"><span>BUILD</span><label title="When it is on, the kinds of your star also build what they themselves decide on, as they always did."><input type="checkbox" id="cmdAuto">they build too</label></div>' +
-      '<div class="cgrid">' + BUILD.map(function (t) { return '<button data-build="' + t + '" title="' + esc(G.BUILDABLE[t].name + ': ' + G.BUILDABLE[t].note) + '"><img alt="" data-pic="' + t + '"><span>' + esc(G.BUILDABLE[t].name) + '</span></button>'; }).join('') + '</div><button id="cmdPick" title="For a screen with no second button: press, then touch one of yours to choose it">Choose by touch</button>' +
+      '<div class="csec"><span>ROLES</span><small title="Click a wanted number to switch that role between a fixed number and a share of your colony (%).">have · want (# or %)</small></div>' +
+      ORDER.map(function (k) { return '<div class="crow" data-job="' + k + '" title="' + esc(TIPS[k]) + '">' + svg(k) + '<span class="nm" data-all="' + k + '">' + JOBS[k].name + 's</span><span class="cn" id="cn' + k + '">0</span><button data-want="' + k + '" data-d="-1" aria-label="fewer ' + JOBS[k].many + '">−</button><span class="cw" id="cw' + k + '" data-mode="' + k + '">0</span><button data-want="' + k + '" data-d="1" aria-label="more ' + JOBS[k].many + '">+</button></div>'; }).join('') +
+      '<div class="crow" title="Those with no role: they live by their own brains, as all of them used to.">' + svg('', '#9fb6c6') + '<span class="nm" data-all="">Free</span><span class="cn" id="cnfree">0</span><span style="width:82px;font-size:10px;color:rgba(207,232,255,.5);text-align:right;flex:none">no orders</span></div>' +
+      '<div class="csec"><span>BUILD</span><label title="When it is on, your colony grows by itself: it builds what it is short of for its numbers (homes, food, a meeting place, towers once raiders come, a spaceport) and keeps enough gatherers and builders. You can still order anything, and cancel what it plans."><input type="checkbox" id="cmdAuto">it grows by itself</label></div>' +
+      '<div class="cgrid">' + BUILD.map(function (t) { return '<button data-build="' + t + '" title="' + esc(G.BUILDABLE[t].name + ': ' + G.BUILDABLE[t].note) + '"><img alt="" data-pic="' + t + '"><span>' + esc(G.BUILDABLE[t].short || G.BUILDABLE[t].name) + '</span></button>'; }).join('') + '</div><button id="cmdPick" title="For a screen with no second button: press, then touch one of yours to choose it">Choose by touch</button>' +
       '<div class="cq" id="cmdQ"></div><div class="ctip dim" id="cmdTip"></div><div class="ckeys"><span id="cmdKeys"></span> <a id="cmdSwap" title="Swap what the two mouse buttons do">swap</a></div></div>';
     root.appendChild(cmd);
     cmd.addEventListener('click', function (e) {
-      const t = e.target, b = t.closest ? t.closest('[data-want],[data-all],[data-build],[data-cancel],[data-found],[data-seeheart],#cmdHead,#cmdSwap,#cmdPick,#cmdMap') : null; if (!b) return;
+      const t = e.target, b = t.closest ? t.closest('[data-want],[data-mode],[data-all],[data-build],[data-cancel],[data-found],[data-seeheart],#cmdHead,#cmdSwap,#cmdPick,#cmdMap') : null; if (!b) return;
       if (b.id === 'cmdMap') { mapGo(e); return; }
       if (b.id === 'cmdSwap') { C.rightChooses = !C.rightChooses; try { localStorage.setItem('primordia.mouse', C.rightChooses ? 'R' : 'L'); } catch (e2) { /* not kept */ } say('Swapped. ' + mouseWords(), 8); sig = ''; return; }
       if (b.id === 'cmdPick') { C.pick = !C.pick; C.placing = null; say(C.pick ? 'Now touch one of yours on the star to choose it.' : '', 6); sig = ''; return; }
       if (b.dataset.found) { const why = G.foundOutpost(); if (why) say(why, 6); sig = ''; return; }
       if (b.dataset.seeheart) { const h = G.foeHeart(G.W); if (h) { G.select(null); G.focusOn(h.x, h.y, 1.4); } return; }
       if (b.id === 'cmdHead') { folded = !folded; cmd.classList.toggle('fold', folded); $('cmdFoldMark').textContent = folded ? '+' : '–'; try { localStorage.setItem('primordia.cmdFold', folded ? '1' : '0'); } catch (e2) { /* not kept */ } sig = ''; return; }
+      if (b.dataset.mode !== undefined) { const k = b.dataset.mode, sh = G.tradeShare(k), col = G.colony(), nAll = Math.max(1, G.jobCount().all); acted();
+        if (sh === null) { G.tradeSet(k, Math.max(col.want[k] ? 1 : 0, Math.round((col.want[k] | 0) / nAll * 100))); say(JOBS[k].name + 's are now a SHARE of your colony (' + G.tradeShare(k) + '%): their number grows and shrinks with it. + and - change the share.', 8); }
+        else { G.tradeSet(k, null, col.want[k] | 0); say(JOBS[k].name + 's are now a fixed NUMBER (' + (col.want[k] | 0) + '), whatever the size of your colony. + and - change the number.', 8); } sig = ''; return; }
       if (b.dataset.want !== undefined) C.want(b.dataset.want, (+b.dataset.d) * (e.shiftKey ? 5 : 1));
       else if (b.dataset.all !== undefined) C.all(b.dataset.all);
       else if (b.dataset.build) C.build(b.dataset.build);
       else if (b.dataset.cancel) { G.buildCancel(+b.dataset.cancel); sig = ''; }
     });
-    cmd.addEventListener('change', function (e) { if (e.target && e.target.id === 'cmdAuto') { G.colony().auto = !!e.target.checked; say(e.target.checked ? 'The kinds of your star build what they decide on too.' : 'Nothing is built now but what you order.', 5); if (G.markDirty) G.markDirty(); } });
+    // what a thing to build DOES is said in the panel the moment the pointer is on its button (and for as long as it stays there)
+    cmd.addEventListener('mouseover', function (e) { const b = e.target.closest ? e.target.closest('[data-build]') : null, K = b ? G.BUILDABLE[b.dataset.build] : null; if (K && K.does && hoverB !== b.dataset.build) { hoverB = b.dataset.build; say(K.does, 600); } });
+    cmd.addEventListener('mouseout', function (e) { const b = e.target.closest ? e.target.closest('[data-build]') : null; if (b && hoverB && !(e.relatedTarget && b.contains(e.relatedTarget))) { hoverB = ''; if (tipUntil - now() > 20000) say('', 0.01); } });
+    cmd.addEventListener('change', function (e) { if (e.target && e.target.id === 'cmdAuto') { G.colony().auto = !!e.target.checked; say(e.target.checked ? 'Your colony grows by itself now: it builds what it is short of for its numbers. You can still order anything.' : 'Nothing is built now but what you order.', 6); if (G.markDirty) G.markDirty(); } });
     const sel = document.createElement('div'); sel.id = 'selbar'; sel.className = 'glass hide';
-    sel.innerHTML = '<div class="s1"><b id="selN"></b><span class="what" id="selWhat"></span>' + ORDER.map(function (k) { return '<button data-job="' + k + '" title="' + esc(TIPS[k]) + '">' + svg(k) + JOBS[k].name.toUpperCase() + '</button>'; }).join('') + '<button data-job="" title="No trade: it lives by its own brain">FREE</button><button class="x" id="selX" title="Let them go (Esc, or right-click on bare ground)">✕</button></div><div class="s2" id="selHint"></div>';
+    sel.innerHTML = '<div class="s1"><b id="selN"></b><span class="what" id="selWhat"></span>' + ORDER.map(function (k) { return '<button data-job="' + k + '" title="' + esc(TIPS[k]) + '">' + svg(k) + JOBS[k].name.toUpperCase() + '</button>'; }).join('') + '<button data-job="" title="No role: it lives by its own brain">FREE</button><button class="x" id="selX" title="Let them go (Esc, or right-click on bare ground)">✕</button></div><div class="s2" id="selHint"></div>';
     root.appendChild(sel);
     sel.addEventListener('click', function (e) { const b = e.target.closest ? e.target.closest('button') : null; if (!b) return; if (b.id === 'selX') { C.clear(); G.select(null); } else if (b.dataset.job !== undefined) C.job(b.dataset.job); });
     return (ui = { res: res, cmd: cmd, sel: sel });
@@ -207,7 +213,7 @@
     if (r && r.state === 'warn' && n.f + n.u < Math.max(3, r.n - 2)) return 'NEXT: a raid of about ' + r.n + ' lands next spring. Press + next to Fighters until you have ' + Math.max(3, r.n - 1) + ' or more.';
     if (n.g < 3) return 'NEXT: press + next to Gatherers. They fill the store, and the store is what everything is built from.';
     if (n.b < 2) return 'NEXT: press + next to Builders (two at least). Then pick something under BUILD and click a lot for it.';
-    if (!Wk.some(function (w) { return w.bp && w.bp.type !== 'heart' && !w.visitor; }) && !col.queue.length && !(W.deed && W.deed.ordered)) return 'NEXT: order a House: click House under BUILD, then click one of the lots marked on the star.';
+    if (!Wk.some(function (w) { return w.bp && w.bp.type !== 'heart' && !w.visitor; }) && !col.queue.length && !(W.deed && W.deed.ordered)) return 'NEXT: order a Home: click Home under BUILD, then click one of the lots marked on the star.';
     if (n.f + n.u < 4) return 'NEXT: rival stars will raid you' + (col.nextRaid ? ' (about year ' + (col.nextRaid + 1) + ')' : '') + '. Press + next to Fighters: four or more. They form up on the muster ground.';
     if (!tower && col.stock[3] < 3) return 'NEXT: lumen. Choose some gatherers (click the word Gatherers) and click a crystal (LUMEN on the star). 3 lumen builds a Tower.';
     if (!tower && !col.queue.some(function (q) { return q.type === 'tower'; })) return 'NEXT: build a Tower near the Heart (3 lumen). It strikes at raiders by itself.';
@@ -229,19 +235,20 @@
     C.sel = C.sel.filter(mine); if (!folded) drawMap();
     const col = G.colony(W), n = G.jobCount(W), hp = G.heartOf(W), hc = hp ? G.buildCount(hp) : [0, 0, 1];
     const selSig = C.sel.length + ':' + C.sel.map(function (c) { return c.job || '-'; }).join('');
-    const s = [col.stock.join(','), JSON.stringify(n), JSON.stringify(col.want), col.queue.map(function (q) { return q.id; }).join('.'), W.deed && W.deed.ordered ? W.deed.title + (W.deed.wait || '') + (W.deed.placed || 0) : '', C.placing, C.pick, C.rightChooses, selSig, tip && now() < tipUntil ? tip : '', col.auto, folded, hc.join('/'), col.tier | 0, col.raid ? col.raid.state + col.raid.id : '', (W.works || []).length, G.starsHeld ? G.starsHeld().length : 0, G.starPanel ? G.starPanel(W) : ''].join('|');
+    const s = [col.stock.join(','), JSON.stringify(n), JSON.stringify(col.want), JSON.stringify(col.share || 0), col.queue.map(function (q) { return q.id; }).join('.'), W.deed && W.deed.ordered ? W.deed.title + (W.deed.wait || '') + (W.deed.placed || 0) : '', C.placing, C.pick, C.rightChooses, selSig, tip && now() < tipUntil ? tip : '', col.auto, folded, hc.join('/'), col.tier | 0, col.raid ? col.raid.state + col.raid.id : '', (W.works || []).length, G.starsHeld ? G.starsHeld().length : 0, G.starPanel ? G.starPanel(W) : ''].join('|');
     if (s === sig) return; sig = s;
     for (let k = 0; k < 4; k++) { const e = $('res' + k); e.querySelector('b').textContent = col.stock[k]; }
     { const sh = G.starPanel ? G.starPanel(W) : '', se = $('cmdStar'); if (se._h !== sh) { se._h = sh; se.innerHTML = sh; } }
     $('resPop').querySelector('b').textContent = n.all; $('resPop').title = n.all + ' live on your star: ' + (n.all - n.free) + ' work, ' + n.free + ' are free.';
     { const w = $('resRaid'), r = col.raid; w.style.display = r && r.state === 'warn' ? '' : 'none'; if (r && r.state === 'warn') { w.querySelector('small').textContent = 'raid next spring: ~' + r.n; w.title = G.raidText(W) + '.'; } }
-    ORDER.forEach(function (k) { const a = $('cn' + k); a.textContent = n[k]; a.classList.toggle('low', n[k] < (col.want[k] | 0)); $('cw' + k).textContent = col.want[k] | 0; });
+    ORDER.forEach(function (k) { const a = $('cn' + k); a.textContent = n[k]; a.classList.toggle('low', n[k] < (col.want[k] | 0)); const sh = G.tradeShare ? G.tradeShare(k) : null, w = $('cw' + k); w.textContent = sh !== null ? sh + '%' : (col.want[k] | 0); w.classList.toggle('pct', sh !== null);
+      w.title = sh !== null ? sh + ' in every hundred of your colony: ' + (col.want[k] | 0) + ' now. It grows and shrinks with the colony. Click to set a fixed number instead.' : 'A fixed number: ' + (col.want[k] | 0) + '. Click to set a share of your colony (%) instead, so it grows with the colony.'; });
     { const tn = G.TIERS && !W.farOf ? G.TIERS[col.tier | 0] : '', e = $('cmdStage'); if (e && e.textContent !== tn) e.textContent = tn; }
     $('cnfree').textContent = n.free; $('cmdAuto').checked = col.auto !== false; $('cmdKeys').textContent = mouseWords(); $('cmdPick').classList.toggle('on', C.pick);
     const imgs = ui.cmd.querySelectorAll('img[data-pic]'); for (let i = 0; i < imgs.length; i++) { const u = pic(imgs[i].dataset.pic); if (u && imgs[i].getAttribute('src') !== u) imgs[i].src = u; }
     const bs = ui.cmd.querySelectorAll('[data-build]'); for (let i = 0; i < bs.length; i++) { const t = bs[i].dataset.build, K = G.BUILDABLE[t]; bs[i].classList.toggle('on', C.placing === t); bs[i].classList.toggle('no', !!(K.cost && K.cost.some(function (v, q) { return v > col.stock[q]; })) || (t === 'ship' && !!G.buildOk('ship', 0, 0))); }
     { const d = W.deed && W.deed.ordered ? W.deed : null, rows = []; if (d) { const c = d.bp ? G.buildCount(d) : null; rows.push('<div><span><b>' + esc(d.title) + '</b> ' + (c ? c[0] + ' of ' + c[2] + ' pieces' : 'being laid out') + (d.wait ? ' · waiting for ' + esc(d.wait) : '') + '</span></div>'); }
-      col.queue.slice(0, d ? 1 : 2).forEach(function (q, i) { rows.push('<div><span>' + esc(q.name) + ' · ' + (n.b < 2 ? 'needs 2 builders' : !d && i === 0 && W.deed ? 'after the ' + esc(W.deed.title || 'plan') : 'waiting') + '</span><a data-cancel="' + q.id + '" title="Do not build it">✕</a></div>'); });
+      col.queue.slice(0, d ? 1 : 2).forEach(function (q, i) { rows.push('<div><span>' + esc(q.name) + (q.auto ? ' (their plan)' : '') + ' · ' + (n.b < 2 ? 'needs 2 builders' : !d && i === 0 && W.deed ? 'after the ' + esc(W.deed.title || 'plan') : 'waiting') + '</span><a data-cancel="' + q.id + '" title="Do not build it">✕</a></div>'); });
       if (col.queue.length > (d ? 1 : 2)) rows[rows.length - 1] = rows[rows.length - 1].replace('</span>', ' (+' + (col.queue.length - (d ? 1 : 2)) + ' more)</span>');
       $('cmdQ').innerHTML = rows.join(''); }
     { const t = $('cmdTip'), live2 = tip && now() < tipUntil; const gl = !live2 && !C.placing ? goal(W, col, n) : ''; t.textContent = live2 ? tip : C.placing ? 'Click a lot for the ' + G.BUILDABLE[C.placing].name + '. Right-click to let it be.' : gl || mouseWords(); t.classList.toggle('dim', !live2 && !C.placing && !gl); t.classList.toggle('goal', !!gl); }
@@ -274,7 +281,7 @@
   // the first time a colony is shown: how the mouse works
   let told = false; try { told = localStorage.getItem('primordia.cmdTold3') === '1'; } catch (e) { told = false; }
   function tellOnce() { if (told || !live() || G.W.farOf || G.W.gen < 2) return; told = true; try { localStorage.setItem('primordia.cmdTold3', '1'); } catch (e) { /* not kept */ }
-    G.banner('You command this star', 'Its creatures are your colony. Give them trades in the panel on the left (+ and −). RIGHT button: choose (click one of yours, or drag a box). LEFT click: send those you chose. Left-drag moves the view, as always.', 14000); }
+    G.banner('You command this star', 'Its creatures are your colony. Give them roles in the panel on the left (+ and −). RIGHT button: choose (click one of yours, or drag a box). LEFT click: send those you chose. Left-drag moves the view, as always.', 14000); }
 
   // ── keeping it all going ──
   G.addSystem({ name: 'command',

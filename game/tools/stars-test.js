@@ -22,7 +22,7 @@ const ev = []; ['star-taken', 'outpost', 'tribute', 'victory', 'raid-warn'].forE
 
 G.newWorld({ seed }); G.founderPond(); G.mode = 'play'; G.speed = 1; run(1e6, () => G.W.gen > 8);
 const H = G.W, col = G.colony(H); col.peace = true;      // (no raids while this is measured)
-Object.assign(col.want, { g: 4, b: 2, f: 8, u: 0 }); run(30);
+col.share = {}; Object.assign(col.want, { g: 4, b: 2, f: 8, u: 0 }); run(30);
 // a ship, standing ready (how one comes to be built is the voyage test's affair)
 const sbp = G.blueprintFrom({ seed: 5, type: 'ship', S: 70, hue: 40, spiky: 0, brain: 0.5 }, '2'.repeat(40)); const ship = { name: 'Test Ship', looks: '', x: H.ww * 0.8, y: G.shoreY(H) - 60, r: 60, by: 'test', hue: 40, sp: 0, bp: sbp, until: 1e9 }; (H.works = H.works || []).push(ship);
 

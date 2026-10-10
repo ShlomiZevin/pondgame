@@ -90,7 +90,7 @@
   // a crew that lands on a rival star has come to fight: they are fighters from the moment they step out
   G.on('arrived', function (V, out) { const W = G.W; if (!W || !W.farOf || !out || !out.length) return; const ij = W.farOf.split(',').map(Number), s = G.starOf({ i: ij[0], j: ij[1] }); if (s.rival) { out.forEach(function (c) { G.setJob(c, 'f', true); }); const c = G.colony(W); c.want.f = Math.max(c.want.f, out.length); } });
   // a rival that is yours now raids no more; and flying out burns lumen
-  { const sail0 = F.sail; F.sail = function (p, crew, ship) { const W = G.W, c = W && !W.farOf && W.col ? W.col : null, pay = c && c.stock[3] >= FUEL; if (pay) c.stock[3] -= FUEL; const out = sail0(p, crew, ship); if (!out && pay && G.W === W) c.stock[3] += FUEL; return out; }; }
+  { const sail0 = F.sail; F.sail = function (p, crew, ship) { const W = G.W, c = W && !W.farOf && W.col ? W.col : null, pay = c && c.stock[3] >= FUEL, k = F.fleetN ? F.fleetN() : 1; F.fleetFix = k; if (pay) c.stock[3] -= FUEL * k;      /* (every ship that flies burns its lumen) */ let out = null; try { out = sail0(p, crew, ship); } finally { F.fleetFix = 0; } if (!out && pay && G.W === W) c.stock[3] += FUEL * k; return out; }; }
 
   // ── kept with the save ──
   { const pack0 = F.pack; F.pack = function () { let o = pack0(); const owes = F.owed.some(function (v) { return v > 0; }); if (!o && !owes && !F.won) return o; o = o || { v: 1, book: {} };
