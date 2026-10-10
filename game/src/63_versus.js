@@ -57,10 +57,10 @@
     { const pn = document.getElementById('panel'), ins = document.getElementById('inspector'), wide = window.innerWidth > 720; if (wide) { const top = pn && !pn.classList.contains('hide') ? pn.getBoundingClientRect().bottom + 10 : 14, zc = document.getElementById('zcard'), low = [ins, zc].filter(function (e) { return e && !e.classList.contains('hide') && e.offsetHeight; }).map(function (e) { return e.getBoundingClientRect().top - 10; }), bot = low.length ? Math.min.apply(null, low) : window.innerHeight - 14;      /* never over the card of a creature or of a thing */ box.style.left = 'auto'; box.style.right = '14px'; box.style.top = Math.round(top) + 'px'; box.style.maxHeight = Math.max(44, Math.round(bot - top)) + 'px'; box.style.visibility = bot - top < 40 ? 'hidden' : ''; box.style.overflowY = 'auto'; box.style.zIndex = '3'; } else { box.style.left = ''; box.style.right = ''; box.style.top = ''; box.style.maxHeight = ''; } }
     // the heading folds the card away; under it, one line says what the card is
     if (shut === null) { try { shut = !!localStorage.getItem('primordia.versusShut'); } catch (e) { shut = false; } }
-    let html = '<div id="vsHead" title="' + (shut ? 'Open' : 'Fold away') + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer"><span class="ilabel" style="margin:0;color:var(--gold)">' + (shut ? 'DANGERS' : 'DANGERS IN THE POND') + '</span><span style="display:flex;align-items:center;gap:6px">' + (shut ? '<small style="padding:1px 8px;border-radius:999px;border:1px solid rgba(255,126,182,.6);color:#ffd3e2">' + order.length + '</small>' : '') + '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;background:rgba(7,18,31,.55);border:1px solid rgba(207,232,255,.25)">' + (shut ? '▸' : '▾') + '</span></span></div>';
+    let html = '<div id="vsHead" title="' + (shut ? 'Open' : 'Fold away') + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer"><span class="ilabel" style="margin:0;color:var(--gold)">' + (shut ? 'DANGERS' : 'DANGERS ON THE STAR') + '</span><span style="display:flex;align-items:center;gap:6px">' + (shut ? '<small style="padding:1px 8px;border-radius:999px;border:1px solid rgba(255,126,182,.6);color:#ffd3e2">' + order.length + '</small>' : '') + '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;background:rgba(7,18,31,.55);border:1px solid rgba(207,232,255,.25)">' + (shut ? '▸' : '▾') + '</span></span></div>';
     if (shut) { box.innerHTML = html; box.style.width = 'auto'; document.getElementById('vsHead').onclick = toggle; sig = s; return; }
     box.style.width = '';
-    html += '<div style="font-size:11px;line-height:1.4;margin:3px 0 5px;color:rgba(207,232,255,.8)">Harmful things you or events put in the pond, and how far the creatures have got in beating each one. Click one to go to it.</div>';
+    html += '<div style="font-size:11px;line-height:1.4;margin:3px 0 5px;color:rgba(207,232,255,.8)">Harmful things you or events put on the star, and how far the creatures have got in beating each one. Click one to go to it.</div>';
     order.slice(0, 2).forEach(function (k) {
       const q = kinds[k], z = q.z, v = G.versus(z);
       const lock = z.p.vault > 0.2 ? 'It locks the food away. ' : z.p.deadly > 0.3 ? 'It kills with one touch. ' : '';
@@ -83,8 +83,8 @@
       const z = W.zones[i];
       if (!G.isBad(z) || z.age < 30) continue;
       const v = G.versus(z), k = z.word.toLowerCase();
-      if (v.carry > 0.25) G.discover('vs25' + k, 'They are learning! A quarter of the pond now carries ' + v.weak + ', the weakness of ' + z.word + '.');
-      if (v.carry > 0.55) G.discover('vs55' + k, 'Most of the pond now carries ' + v.weak + '. ' + z.word + ' is in trouble.');
+      if (v.carry > 0.25) G.discover('vs25' + k, 'They are learning! A quarter of the star now carries ' + v.weak + ', the weakness of ' + z.word + '.');
+      if (v.carry > 0.55) G.discover('vs55' + k, 'Most of the star now carries ' + v.weak + '. ' + z.word + ' is in trouble.');
     }
   };
 

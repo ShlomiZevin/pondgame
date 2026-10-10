@@ -304,10 +304,10 @@
     const press = G.W && G.W.press ? G.W.press : null;
     // nudge traits
     // size answers the pond: danger favours bigger bodies, hunger and thin air smaller ones; chance does the rest
-    { const st = G.W && G.W.grow || 0; if (st > 0.2 && r() < 0.025 * st * wild) { g.t[0] = g.t[0] * 1.07; note('t', 0, 'grew bigger: the pond has turned to growing', true); } }
+    { const st = G.W && G.W.grow || 0; if (st > 0.2 && r() < 0.025 * st * wild) { g.t[0] = g.t[0] * 1.07; note('t', 0, 'grew bigger: the star has turned to growing', true); } }
     if (r() < m * 2) { g.t[0] += n() * (0.6 + 0.04 * g.t[0]) + (0.12 + 0.01 * g.t[0]) * (G.W && G.W.grow || 0) - (1 + 0.05 * g.t[0]) * clamp((0.62 - (G.W && G.W.popR !== undefined ? G.W.popR : 1)) / 0.3, 0, 1) + (press && press.size ? 0.5 * press.size : 0); note('t', 0, 'size', false); }
     { const pr = G.W && G.W.popR !== undefined ? G.W.popR : 1; if (pr < 0.5 && r() < 0.1 * wild) { g.t[0] = Math.max(6, g.t[0] * 0.9); note('t', 0, 'grew smaller: there were too few of them', true); } }
-    if (press && Math.abs(press.size) > 0.2 && r() < 0.06 * Math.abs(press.size) * wild) { const up = press.size > 0; g.t[0] = Math.max(5, g.t[0] * (up ? 1.12 : 0.9)); note('t', 0, (up ? 'grew bigger, ' : 'grew smaller, ') + (press.sizeWhy || 'to suit the pond'), true); }
+    if (press && Math.abs(press.size) > 0.2 && r() < 0.06 * Math.abs(press.size) * wild) { const up = press.size > 0; g.t[0] = Math.max(5, g.t[0] * (up ? 1.12 : 0.9)); note('t', 0, (up ? 'grew bigger, ' : 'grew smaller, ') + (press.sizeWhy || 'to suit the star'), true); }
     g.t[0] = Math.min(g.t[0], ((G.W && G.W.sizeCap) || 23.6) * 1.05);
     if (r() < m * 2) { g.t[1] += n() * 0.07; note('t', 1, 'speed', false); }
     // breath: how far out of the water it can live. It drifts like any gene, and now and then takes a real step either way

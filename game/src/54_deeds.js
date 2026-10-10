@@ -101,7 +101,7 @@
       if (f) { f.spare = d.sp; f.quiet = true; }                                                  // it is theirs: it does not harm them
       made = { name: r.name, looks: r.looks, x: d.x, y: d.y, r: Math.min(r.size * m, 150), until: W.t + r.life, by: d.kind, hue: d.hue, field: f ? f.id : 0, plan: d.title, what: d.what, why: d.why, gen: W.gen };
       (W.works = W.works || []).push(made); if (W.works.length > 24) W.works.shift();
-      if (G.figureFor) G.figureFor({ name: r.name, note: r.looks + ' Built by small pond creatures.', hue: d.hue }, r.looks).then(function (fig) { made.fig = fig || null; });
+      if (G.figureFor) G.figureFor({ name: r.name, note: r.looks + ' Built by small star creatures.', hue: d.hue }, r.looks).then(function (fig) { made.fig = fig || null; });
     }
     G.emit('deed-end', d, how, made);
   }
@@ -191,7 +191,7 @@
   G.on('deed-step', function (d) { if (G.mode !== 'play') return; const st = d.steps[d.i]; if (G.log) G.log('sel', d.title, 'Now they are ' + (WORDS[st.do] || st.do) + (st.cry ? ', crying "' + st.cry + '"' : '') + '.'); });
   G.on('deed-end', function (d, how, made) {
     const W = G.W; if (G.mode !== 'play' || !W) return;
-    const t = how === 'done' ? (made ? 'The ' + d.kind + ' finished ' + d.title + '. The ' + made.name + ' now stands in the pond.' : 'The ' + d.kind + ' carried out ' + d.title + '.') : how === 'off' ? d.title + ' was called off.' : 'Too few of the ' + d.kind + ' were left: ' + d.title + ' was abandoned.';
+    const t = how === 'done' ? (made ? 'The ' + d.kind + ' finished ' + d.title + '. The ' + made.name + ' now stands on the star.' : 'The ' + d.kind + ' carried out ' + d.title + '.') : how === 'off' ? d.title + ' was called off.' : 'Too few of the ' + d.kind + ' were left: ' + d.title + ' was abandoned.';
     if (G.banner) G.banner(how === 'done' ? 'They did it' : 'It came to nothing', t, 7000); if (G.log) G.log('disc', d.title, t);
     if (W.discLog) W.discLog.push({ key: 'deed' + d.id + '_' + W.gen, text: d.say + ' ' + t, gen: W.gen });
   });

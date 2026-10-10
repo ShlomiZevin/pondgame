@@ -49,7 +49,7 @@
   /** what it does, in plain words, for its card */
   G.actWords = function (z) {
     const a = z && z.act; if (!a) return [];
-    const who = a.side === 'friend' ? 'On the creatures\' side: it goes for whatever attacks them.' : a.side === 'wild' ? 'On nobody\'s side: it goes for creatures and for other things alike.' : 'Against the creatures of the pond.';
+    const who = a.side === 'friend' ? 'On the creatures\' side: it goes for whatever attacks them.' : a.side === 'wild' ? 'On nobody\'s side: it goes for creatures and for other things alike.' : 'Against the creatures of the star.';
     const prey = a.prey ? ' It is after <b>' + G.escapeHtml(a.prey) + '</b> above all.' : '';
     const how = prey + ' ' + (a.way === 'hunts' ? 'It hunts: it goes after them.' : a.way === 'guards' ? 'It guards its place and goes for whatever comes near.' : a.way === 'wanders' ? 'It wanders.' : 'It stays where it is.');
     const L = a.acts.map(function (q) { return 'It <b>' + VERB[q.do] + '</b>' + (q.with && (q.do === 'strike' || q.do === 'shoot' || q.do === 'blast') ? ' with ' + G.escapeHtml(q.with) : '') + ' (' + (q.power > 0.66 ? 'hard' : q.power > 0.33 ? 'firmly' : 'lightly') + ', every ' + q.every.toFixed(1) + ' s' + (z.actN && z.actN[q.do] ? '; ' + z.actN[q.do] + ' times so far' : '') + ').'; });
@@ -107,7 +107,7 @@
       o.dmg = (o.dmg || 0) + dmg; if (o.dmg > 110) { o.dmg = 0; const P = o.bp.P; for (let k = P.length - 1; k >= 0; k--) if (P[k].st > 0) { P[k].st = 0; G.emit('build-fall', o, P[k]); break; } o.hitBy = z.word; o.hitGen = W.gen; }
     } else {         // another thing
       if (o.alive > 0.25) o.health = Math.max(0, (o.health || 0) - dmg * 0.006); else o.life -= dmg * 0.14;      /* a thing takes many blows: a fight between two of them is something to watch */
-      if ((o.alive > 0.25 ? o.health <= 0 : o.life <= 0) && !o.felled) { o.felled = z.word; if (G.zoneEvent) G.zoneEvent(z, 'It brought down ' + o.word); if (G.mode === 'play' && G.log) G.log('disc', z.word + ' brought down ' + o.word, 'One thing you added has destroyed another.'); if (G.note) G.note('It happened in the pond', z.word + ' brought down ' + o.word + '.'); }
+      if ((o.alive > 0.25 ? o.health <= 0 : o.life <= 0) && !o.felled) { o.felled = z.word; if (G.zoneEvent) G.zoneEvent(z, 'It brought down ' + o.word); if (G.mode === 'play' && G.log) G.log('disc', z.word + ' brought down ' + o.word, 'One thing you added has destroyed another.'); if (G.note) G.note('It happened on the star', z.word + ' brought down ' + o.word + '.'); }
       o.struck = 1; o.bite = 1;
     }
     G.emit('act-hit', z, o, why);

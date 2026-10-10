@@ -102,7 +102,7 @@
     refs.pop = null;
     // zoom: the pond is bigger than the screen
     const zm = el('div', 'glass hide', '', ui); zm.id = 'zoom';
-    [['+', 'Zoom in', function () { G.zoomAt(1.35); }], ['−', 'Zoom out', function () { G.zoomAt(1 / 1.35); }], ['⤢', 'Back to the middle of the pond, all of it in view', function () { G.camHome(); }]].forEach(function (b) {
+    [['+', 'Zoom in', function () { G.zoomAt(1.35); }], ['−', 'Zoom out', function () { G.zoomAt(1 / 1.35); }], ['⤢', 'Back to the middle of the star, all of it in view', function () { G.camHome(); }]].forEach(function (b) {
       const bt = el('button', 'btn', b[0], zm); bt.setAttribute('aria-label', b[1]); bt.title = b[1]; bt.onclick = function () { G.sfx('click'); b[2](); };
     });
     refs.zoom = zm;
@@ -113,7 +113,7 @@
     ['SPRING: breed and mutate', 'Steps 5 and 6 of the genetic algorithm.', 'Every creature that lived through winter may have children: more stored energy means more children (up to three). Mates are chosen for charm and health, and the plainest find none. A child copies its parents\' genes, sometimes mixed from two parents, and a few genes change by chance: that is mutation. Gold rings mark the parents; pink flashes mark a mutated child.'],
     ['SUMMER: the test', 'Step 2 of the genetic algorithm.', 'Nothing is decided by a formula here. Each creature simply lives: it looks for food it can digest, avoids what hurts it, and spends energy on everything it does and everything it carries. Whatever its genes built is put to the test.'],
     ['AUTUMN: the score', 'Step 3 of the genetic algorithm.', 'Each creature is scored by how full its energy tank is: that share, from 0 to 1, is its fitness. The bar above each creature is its score, and the best tenth glow gold. This is the number on the FITNESS graph.'],
-    ['WINTER: selection', 'Step 4 of the genetic algorithm.', 'The lowest scores fade away, along with the old and a few unlucky ones, until the pond is back to what it can feed. The dashed ring marks who is about to go. Those left are the parents of the next generation, and the loop starts again.'],
+    ['WINTER: selection', 'Step 4 of the genetic algorithm.', 'The lowest scores fade away, along with the old and a few unlucky ones, until the star is back to what it can feed. The dashed ring marks who is about to go. Those left are the parents of the next generation, and the loop starts again.'],
   ];
   function seasonHelp(i) {
     closePop();
@@ -171,7 +171,7 @@
     const defs = [
       ['temp', 'Temperature', -1, 1, 0.05, 'Hot or cold water: creatures without resistance lose energy.', function (v) { return (v > 0 ? '+' : '') + v.toFixed(2); }],
       ['light', 'Light', 0.2, 2, 0.05, 'Sunlight decides where algae grow.', function (v) { return v.toFixed(2); }],
-      ['bloom', 'Food', 0.2, 3, 0.05, 'How much algae the pond grows.', function (v) { return v.toFixed(2) + '×'; }],
+      ['bloom', 'Food', 0.2, 3, 0.05, 'How much algae the star grows.', function (v) { return v.toFixed(2) + '×'; }],
       ['mut', 'Mutation', 0.25, 4, 0.05, 'How wild the changes in new children are.', function (v) { return v.toFixed(2) + '×'; }],
     ];
     defs.forEach(function (d) {
@@ -185,7 +185,7 @@
     });
     el('h3', '', 'MAKE ANYTHING HAPPEN', pop).style.marginTop = '10px';
     const evIn = el('input', '', '', pop); evIn.type = 'text'; evIn.maxLength = 90; evIn.placeholder = 'an ice age, a jellyfish invasion, aliens…'; evIn.setAttribute('aria-label', 'Describe an event'); evIn.autocomplete = 'off';
-    const evMsg = el('div', 'desc', 'Type any event. The pond works out what it means.', pop); evMsg.style.marginTop = '6px';
+    const evMsg = el('div', 'desc', 'Type any event. The star works out what it means.', pop); evMsg.style.marginTop = '6px';
     const mine = (W.evShelf || []).slice().reverse();
     if (mine.length) {
       el('div', 'ilabel', 'Yours: make it happen again', pop);
@@ -194,14 +194,14 @@
     }
     const evGo = function () {
       const t = evIn.value.trim(); if (!t) return;
-      G.sfx('click'); evMsg.textContent = 'The pond trembles…';
+      G.sfx('click'); evMsg.textContent = 'The star trembles…';
       G.ai.ask('event', t).then(function (ev) {
         if (ev) {
           G.runEvent(ev);
           const W0 = G.W; W0.evShelf = (W0.evShelf || []).filter(function (e) { return e.name.toLowerCase() !== ev.name.toLowerCase(); }); W0.evShelf.push(JSON.parse(JSON.stringify(ev))); if (W0.evShelf.length > 10) W0.evShelf.shift(); G.markDirty();
         }
         closePop();
-      }, function (err) { evMsg.textContent = err && err.budget ? 'World events have used their budget for this pond, so they are off. A new pond starts with a full budget.' : err && err.refused ? 'The pond will not do that. Try another.' : 'Nothing happened. Try again.'; });
+      }, function (err) { evMsg.textContent = err && err.budget ? 'World events have used their budget for this star, so they are off. A new star starts with a full budget.' : err && err.refused ? 'The star will not do that. Try another.' : 'Nothing happened. Try again.'; });
     };
     evIn.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); evGo(); } else if (e.key === 'Escape') { evIn.blur(); closePop(); } e.stopPropagation(); };
     el('h3', '', 'DISASTERS', pop).style.marginTop = '10px';
@@ -211,7 +211,7 @@
       b.onclick = function () {
         G.sfx('click');
         if (d[0] === 'meteor') { closePop(); G.armMeteor(); }
-        else { G.disaster(d[0]); G.log('sel', d[2] + '!', 'Something shook the pond.'); closePop(); }
+        else { G.disaster(d[0]); G.log('sel', d[2] + '!', 'Something shook the star.'); closePop(); }
       };
     });
   }
@@ -259,13 +259,13 @@
         const fin = function () {
           making('');
           if (open()) { $('thing').innerHTML = card(''); G.beginPlacing(info); closePopSoon(); }
-          else { G.beginPlacing(info); if (G.toast) G.toast('<b style="color:var(--gold)">' + escapeHtml(info.name) + ' is ready.</b><br>' + (G.touch ? 'Tap' : 'Click') + ' the pond to drop it.'); G.sfx('discovery'); }
+          else { G.beginPlacing(info); if (G.toast) G.toast('<b style="color:var(--gold)">' + escapeHtml(info.name) + ' is ready.</b><br>' + (G.touch ? 'Tap' : 'Click') + ' the star to drop it.'); G.sfx('discovery'); }
         };
         const wall = info.props && info.props.vault > 0.2;
         (G.figureFor ? G.figureFor({ name: info.name, note: info.note, hue: info.hue, wall: wall }, w) : Promise.resolve(null)).then(fin, fin);
       }, function (err) {
         making('');
-        const msg = err && err.budget ? 'Adding things has used its budget for this pond, so it is off. A new pond starts with a full budget.' : err && err.refused ? 'The pond cannot take that word. Try another.' : 'The pond could not make sense of that. Try again.';
+        const msg = err && err.budget ? 'Adding things has used its budget for this star, so it is off. A new star starts with a full budget.' : err && err.refused ? 'The star cannot take that word. Try another.' : 'The star could not make sense of that. Try again.';
         if (open()) $('thing').innerHTML = '<div class="thingcard">' + msg + '</div>'; else if (G.toast) G.toast(msg);
       });
     };
@@ -288,7 +288,7 @@
     document.getElementById('pond').classList.add('placing');
     const pl = refs.placing;
     pl.classList.remove('hide');
-    pl.innerHTML = '<span>' + (G.touch ? 'Tap' : 'Click') + ' the pond to drop <b>' + escapeHtml(info.name) + '</b></span><button class="btn sm" id="plCancel">CANCEL</button>';
+    pl.innerHTML = '<span>' + (G.touch ? 'Tap' : 'Click') + ' the star to drop <b>' + escapeHtml(info.name) + '</b></span><button class="btn sm" id="plCancel">CANCEL</button>';
     $('plCancel').onclick = function () { G.cancelPlacing(); };
   };
   G.cancelPlacing = function () {
@@ -301,7 +301,7 @@
     UI.meteor = true;
     const pl = refs.placing;
     pl.classList.remove('hide');
-    pl.innerHTML = '<span>' + (G.touch ? 'Tap' : 'Click') + ' the pond to aim the meteor</span><button class="btn sm" id="plCancel">CANCEL</button>';
+    pl.innerHTML = '<span>' + (G.touch ? 'Tap' : 'Click') + ' the star to aim the meteor</span><button class="btn sm" id="plCancel">CANCEL</button>';
     $('plCancel').onclick = function () { G.cancelPlacing(); };
     document.getElementById('pond').classList.add('placing');
   };
@@ -322,7 +322,7 @@
     }
     if (UI.meteor) {
       G.disaster('meteor', c.x, c.y);
-      G.log('sel', 'Meteor!', 'It struck the pond.');
+      G.log('sel', 'Meteor!', 'It struck the star.');
       G.cancelPlacing();
       return;
     }
@@ -380,7 +380,7 @@
   G.on('new-pond', function () { log = []; UI.logDirty = true; UI.eraSig = ''; });
   G.on('era', function (age, was) {
     if (G.mode !== 'play') return;
-    const t = 'The commonest body in the pond is now the ' + age.kind.toLowerCase() + ' (' + Math.round(age.share * 100) + '% of all life). The ' + was.kind.toLowerCase() + 's had led since generation ' + was.gen + '.';
+    const t = 'The commonest body on the star is now the ' + age.kind.toLowerCase() + ' (' + Math.round(age.share * 100) + '% of all life). The ' + was.kind.toLowerCase() + 's had led since generation ' + was.gen + '.';
     G.log('disc', age.name.toUpperCase(), t + (age.why ? ' ' + age.why : ''));
     G.banner('A NEW AGE BEGINS', age.name + '. ' + t + (age.why ? ' ' + age.why : ''), 11000);
     G.R.flash = 1; G.R.flashCol = G.PAL.gold; G.R.shake = 0.4;
@@ -396,17 +396,17 @@
     if (G.log) G.log('disc', 'A marvel: ' + def.name, 'Creature #' + c.id + '. ' + def.wonder);
     if (G.markDirty) G.markDirty();
   });
-  G.on('plan-new', function (p) { if (G.mode !== 'play') return; const t = 'A new shape of body was imagined for this pond: the ' + p.name + '. ' + p.note + (p.because ? ' Why: ' + p.because + '.' : '') + (p.seen ? ' Drawn and looked at first: ' + Math.round(p.seen.score * 10) + '/10.' : ''); G.log('disc', 'A new shape of body', t); if (G.speed <= 16) G.banner('A body nobody has seen', t, 7500); });
-  G.on('idea-dropped', function (name, v) { if (G.mode !== 'play') return; G.log('disc', 'An idea was turned away', 'The "' + name + '" was imagined for this pond, drawn, and looked at. The eye for beauty gave it ' + Math.round(v.score * 10) + '/10 (' + v.why + '), so it was not let in.'); });
-  G.on('design-new', function (d) { if (G.mode !== 'play') return; const t = 'A new kind of body part is now possible in this pond: the ' + d.name + '. ' + d.note + (d.because ? ' Why: ' + d.because + '.' : ''); G.log('disc', 'A new kind of part', t); if (G.speed <= 16) G.banner('Something never seen before', t, 7000); });
+  G.on('plan-new', function (p) { if (G.mode !== 'play') return; const t = 'A new shape of body was imagined for this star: the ' + p.name + '. ' + p.note + (p.because ? ' Why: ' + p.because + '.' : '') + (p.seen ? ' Drawn and looked at first: ' + Math.round(p.seen.score * 10) + '/10.' : ''); G.log('disc', 'A new shape of body', t); if (G.speed <= 16) G.banner('A body nobody has seen', t, 7500); });
+  G.on('idea-dropped', function (name, v) { if (G.mode !== 'play') return; G.log('disc', 'An idea was turned away', 'The "' + name + '" was imagined for this star, drawn, and looked at. The eye for beauty gave it ' + Math.round(v.score * 10) + '/10 (' + v.why + '), so it was not let in.'); });
+  G.on('design-new', function (d) { if (G.mode !== 'play') return; const t = 'A new kind of body part is now possible on this star: the ' + d.name + '. ' + d.note + (d.because ? ' Why: ' + d.because + '.' : ''); G.log('disc', 'A new kind of part', t); if (G.speed <= 16) G.banner('Something never seen before', t, 7000); });
   G.on('new-pond', function () { if (G.form.clearCache) G.form.clearCache(); });
-  G.on('bred', function (it, c) { if (G.mode !== 'play') return; G.log('disc', 'Bred', it.name + ' and #' + c.id + ' had six children.'); G.banner('A new family', 'Six children of ' + it.name + ' and a creature of this pond were born. Watch what they become.', 5200); G.focusOn(c.x, c.y, 1.8); });
-  G.on('released', function (it, x, y) { if (G.mode !== 'play') return; G.log('disc', 'Released', it.name + ' (' + it.kind + ') now lives in this pond.'); G.focusOn(x, y, 1.8); });
-  G.on('sickness', function (kind, n, crowd) { if (G.mode !== 'play') return; const t = 'There are so many ' + kind.toLowerCase() + 's (' + Math.round(crowd * 100) + '% of the pond) that a sickness spreads among them. ' + n + ' will not see spring; the rarer kinds are hardly touched.'; G.log('sel', 'A sickness of the many', t); if (G.speed <= 16) G.banner('Too many of one kind', t, 6500); });
+  G.on('bred', function (it, c) { if (G.mode !== 'play') return; G.log('disc', 'Bred', it.name + ' and #' + c.id + ' had six children.'); G.banner('A new family', 'Six children of ' + it.name + ' and a creature of this star were born. Watch what they become.', 5200); G.focusOn(c.x, c.y, 1.8); });
+  G.on('released', function (it, x, y) { if (G.mode !== 'play') return; G.log('disc', 'Released', it.name + ' (' + it.kind + ') now lives on this star.'); G.focusOn(x, y, 1.8); });
+  G.on('sickness', function (kind, n, crowd) { if (G.mode !== 'play') return; const t = 'There are so many ' + kind.toLowerCase() + 's (' + Math.round(crowd * 100) + '% of the star) that a sickness spreads among them. ' + n + ' will not see spring; the rarer kinds are hardly touched.'; G.log('sel', 'A sickness of the many', t); if (G.speed <= 16) G.banner('Too many of one kind', t, 6500); });
   G.on('painted', function (sig, info, source) { if (G.mode !== 'play') return; G.log('sp', 'Painted', (info.name || 'A kind') + ', a ' + String(info.kind || '').toLowerCase() + ', has been painted' + (source === 'library' ? ' (from the library, free).' : '.')); });
   G.on('fashion', function (t) { if (G.mode !== 'play') return; G.log('sp', 'Taste has shifted', t + '. Those who have it will find mates more easily.'); UI.eraSig = ''; });
   G.on('judged', function (s) { if (G.mode !== 'play') return; G.log('sp', 'Beauty ' + Math.round(s.judge.score * 10) + '/10: the ' + s.name, (s.judge.why || 'no comment') + (s.judge.fix ? ' What would make it nicer: ' + s.judge.fix.replace(/_/g, ' ') + ' (its children are now likelier to be born that way).' : '')); });
-  G.on('zone-killed', function (z) { if (G.mode !== 'play') return; const t = 'The pond killed ' + z.word + '! Creatures with ' + G.WEAK[z.weak].text + ' wore it down.'; G.log('disc', 'Victory', t); G.banner('Life fought back', t, 6000); });
+  G.on('zone-killed', function (z) { if (G.mode !== 'play') return; const t = 'The star killed ' + z.word + '! Creatures with ' + G.WEAK[z.weak].text + ' wore it down.'; G.log('disc', 'Victory', t); G.banner('Life fought back', t, 6000); });
   G.on('event', function (ev) { if (G.mode !== 'play') return; if (ev.got) ev.note = (ev.note ? ev.note + ' ' : '') + ev.got + ' creatures grew ' + ev.gift.trait + '.'; G.log('sel', (ev.nature ? 'Nature: ' : '') + ev.name, ev.note); G.banner('It happened', ev.name + (ev.note ? ': ' + ev.note : ''), 5200); });
   G.on('story', function (s) { if (G.mode !== 'play') return; G.log('disc', s.title, s.text); if (G.speed <= 16) G.banner('The story so far · ' + s.title, s.text, 9000); });
   G.on('organ-new', function (o) { if (G.mode === 'play') G.log('disc', 'New organ', o.name + (G.ai.labelOf(o.by) ? ' (imagined by ' + G.ai.labelOf(o.by) + ')' : '') + ': ' + o.note); });
@@ -443,16 +443,16 @@
   // ── graph ──
   const METRICS = {
     whole: { label: 'Whole: how much of a whole, full creature they are, out of 10: from a cell (1), through a ball with a face (3) and a simple critter (5), to a full character with head, body, legs and arms (9). The average; the dashed line is the most whole one alive.', get: function (h) { return (h.whole || 0) * 10; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 },
-    look: { label: 'Beauty: how nice to the eye the creatures of this pond are, out of 10 (the average; the dashed line is the nicest one alive). This is what the pond evolves towards.', get: function (h) { return (h.look || 0) * 10; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 },
+    look: { label: 'Beauty: how nice to the eye the creatures of this star are, out of 10 (the average; the dashed line is the nicest one alive). This is what the star evolves towards.', get: function (h) { return (h.look || 0) * 10; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 },
     fit: { label: 'Fitness = how nice to the eye and how whole a creature is, for those that have eaten well enough (half a tank). Higher scores survive winter and have more children.', get: function (h) { return h.avg; }, fmt: function (v) { return v.toFixed(2); }, min: 0, max: 1 },
-    room: { label: 'Room to grow: how much more a body may carry than at the start before the pond counts it as clutter. It is earned: it opens a little each time the watcher looks and finds the bodies read well, and closes when they do not. 0 means the first, simple limits.', get: function (h) { return h.room || 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
+    room: { label: 'Room to grow: how much more a body may carry than at the start before the star counts it as clutter. It is earned: it opens a little each time the watcher looks and finds the bodies read well, and closes when they do not. 0 means the first, simple limits.', get: function (h) { return h.room || 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
     body: { label: 'Parts: a plain COUNT of what is on a body (its joined parts and everything that grows on it). Not a mark: more is not better. The average; the dashed line is the busiest body alive.', get: function (h) { return h.body || 0; }, top: function (h) { return h.bodyTop || 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
-    size: { label: 'Size: how big the creatures are (the first cells are about 10; the most a creature can reach is 64). The average; the dashed line is the biggest one alive. An old pond drifts bigger for as long as there is food for it.', get: function (h) { return h.size || 0; }, top: function (h) { return h.sizeTop || 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
+    size: { label: 'Size: how big the creatures are (the first cells are about 10; the most a creature can reach is 64). The average; the dashed line is the biggest one alive. An old star drifts bigger for as long as there is food for it.', get: function (h) { return h.size || 0; }, top: function (h) { return h.sizeTop || 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
     skill: { label: 'Skill: food eaten per creature each generation', get: function (h) { return h.intake; }, fmt: function (v) { return v.toFixed(0); }, min: 0 },
     pop: { label: 'How many creatures were alive at autumn', get: function (h) { return h.pop; }, fmt: function (v) { return v.toFixed(0); }, min: 0 },
     genes: { label: 'Genome size: parts, wires and brain cells per creature', get: function (h) { return h.genes; }, fmt: function (v) { return v.toFixed(1); }, min: 0 },
   };
-  (G.MARKS_X || []).forEach(function (m) { METRICS['mx_' + m.id] = { label: m.note + ' The average; the dashed line is the highest alive. Where the watcher has not looked, it is the pond\'s own guess.', get: function (h) { return h.mx && h.mx[m.id] ? h.mx[m.id][0] * 10 : 0; }, top: function (h) { return h.mx && h.mx[m.id] ? h.mx[m.id][1] * 10 : 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 }; });
+  (G.MARKS_X || []).forEach(function (m) { METRICS['mx_' + m.id] = { label: m.note + ' The average; the dashed line is the highest alive. Where the watcher has not looked, it is the star\'s own guess.', get: function (h) { return h.mx && h.mx[m.id] ? h.mx[m.id][0] * 10 : 0; }, top: function (h) { return h.mx && h.mx[m.id] ? h.mx[m.id][1] * 10 : 0; }, fmt: function (v) { return v.toFixed(1); }, min: 0, max: 10 }; });
   function drawGraph(force) {
     const W = G.W, cv = $('graph'); if (!cv || !W) return;
     const m = METRICS[UI.metric || 'look'];
@@ -511,7 +511,7 @@
       $('genLabel').textContent = 'GENERATION ' + W.gen;
       $('gaStep').textContent = first ? 'step 1 · random population' : 'step ' + (s === 0 ? '5 · breed + 6 · mutate' : s === 1 ? '2 · test' : s === 2 ? '3 · score' : '4 · select');
       $('capTitle').textContent = first ? 'GENERATION 1 · RANDOM POPULATION' : info.title;
-      $('capText').textContent = first ? 'A pond of blobs, each with different random genes. Nobody designed them; let us see who survives.' : info.text;
+      $('capText').textContent = first ? 'A star of blobs, each with different random genes. Nobody designed them; let us see who survives.' : info.text;
     }
     $('prog').style.width = (100 * (W.st / G.PH[s])).toFixed(1) + '%';
     const st = W.stats;
@@ -530,7 +530,7 @@
     if (G.ai.provider === 'server') {
       const t = G.ai.totals();
       const snd = (G.ai.count.sound || {}).fresh || 0;
-      const line = 'AI this session: ' + G.ai.money(t.usd) + ' · ' + t.fresh + ' new answer' + (t.fresh === 1 ? '' : 's') + (snd ? ' (' + snd + ' sound' + (snd === 1 ? '' : 's') + ')' : '') + (t.asked > t.fresh ? ' · ' + (t.asked - t.fresh) + ' reused free' : '') + (t.unpriced ? ' · ' + t.unpriced + ' not priced' : '') + (G.ai.fuel !== null ? ' · fuel left: ' + G.ai.fuel + (G.ai.fuel === 0 ? ' (the pond now imagines by itself)' : '') : '') + ' · see the breakdown';
+      const line = 'AI this session: ' + G.ai.money(t.usd) + ' · ' + t.fresh + ' new answer' + (t.fresh === 1 ? '' : 's') + (snd ? ' (' + snd + ' sound' + (snd === 1 ? '' : 's') + ')' : '') + (t.asked > t.fresh ? ' · ' + (t.asked - t.fresh) + ' reused free' : '') + (t.unpriced ? ' · ' + t.unpriced + ' not priced' : '') + (G.ai.fuel !== null ? ' · fuel left: ' + G.ai.fuel + (G.ai.fuel === 0 ? ' (the star now imagines by itself)' : '') : '') + ' · see the breakdown';
       if (!UI.aiLineBound && $('aiLine')) { UI.aiLineBound = true; $('aiLine').onclick = function () { G.showCosts(); }; }
       if (UI.aiLine !== line) { UI.aiLine = line; $('aiLine').textContent = line; }
     }
@@ -545,7 +545,7 @@
         '<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;margin:6px 0 4px;background:rgba(7,18,31,.5)">' + kinds.map(function (k, i) { return '<i title="' + k[0] + ': ' + Math.round(k[1] * 100) + '%" style="width:' + (k[1] * 100).toFixed(1) + '%;background:' + COL[i] + ';opacity:.85"></i>'; }).join('') + '</div>' +
         '<div style="font-size:10.5px;line-height:1.35;color:rgba(207,232,255,.85)">' + kinds.slice(0, 4).map(function (k, i) { return '<span style="white-space:nowrap"><i style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + COL[i] + ';margin-right:3px"></i>' + k[0] + ' ' + Math.round(k[1] * 100) + '%</span>'; }).join(' &nbsp;') + '</div>' +
         '<div style="font-size:10.5px;color:rgba(207,232,255,.7);line-height:1.3;margin-top:4px">This water: <b style="color:#fff">' + G.envText(W) + '</b>.</div>' +
-        '<div style="font-size:10.5px;color:rgba(207,232,255,.7);line-height:1.3;margin-top:4px">Admired in this pond: <b style="color:#fff">' + G.form.fashionText(W.fashion) + '</b>.</div>' +
+        '<div style="font-size:10.5px;color:rgba(207,232,255,.7);line-height:1.3;margin-top:4px">Admired on this star: <b style="color:#fff">' + G.form.fashionText(W.fashion) + '</b>.</div>' +
         (past ? '<div style="font-size:10px;color:rgba(207,232,255,.5);line-height:1.3;margin-top:3px">Before: ' + past + '</div>' : '');
     }
     if (W.hist.length !== UI.histLen || UI.gDirty) { UI.histLen = W.hist.length; UI.gDirty = false; drawGraph(); }
@@ -564,11 +564,11 @@
     if (W.gen === 1 && s === 2) G.hint('score', 'Autumn: the bars are the scores. Fitness is stored energy.', 8000);
     if (W.gen === 1 && s === 3 && W.st > 1) G.hint('winter', 'Winter: the lowest scores fade. That is selection.', 8000);
     if (W.gen === 2 && s === 0 && W.st > 2) G.hint('spring', 'Spring: survivors have children. Their genes are copied, mixed and sometimes mutated.', 9000);
-    if (W.gen === 3 && s === 1) G.hint('add', 'Try ADD: type any word and drop it into the pond.', 8000);
-    if (W.gen === 2 && s === 1) G.hint('zoom', G.touch ? 'Pinch to zoom, drag to move: the pond is bigger than the screen.' : 'Scroll to zoom, drag to move: the pond is bigger than the screen.', 8000);
+    if (W.gen === 3 && s === 1) G.hint('add', 'Try ADD: type any word and drop it onto the star.', 8000);
+    if (W.gen === 2 && s === 1) G.hint('zoom', G.touch ? 'Pinch to zoom, drag to move: the star is bigger than the screen.' : 'Scroll to zoom, drag to move: the star is bigger than the screen.', 8000);
     if (W.gen === 5 && s === 1) G.hint('speed', 'Use SPEED to fast-forward: evolution is slow.', 8000);
-    if (W.gen === 7 && s === 1) G.hint('world', 'WORLD changes the weather. Stress the pond and see what answers.', 8000);
-    if (W.gen === 9 && s === 1) G.hint('guide', 'BOOK is the Book of Life: the history of this pond, every kind that evolved, and what was invented.', 8000);
+    if (W.gen === 7 && s === 1) G.hint('world', 'WORLD changes the weather. Stress the star and see what answers.', 8000);
+    if (W.gen === 9 && s === 1) G.hint('guide', 'BOOK is the Book of Life: the history of this star, every kind that evolved, and what was invented.', 8000);
   }
   function renderLog() {
     const L = $('mutLog'); if (!L) return;
@@ -595,23 +595,23 @@
       '<button class="btn sm" id="iwhy" style="width:100%;margin-top:8px" title="Everything about it in one window: its marks and its life, what it is made of, and its brain at work">ABOUT IT · GENES · BRAIN</button>' +
       '<button class="btn sm" id="igenes" style="display:none">GENES AND BRAIN</button>' +
       '<style>#inspector .ihead{flex-direction:column;align-items:center;text-align:center;position:relative;gap:0}#inspector .ihead canvas{width:150px;height:150px;margin:-14px 0 -10px}#inspector .ihead>div{width:100%}#inspector .ihead b{font-size:15px}#inspector .x{position:absolute;top:-6px;right:-6px;margin:0}#isub{text-align:left;margin-top:5px}#iacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}#iacts .btn{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:0 4px;font-size:10px;letter-spacing:.06em;white-space:nowrap}#iacts .btn svg{width:14px;height:14px;flex:none;margin:0}#iacts .btn i{font-style:normal;font-size:14px;line-height:1}#iacts #ikeep i{color:var(--gold)}#iacts #ibreed i{color:var(--rose)}#imarvel{margin:8px 0 6px;padding:9px 11px;border-radius:12px;background:rgba(246,211,101,.12);border:1.5px solid rgba(246,211,101,.7);text-align:left}#imarvel .mk{font:800 9.5px system-ui,sans-serif;letter-spacing:.2em;color:#f6d365}#imarvel .mn{display:flex;align-items:center;gap:8px;font:800 16px system-ui,sans-serif;color:#fff;margin:2px 0 3px}#imarvel .mn img{width:30px;height:30px;flex:none}#imarvel .mw{font:600 12.5px/1.4 system-ui,sans-serif;color:#fff}#imarvel ul{margin:6px 0 0;padding:0;list-style:none}#imarvel li{font:600 11.5px/1.35 system-ui,sans-serif;color:#ffe9a8;padding:3px 0 3px 16px;position:relative}#imarvel li:before{content:"\\25C6";position:absolute;left:0;font-size:9px;top:5px}#imarvel .my{font-size:10.5px;opacity:.75;margin-top:5px;font-style:italic}</style>' +
-      '<div id="iacts"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the pond."><i>★</i>KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection."><i>♥</i>BREED</button><button class="btn sm" id="itree" title="Its family tree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide" title="Its kind, in the Book of Life">' + ICON.book + 'KIND</button></div>';
+      '<div id="iacts"><button class="btn sm" id="ikeep" title="Keep this creature in your collection. It outlives the star."><i>★</i>KEEP</button><button class="btn sm" id="ibreed" title="Breed this creature with one from your collection."><i>♥</i>BREED</button><button class="btn sm" id="itree" title="Its family tree">' + ICON.tree + 'TREE</button><button class="btn sm" id="iguide" title="Its kind, in the Book of Life">' + ICON.book + 'KIND</button></div>';
     $('iclose').onclick = function () { G.select(null); };
     $('iwhy').onclick = function () { G.sfx('click'); if (G.openAbout) G.openAbout(); };
     $('igenes').onclick = function () { G.sfx('click'); if (G.openGenes) G.openGenes(); };
     $('isub').onclick = function () { this.classList.toggle('open'); };
     $('itree').onclick = function () { G.sfx('click'); G.openTree(); };
-    $('ibreed').onclick = function () { const c = G.R.sel; if (!c) return; G.sfx('click'); if (!G.collection.length) { G.banner('Nothing to breed it with yet', 'First ★ KEEP a creature you like (from this pond or another). Then choose it here to breed the two.', 5200); return; } UI.breedWith = c.id; UI.guideTab = 'coll'; G.openGuide(); };
+    $('ibreed').onclick = function () { const c = G.R.sel; if (!c) return; G.sfx('click'); if (!G.collection.length) { G.banner('Nothing to breed it with yet', 'First ★ KEEP a creature you like (from this star or another). Then choose it here to breed the two.', 5200); return; } UI.breedWith = c.id; UI.guideTab = 'coll'; G.openGuide(); };
     // a short word right where the hand is: it shows at once and fades by itself
     G.toast = function (html) { let t = $('toast'); if (!t) { t = el('div', 'glass', '', ui); t.id = 'toast'; t.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:7;max-width:min(300px,calc(100vw - 28px));padding:10px 14px;border-radius:14px;font-size:12.5px;line-height:1.35;border:1px solid rgba(246,211,101,.6);pointer-events:none;transition:opacity .4s,transform .4s;opacity:0;transform:translateY(8px)'; } t.innerHTML = html; const i = $('inspector'); t.style.bottom = (i && !i.classList.contains('hide') ? Math.round(i.getBoundingClientRect().height) + 22 : 14) + 'px'; t.style.opacity = '1'; t.style.transform = 'none'; clearTimeout(G.toast._t); G.toast._t = setTimeout(function () { t.style.opacity = '0'; t.style.transform = 'translateY(8px)'; }, 3200); };
     const keptOf = function (c) { const tag = ' #' + c.id; for (let i = 0; i < G.collection.length; i++) { const n = G.collection[i].name; if (n.slice(-tag.length) === tag) return G.collection[i]; } return null; };
-    const keepLabel = function () { const c = G.R.sel, b = $('ikeep'); if (!b) return; const k = c && keptOf(c); b.innerHTML = k ? '<i>★</i>KEPT' : '<i>★</i>KEEP'; b.style.borderColor = k ? 'var(--gold)' : ''; b.style.color = k ? 'var(--gold)' : ''; b.title = k ? 'It is in your collection (BOOK, under COLLECTION).' : 'Keep this creature in your collection. It outlives the pond.'; };
+    const keepLabel = function () { const c = G.R.sel, b = $('ikeep'); if (!b) return; const k = c && keptOf(c); b.innerHTML = k ? '<i>★</i>KEPT' : '<i>★</i>KEEP'; b.style.borderColor = k ? 'var(--gold)' : ''; b.style.color = k ? 'var(--gold)' : ''; b.title = k ? 'It is in your collection (BOOK, under COLLECTION).' : 'Keep this creature in your collection. It outlives the star.'; };
     G.on('select', keepLabel); G.on('kept', keepLabel);
     $('ikeep').onclick = function () {
       const c = G.R.sel; if (!c) return;
       if (keptOf(c)) { G.sfx('click'); G.toast('<b style="color:var(--gold)">★ Already in your collection.</b><br>Open BOOK, then COLLECTION, to release or breed it.'); return; }
       const it = G.keep(c);
-      if (it) { G.sfx('discovery'); keepLabel(); G.toast('<b style="color:var(--gold)">★ Kept: ' + escapeHtml(it.name) + '</b><br>It is in your collection now (BOOK, then COLLECTION). It outlives this pond.'); G.markDirty(); }
+      if (it) { G.sfx('discovery'); keepLabel(); G.toast('<b style="color:var(--gold)">★ Kept: ' + escapeHtml(it.name) + '</b><br>It is in your collection now (BOOK, then COLLECTION). It outlives this star.'); G.markDirty(); }
     };
     $('iguide').onclick = function () { G.sfx('click'); UI.guideTab = 'live'; G.openGuide(); };
     G.on('select', function (c) {
@@ -677,7 +677,7 @@
         const cell = function (name, v, col, tip) { return '<span class="mcell" title="' + escapeHtml(tip || '') + '"><span>' + name + '</span><span class="bar"><i style="width:' + Math.round(Math.max(0, Math.min(1, v)) * 100) + '%' + (col ? ';background:' + col : '') + '"></i></span><b>' + (v * 10).toFixed(1) + '</b></span>'; };
         $('ifit').innerHTML = '<div class="imarks">' + (G.MARKS || []).map(function (m) { return cell(m.label, G.markOf(c, m.id), '', m.note); }).join('') + cell('Fed', Math.max(0, f), 'var(--algae)', 'How full it is: a creature must have fed to breed.') + '</div>' +
           '<div class="iappeal">Appeal <b>' + (G.charmOf(c) * 10).toFixed(1) + '</b> <i>' + 'all its marks together: this, with being fed, is its fitness' + '</i></div>' +
-          '<small>' + (c.real ? '<b style="color:var(--gold)">The watcher looked at it:</b> <i>' + escapeHtml(c.real.why || 'no comment') + '</i>' : G.W.eyeN ? 'Not looked at yet: these marks are its parents\' marks, adjusted for how it differs.' : 'No watcher here: these marks are the pond\'s own guess.') + '</small>' +
+          '<small>' + (c.real ? '<b style="color:var(--gold)">The watcher looked at it:</b> <i>' + escapeHtml(c.real.why || 'no comment') + '</i>' : G.W.eyeN ? 'Not looked at yet: these marks are its parents\' marks, adjusted for how it differs.' : 'No watcher here: these marks are the star\'s own guess.') + '</small>' +
           '<small>' + (c.doomed ? '<span style="color:var(--rose)">Its score is too low: it fades this winter.</span> ' : c.snub ? '<span style="color:var(--rose)">Among the plainest: nobody chose it as a mate this spring.</span> ' : kids ? 'It could have <b>' + kids + '</b> ' + (kids === 1 ? 'child' : 'children') + ' in spring. ' : '') +
           (bw.up.length ? 'Nice: ' + nice(bw.up) + '. ' : '') + (bw.down.length ? 'Holds it back: ' + nice(bw.down) + '. ' : '') + '</small>' +
           (wh.lacks.length ? '<small>To be a whole creature it still lacks: ' + wh.lacks.join('; ') + '.</small>' : '') +

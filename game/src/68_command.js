@@ -23,7 +23,7 @@
 
   const now = function () { return performance.now(); };
   /** is there a colony to command on what is being shown? (your own star, in play, not out in space) */
-  const live = function () { const W = G.W; return !!(W && G.mode === 'play' && !W.title && !W.extinct && !W.farOf && !(G.far && G.far.there && G.far.there()) && !(G.pondAsleep && G.pondAsleep())); };
+  const live = function () { const W = G.W; return !!(W && G.mode === 'play' && !W.title && !W.extinct && !(G.pondAsleep && G.pondAsleep())); };
   const mine = function (c) { return c && !c.dead && !c.team && !c.inShip && G.W.cre.indexOf(c) >= 0; };
   const pos = function (c) { return { x: c.rx === undefined ? c.x : c.rx, y: c.ry === undefined ? c.y : c.ry }; };
   const say = function (s, secs) { tip = s; tipUntil = now() + (secs || 5) * 1000; sig = ''; };
@@ -57,15 +57,16 @@
   function near(list, x, y, R, ok) { let best = null, bd = R * R; for (let i = 0; i < list.length; i++) { const o = list[i]; if (ok && !ok(o)) continue; const d = (o.x - x) * (o.x - x) + (o.y - y) * (o.y - y); if (d < bd) { bd = d; best = o; } } return best; }
   function orderAt(p) {
     const W = G.W; C.sel = C.sel.filter(mine); if (!C.sel.length) return false;
-    const R = Math.max(20, 22 / G.view.scale), foe = near(W.cre, p.x, p.y, R + 14, function (o) { return o.team && !o.dead && !o.inShip; }), node = near(G.lumenNodes(W), p.x, p.y, 50, function (q) { return q.n > 0; }), mat = near(W.mats || [], p.x, p.y, R),
+    const R = Math.max(20, 22 / G.view.scale), foe = near(W.cre, p.x, p.y, R + 14, function (o) { return o.team === 1 && !o.dead && !o.inShip; }), node = near(G.lumenNodes(W), p.x, p.y, 50, function (q) { return q.n > 0; }), mat = near(W.mats || [], p.x, p.y, R),
       hit = G.thingAt ? G.thingAt(p.x, p.y) : null, work = hit && hit.k === 'work' && hit.o.bp ? hit.o : null, n = C.sel.length, who = n === 1 ? 'It' : 'All ' + n, soldiers = C.sel.some(function (c) { return c.job === 'f' || c.job === 'u'; });
     let o, col, words;
-    if (foe) { o = { x: foe.x, y: foe.y, foe: foe }; col = RGB.f; words = who + (n === 1 ? ' goes' : ' go') + ' for the enemy.'; }
+    if (work && work.enemy && !foe) { o = { x: work.x, y: work.y, work: work }; col = RGB.f; words = who + (n === 1 ? ' goes' : ' go') + ' to break the ' + work.name + '.'; }
+    else if (foe) { o = { x: foe.x, y: foe.y, foe: foe }; col = RGB.f; words = who + (n === 1 ? ' goes' : ' go') + ' for the enemy.'; }
     else if (node) { o = { x: node.x, y: node.y, mat: 3 }; col = '120,235,255'; words = who + (n === 1 ? ' is' : ' are') + ' to gather lumen here.'; }
     else if (mat) { o = { x: mat.x, y: mat.y, mat: mat.k }; col = RGB.g; words = who + (n === 1 ? ' is' : ' are') + ' to gather ' + G.RES[mat.k] + ' round here.'; }
-    else if (work && soldiers) { o = { x: work.x, y: work.y, work: work }; col = RGB.u; words = 'The fighters and guards among them are to guard the ' + work.name + '.'; }
+    else if (work && !work.enemy && soldiers) { o = { x: work.x, y: work.y, work: work }; col = RGB.u; words = 'The fighters and guards among them are to guard the ' + work.name + '.'; }
     else { o = { x: p.x, y: p.y }; col = soldiers ? RGB.f : RGB.move; words = C.sel.every(function (c) { return c.job === 'f'; }) ? (n === 1 ? 'Its' : 'Their') + ' post is here now.' : C.sel.every(function (c) { return c.job === 'g'; }) ? 'They gather round here now.' : who + (n === 1 ? ' goes' : ' go') + ' there.'; }
-    const cant = C.sel.filter(function (c) { return !G.canReach(W, c, o.y); }).length;
+    const cant = o.work ? 0 : C.sel.filter(function (c) { return !G.canReach(W, c, o.y); }).length;
     acted(); G.order(C.sel, o); FX.push({ x: o.x, y: o.y, t0: now(), col: col, from: C.sel.map(pos) });
     say(words + (cant ? ' (' + (cant === n ? (n === 1 ? 'It is' : 'They are') : cant === 1 ? 'One of them is' : cant + ' of them are') + ' of the ' + (C.sel.filter(function (c) { return !G.canReach(W, c, o.y); })[0].ph.home ? 'land' : 'water') + ': as near as ' + (cant === 1 ? 'it' : 'they') + ' can come.)' : ''), 6);
     if (G.sfx) G.sfx('click'); return true;
@@ -100,7 +101,7 @@
     '#cmd .cgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}#cmd .cgrid button{appearance:none;border:1px solid rgba(207,232,255,.24);background:rgba(7,18,31,.45);border-radius:9px;padding:3px 0 4px;cursor:pointer;color:#dcecf8;font:700 9.5px system-ui;letter-spacing:.03em;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0}' +
     '#cmd .cgrid button img{width:38px;height:38px;display:block}#cmd .cgrid button:hover{border-color:#33d6a6;box-shadow:inset 0 0 12px rgba(51,214,166,.3)}#cmd .cgrid button.on{border-color:#f6d365;box-shadow:inset 0 0 14px rgba(246,211,101,.4)}#cmd .cgrid button.no{opacity:.42}' +
     '#cmd .cq{margin-top:6px;height:40px;overflow:hidden;font-size:11px;line-height:1.35;color:rgba(207,232,255,.85)}#cmd .cq div{display:flex;justify-content:space-between;gap:6px;white-space:nowrap}#cmd .cq div span{overflow:hidden;text-overflow:ellipsis}#cmd .cq a{color:#ff9db0;cursor:pointer;font-weight:800;padding:0 4px}' +
-    '#cmd .ctip{margin-top:6px;height:44px;overflow:hidden;font-size:11px;line-height:1.3;color:#ffe9a8}#cmd .ctip.dim{color:rgba(207,232,255,.55)}' +
+    '#cmd .ctip{margin-top:6px;height:58px;overflow:hidden;font-size:11px;line-height:1.3;color:#ffe9a8}#cmd .ctip.dim{color:rgba(207,232,255,.55)}#cmd .ctip.goal{color:#9dffcf}#cmd .ckeys{margin-top:5px;font-size:9.5px;line-height:1.3;color:rgba(207,232,255,.45)}' +
     '#cmd label{display:flex;align-items:center;gap:4px;cursor:pointer;font:600 9.5px system-ui;letter-spacing:.02em;text-transform:none;color:rgba(207,232,255,.7)}#cmd label input{margin:0;accent-color:#33d6a6}' +
     'body.cmdOpen #zoom{left:262px}@media (min-width:1100px){body.cmdOpen #rarebox{left:262px}}' +
     '#selbar{position:fixed;bottom:14px;left:660px;z-index:4;padding:8px 12px;border-radius:16px;display:flex;flex-direction:column;gap:5px;max-width:calc(100vw - 690px);font:12px system-ui,sans-serif;color:#dcecf8}#selbar.hide{display:none}' +
@@ -122,16 +123,18 @@
       '<span class="sep"></span><span class="r" id="resPop" title="How many live on your star (and how many of them work)"><b>0</b><small>alive</small></span><span class="r bad" id="resFoe" style="display:none;cursor:pointer" title="Enemies on your star: click to see them"><b>0</b><small>enemies</small></span><span class="r warn" id="resRaid" style="display:none"><small style="color:#ffd0a8"></small></span>';
     root.appendChild(res); res.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('#resFoe')) C.seeFoes(); });
     const cmd = document.createElement('div'); cmd.id = 'cmd'; cmd.className = 'glass' + (folded ? ' fold' : '');
-    cmd.innerHTML = '<div class="ch" id="cmdHead" title="Fold or unfold"><b>YOUR COLONY</b><span id="cmdFoldMark">' + (folded ? '+' : '–') + '</span></div><div class="cb">' +
+    cmd.innerHTML = '<div class="ch" id="cmdHead" title="Fold or unfold"><b>YOUR COLONY</b><span id="cmdFoldMark">' + (folded ? '+' : '–') + '</span></div><div class="cb"><div id="cmdStar"></div>' +
       '<div class="csec"><span>TRADES</span><small>have · want</small></div>' +
       ORDER.map(function (k) { return '<div class="crow" data-job="' + k + '" title="' + esc(TIPS[k]) + '"><i style="background:' + COL[k] + '"></i><span class="nm" data-all="' + k + '">' + JOBS[k].name + 's</span><span class="cn" id="cn' + k + '">0</span><button data-want="' + k + '" data-d="-1" aria-label="fewer ' + JOBS[k].many + '">−</button><span class="cw" id="cw' + k + '">0</span><button data-want="' + k + '" data-d="1" aria-label="more ' + JOBS[k].many + '">+</button></div>'; }).join('') +
       '<div class="crow" title="Those with no trade: they live by their own brains, as all of them used to."><i style="background:' + COL[''] + '"></i><span class="nm" data-all="">Free</span><span class="cn" id="cnfree">0</span><span style="width:78px;font-size:10px;color:rgba(207,232,255,.5);text-align:right">no orders</span></div>' +
       '<div class="csec"><span>BUILD</span><label title="When it is on, the kinds of your star also build what they themselves decide on, as they always did."><input type="checkbox" id="cmdAuto">they build too</label></div>' +
       '<div class="cgrid">' + BUILD.map(function (t) { return '<button data-build="' + t + '" title="' + esc(G.BUILDABLE[t].name + ': ' + G.BUILDABLE[t].note) + '"><img alt="" data-pic="' + t + '"><span>' + esc(G.BUILDABLE[t].name) + '</span></button>'; }).join('') + '</div>' +
-      '<div class="cq" id="cmdQ"></div><div class="ctip dim" id="cmdTip"></div></div>';
+      '<div class="cq" id="cmdQ"></div><div class="ctip dim" id="cmdTip"></div><div class="ckeys">Drag: choose · right-click: send · right-drag or W A S D: move the view</div></div>';
     root.appendChild(cmd);
     cmd.addEventListener('click', function (e) {
-      const t = e.target, b = t.closest ? t.closest('[data-want],[data-all],[data-build],[data-cancel],#cmdHead') : null; if (!b) return;
+      const t = e.target, b = t.closest ? t.closest('[data-want],[data-all],[data-build],[data-cancel],[data-found],[data-seeheart],#cmdHead') : null; if (!b) return;
+      if (b.dataset.found) { const why = G.foundOutpost(); if (why) say(why, 6); sig = ''; return; }
+      if (b.dataset.seeheart) { const h = G.foeHeart(G.W); if (h) { G.select(null); G.focusOn(h.x, h.y, 1.4); } return; }
       if (b.id === 'cmdHead') { folded = !folded; cmd.classList.toggle('fold', folded); $('cmdFoldMark').textContent = folded ? '+' : '–'; try { localStorage.setItem('primordia.cmdFold', folded ? '1' : '0'); } catch (e2) { /* not kept */ } sig = ''; return; }
       if (b.dataset.want !== undefined) C.want(b.dataset.want, (+b.dataset.d) * (e.shiftKey ? 5 : 1));
       else if (b.dataset.all !== undefined) C.all(b.dataset.all);
@@ -147,16 +150,34 @@
   }
   const TIPS = { g: 'Gatherers fetch what lies about the star (stone, reed, shell) and lumen, and carry it to the Heart. Click the name to choose them all.', b: 'Builders raise what you order built, from the store and from what lies near. Click the name to choose them all.', f: 'Fighters keep to their rally point, go for any enemy in sight, and attack what you send them against. Click the name to choose them all.', u: 'Guards stand by the place you post them at and do not leave it. Click the name to choose them all.' };
 
+  /** what there is to do next: the first thing on the road from a handful of creatures to a star that holds its own (said in the panel) */
+  function goal(W, col, n) {
+    if (W.farOf) return ''; const Wk = W.works || [], has = function (t) { return Wk.some(function (w) { return w.bp && w.bp.type === t && !w.visitor && !w.enemy; }); }, tower = Wk.some(function (w) { return w.tower; }), r = col.raid;
+    if (r && r.state === 'warn' && n.f + n.u < Math.max(3, r.n - 2)) return 'NEXT: a raid of about ' + r.n + ' lands next spring. Press + next to Fighters until you have ' + Math.max(3, r.n - 1) + ' or more.';
+    if (n.g < 3) return 'NEXT: press + next to Gatherers. They fill the store, and the store is what everything is built from.';
+    if (n.b < 2) return 'NEXT: press + next to Builders (two at least). Then pick something under BUILD and click a place for it.';
+    if (!Wk.some(function (w) { return w.bp && w.bp.type !== 'heart' && !w.visitor; }) && !col.queue.length && !(W.deed && W.deed.ordered)) return 'NEXT: order a House: click House under BUILD, then click a place on the star.';
+    if (n.f + n.u < 4) return 'NEXT: rival stars will raid you' + (col.nextRaid ? ' (about year ' + (col.nextRaid + 1) + ')' : '') + '. Press + next to Fighters: four or more.';
+    if (!tower && col.stock[3] < 3) return 'NEXT: lumen. Choose some gatherers and right-click a crystal (LUMEN on the star). 3 lumen builds a Tower.';
+    if (!tower && !col.queue.some(function (q) { return q.type === 'tower'; })) return 'NEXT: build a Tower near the Heart (3 lumen). It strikes at raiders by itself.';
+    if (!has('port')) return 'NEXT: a Spaceport, on the land. A starship is built on it.';
+    if (!has('ship')) return 'NEXT: a Starship (it is built on the spaceport). It carries a crew to other stars.';
+    if (!G.starsHeld || !G.starsHeld().length) return 'NEXT: open SPACE and send the ship out (4 lumen). Found an outpost on a free star, or break a rival\'s Heart: the star is yours.';
+    if (G.far && !G.far.won) return 'NEXT: take every rival star near you, and this corner of space is yours.';
+    return 'Every rival near you has fallen. The stars are yours.';
+  }
   function refresh() {
     const W = G.W, on = live(); build(); document.body.classList.toggle('cmdOpen', on && !folded);
-    ui.res.style.display = on ? '' : 'none'; ui.cmd.style.display = on ? '' : 'none'; if (!on) { ui.sel.classList.add('hide'); return; }
+    ui.res.style.display = on && G.heartOf(W) ? '' : 'none'; ui.cmd.style.display = on ? '' : 'none'; if (!on) { ui.sel.classList.add('hide'); return; }
+    if (window.innerWidth > 720) { let y = 14; ['wish', 'wxnow', 'voybar', 'voypick'].forEach(function (id) { const e = $(id); if (e && !e.classList.contains('hide') && e.offsetHeight) { const r = e.getBoundingClientRect(); if (r.top < 140 && Math.abs((r.left + r.right) / 2 - window.innerWidth / 2) < 260) y = Math.max(y, r.bottom + 8); } }); if (ui.res.style.top !== y + 'px') ui.res.style.top = y + 'px'; }
     C.sel = C.sel.filter(mine);
-    const col = G.colony(W), n = G.jobCount(W), foes = W.cre.filter(function (c) { return c.team && !c.dead; }).length, hp = G.heartOf(W), hc = hp ? G.buildCount(hp) : [0, 0, 1];
+    const col = G.colony(W), n = G.jobCount(W), foes = W.cre.filter(function (c) { return c.team === 1 && !c.dead; }).length, hp = G.heartOf(W), hc = hp ? G.buildCount(hp) : [0, 0, 1];
     const selSig = C.sel.length + ':' + C.sel.map(function (c) { return c.job || '-'; }).join('');
-    const s = [col.stock.join(','), JSON.stringify(n), JSON.stringify(col.want), foes, col.queue.map(function (q) { return q.id; }).join('.'), W.deed && W.deed.ordered ? W.deed.title + (W.deed.wait || '') + (W.deed.placed || 0) : '', C.placing, C.send, selSig, tip && now() < tipUntil ? tip : '', col.auto, folded, hc.join('/'), col.raid ? col.raid.state + col.raid.id : ''].join('|');
+    const s = [col.stock.join(','), JSON.stringify(n), JSON.stringify(col.want), foes, col.queue.map(function (q) { return q.id; }).join('.'), W.deed && W.deed.ordered ? W.deed.title + (W.deed.wait || '') + (W.deed.placed || 0) : '', C.placing, C.send, selSig, tip && now() < tipUntil ? tip : '', col.auto, folded, hc.join('/'), col.raid ? col.raid.state + col.raid.id : '', (W.works || []).length, G.starsHeld ? G.starsHeld().length : 0, G.starPanel ? G.starPanel(W) : ''].join('|');
     { const se = $('season'); if (se && se.offsetHeight) { const top = Math.round(se.getBoundingClientRect().bottom + 10); if (window.innerWidth > 720 && ui.cmd.style.top !== top + 'px') ui.cmd.style.top = top + 'px'; } }
     if (s === sig) return; sig = s;
     for (let k = 0; k < 4; k++) { const e = $('res' + k); e.querySelector('b').textContent = col.stock[k]; }
+    { const sh = G.starPanel ? G.starPanel(W) : '', se = $('cmdStar'); if (se._h !== sh) { se._h = sh; se.innerHTML = sh; } }
     $('resPop').querySelector('b').textContent = n.all; $('resPop').title = n.all + ' live on your star: ' + (n.all - n.free) + ' work, ' + n.free + ' are free.';
     { const f = $('resFoe'); f.style.display = foes ? '' : 'none'; f.querySelector('b').textContent = foes; const w = $('resRaid'), r = col.raid; w.style.display = r && r.state === 'warn' ? '' : 'none'; if (r && r.state === 'warn') { w.querySelector('small').textContent = 'raid next spring: ~' + r.n; w.title = G.raidText(W) + '.'; } }
     ORDER.forEach(function (k) { const a = $('cn' + k); a.textContent = n[k]; a.classList.toggle('low', n[k] < (col.want[k] | 0)); $('cw' + k).textContent = col.want[k] | 0; });
@@ -167,7 +188,7 @@
       col.queue.slice(0, d ? 1 : 2).forEach(function (q, i) { rows.push('<div><span>' + esc(q.name) + ' · ' + (n.b < 2 ? 'needs 2 builders' : !d && i === 0 && W.deed ? 'after the ' + esc(W.deed.title || 'plan') : 'waiting') + '</span><a data-cancel="' + q.id + '" title="Do not build it">✕</a></div>'); });
       if (col.queue.length > (d ? 1 : 2)) rows[rows.length - 1] = rows[rows.length - 1].replace('</span>', ' (+' + (col.queue.length - (d ? 1 : 2)) + ' more)</span>');
       $('cmdQ').innerHTML = rows.join(''); }
-    { const t = $('cmdTip'), live2 = tip && now() < tipUntil; t.textContent = live2 ? tip : C.placing ? 'Click the place for the ' + G.BUILDABLE[C.placing].name + '. Right-click to let it be.' : 'Drag a box to choose creatures. Right-click sends them. Move the view with the right button, or W A S D.'; t.classList.toggle('dim', !live2 && !C.placing); }
+    { const t = $('cmdTip'), live2 = tip && now() < tipUntil; const gl = !live2 && !C.placing ? goal(W, col, n) : ''; t.textContent = live2 ? tip : C.placing ? 'Click the place for the ' + G.BUILDABLE[C.placing].name + '. Right-click to let it be.' : gl || 'Drag a box to choose creatures. Right-click sends them. Move the view with the right button, or W A S D.'; t.classList.toggle('dim', !live2 && !C.placing && !gl); t.classList.toggle('goal', !!gl); }
     // those you have chosen
     const m = C.sel.length; ui.sel.classList.toggle('hide', !m);
     if (m) { const by = {}; let land = 0; C.sel.forEach(function (c) { by[c.job || ''] = (by[c.job || ''] || 0) + 1; if (c.ph.home) land++; });
@@ -196,6 +217,7 @@
     const st = G.storeAt(W), hp = G.heartOf(W);
     if (st) { for (let k = 0; k < 4; k++) { const n = Math.min(10, Math.ceil(col.stock[k] / (k === 3 ? 2 : 5))); for (let j = 0; j < n; j++) G.matDraw(ctx, { x: st.x - 22 + k * 15 + (j % 2) * 6, y: st.y - 2 - Math.floor(j / 2) * 5, k: k, s: (j * 0.31 + k * 0.17) % 1 }, t); } }
     if (hp) { const c = G.buildCount(hp), top = hp.y + hp.bp.S * 0.45 + 12 * inv; if (c[0] < c[2] || hp.ruin || T - (hp.hitAt || 0) < 4000) { const w = 70 * inv, hh = 6 * inv; ctx.fillStyle = 'rgba(7,18,31,0.75)'; ctx.fillRect(hp.x - w / 2, top, w, hh); ctx.fillStyle = c[0] / c[2] > 0.5 ? '#6ef0a8' : c[0] / c[2] > 0.25 ? '#f6d365' : '#ff5d73'; ctx.fillRect(hp.x - w / 2, top, w * c[0] / c[2], hh); if (hp.ruin) label(ctx, hp.x, top - 13 * inv, inv, 'being raised again', '#ffe9a8', 10); } }
+    { const fh = G.foeHeart ? G.foeHeart(W) : null; if (fh) { const c = G.buildCount(fh), top = fh.y + fh.bp.S * 0.45 + 12 * inv, w = 70 * inv, hh = 6 * inv; ctx.fillStyle = 'rgba(7,18,31,0.75)'; ctx.fillRect(fh.x - w / 2, top, w, hh); ctx.fillStyle = '#ff5d73'; ctx.fillRect(fh.x - w / 2, top, w * c[0] / c[2], hh); label(ctx, fh.x, top + 17 * inv, inv, 'THEIR HEART', '#ff9db0', 10.5); } }
     // what is waiting to be built, and the place being chosen for something
     col.queue.forEach(function (q) { if (q.type === 'ship') return; ctx.strokeStyle = 'rgba(255,154,76,' + (0.55 + 0.2 * Math.sin(t * 3)) + ')'; ctx.lineWidth = 2 * inv; ctx.setLineDash([8 * inv, 7 * inv]); ctx.beginPath(); ctx.ellipse(q.x, q.y - 34, 52, 44, 0, 0, 6.2832); ctx.stroke(); ctx.setLineDash([]); label(ctx, q.x, q.y + 12 * inv, inv, q.name + ': to be built', '#ffd0a8', 10); });
     if (C.placing && G.input.ptr.inside) { const p = G.input.ptr, why = G.buildOk(C.placing, p.wx, p.wy), okc = why ? '255,93,115' : '110,240,168'; ctx.fillStyle = 'rgba(' + okc + ',0.16)'; ctx.strokeStyle = 'rgba(' + okc + ',0.9)'; ctx.lineWidth = 2 * inv; ctx.beginPath(); ctx.ellipse(p.wx, p.wy - 34, 56, 46, 0, 0, 6.2832); ctx.fill(); ctx.stroke();
@@ -213,6 +235,7 @@
     if (!W.deed && G.drawHauls) G.drawHauls(ctx);      // what the gatherers carry (while a plan is on, the plan draws it)
     // the creatures: a ring under the chosen and under enemies, a mark of its trade over every worker, and how hurt those in a fight are
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || c.inShip) continue; const x = c.rx === undefined ? c.x : c.rx, y = c.ry === undefined ? c.y : c.ry, r = c.ph.r;
+      if (c.team === 2) continue;
       if (c.team) { ctx.strokeStyle = 'rgba(255,60,90,' + (0.75 + 0.2 * Math.sin(t * 6 + i)) + ')'; ctx.lineWidth = Math.max(2, 2 * inv); ctx.beginPath(); ctx.ellipse(x, y + r * 0.1, r * 1.35 + 2, r * 0.5 + 1.5, 0, 0, 6.2832); ctx.stroke(); ctx.fillStyle = '#ff3c5a'; ctx.beginPath(); const yy = y - r * 2.2 - 6 * inv, z = Math.max(4, 4.5 * inv); ctx.moveTo(x, yy + z); ctx.lineTo(x - z, yy - z * 0.6); ctx.lineTo(x + z, yy - z * 0.6); ctx.closePath(); ctx.fill(); ctx.strokeStyle = '#14202e'; ctx.lineWidth = inv; ctx.stroke(); }
       else { if (chosen.has(c)) { ctx.strokeStyle = 'rgba(120,255,190,0.95)'; ctx.lineWidth = Math.max(1.6, 2 * inv); ctx.beginPath(); ctx.ellipse(x, y + r * 0.1, r * 1.35 + 2, r * 0.5 + 1.5, 0, 0, 6.2832); ctx.stroke(); }
         if (c.job && COL[c.job]) { const z = Math.max(2.6, 3.4 * inv), yy = y - r * 1.9 - 5 * inv; ctx.fillStyle = COL[c.job]; ctx.strokeStyle = '#14202e'; ctx.lineWidth = Math.max(0.8, inv); ctx.beginPath(); if (c.job === 'f') { ctx.moveTo(x, yy - z * 1.2); ctx.lineTo(x + z, yy + z * 0.8); ctx.lineTo(x - z, yy + z * 0.8); ctx.closePath(); } else if (c.job === 'u') ctx.rect(x - z * 0.85, yy - z * 0.85, z * 1.7, z * 1.7); else if (c.job === 'b') { ctx.moveTo(x, yy - z); ctx.lineTo(x + z, yy); ctx.lineTo(x, yy + z); ctx.lineTo(x - z, yy); ctx.closePath(); } else ctx.arc(x, yy, z * 0.9, 0, 6.2832); ctx.fill(); ctx.stroke(); if (c.hungry) { ctx.fillStyle = 'rgba(7,18,31,0.6)'; ctx.beginPath(); ctx.arc(x, yy, z * 0.45, 0, 6.2832); ctx.fill(); } } }
@@ -231,13 +254,15 @@
   const SHIPS = {};
   function raidShip(r) { const k = r.seed + ':' + Math.round(r.hue); if (!SHIPS[k]) SHIPS[k] = G.blueprintFrom({ seed: r.seed, type: 'ship', S: 74, hue: r.hue, spiky: 1, brain: 0.8, wet: false }, '22222222222222222222222222222222222222222222222222'); return SHIPS[k]; }
   /** take the view to where the enemy is (their raiders, or the ship they came in) */
-  C.seeFoes = function () { const W = G.W; if (!W) return; const L = W.cre.filter(function (c) { return c.team && !c.dead; }), r = G.colony(W).raid; let x = 0, y = 0; if (L.length) { L.forEach(function (c) { x += c.x; y += c.y; }); x /= L.length; y /= L.length; } else if (r && r.state !== 'warn') { x = r.x; y = r.y; } else return; G.select(null); G.focusOn(x, y, 1.5); };
+  C.seeFoes = function () { const W = G.W; if (!W) return; const L = W.cre.filter(function (c) { return c.team === 1 && !c.dead; }), r = G.colony(W).raid; let x = 0, y = 0; if (L.length) { L.forEach(function (c) { x += c.x; y += c.y; }); x /= L.length; y /= L.length; } else if (r && r.state !== 'warn') { x = r.x; y = r.y; } else return; G.select(null); G.focusOn(x, y, 1.5); };
   G.on('raid-warn', function (r) { if (G.mode !== 'play') return; G.banner('A raid is coming', 'The colony of ' + r.name + ' is sending a ship: about ' + r.n + ' raiders will land next spring, and go for your Heart. Name fighters and guards and keep them near it.', 9000); if (G.log) G.log('sel', 'A raid is coming', 'From ' + r.name + ': about ' + r.n + ' raiders, next spring. If the Heart falls they take what is in the store.'); if (G.hub) G.hub.poke(); sig = ''; });
   G.on('raid-land', function (r) { if (G.mode !== 'play') return; if (G.speed > 4) G.setSpeed(1); G.banner('Raid', 'The raiders of ' + r.name + ' are landing on your star! ' + (G.jobCount().f + G.jobCount().u ? 'Your fighters and guards will meet them.' : 'You have no fighters: name some, quickly.'), 8000); if (G.sfx) G.sfx('discovery'); sig = ''; });
   G.on('raid-over', function (r, how) { if (G.mode !== 'play') return; if (how === 'beaten') { G.banner('The raid is beaten', 'Every raider of ' + r.name + ' is slain. You took ' + r.loot + ' lumen from their ship.', 8000); if (G.log) G.log('sel', 'Raid beaten', 'The raiders of ' + r.name + ' are all slain: ' + r.loot + ' lumen taken from their ship.'); } else if (how === 'worn') { if (G.note) G.note('The raid', 'The raiders of ' + r.name + ' have given up and are going home.'); } if (G.hub) G.hub.poke(); sig = ''; });
   if (G.hub) { G.hub.add(function (W) { const col = W.col, r = col && col.raid; if (!r || W.farOf) return null; const txt = G.raidText(W), hp = G.heartOf(W), hc = hp ? G.buildCount(hp) : [0, 0, 1], n = G.jobCount(W);
       const row = G.hub.row({ icon: '!', title: r.state === 'warn' ? 'A raid is coming' : 'Raid', tag: r.state === 'warn' ? 'next spring' : r.state === 'on' ? (r.left || r.n) + ' raiders' : '', bad: true, sub: esc(txt) + '. You have <b>' + n.f + ' fighters</b> and <b>' + n.u + ' guards</b>; the Heart has ' + hc[0] + ' of ' + hc[2] + ' pieces.', act: r.state === 'warn' ? '' : 'foes', live: r.state !== 'warn' });
       return { sig: 'raid' + r.id + r.state + (r.left || 0) + hc[0] + n.f + n.u, dangers: [row], alarm: ['raid' + r.id + r.state], alarmRows: [row] }; }); G.hub.act('foes', function () { C.seeFoes(); }); }
+
+  C.pop = function (x, y, text, colr) { POP.push({ x: x, y: y, t0: now(), text: text, col: colr || '#e8f4ff' }); };
 
   // ── what happens, told ──
   G.on('fight', function (a, b) { const T = now(); a.hpT = T; b.hpT = T; });
@@ -252,10 +277,15 @@
   G.on('build-started', function (o) { if (G.mode === 'play') say('Your builders have started on the ' + o.name + '.', 6); });
   G.on('deed-end', function (d, how) { if (G.mode === 'play' && d && d.ordered) { say(how === 'done' ? 'The ' + d.title + ' is finished.' : 'The ' + d.title + ' was given up: too few builders came to it.', 8); sig = ''; } });
 
+  // the first time a colony is shown: how the mouse works now
+  let told = false; try { told = localStorage.getItem('primordia.cmdTold') === '1'; } catch (e) { told = false; }
+  function tellOnce() { if (told || !live() || G.W.farOf || G.W.gen < 2) return; told = true; try { localStorage.setItem('primordia.cmdTold', '1'); } catch (e) { /* not kept */ }
+    G.banner('You command this star', 'Its creatures are your colony. Give them trades in the panel on the left (+ and −), drag a box round creatures to choose them, and right-click the star to send them. The left button chooses now: move the view with the right button, or W A S D.', 14000); }
+
   // ── keeping it all going ──
   G.addSystem({ name: 'command',
     update: function (dt) {
-      const T = now(); if (T - lastT > 250) { lastT = T; try { refresh(); } catch (e) { console.error(e); } }
+      const T = now(); if (T - lastT > 250) { lastT = T; try { refresh(); tellOnce(); } catch (e) { console.error(e); } }
       // the view is moved with W A S D or the arrow keys
       if (G.mode === 'play' && G.W && !G.isBlocked() && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) { const K = G.input.keys, dx = (K.d || K.ArrowRight ? 1 : 0) - (K.a || K.ArrowLeft ? 1 : 0), dy = (K.s || K.ArrowDown ? 1 : 0) - (K.w || K.ArrowUp ? 1 : 0); if (dx || dy) { const sp = 620 / G.view.scale * Math.min(0.05, dt || 0.016); G.cam.x += dx * sp; G.cam.y += dy * sp; G.applyCam(); } }
     },

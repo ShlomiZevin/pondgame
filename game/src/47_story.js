@@ -46,7 +46,7 @@
     const ch = info.changes || [];
     const top = info.species && info.species[0];
     let text;
-    if (!ch.length) text = 'A quiet stretch. ' + (top ? 'The ' + top.name + ' still rules the pond: ' + top.about : 'Life holds steady.');
+    if (!ch.length) text = 'A quiet stretch. ' + (top ? 'The ' + top.name + ' still rules the star: ' + top.about : 'Life holds steady.');
     else {
       const c = ch[0], up = c.to > c.from;
       const why = /food/.test(c.what) ? (up ? 'they have become better at finding food' : 'food has become harder to find')

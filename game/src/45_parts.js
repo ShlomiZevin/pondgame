@@ -59,7 +59,7 @@
       kid.sp = c.sp; kid.E = kid.ph.Emax * 0.6; kid.P = kid.ph.Emax * 0.4;
       W.births.push({ at: W.st + 0.1 + G.rand() * 1.2, c: kid, x: c.x + G.randn() * 50, y: c.y + G.randn() * 40, from: c }); n++;
     }
-    W.discLog.push({ key: 'bred' + W.gen + c.id, text: 'You bred ' + item.name + ' with a creature of this pond: six children of the two were born.', gen: W.gen });
+    W.discLog.push({ key: 'bred' + W.gen + c.id, text: 'You bred ' + item.name + ' with a creature of this star: six children of the two were born.', gen: W.gen });
     G.emit('bred', item, c);
     return n;
   };
@@ -79,7 +79,7 @@
       c.E = c.ph.Emax * 0.6; c.P = c.ph.Emax * 0.4;
       W.births.push({ at: W.st + 0.1 + G.rand() * 1.5, c: c, x: x + G.randn() * 60, y: y + G.randn() * 50, from: null }); n++;
     }
-    W.discLog.push({ key: 'rel' + W.gen, text: 'You released ' + item.name + ' (' + item.kind + ') into the pond: eight of its kind, to breed with what lives here.', gen: W.gen });
+    W.discLog.push({ key: 'rel' + W.gen, text: 'You released ' + item.name + ' (' + item.kind + ') onto the star: eight of its kind, to breed with what lives here.', gen: W.gen });
     G.emit('released', item, x, y);
     return n;
   };

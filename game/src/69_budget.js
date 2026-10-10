@@ -1,5 +1,5 @@
 // ── A budget for every thing the AI does ──
-// Each kind of AI work has its own budget in dollars FOR THIS POND (what a pond has spent is kept in its save, G.ai.life).
+// Each kind of AI work has its own budget in dollars FOR THIS STAR (what a pond has spent is kept in its save, G.ai.life).
 // When a kind has used its budget it stops, in this pond, for good: nothing more is asked of the AI for it, the place where
 // it shows says so, and it is marked OFF in the costs sheet (the $ chip, top right). A new pond starts with full budgets.
 // The numbers are in one table, here. The server's prices decide what a call costs; this only decides when to stop.
@@ -50,7 +50,7 @@
   A.tally = function (kind, source, usd) {
     tally0(kind, source, usd);
     const k = key(kind);
-    if (!told[k] && A.over(k)) { told[k] = 1; const name = A.LABEL[k] || k; if (G.note) G.note('A budget is used up', name + ' has used its ' + A.money(A.budgetOf(k)) + ' for this pond, so it is off now. See the $ chip for all of them.'); if (G.log) G.log('sel', 'Budget used up', name + ': ' + A.money(A.budgetOf(k)) + ' for this pond. It is off now.'); G.emit('budget-out', k); mark(); }
+    if (!told[k] && A.over(k)) { told[k] = 1; const name = A.LABEL[k] || k; if (G.note) G.note('A budget is used up', name + ' has used its ' + A.money(A.budgetOf(k)) + ' for this star, so it is off now. See the $ chip for all of them.'); if (G.log) G.log('sel', 'Budget used up', name + ': ' + A.money(A.budgetOf(k)) + ' for this star. It is off now.'); G.emit('budget-out', k); mark(); }
   };
   G.on('new-pond', function () { told = {}; setTimeout(mark, 50); });
   /** the player sets a budget (dollars for this pond; 0 = off; nothing = back to the usual one) */
@@ -67,7 +67,7 @@
     const B = document.querySelectorAll('#toolbar button'); if (!B.length) return;
     for (let i = 0; i < B.length; i++) { const b = B[i], t = (b.textContent || '').trim().toUpperCase(), kind = t.indexOf('ADD') === 0 ? 'thing' : t.indexOf('WORLD') === 0 ? 'event' : '';
       if (!kind) continue; const off = A.provider === 'server' && A.over(kind);
-      b.style.opacity = off ? '0.45' : ''; b.title = off ? 'Off: its budget for this pond is used up' : '';
+      b.style.opacity = off ? '0.45' : ''; b.title = off ? 'Off: its budget for this star is used up' : '';
       let tag = b.querySelector('.boff'); if (off && !tag) { tag = document.createElement('i'); tag.className = 'boff'; tag.textContent = 'OFF'; tag.style.cssText = 'font:800 8.5px system-ui,sans-serif;font-style:normal;letter-spacing:.08em;color:#ff9db0;margin-left:5px'; b.appendChild(tag); } else if (!off && tag) tag.remove(); }
   }
   if (typeof setInterval !== 'undefined' && typeof document !== 'undefined') setInterval(mark, 3000);

@@ -59,7 +59,7 @@
   function farPond(i, j, cs, cx, cy) {      // (i, j) is counted from the pond you are IN; space itself is counted from your own pond (57x_far.js)
     if (!i && !j) return null;
     const o = F.origin, I = i + (o ? o.i : 0), J = j + (o ? o.j : 0), jo = o ? F.jit(o.i, o.j) : [0, 0], jt = F.jit(I, J), x = cx + (i + jt[0] - jo[0]) * cs, y = cy + (j + jt[1] - jo[1]) * cs;
-    if (!I && !J) { const L = F.homeLook || {}; return { home: true, i: 0, j: 0, li: i, lj: j, x: x, y: y, r: unit() * 0.3, hue: L.hue === undefined ? 190 : L.hue, name: 'Your pond', kinds: L.kinds || 2 }; }      // seen from a far pond, your own is one of the ponds out there
+    if (!I && !J) { const L = F.homeLook || {}; return { home: true, i: 0, j: 0, li: i, lj: j, x: x, y: y, r: unit() * 0.3, hue: L.hue === undefined ? 190 : L.hue, name: 'Your star', kinds: L.kinds || 2 }; }      // seen from a far pond, your own is one of the ponds out there
     const c = F.cell(I, J); if (!c) return null;
     c.li = i; c.lj = j; c.x = x; c.y = y; c.r = unit() * 0.3 * (c.size || 1); return c;
   }
@@ -176,7 +176,7 @@
     const g = ctx.createRadialGradient(px, py, 0, px, py, w * 0.7); g.addColorStop(0, 'rgba(246,211,101,' + 0.1 * pulse2 + ')'); g.addColorStop(1, 'rgba(246,211,101,0)'); ctx.fillStyle = g; ctx.fillRect(px - w, py - w, w * 2, w * 2);
     ctx.strokeStyle = 'rgba(246,211,101,' + (0.4 + 0.4 * pulse2) + ')'; ctx.lineWidth = Math.max(1, pr * 0.03); ctx.setLineDash([Math.max(3, pr * 0.14), Math.max(3, pr * 0.12)]); ctx.lineDashOffset = -t * 5; G.roundRect(ctx, px - w / 2, py - h / 2, w, h, rr); ctx.stroke(); ctx.setLineDash([]);
     if (pr > 7) { const a = pr * 0.3; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(1.5, pr * 0.06); ctx.beginPath(); ctx.moveTo(px - a, py); ctx.lineTo(px + a, py); ctx.moveTo(px, py - a); ctx.lineTo(px, py + a); ctx.stroke(); }
-    if (pr > 16) { ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '800 ' + Math.round(clamp(pr * 0.2, 11, 15)) + 'px system-ui, sans-serif'; ctx.fillStyle = 'rgba(246,211,101,0.95)'; ctx.fillText('EMPTY PLACE', px, py + h / 2 + 18); ctx.font = '600 10.5px system-ui, sans-serif'; ctx.fillStyle = 'rgba(207,232,255,0.75)'; ctx.fillText('a pond could be put here', px, py + h / 2 + 34); }
+    if (pr > 16) { ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '800 ' + Math.round(clamp(pr * 0.2, 11, 15)) + 'px system-ui, sans-serif'; ctx.fillStyle = 'rgba(246,211,101,0.95)'; ctx.fillText('EMPTY PLACE', px, py + h / 2 + 18); ctx.font = '600 10.5px system-ui, sans-serif'; ctx.fillStyle = 'rgba(207,232,255,0.75)'; ctx.fillText('a star could be put here', px, py + h / 2 + 34); }
   }
   function farPondDraw(ctx, p, px, py, pr, t) {
     if (p.free) { freeDraw(ctx, p, px, py, pr, t); return; }
@@ -196,7 +196,7 @@
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const fs = Math.round(clamp(pr * 0.24, 12, 18)); ctx.font = '800 ' + fs + 'px system-ui, sans-serif';
       const tw = ctx.measureText(p.name).width + 26, ty = py + hh2 + FM * k * 0.5 + 14; ctx.fillStyle = 'rgba(9,20,33,0.85)'; G.roundRect(ctx, px - tw / 2, ty - fs * 0.85, tw, fs * 1.7, fs * 0.85); ctx.fill(); ctx.strokeStyle = col(20, 90, 75, 0.7); ctx.lineWidth = 1.2; ctx.stroke();
       ctx.fillStyle = '#fff'; ctx.fillText(p.name, px, ty + 0.5);
-      ctx.font = '700 10px system-ui, sans-serif'; ctx.fillStyle = col(20, 80, 80, 0.9); { const rec = p.home ? null : F.book[p.i + ',' + p.j]; if (p.home || (rec && rec.mine)) ctx.fillStyle = '#f6d365'; ctx.fillText(p.home ? '\u2691 YOUR OWN POND \u00b7 HOME' : rec && rec.mine ? '\u2691 YOUR PEOPLE HERE: ' + rec.mine : rec ? 'YOU HAVE BEEN HERE' : p.kinds + (p.kinds === 1 ? ' KIND LIVES HERE' : ' KINDS LIVE HERE'), px, ty + fs * 1.5); }
+      ctx.font = '700 10px system-ui, sans-serif'; ctx.fillStyle = col(20, 80, 80, 0.9); { const rec = p.home ? null : F.book[p.i + ',' + p.j]; if (p.home || (rec && rec.mine)) ctx.fillStyle = '#f6d365'; ctx.fillText(p.home ? '\u2691 YOUR OWN STAR \u00b7 HOME' : rec && rec.mine ? '\u2691 YOUR PEOPLE HERE: ' + rec.mine : rec ? 'YOU HAVE BEEN HERE' : p.kinds + (p.kinds === 1 ? ' KIND LIVES HERE' : ' KINDS LIVE HERE'), px, ty + fs * 1.5); }
     }
   }
 
@@ -276,7 +276,7 @@
     for (let k = 0; k < P.length; k++) { const p = P[k], px = p.x * v.scale + v.ox, py = p.y * v.scale + v.oy, pr = p.r * v.scale;
       if (px + pr * 4 < 0 || py + pr * 4 < 0 || px - pr * 4 > v.w || py - pr * 5 > v.h) continue;
       if (pr < 1.4) { ctx.fillStyle = 'hsla(' + p.hue + ',85%,72%,0.9)'; ctx.fillRect(px - 1.2, py - 1.2, 2.4, 2.4); continue; }
-      farPondDraw(ctx, p, px, py, pr, t); }
+      farPondDraw(ctx, p, px, py, pr, t); if (G.starMark) G.starMark(ctx, p, px, py, pr, t); }      // (whose it is, and what it is rich in: 68b_stars.js)
     // falling stars, often; and now and then a comet taking its time across the sky
     for (let lane = 0; lane < 2; lane++) { const T = lane ? 4.3 : 2.9, n = Math.floor(t / T), u = (t - n * T) / 0.8; if (u < 1 && hash(n, lane, 77) < 0.8) { const sx = hash(n, lane, 71) * v.w, sy = hash(n, lane, 72) * v.h * 0.75, an = 0.45 + hash(n, lane, 73) * 0.7, L = 120 + 190 * hash(n, lane, 74), hx = sx + Math.cos(an) * L * u * 2.2, hy = sy + Math.sin(an) * L * u * 2.2, g = ctx.createLinearGradient(hx, hy, hx - Math.cos(an) * L, hy - Math.sin(an) * L); g.addColorStop(0, 'rgba(255,255,255,' + 0.95 * (1 - u) + ')'); g.addColorStop(1, 'rgba(160,210,255,0)'); ctx.strokeStyle = g; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx - Math.cos(an) * L, hy - Math.sin(an) * L); ctx.stroke(); } }
     { const T = 23, n = Math.floor(t / T), u = (t - n * T) / 9; if (u < 1) { const fromL = hash(n, 8, 81) < 0.5, an = (fromL ? 0.25 : 2.9) + (hash(n, 8, 82) - 0.5) * 0.5, sx = fromL ? -80 : v.w + 80, sy = hash(n, 8, 83) * v.h * 0.6, D = Math.hypot(v.w, v.h) * 1.2, hx = sx + Math.cos(an) * D * u, hy = sy + Math.sin(an) * D * u, L = 260, fade = Math.sin(3.1416 * u);
@@ -289,7 +289,7 @@
     else { edgePart(); const O = sheet(main.canvas.width, main.canvas.height); spacePart(O.getContext('2d'), true, O); main.setTransform(1, 0, 0, 1, 0, 0); main.drawImage(O, 0, 0); }
     // seen from afar, our own is named
     if (G.cam.z < 0.45) { ctx.save(); ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); const px = ww / 2 * v.scale + v.ox, py = (wh + MG * 0.55) * v.scale + v.oy + 14; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = '800 14px system-ui, sans-serif'; ctx.fillStyle = '#f6d365'; ctx.fillText(F.there() ? F.there().name.toUpperCase() : 'YOUR POND', px, py); ctx.font = '600 11px system-ui, sans-serif'; ctx.fillStyle = 'rgba(207,232,255,0.85)'; ctx.fillText('generation ' + W.gen + ' · ' + W.cre.length + ' alive' + (F.there() ? ' · you are visiting' : '') + (F.there() ? '' : asleep ? ' · waiting for you' : ''), px, py + 17); ctx.restore(); }
+      ctx.font = '800 14px system-ui, sans-serif'; ctx.fillStyle = '#f6d365'; ctx.fillText(F.there() ? F.there().name.toUpperCase() : 'YOUR STAR', px, py); ctx.font = '600 11px system-ui, sans-serif'; ctx.fillStyle = 'rgba(207,232,255,0.85)'; ctx.fillText('generation ' + W.gen + ' · ' + W.cre.length + ' alive' + (F.there() ? ' · you are visiting' : '') + (F.there() ? '' : asleep ? ' · waiting for you' : ''), px, py + 17); ctx.restore(); }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
   // the camera's flight is stepped BEFORE the pond is drawn, so the pond and the space round it are always drawn from the same place
@@ -323,7 +323,7 @@
       '#farcard{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:8;width:min(440px,calc(100vw - 28px));padding:13px 16px 14px;border-radius:18px;font:500 12.5px/1.45 system-ui,sans-serif;color:#cfe8ff;text-align:center}#farcard b{display:block;font:800 18px system-ui,sans-serif;color:#fff;margin:2px 0 4px}#farcard .k{font:700 9.5px system-ui,sans-serif;letter-spacing:.2em;color:#f6d365;text-transform:uppercase}#farcard .ks{display:flex;justify-content:center;gap:6px;margin:4px 0 6px}#farcard .ks img{width:76px;height:76px}#farcard .r{display:flex;gap:8px;margin-top:10px}#farcard .r .btn{flex:1;min-height:34px}';
     document.head.appendChild(st);
     const host = document.getElementById('ui') || document.body;
-    home = document.createElement('button'); home.id = 'gohome'; home.className = 'hide'; home.innerHTML = '<i>➤</i><span>BACK TO MY POND</span><small></small>'; host.appendChild(home);
+    home = document.createElement('button'); home.id = 'gohome'; home.className = 'hide'; home.innerHTML = '<i>➤</i><span>BACK TO MY STAR</span><small></small>'; host.appendChild(home);
     home.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
     home.addEventListener('click', function (e) { e.stopPropagation(); if (G.sfx) G.sfx('click'); G.goHome(); });
     card = document.createElement('div'); card.id = 'farcard'; card.className = 'glass hide'; host.appendChild(card);
@@ -340,7 +340,7 @@
     // out in space the pond's own panels step aside: only the way home, the card of a far place and the zoom buttons stay. They come back with the pond.
     if (asleep !== wasAsleep) { wasAsleep = asleep; const host = document.getElementById('ui'); if (host) host.classList.toggle('exploring', asleep); const wx = document.getElementById('wxfx'); if (wx) wx.style.visibility = asleep ? 'hidden' : ''; }
     if (away !== wasAway) { wasAway = away; home.classList.toggle('hide', !away); }
-    if (away) { const cx = W.ww / 2, cy = W.wh / 2, dx = cx - G.cam.x, dy = cy - G.cam.y, d = Math.hypot(dx, dy) / unit(), rot = seen ? 'rotate(-90deg)' : 'rotate(' + (Math.round(Math.atan2(dy, dx) * 20) / 20) + 'rad)', txt = seen ? '' : Math.max(1, Math.round(d)) + (Math.round(d) <= 1 ? ' pond away' : ' ponds away');
+    if (away) { const cx = W.ww / 2, cy = W.wh / 2, dx = cx - G.cam.x, dy = cy - G.cam.y, d = Math.hypot(dx, dy) / unit(), rot = seen ? 'rotate(-90deg)' : 'rotate(' + (Math.round(Math.atan2(dy, dx) * 20) / 20) + 'rad)', txt = seen ? '' : Math.max(1, Math.round(d)) + (Math.round(d) <= 1 ? ' star away' : ' stars away');
       if (rot !== lastRot) { lastRot = rot; home.firstChild.style.transform = rot; } if (txt !== lastTxt) { lastTxt = txt; home.lastChild.textContent = txt; } }
     if (!on && shown) hideCard();
   }
@@ -353,11 +353,11 @@
     ui(); if (G.sfx) G.sfx('click');
     G.flyTo(hit.x, hit.y + hit.r * 0.7, clamp(v.h * 0.17 / (hit.r * v.base), ZMIN, 1.2), 1.0);
     shown = hit.name;
-    if (hit.free) { card.innerHTML = '<div class="k">An empty place</div><b>Nobody lives here yet</b>This is what a free place in space looks like. Someone with no pond yet will be able to choose a place like this one and start their pond here, next to whoever is already nearby. For now it is only shown: placing a pond is not open yet.<div class="r"><button class="btn sm" id="farHome">BACK TO MY POND</button><button class="btn sm" id="farClose">CLOSE</button></div>'; card.classList.remove('hide'); return; }
+    if (hit.free) { card.innerHTML = '<div class="k">An empty place</div><b>Nobody lives here yet</b>This is what a free place in space looks like. Someone with no star yet will be able to choose a place like this one and start their star here, next to whoever is already nearby. For now it is only shown: placing a star is not open yet.<div class="r"><button class="btn sm" id="farHome">BACK TO MY STAR</button><button class="btn sm" id="farClose">CLOSE</button></div>'; card.classList.remove('hide'); return; }
     cardPond = hit;
     const K = kindsOf(hit); let pics = ''; for (let k = 0; k < K.length; k++) { try { pics += '<img alt="" src="' + K[k].toDataURL('image/png') + '">'; } catch (e) { /* no picture */ } }
     if (G.farCardHtml) { card.innerHTML = G.farCardHtml(hit, pics, K.length); card.classList.remove('hide'); return; }
-    card.innerHTML = '<div class="k">A far pond</div><b>' + G.escapeHtml(hit.name) + '</b>' + (pics ? '<div class="ks">' + pics + '</div>' : '') + K.length + (K.length === 1 ? ' kind lives' : ' kinds live') + ' here. One day this will be somebody else\'s living pond, and you will be able to go in, look around and meet them. For now it is only a place on the map: visiting is not open yet.<div class="r"><button class="btn sm" id="farHome">BACK TO MY POND</button><button class="btn sm" id="farClose">CLOSE</button></div>';
+    card.innerHTML = '<div class="k">A far star</div><b>' + G.escapeHtml(hit.name) + '</b>' + (pics ? '<div class="ks">' + pics + '</div>' : '') + K.length + (K.length === 1 ? ' kind lives' : ' kinds live') + ' here. One day this will be somebody else\'s living star, and you will be able to go in, look around and meet them. For now it is only a place on the map: visiting is not open yet.<div class="r"><button class="btn sm" id="farHome">BACK TO MY STAR</button><button class="btn sm" id="farClose">CLOSE</button></div>';
     card.classList.remove('hide');
   });
   G.on('new-pond', function () { fly = null; asleep = false; snap = null; skip = false; wasAsleep = null; wasAway = null; hideCard(); for (const q in KIND) delete KIND[q]; });

@@ -151,6 +151,8 @@ function drawWaterDepth() {
   // every pond's water has its own colour, and murky water is dimmer
   const E = G.W && G.W.env;
   if (E) { ctx.fillStyle = 'hsla(' + Math.round(E.hue) + ',70%,' + Math.round(46 - 14 * E.murk) + '%,' + (0.2 + 0.1 * E.murk).toFixed(2) + ')'; ctx.fillRect(0, 0, v.w, v.h); }
+  // every star's terrain colours its sea (52c_terrain.js)
+  if (G.W && G.terrainLook && !G.W.title) { const TL = G.terrainLook(G.W); ctx.fillStyle = TL.sea; ctx.fillRect(0, 0, v.w, v.h); ctx.fillStyle = TL.deep; ctx.fillRect(0, 0, v.w, v.h); }
   // the pond runs from bright shallows (left) to the dark deep (right)
   const d = ctx.createLinearGradient(0, 0, v.w, 0);
   d.addColorStop(0, 'rgba(246,211,101,0.07)'); d.addColorStop(0.45, 'rgba(7,18,31,0)'); d.addColorStop(1, 'rgba(7,18,31,0.55)');
@@ -212,16 +214,18 @@ function drawShore() {
   beginWorld(ctx);
   ctx.save();
   const g = ctx.createLinearGradient(0, 0, 0, sy + 30);
-  g.addColorStop(0, 'rgba(70,96,58,0.96)'); g.addColorStop(0.72, 'rgba(120,128,78,0.9)'); g.addColorStop(0.9, 'rgba(196,180,120,0.7)'); g.addColorStop(1, 'rgba(196,180,120,0)');
+  const TL = G.terrainLook && !W.title ? G.terrainLook(W) : null, LC = TL ? TL.land : ['rgba(70,96,58,0.96)', 'rgba(120,128,78,0.9)', 'rgba(196,180,120,0.7)', 'rgba(196,180,120,0)'];      // (the ground of this star's terrain)
+  g.addColorStop(0, LC[0]); g.addColorStop(0.72, LC[1]); g.addColorStop(0.9, LC[2]); g.addColorStop(1, LC[3]);
   ctx.fillStyle = g;
   ctx.beginPath(); ctx.moveTo(-50, -50); ctx.lineTo(W.ww + 50, -50); ctx.lineTo(W.ww + 50, sy);
   for (let x = W.ww + 50; x >= -50; x -= 40) ctx.lineTo(x, sy + 9 * Math.sin(x * 0.011 + G.rt * 0.5) + 6 * Math.sin(x * 0.031));
   ctx.closePath(); ctx.fill();
-  // tufts of grass
-  ctx.strokeStyle = 'rgba(140,200,110,0.55)'; ctx.lineWidth = 2;
-  for (let i = 0; i < 60; i++) { const x = (i * 0.618034 % 1) * W.ww, y = 10 + ((i * 0.3711) % 1) * (sy - 26), sw = Math.sin(G.rt * 1.4 + i) * 3; ctx.beginPath(); ctx.moveTo(x, y + 8); ctx.lineTo(x + sw, y - 2); ctx.moveTo(x + 4, y + 8); ctx.lineTo(x + 6 + sw, y); ctx.stroke(); }
+  // tufts of grass (where this terrain grows any)
+  ctx.strokeStyle = TL ? (TL.tuft || 'rgba(0,0,0,0)') : 'rgba(140,200,110,0.55)'; ctx.lineWidth = 2;
+  if (!TL || TL.tuft) for (let i = 0; i < 60; i++) { const x = (i * 0.618034 % 1) * W.ww, y = 10 + ((i * 0.3711) % 1) * (sy - 26), sw = Math.sin(G.rt * 1.4 + i) * 3; ctx.beginPath(); ctx.moveTo(x, y + 8); ctx.lineTo(x + sw, y - 2); ctx.moveTo(x + 4, y + 8); ctx.lineTo(x + 6 + sw, y); ctx.stroke(); }
+  if (TL && G.drawTerrainLand) { try { G.drawTerrainLand(ctx, W, sy); } catch (e) { if (!drawShore.err) { drawShore.err = 1; console.error(e); } } }
   // the waterline
-  ctx.strokeStyle = 'rgba(207,232,255,0.35)'; ctx.lineWidth = 2; ctx.beginPath();
+  ctx.strokeStyle = TL ? TL.line : 'rgba(207,232,255,0.35)'; ctx.lineWidth = 2; ctx.beginPath();
   for (let x = -50; x <= W.ww + 50; x += 40) { const y = sy + 9 * Math.sin(x * 0.011 + G.rt * 0.5) + 6 * Math.sin(x * 0.031); if (x === -50) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
   ctx.stroke();
   ctx.restore();
@@ -946,6 +950,7 @@ G.addSystem({
     drawWaterDepth();
     drawCaustics();
     drawDustFar();
+    if (G.drawTerrainSea && G.W && !G.W.title) { try { beginWorld(ctx); G.drawTerrainSea(ctx, G.W); } catch (e) { if (!drawShore.err2) { drawShore.err2 = 1; console.error(e); } } }      // what stands on the sea floor of this star
     drawShore();
     drawHazardWashes();
     drawFood();

@@ -56,20 +56,20 @@
     if (z.ate) facts.push('It has eaten <b>' + z.ate + '</b> creatures.');
     if (z.vis > 5) facts.push('Creatures have spent <b>' + Math.round(z.vis) + '</b> seconds inside it.');
     if (living) facts.push('It is alive: it grows in the light, shrinks when grazed, and spreads' + (z.kids ? ' (it has budded <b>' + z.kids + '</b> new patches)' : '') + '.');
-    if (z.p.nut > 0.3) { const u = G.usedBy(z); facts.push('How well the pond uses it: <b>' + Math.round(u.eaten * 100) + '%</b> of its food gets eaten, and <b>' + Math.round(u.can * 100) + '%</b> of creatures can eat it.'); }
+    if (z.p.nut > 0.3) { const u = G.usedBy(z); facts.push('How well the star uses it: <b>' + Math.round(u.eaten * 100) + '%</b> of its food gets eaten, and <b>' + Math.round(u.can * 100) + '%</b> of creatures can eat it.'); }
     if (G.isBad(z)) {
       const w = G.WEAK[z.weak]; let n = 0; const cre = G.W.cre;
       for (let i = 0; i < cre.length; i++) if (G.weakPower(cre[i], z.weak) > 0.2) n++;
       facts.push('<span style="color:var(--gold)">Its weakness: ' + w.text + '.</span> <b>' + (cre.length ? Math.round(100 * n / cre.length) : 0) + '%</b> of creatures carry them' + (z.hit > 0.02 ? ', and they have worn it down by <b>' + Math.round(Math.min(1, z.hit / 1.2) * 100) + '%</b>.' : '.'));
     }
-    if (z.p.poison + z.p.acid + z.p.eats + (z.p.deadly || 0) > 0.25) { const a = G.adaptedTo(z); facts.push('The pond has adapted to it: <b>' + Math.round(a * 100) + '%</b>' + (a > 0.45 ? ' (they have learned to live with it).' : a > 0.2 ? ' (they are learning).' : ' (so far it still hurts).')); }
-    if (z.haven) { const n = Math.min(G.HAVEN_ROOM || 3, Math.max(z.hvPrev || 0, z.hvNow || 0)); facts.length = 0; facts.push('<b>' + n + ' of ' + (G.HAVEN_ROOM || 3) + '</b> places are taken. Only marvels can enter, and only through the gate at the bottom.', 'Inside, a marvel is fed, kept from harm and does not die of old age. A child born here is a marvel one time in four.', 'It stands for about <b>' + Math.round(z.life) + '</b> more seconds of pond time; then you can add another.'); }
+    if (z.p.poison + z.p.acid + z.p.eats + (z.p.deadly || 0) > 0.25) { const a = G.adaptedTo(z); facts.push('The star has adapted to it: <b>' + Math.round(a * 100) + '%</b>' + (a > 0.45 ? ' (they have learned to live with it).' : a > 0.2 ? ' (they are learning).' : ' (so far it still hurts).')); }
+    if (z.haven) { const n = Math.min(G.HAVEN_ROOM || 3, Math.max(z.hvPrev || 0, z.hvNow || 0)); facts.length = 0; facts.push('<b>' + n + ' of ' + (G.HAVEN_ROOM || 3) + '</b> places are taken. Only marvels can enter, and only through the gate at the bottom.', 'Inside, a marvel is fed, kept from harm and does not die of old age. A child born here is a marvel one time in four.', 'It stands for about <b>' + Math.round(z.life) + '</b> more seconds of star time; then you can add another.'); }
     if (z.act && G.actWords) { const aw = G.actWords(z); for (let i = aw.length - 1; i >= 0; i--) facts.unshift(aw[i]); if (z.deaths) facts.push('It has struck down <b>' + z.deaths + '</b> creatures.'); }
     if (!facts.length) facts.push('Nothing has happened to it yet.');
     const ev = (z.ev || []).map(function (e) { return '<div><small>g' + e.g + '</small> ' + esc(e.t) + '</div>'; }).join('');
     const lifeTxt = living ? 'Health' : 'Time left';
     card.innerHTML = '<div class="ihead">' + picture(z) + '<div><b>' + esc(z.word) + (living && z.genN > 1 ? ' <small>· generation ' + z.genN + '</small>' : '') + '</b><small>' + esc(z.note || '') + '</small>' + (by ? '<small style="color:var(--gold)">imagined by ' + esc(by) + '</small>' : '') + '</div><button class="x" id="zclose" aria-label="Close">' + G.ICON.close + '</button></div>' +
-      '<div class="ilabel">What it does</div>' + (bars || (z.haven ? '<small>Shelters the marvels of the pond.</small>' : z.act ? '' : '<small>Very little.</small>')) +
+      '<div class="ilabel">What it does</div>' + (bars || (z.haven ? '<small>Shelters the marvels of the star.</small>' : z.act ? '' : '<small>Very little.</small>')) +
       '<div class="ilabel">' + lifeTxt + '</div><div class="meter"><i id="zlife"></i></div>' +
       '<div class="ilabel">Its story</div><div class="log" style="height:auto;max-height:96px" id="zev">' + ev + '</div>' +
       '<div id="zfacts" style="font-size:11.5px;line-height:1.45;margin-top:6px">' + facts.join(' ') + '</div>';
@@ -121,7 +121,7 @@
       return { t: does + (taken ? ' · ' + taken + ' taken' : '') + (z.hurtN ? ' · hurting ' + z.hurtN : '') + (z.atk ? ' · ' + z.atk + ' fighting back' : ' · weak to ' + w), tone: z.atk ? 'fight' : 'bad', bar: z.alive > 0.25 ? G.clamp(z.health, 0, 1) : G.clamp(z.life / (z.life0 || 120), 0, 1) };
     }
     if (z.haven) { const n = Math.min(G.HAVEN_ROOM || 3, Math.max(z.hvPrev || 0, z.hvNow || 0)); return { t: 'shelters marvels · ' + n + ' of ' + (G.HAVEN_ROOM || 3) + ' places taken', tone: 'good', bar: null }; }
-    if (p.nut > 0.2) { const u = G.usedBy ? G.usedBy(z) : null; return { t: 'feeds the pond' + (u ? ' · ' + pct(u.can) + ' can eat it' : '') + (z.near ? ' · ' + z.near + ' here' : ''), tone: 'good', bar: null }; }
+    if (p.nut > 0.2) { const u = G.usedBy ? G.usedBy(z) : null; return { t: 'feeds the star' + (u ? ' · ' + pct(u.can) + ' can eat it' : '') + (z.near ? ' · ' + z.near + ' here' : ''), tone: 'good', bar: null }; }
     const what = Math.abs(p.heat) > 0.3 ? (p.heat > 0 ? 'warms the water' : 'chills the water') : Math.abs(p.light) > 0.3 ? (p.light > 0 ? 'lights the water' : 'darkens the water') : p.sticky > 0.3 ? 'slows what touches it' : p.pull ? (p.pull > 0 ? 'draws creatures in' : 'drives creatures away') : p.hard > 0.3 ? 'blocks the way' : 'drifts';
     return { t: what + (z.near ? ' · ' + z.near + ' here' : ''), tone: 'calm', bar: null };
   };

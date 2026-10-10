@@ -25,7 +25,7 @@
 
   /** a raid is announced: it will land next spring. who: one of G.rivals() (the nearest, if none is given) */
   G.raidWarn = function (who, n) {
-    const W = G.W, c = col(W); if (c.raid || W.farOf) return null; const R = G.rivals(); who = who || R[(c.raidN || 0) % Math.max(1, Math.min(2, R.length))]; if (!who) return null;
+    const W = G.W, c = col(W); if (c.raid || W.farOf) return null; const R = G.rivals().filter(function (q) { const b = G.far.book[q.key]; return !(b && b.held); }); who = who || R[(c.raidN || 0) % Math.max(1, Math.min(2, R.length))]; if (!who) return null;      // (a rival whose star is yours raids no more)
     c.raid = { id: (c.raidN || 0) + 1, key: who.key, i: who.i, j: who.j, name: who.name, hue: who.hue, n: n || G.raidSize(W), landGen: W.gen + 1, state: 'warn', out: 0, t0: 0, x: 0, y: 0, seed: 1 + ((G.far.hash(who.i, who.j, 71) * 9000) | 0) };
     G.emit('raid-warn', c.raid); return c.raid;
   };
@@ -34,7 +34,7 @@
     let x = G.rand() < 0.5 ? W.ww * 0.2 : W.ww * 0.8; if (port && Math.abs(port.x - x) < 260) x = W.ww - x; x = clamp(x, e, W.ww - e);
     r.x = x; r.y = Math.max(70, sy - 34); r.state = 'land'; r.t0 = W.t; r.out = 0; r.landed = W.gen; G.emit('raid-land', r, hp);
   }
-  function raiders(W, r) { const out = []; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.team && c.raid === r.id && !c.dead && !c.gone) out.push(c); } return out; }
+  function raiders(W, r) { const out = []; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.team === 1 && c.raid === r.id && !c.dead && !c.gone) out.push(c); } return out; }
   function stepOut(W, r) {
     const F = G.far, kinds = F.kindsOf(r.p || F.cell(r.i, r.j) || { i: r.i, j: r.j, kinds: 2, hue: r.hue }); let pool = kinds.length ? kinds : (W.species || []).filter(function (s) { return s.rep && !s.extinct; }).map(function (s) { return s.rep; }); if (!pool.length) return;
     // of that star's kinds, the ones best made for fighting come; each a little its own
@@ -55,7 +55,7 @@
   // the raid itself
   { const s0 = G.step; G.step = function (dt) { s0(dt); const W = G.W; if (!W || W.title || !W.col || !W.col.raid) return; const c = W.col, r = c.raid;
       if (r.state === 'warn') { if (W.gen >= r.landGen && W.season === 0 && W.st > 1.5) land(W, c); return; }
-      if (!r.bound) { r.bound = 1; W.cre.forEach(function (q) { if (q.team && !q.raid) { q.raid = r.id; q.from = { x: r.x, y: r.y + 10 }; } }); }      // (a game opened again in the middle of a raid: its raiders are that raid's)
+      if (!r.bound) { r.bound = 1; W.cre.forEach(function (q) { if (q.team === 1 && !q.raid) { q.raid = r.id; q.from = { x: r.x, y: r.y + 10 }; } }); }      // (a game opened again in the middle of a raid: its raiders are that raid's)
       const t = W.t - r.t0;
       if (r.state === 'land') { if (t > 3 && r.out < r.n) { if (t > 3 + r.out * 0.55) stepOut(W, r); } else if (r.out >= r.n) { r.state = 'on'; r.t0 = W.t; } return; }
       if (r.state === 'on') { const L = raiders(W, r); r.left = L.length; if (!L.length) { over(W, c, c.fellNow === r.id ? 'won' : 'beaten'); return; }

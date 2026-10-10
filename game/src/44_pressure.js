@@ -38,7 +38,7 @@
     // short of breath: more than a fifth of the pond's breaths last season came up short
     if (W.lastStats && W.cre.length && (W.lastStats.gasp || 0) > W.lastStats.breaths * 0.2) { P.o2 = 2; P.list.push('the water is thin on oxygen (fins and frills breathe better; small bodies need less)'); }
     if (light > 1.2) { fx('photo', 2.5); P.list.push('there is plenty of light'); }
-    if (W.mods.length && G.modSum('poison') > 0.1) { fx('poison', 4); P.c[8] += 2; P.list.push('the whole pond is poisoned'); }
+    if (W.mods.length && G.modSum('poison') > 0.1) { fx('poison', 4); P.c[8] += 2; P.list.push('the whole star is poisoned'); }
     // size: a hunter takes only prey well under its own size, so danger makes a bigger body a likelier thing to stumble on; hunger, heat and thin air favour small bodies
     if (W.lastStats && (W.lastStats.killed > 5 || W.lastStats.fights > 12)) { P.size += 1; P.sizeWhy = 'to be too big to bite'; }
     if (W.lastStats && W.lastStats.protShort > W.cre.length * 0.3 && P.size <= 0) { P.size -= 0.5; P.sizeWhy = 'to need less food'; }

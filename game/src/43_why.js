@@ -66,7 +66,7 @@
     const cre = G.W.cre; let a = 0, an = 0, b = 0, bn = 0;
     for (let i = 0; i < cre.length; i++) { if (has(cre[i])) { a += cre[i].fit || 0; an++; } else { b += cre[i].fit || 0; bn++; } }
     if (an < 3) return '';
-    if (bn < 3) return 'Nearly all of the pond has it now.';
+    if (bn < 3) return 'Nearly all of the star has it now.';
     a /= an; b /= bn;
     if (a > b + 0.03) return 'Those that have it scored ' + a.toFixed(2) + ' this year; the rest ' + b.toFixed(2) + '.';
     if (a < b - 0.03) return 'It does not pay yet: ' + a.toFixed(2) + ' against ' + b.toFixed(2) + ' for the rest. It spread through mates, kin or luck, and may not last.';
@@ -77,7 +77,7 @@
     const out = [];
     const f = G.forWhat(key);
     if (f) out.push(f.charAt(0).toUpperCase() + f.slice(1) + '.'); else if (extra) out.push(extra);
-    if (admired(key)) out.push('It is admired in this pond, so its owners are chosen as mates.');
+    if (admired(key)) out.push('It is admired on this star, so its owners are chosen as mates.');
     const has = hasFn(key);
     if (has) { const e = G.edge(has); if (e) out.push(e); }
     return out.length ? 'Why: ' + out.join(' ') : '';

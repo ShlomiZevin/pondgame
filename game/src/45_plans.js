@@ -65,7 +65,7 @@
     out.creatures = live.map(function (s) { return { kind: G.form.kind(s.rep.f).full, share: Math.round(100 * s.n / Math.max(1, W.cre.length)) + '%', body: G.form.facts(s.rep.f).slice(0, 8).join('; '), beauty: s.judge ? Math.round(s.judge.score * 10) + '/10 (' + s.judge.why + ')' : 'not graded yet' }; });
     out.keptByPlayer = (G.collection || []).slice(-3).map(function (it) { return it.kind; });
     const tried = [];
-    const share = function (test) { let n = 0; for (let i = 0; i < W.cre.length; i++) if (test(W.cre[i].g.f)) n++; return Math.round(100 * n / Math.max(1, W.cre.length)) + '% of the pond has it'; };
+    const share = function (test) { let n = 0; for (let i = 0; i < W.cre.length; i++) if (test(W.cre[i].g.f)) n++; return Math.round(100 * n / Math.max(1, W.cre.length)) + '% of the star has it'; };
     (W.plans || []).forEach(function (p) { tried.push({ idea: p.name + ' (a shape of body)', now: share(function (f) { return f.pl === p.id; }) }); });
     (W.designs || []).forEach(function (d) { tried.push({ idea: d.name + ' (a part)', now: share(function (f) { return f.rules.some(function (q) { return q.k === 8 && q.t === d.id; }); }) }); });
     (W.museLog || []).slice(-5).forEach(function (m) { tried.push({ idea: m.name, now: 'gone: ' + m.what }); });

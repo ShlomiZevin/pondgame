@@ -833,7 +833,7 @@
       const byP = Math.floor(p.P / (cost * p.ph.pneed));
       if (byP < n) { W.stats.protShort += n - byP; n = byP > 0 ? byP : (G.rand() < 0.25 ? 1 : 0); }
       if (G.marvelBlessed && G.marvelBlessed(p) && n < 1 && p.E > cost * 0.6) n = 1;      // a new marvel is treasured: its carriers have a child if they at all can
-      if (p.team) n = 0;      // (raiders have come to break, not to settle)
+      if (p.raid) n = 0;      // (raiders have come to break, not to settle)
       if (p.jobF > 1.12 && n < 3) n++; else if (p.jobF < 0.9 && n > 1) n--;      // the colony sees its best workers fed: they have a child more, and its worst a child less
       if (n > 0) plan.push({ p: p, n: n });
     }
@@ -916,7 +916,7 @@
         child.sp = p.sp; child.E = child.ph.Emax * 0.6; child.P = child.ph.Emax * 0.3;
         W.births.push({ at: 0.3 + G.rand() * 3.4, c: child, x: nx + G.randn() * 40, y: ny + G.randn() * 30, from: null, mate: null });
       }
-      if (W.gen - (W.arkGen || -99) > 30) { W.arkGen = W.gen; W.discLog.push({ key: 'ark' + W.gen, text: 'Almost all of them were gone. A few small survivors turned up in a sheltered corner of the pond.', gen: W.gen }); }
+      if (W.gen - (W.arkGen || -99) > 30) { W.arkGen = W.gen; W.discLog.push({ key: 'ark' + W.gen, text: 'Almost all of them were gone. A few small survivors turned up in a sheltered corner of the star.', gen: W.gen }); }
     }
     // the hall of fame: the best the watcher has really seen. A couple of children a spring are one of them crossed with a good survivor, so what once was
     // lovable is not lost to drift, to a sickness of the common kind or to a pressure that favoured something plainer
@@ -1016,7 +1016,7 @@
     // generations, and falls as soon as it does. See G.mutate (size), G.derive (what size costs) and winter (who lasts).
     { let ap = 0; for (let i = 0; i < cre.length; i++) ap += G.charmOf(cre[i]); const H = W.apHist = W.apHist || []; H.push(cre.length ? ap / cre.length : 0); if (H.length > 40) H.shift();
       if (H.length >= 20) { let a = 0, b = 0; for (let i = 0; i < 10; i++) { a += H[H.length - 1 - i]; b += H[H.length - 11 - i]; } const was = W.stall || 0; W.stall = a / 10 < b / 10 + 0.01 ? Math.min(1, was + 0.2) : Math.max(0, was - 0.35);
-        if (W.stall >= 0.6 && was < 0.6 && W.gen - (W.stallNote || -99) > 40) { W.stallNote = W.gen; W.discLog.push({ key: 'stall' + W.gen, text: 'The pond has stopped getting nicer, so its creatures turn to growing bigger: size is what there is left to improve.', gen: W.gen }); G.emit('stall'); } } }
+        if (W.stall >= 0.6 && was < 0.6 && W.gen - (W.stallNote || -99) > 40) { W.stallNote = W.gen; W.discLog.push({ key: 'stall' + W.gen, text: 'The star has stopped getting nicer, so its creatures turn to growing bigger: size is what there is left to improve.', gen: W.gen }); G.emit('stall'); } } }
     // the drive to grow is only as strong as the pond can bear: it eases off when the pond is below its capacity (the big need feeding) and as the average size gets large
     { const popR = W.popR = cre.length / Math.max(1, capNow()), mr = cre.length ? cre.reduce(function (s, c) { return s + c.ph.r; }, 0) / cre.length : 12;
       { const gr = Math.max(1, W.wh / 1400), fedM = cre.length ? cre.reduce(function (s, c) { return s + (c.fed || 0); }, 0) / cre.length : 0, was = W.richS || 1;
@@ -1024,7 +1024,7 @@
         const fit = 1.2 * Math.sqrt(0.03 * W.ww * W.wh / (Math.max(110, cre.length) * 11.34));      // the biggest body there is room for
         W.sizeCap = Math.min(G.sizeCapOf(W.richS), Math.max(14, fit));
         W.rich = Math.min(W.richS, Math.pow(Math.max(1, W.sizeCap / 13), 2.05)) * Math.pow(gr, 0.8); W.meanR = mr; }
-      // WHEN THE POND IS STUCK, IT GROWS. While beauty and wholeness have stopped rising (W.stall, above) the pond turns to size: bigger bodies are likelier, cheaper
+      // WHEN THE STAR IS STUCK, IT GROWS. While beauty and wholeness have stopped rising (W.stall, above) the pond turns to size: bigger bodies are likelier, cheaper
       // to keep and last the winter better. Looks may dip while bodies change scale, and then the pond works on them again at the new size. There is no size at
       // which this stops: only the pond being too thinly peopled holds it back (the big need feeding).
       W.grow = (W.stall || 0) * clamp((popR - 0.6) / 0.3, 0, 1); }
@@ -1106,7 +1106,7 @@
     let sick = 0;
     { const ap = cre.map(G.charmOf).sort(function (a, b) { return b - a; }), cut = ap[Math.floor(ap.length * 0.15)] || 1; for (let i = 0; i < cre.length; i++) { cre[i].elite = cre.length >= 12 && G.charmOf(cre[i]) >= cut && cre[i].fed > 0.2; if (cre[i].elite) cre[i].sel += 0.5; if (G.marvelBlessed && G.marvelBlessed(cre[i])) { cre[i].elite = true; cre[i].sel += 2; } }      /* a marvel is looked after */ }
     if (crowd > 0.5 && cre.length > 30) { const pr = (crowd - 0.5) * 0.9; for (let i = 0; i < cre.length; i++) if (cre[i].kd === topK && !cre[i].elite && G.rand() < pr) { cre[i].sel = -1; cre[i].sick = true; sick++; } }
-    if (sick > 4 && (W.gen - (W.sickGen || 0)) > 6) { W.sickGen = W.gen; W.discLog.push({ key: 'sick' + W.gen, text: 'A sickness is going round the ' + topK.toLowerCase() + 's: there are so many of them (' + Math.round(crowd * 100) + '% of the pond) that it spreads easily. ' + sick + ' will not see spring. The rarer kinds are hardly touched.', gen: W.gen }); G.emit('sickness', topK, sick, crowd); }
+    if (sick > 4 && (W.gen - (W.sickGen || 0)) > 6) { W.sickGen = W.gen; W.discLog.push({ key: 'sick' + W.gen, text: 'A sickness is going round the ' + topK.toLowerCase() + 's: there are so many of them (' + Math.round(crowd * 100) + '% of the star) that it spreads easily. ' + sick + ' will not see spring. The rarer kinds are hardly touched.', gen: W.gen }); G.emit('sickness', topK, sick, crowd); }
     const sorted = cre.slice().sort(function (a, b) { return a.sel - b.sel; });
     const room = Math.round(cap * 0.8);
     let doom = [];
@@ -1221,7 +1221,7 @@
     if (W.stats.fights >= 12) G.discover('war', 'A violent kind! Some creatures now attack other kinds on sight.');
     for (let i = 0; i < W.zones.length; i++) {
       const z = W.zones[i];
-      if (z.p.nut > 0.3 && z.made > 60) { const u = G.usedBy(z); if (u.eaten > 0.75 && u.can > 0.6) G.discover('use' + z.id, 'The pond makes the most of ' + z.word + ': almost all of its food is eaten.'); }
+      if (z.p.nut > 0.3 && z.made > 60) { const u = G.usedBy(z); if (u.eaten > 0.75 && u.can > 0.6) G.discover('use' + z.id, 'The star makes the most of ' + z.word + ': almost all of its food is eaten.'); }
     }
     if (G.versusMilestones) G.versusMilestones();
     // the pond learns to live with what was thrown at it
@@ -1230,7 +1230,7 @@
       if (z.p.poison + z.p.acid + z.p.eats + z.p.deadly < 0.25 || z.age < 40) continue;
       const a = G.adaptedTo(z);
       z.adapt = a;
-      if (a > 0.45) G.discover('adapt' + z.id, 'The pond has learned to live with ' + z.word + '!');
+      if (a > 0.45) G.discover('adapt' + z.id, 'The star has learned to live with ' + z.word + '!');
     }
   };
   G.checkDiscoveries = function () {};
@@ -1275,7 +1275,7 @@
     if (z.p.vault > 0.2) { z.p.hard = 1; z.p.moves = 0; z.alive = 0; z.r0 = Math.max(z.r0, 165); z.life = 420; }    // a wall is big, solid, and only falls when it is broken
     z.look = info.look || (G.beingLook && !(z.p.vault > 0.2) && info.source !== 'ai' ? G.beingLook({ name: z.word, props: { eats: z.p.eats, moves: z.p.moves, deadly: z.p.deadly, poison: z.p.poison, light: z.p.light }, alive: z.alive }) : null);
     z.life0 = z.life;
-    z.ev.push({ g: W.gen, t: info.from ? 'Budded from ' + info.from : 'Dropped into the pond' });
+    z.ev.push({ g: W.gen, t: info.from ? 'Budded from ' + info.from : 'Dropped onto the star' });
     W.zones.push(z);
     if (W.zones.length > 14) W.zones.shift();
     for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i], dx = c.x - x, dy = c.y - y, d = Math.sqrt(dx * dx + dy * dy) + 0.01; if (d < 300) { c.startle = 1.6; c.vx += dx / d * 70; c.vy += dy / d * 70; } }
@@ -1393,7 +1393,7 @@
     const bits = [];
     const facts = G.form.facts(f);
     bits.push('A ' + G.form.kind(f).full.toLowerCase() + ': ' + facts.slice(0, 5).join(', ') + '.');
-    if (s.judge && s.judge.why) bits.push('The pond\'s verdict: ' + s.judge.why);
+    if (s.judge && s.judge.why) bits.push('The star\'s verdict: ' + s.judge.why);
     const best = [0, 1, 2, 3, 4, 5].sort(function (a, b) { return g.c[b] - g.c[a]; });
     const names = ['gold', 'lime', 'green', 'blue', 'violet', 'pink'];
     if (ph.photo > 0.3) bits.push(ph.speed < 22 ? 'Lives on light and hardly moves, like a plant.' : 'Feeds partly on light.');

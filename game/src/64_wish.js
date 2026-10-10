@@ -8,7 +8,7 @@
   'use strict';
   const NEED = 8;                 // how close (of 10) a creature must be for the wish to come true
   const S = G.wish = { level: 1, cur: null, best: null, legends: [], busy: false, open: false, lastKeys: '' };
-  if (G.ai) { G.ai.gaps.wish = 4000; G.ai.caps.wish = 40; G.ai.gaps.wishcheck = 4000; G.ai.caps.wishcheck = 160; G.ai.LABEL.wish = 'The wishes of the pond'; G.ai.LABEL.wishcheck = 'Checking the creatures against the wish'; }
+  if (G.ai) { G.ai.gaps.wish = 4000; G.ai.caps.wish = 40; G.ai.gaps.wishcheck = 4000; G.ai.caps.wishcheck = 160; G.ai.LABEL.wish = 'The wishes of the star'; G.ai.LABEL.wishcheck = 'Checking the creatures against the wish'; }
   const live = function () { return G.mode === 'play' && !G.catching && G.W && !G.W.title && G.host && G.host.ready && G.host.caps && G.host.caps.ai && G.ai.provider === 'server' && G.ai.hasFuel(); };
   const esc = function (s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   const brief = function () { try { return G.worldBrief ? G.worldBrief() : {}; } catch (e) { return {}; } };
@@ -53,23 +53,23 @@
     const on = G.mode === 'play' && G.W && !G.W.title && (S.cur || S.busy);
     box.classList.toggle('hide', !on);
     if (!on) return;
-    if (S.busy || !S.cur) { box.classList.remove('open'); S.open = false; box.innerHTML = '<div class="wk"><span>✦ The wish of the pond</span></div><div class="wdream"><span class="wdot"></span>' + (S.asked === 'another' ? 'The pond is dreaming of something else…' : S.asked === 'next' ? 'The pond is dreaming its next wish…' : 'The pond is dreaming…') + '</div>'; return; }
+    if (S.busy || !S.cur) { box.classList.remove('open'); S.open = false; box.innerHTML = '<div class="wk"><span>✦ The wish of the star</span></div><div class="wdream"><span class="wdot"></span>' + (S.asked === 'another' ? 'The star is dreaming of something else…' : S.asked === 'next' ? 'The star is dreaming its next wish…' : 'The star is dreaming…') + '</div>'; return; }
     const b = S.best, pct = b ? Math.round(b.close * 10) : 0;
     if (S.min === undefined) { try { S.min = !!localStorage.getItem('primordia.wishMin'); } catch (er) { S.min = false; } }
     box.classList.toggle('min', !!S.min);
     if (S.min) { box.classList.remove('open'); S.open = false; box.innerHTML = '<div class="wk" title="Open the wish"><span>✦ Wish</span><span class="wmt">' + esc(S.cur.title) + '</span><span>' + (b ? b.close : 0) + ' of 10 ▸</span></div>'; return; }
     const here = (G.W && G.W.wishN) || 0;
-    box.innerHTML = '<div class="wk"><span>✦ The pond wishes for</span><span>' + (here ? '★ ' + here + ' granted in this pond' : '') + '<u id="wishMin" title="Fold away">▾</u></span></div>' +
+    box.innerHTML = '<div class="wk"><span>✦ The star wishes for</span><span>' + (here ? '★ ' + here + ' granted on this star' : '') + '<u id="wishMin" title="Fold away">▾</u></span></div>' +
       '<div class="wt">' + esc(S.cur.title) + '</div>' +
       '<div class="wrow"><span>Closest creature: <b>' + (b ? b.close : 0) + ' of 10</b></span><span>comes true at ' + NEED + '</span></div>' +
             '<div class="wbar"><i style="width:' + pct + '%"></i><b></b></div>' +
-      '<div class="wsub">' + (b ? '<u>Still missing</u> ' + esc(String(b.why).replace(/\.+$/, '')) + '.' : 'Nobody has been looked at yet.') + (G.ai.over && G.ai.over('wishcheck') ? ' <b style="color:#ff9db0">Looking is OFF: its budget for this pond is used up.</b>' : '') + '</div>' +
-      '<div class="wfoot"><span>' + (S.note || 'The pond looks at its creatures only when you ask. One look costs about a third of a cent.') + '</span><button class="wbtn" id="wishCheck"' + (S.checking || (G.ai.over && G.ai.over('wishcheck')) ? ' disabled style="opacity:.5"' : '') + '>' + (S.checking ? 'LOOKING…' : 'CHECK NOW') + '</button></div>' +
+      '<div class="wsub">' + (b ? '<u>Still missing</u> ' + esc(String(b.why).replace(/\.+$/, '')) + '.' : 'Nobody has been looked at yet.') + (G.ai.over && G.ai.over('wishcheck') ? ' <b style="color:#ff9db0">Looking is OFF: its budget for this star is used up.</b>' : '') + '</div>' +
+      '<div class="wfoot"><span>' + (S.note || 'The star looks at its creatures only when you ask. One look costs about a third of a cent.') + '</span><button class="wbtn" id="wishCheck"' + (S.checking || (G.ai.over && G.ai.over('wishcheck')) ? ' disabled style="opacity:.5"' : '') + '>' + (S.checking ? 'LOOKING…' : 'CHECK NOW') + '</button></div>' +
       '<div class="wmore"><p class="wsay">“' + esc(S.cur.text) + '”</p>' +
       '<div class="wlab">It must have</div><div class="wneeds">' + S.cur.needs.map(function (n) { return '<span class="wchip">' + esc(n) + '</span>'; }).join('') + '</div>' +
       (S.cur.hint ? '<div class="wlab">A thought</div><p>' + esc(S.cur.hint) + '</p>' : '') +
       '<div class="wlab">How</div><p>' + (S.level > 1 ? 'This is wish number ' + S.level + ' for you; each one is a little harder than the last. ' : '') + 'It comes true when a living creature reaches ' + NEED + ' of 10. You steer: ADD things, cause WORLD events, ★ KEEP and ♥ BREED the ones heading the right way.</p>' +
-      (S.legends.length ? '<div class="wlab">Wishes you granted before, in any pond</div><p>' + S.legends.slice(-4).reverse().map(function (l) { return esc(l.title) + (l.name ? ' (' + esc(l.name) + ')' : ''); }).join(' · ') + '</p>' : '') +
+      (S.legends.length ? '<div class="wlab">Wishes you granted before, on any star</div><p>' + S.legends.slice(-4).reverse().map(function (l) { return esc(l.title) + (l.name ? ' (' + esc(l.name) + ')' : ''); }).join(' · ') + '</p>' : '') +
       '<div class="wfoot"><button class="wbtn" id="wishAnother">A DIFFERENT WISH</button></div></div>';
   }
 
@@ -78,7 +78,7 @@
     if (!r) return;
     if (typeof r.level === 'number') S.level = r.level;
     if (Array.isArray(r.legends)) S.legends = r.legends;
-    if (r.wish && (!S.cur || S.cur.id !== r.wish.id)) { S.cur = r.wish; S.best = null; S.lastKeys = ''; if (G.mode === 'play' && G.banner) G.banner('The pond wishes for', r.wish.title + '. ' + (r.wish.text || ''), 7000); }
+    if (r.wish && (!S.cur || S.cur.id !== r.wish.id)) { S.cur = r.wish; S.best = null; S.lastKeys = ''; if (G.mode === 'play' && G.banner) G.banner('The star wishes for', r.wish.title + '. ' + (r.wish.text || ''), 7000); }
     else if (r.wish) S.cur = r.wish;
   }
   function fetchWish(extra) {
@@ -105,7 +105,7 @@
     const picks = candidates(8); if (picks.length < 1) { S.note = 'Nobody to look at yet.'; return; }
     const sig = picks.map(function (c) { return G.form.key(c.g.f); }).join('~');
     if (sig === S.lastKeys) { S.note = 'Nothing has changed since the last look.'; return; }                           // nothing new to look at: no charge
-    if (!G.ai.allow('wishcheck')) { S.note = G.ai.over && G.ai.over('wishcheck') ? 'Its budget for this pond is used up.' : 'One moment: it has only just looked.'; return; }
+    if (!G.ai.allow('wishcheck')) { S.note = G.ai.over && G.ai.over('wishcheck') ? 'Its budget for this star is used up.' : 'One moment: it has only just looked.'; return; }
     const img = G.sheet(picks.map(function (c) { return c.g.f; }), { cw: 200, ch: 206, sc: 0.55, cols: 4 });
     if (!img) return;
     S.checking = true; S.lastKeys = sig;
@@ -128,7 +128,7 @@
     const W = G.W, bits = [];
     (W.zones || []).slice(-4).forEach(function (z) { bits.push(z.word + ' (dropped in generation ' + z.born + ')'); });
     (W.events || []).slice(-3).forEach(function (e) { bits.push(e.name + ' (generation ' + e.g + ')'); });
-    return 'Born in generation ' + W.gen + (bits.length ? '. In its world: ' + bits.join(', ') : ', in a quiet pond') + '.';
+    return 'Born in generation ' + W.gen + (bits.length ? '. In its world: ' + bits.join(', ') : ', on a quiet star') + '.';
   }
   function grant(c, top) {
     const W = G.W, wish = S.cur, sp = c.sp && G.speciesById ? G.speciesById(c.sp) : null;

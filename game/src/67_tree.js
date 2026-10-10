@@ -68,7 +68,7 @@
   function renderAncestry(root) {
     root.innerHTML = '';
     const c = G.R.sel;
-    if (!c) { el('div', 'empty', 'Click a creature in the pond first, then open the tree to see where it came from.', root); return; }
+    if (!c) { el('div', 'empty', 'Click a creature on the star first, then open the tree to see where it came from.', root); return; }
     // the deep past: species by species (this is remembered even after closing the game)
     const chainS = [];
     let s = G.speciesById(c.sp), guard = 0;
@@ -88,7 +88,7 @@
     let p = c.dad;
     while (p && chain.length < 8) { chain.push({ g: p.g, gen: p.gen, id: p.id, mate: p.mate }); p = p.up; }
     chain.reverse();
-    heading(root, 'ITS RECENT FAMILY, BIRTH BY BIRTH', chain.length > 1 ? 'Each card is one birth: a child, and how it differs from its mother.' : 'This creature has no recorded parents (a founder, or the pond was reloaded since).');
+    heading(root, 'ITS RECENT FAMILY, BIRTH BY BIRTH', chain.length > 1 ? 'Each card is one birth: a child, and how it differs from its mother.' : 'This creature has no recorded parents (a founder, or the star was reloaded since).');
     const row2 = strip(root);
     chain.forEach(function (a, i) {
       if (i) arrow(row2);

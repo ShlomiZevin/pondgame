@@ -77,6 +77,7 @@
   F.crewFor = function (ship) {
     const W = G.W, cap = F.holdOf(ship).crew, out = [], ok = function (c) { return c && !c.dead && !c.deedId && c.crewPick !== -1 && out.indexOf(c) < 0; }, dist = function (a, b) { return Math.hypot(a.x - ship.x, a.y - ship.y) - Math.hypot(b.x - ship.x, b.y - ship.y); };
     W.cre.filter(function (c) { return c.crewPick === 1 && ok(c); }).forEach(function (c) { if (out.length < cap) { c.crewWhy = 'you chose it'; out.push(c); } });      // (you may put anyone in the crew, of any kind, and take anyone out: CREW on its card, or the cross on its face in the crew list)
+    if (F.warTo && G.jobFit) W.cre.filter(function (c) { return ok(c) && !c.team && (c.job === 'f' || c.job === 'u'); }).sort(function (a, b) { return (b.job === 'f' ? 1 : 0) - (a.job === 'f' ? 1 : 0) || G.jobFit(b, 'f') - G.jobFit(a, 'f'); }).forEach(function (c) { if (out.length < cap) { c.crewWhy = 'a fighter'; out.push(c); } });      // (against a rival, your fighters go first)
     const L = G.leaderOf ? G.leaderOf(ship.sp) : null; if (out.length < cap && ok(L)) { L.crewWhy = 'their leader'; out.push(L); }
     W.cre.filter(function (c) { return ok(c) && c.builtShip === ship.name; }).sort(dist).forEach(function (c) { if (out.length < cap) { c.crewWhy = 'built it'; out.push(c); } });
     W.cre.filter(function (c) { return ok(c) && ship.sp && c.sp === ship.sp; }).sort(dist).forEach(function (c) { if (out.length < cap) { c.crewWhy = 'of their kind'; out.push(c); } });
@@ -123,7 +124,7 @@
     const key = F.key(p), rec = F.book[key] || (F.book[key] = { name: p.name, hue: p.hue, visits: 0, mine: 0 });
     swap(function () { if (rec.blob && G.validSave(rec.blob)) G.applySave(rec.blob); else F.make(p); });
     rec.visits = (rec.visits || 0) + 1; rec.name = p.name; rec.hue = p.hue;
-    F.here = 'far'; F.origin = { i: p.i, j: p.j }; F.visiting = { key: key, i: p.i, j: p.j, name: p.name, hue: p.hue, adds: hold.adds, adds0: hold.adds, ship: pk, crew0: packs.length, mood: F.moodWords(p) };
+    F.warTo = null; F.here = 'far'; F.origin = { i: p.i, j: p.j }; F.visiting = { key: key, i: p.i, j: p.j, name: p.name, hue: p.hue, adds: hold.adds, adds0: hold.adds, ship: pk, crew0: packs.length, mood: F.moodWords(p) };
     const W2 = G.W, sh = landShip(pk, true), out = [];
     // they leave the ship and swim out to where the people of the pond are (most of the way: the meeting is left to both sides)
     const meet = (function () { const sy2 = G.shoreY ? G.shoreY(W2) : sh.y + 70; let x = 0, y = 0, n = 0; W2.cre.forEach(function (c) { if (!c.dead) { x += c.x; y += c.y; n++; } }); if (!n) return { x: sh.x - 140, y: sy2 + 70 }; return { x: sh.x + (x / n - sh.x) * 0.7, y: Math.max(sy2 + 60, sy2 + 60 + (y / n - sy2 - 60) * 0.7) }; })();
@@ -217,7 +218,7 @@
     F.book = {}; F.origin = null; F.visiting = null; F.homeBlob = null; F.here = null; F._kinds = {}; F._pool = null;
     const b = d && d.far && d.far.book; if (!b || typeof b !== 'object') return;
     Object.keys(b).slice(0, 24).forEach(function (k) { const r = b[k]; if (!r || !/^-?\d{1,6},-?\d{1,6}$/.test(k)) return; const n = function (v, hi) { v = +v; return isFinite(v) ? clamp(v, 0, hi) : 0; };
-      F.book[k] = { name: String(r.name || 'A far pond').replace(/[<>&]/g, '').slice(0, 40), hue: n(r.hue, 360), visits: n(r.visits, 1e6), mine: n(r.mine, 1e4), gen: n(r.gen, 1e6), alive: n(r.alive, 1e4), at: n(r.at, 1e14) }; if (r.blob && G.validSave && G.validSave(r.blob)) F.book[k].blob = r.blob; });
+      F.book[k] = { name: String(r.name || 'A far star').replace(/[<>&]/g, '').slice(0, 40), hue: n(r.hue, 360), visits: n(r.visits, 1e6), mine: n(r.mine, 1e4), gen: n(r.gen, 1e6), alive: n(r.alive, 1e4), at: n(r.at, 1e14) }; if (r.blob && G.validSave && G.validSave(r.blob)) F.book[k].blob = r.blob; });
   };
   G.on('new-pond', function (opts) { if (opts && opts.voyage) return; F.book = {}; F.origin = null; F.visiting = null; F.homeBlob = null; F.here = null; F._kinds = {}; F._pool = null; });      // a new pond of your own: a new sky
   // each ADD in a far pond is one of the few the ship could carry

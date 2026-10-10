@@ -259,6 +259,6 @@
     ctx.restore();
   };
 
-  G.on('field-begin', function (f) { if (G.mode !== 'play') return; const d = words(f); if (G.log) G.log('sel', f.name, (f.shape === 'line' || f.shape === 'band' ? 'It lies across the pond' : f.shape === 'half' ? 'It covers the ' + f.side + ' of the pond' : f.shape === 'all' ? 'It is everywhere' : 'It has appeared in the pond') + (d ? ': ' + d : '') + '.'); if (f.after > 2 && G.banner) G.banner('And then', f.name + (d ? ': ' + d : '') + '.', 4200); });
+  G.on('field-begin', function (f) { if (G.mode !== 'play') return; const d = words(f); if (G.log) G.log('sel', f.name, (f.shape === 'line' || f.shape === 'band' ? 'It lies across the star' : f.shape === 'half' ? 'It covers the ' + f.side + ' of the star' : f.shape === 'all' ? 'It is everywhere' : 'It has appeared on the star') + (d ? ': ' + d : '') + '.'); if (f.after > 2 && G.banner) G.banner('And then', f.name + (d ? ': ' + d : '') + '.', 4200); });
   G.on('field-gone', function (f, broken) { if (G.mode !== 'play' || !f.solid) return; const t = broken ? 'The creatures broke through ' + f.name + '.' : f.name + ' wore away.'; if (G.log) G.log('sel', f.name + ' is gone', t); if (G.banner) G.banner('It fell', t, 5000); });
 })();

@@ -26,7 +26,7 @@
     G.closeMenu && G.closeMenu();
     G.closeModal && G.closeModal();
     const o = el('div', 'overlay', '', $('ui')); o.id = 'catchup'; o.style.zIndex = 20;
-    o.innerHTML = '<div class="glass sheet" style="width:min(460px,100%);align-items:center;text-align:center"><h2 style="font-size:18px;letter-spacing:.2em;margin-bottom:8px">THE POND KEPT GOING</h2>' +
+    o.innerHTML = '<div class="glass sheet" style="width:min(460px,100%);align-items:center;text-align:center"><h2 style="font-size:18px;letter-spacing:.2em;margin-bottom:8px">THE STAR KEPT GOING</h2>' +
       '<small id="cuLine" style="margin-bottom:12px"></small><div class="meter" style="width:100%;height:10px"><i id="cuBar" style="width:0;background:linear-gradient(90deg,#ff7eb6,#f6d365,#33d6a6)"></i></div>' +
       '<div class="ilabel" id="cuGen" style="margin:10px 0 12px">generation ' + W.gen + '</div><button class="btn sm" id="cuSkip">SKIP AHEAD</button></div>';
     job.el = o;
@@ -67,7 +67,7 @@
     const W = G.W;
     const gens = r.gens, newSp = r.newSpecies || 0, died = r.diedOut || 0, found = r.discoveries || [];
     const rows = [
-      '<b>' + gens + '</b> generations passed' + (r.capped ? ' <small>(the pond catches up at most ' + (r.capGens || 150) + ' generations)</small>' : ''),
+      '<b>' + gens + '</b> generations passed' + (r.capped ? ' <small>(the star catches up at most ' + (r.capGens || 150) + ' generations)</small>' : ''),
       '<b>' + (r.alive !== undefined ? r.alive : W.cre.length) + '</b> creatures alive' + (r.fitness ? ' · average fitness <b>' + (+r.fitness).toFixed(2) + '</b>' : ''),
       newSp ? '<b>' + newSp + '</b> new species appeared' : 'No new species appeared',
       died ? '<b>' + died + '</b> species died out' : 'No species died out',
@@ -75,7 +75,7 @@
     const disc = found.length ? '<div class="ilabel" style="margin-top:12px">Evolution invented</div>' + found.slice(0, 5).map(function (t) { return '<div style="margin:4px 0;color:var(--gold)">' + esc(t) + '</div>'; }).join('') : '';
     const o = el('div', 'overlay', '', $('ui')); o.id = 'awayReport'; o.style.zIndex = 15;
     o.innerHTML = '<div class="glass sheet" style="width:min(480px,100%);align-items:flex-start"><h2 style="font-size:17px;letter-spacing:.2em;margin-bottom:10px">WHILE YOU WERE AWAY</h2>' + rows.map(function (r) { return '<div style="margin:5px 0;line-height:1.4">' + r + '</div>'; }).join('') + disc +
-      '<div style="margin-top:14px;align-self:center"><button class="btn big" id="arGo">SEE THE POND</button></div></div>';
+      '<div style="margin-top:14px;align-self:center"><button class="btn big" id="arGo">SEE THE STAR</button></div></div>';
     $('arGo').onclick = function () { o.remove(); G.sfx && G.sfx('click'); G.hint('nature', 'You are nature: change the world and see how life answers.', 6000); };
     G.log && G.log('sel', 'Away', gens + ' generations passed while you were gone.');
     G.emit('catchup-done', gens);

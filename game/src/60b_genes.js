@@ -76,7 +76,7 @@
     if (c.gave) add('shared \u00d7' + c.gave, 'It has given of its own food ' + c.gave + (c.gave === 1 ? ' time.' : ' times.'), 'g');
     if (c.danced) add('danced \u00d7' + c.danced, 'It has danced ' + c.danced + (c.danced === 1 ? ' time.' : ' times.'));
     if (c.builtShip) add('built the ship', 'It set pieces of the ' + c.builtShip + ' with its own hands: it is among the first to go in it.', 'g');
-    if (c.stranger !== undefined) add('from another pond', c.fromPond === 0 ? 'You set it down here yourself.' : 'It came here from another pond.', 'g'); else if (c.line) add('a stranger\'s line', 'It is descended from one who came here from another pond.', 'g');
+    if (c.stranger !== undefined) add('from another star', c.fromPond === 0 ? 'You set it down here yourself.' : 'It came here from another star.', 'g'); else if (c.line) add('a stranger\'s line', 'It is descended from one who came here from another star.', 'g');
     return T;
   }
   const tags = function (c) { return tagList(c).map(function (t) { return '<span' + (t[2] ? ' class="' + t[2] + '"' : '') + ' title="' + esc(t[1]) + '">' + esc(t[0]) + '</span>'; }).join(''); };
@@ -110,7 +110,7 @@
   { const t = setInterval(function () { const b = $('iwhy'); if (!b) return; clearInterval(t); const row = document.createElement('div'); row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px';
       row.innerHTML = '<button class="btn sm" id="igood" title="Tell it that what it is doing right now is good. It will do more of it. It learns; you do not command." style="border-color:rgba(51,214,166,.7);color:#dffbf1">\u2665 GOOD</button><button class="btn sm" id="ibad" title="Tell it that what it is doing right now is bad. It will do less of it." style="border-color:rgba(255,126,182,.7);color:#ffd3e2">\u2715 BAD</button>';
       const say = document.createElement('div'); say.id = 'idoing'; say.style.cssText = 'font-size:11.5px;line-height:1.4;margin-top:8px;color:rgba(207,232,255,.85)'; b.parentNode.insertBefore(say, b); b.parentNode.insertBefore(row, b);
-      const more = document.createElement('div'); more.style.cssText = 'font-size:10.5px;margin-top:4px;opacity:.7;cursor:pointer;text-decoration:underline'; more.textContent = 'what you have taught this pond'; more.onclick = function () { if (G.openTaught) G.openTaught(); }; b.parentNode.insertBefore(more, b);
+      const more = document.createElement('div'); more.style.cssText = 'font-size:10.5px;margin-top:4px;opacity:.7;cursor:pointer;text-decoration:underline'; more.textContent = 'what you have taught this star'; more.onclick = function () { if (G.openTaught) G.openTaught(); }; b.parentNode.insertBefore(more, b);
       setInterval(function () { const c = G.R.sel; if (!c || c.dead || !G.doingWords) return; const t = 'Right now it is <b style="color:#f6d365">' + G.doingWords(c) + '</b>. Your word is about that:'; if (say._t !== t) { say._t = t; say.innerHTML = t; } }, 400); $('igood').onclick = function () { G.sfx('click'); G.judge(G.R.sel, true); }; $('ibad').onclick = function () { G.sfx('click'); G.judge(G.R.sel, false); }; }, 400); }
   G.on('new-pond', close);
 

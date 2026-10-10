@@ -1,0 +1,65 @@
+// ── The terrain of a star ──
+// Every star has a terrain of its own (57ya_stars.js says which): the colour of its sea, the ground of its land, and what stands on both. It is scenery
+// only: nothing here is touched, eaten or built with, and it lies under everything that lives. Each star's scenery is laid out from its own seed, so a star
+// looks the same every time you come to it. A few old BEACONS stand on every star: thin pylons with a light, left by whoever came before.
+//     reef     warm turquoise sea, sand and low dunes, coral fans; coral mounds on the floor
+//     crag     slate sea, grey broken rock and boulders; rock stacks on the floor
+//     marsh    green murk, dark wet ground with pools and reed clumps; long weed on the floor
+//     crystal  violet sea, purple rock with tall crystal spires; glowing crystals on the floor
+//     ember    dark red sea, black glass ground with glowing cracks and vents; vents on the floor
+//     frost    pale cold sea, snow and ice shards; ice blocks on the floor
+(function () {
+  'use strict';
+  if (typeof document === 'undefined') return;
+  const LOOK = {
+    reef: { land: ['rgba(70,96,58,0.96)', 'rgba(120,128,78,0.9)', 'rgba(196,180,120,0.7)', 'rgba(196,180,120,0)'], tuft: 'rgba(140,200,110,0.55)', line: 'rgba(207,232,255,0.35)', sea: 'hsla(178,70%,45%,0.10)', deep: 'rgba(4,30,44,0.0)', glow: '#7ff0d8' },
+    crag: { land: ['rgba(62,66,74,0.97)', 'rgba(96,98,104,0.93)', 'rgba(150,148,142,0.72)', 'rgba(150,148,142,0)'], tuft: 'rgba(170,176,160,0.35)', line: 'rgba(220,226,235,0.4)', sea: 'hsla(214,26%,34%,0.34)', deep: 'rgba(8,10,18,0.25)', glow: '#c9d3dc' },
+    marsh: { land: ['rgba(38,58,40,0.97)', 'rgba(60,82,48,0.93)', 'rgba(96,110,62,0.72)', 'rgba(96,110,62,0)'], tuft: 'rgba(170,214,96,0.7)', line: 'rgba(190,230,170,0.4)', sea: 'hsla(96,46%,26%,0.36)', deep: 'rgba(6,16,8,0.25)', glow: '#b9f27a' },
+    crystal: { land: ['rgba(58,36,86,0.97)', 'rgba(92,58,128,0.93)', 'rgba(150,110,186,0.72)', 'rgba(150,110,186,0)'], tuft: 'rgba(160,240,255,0.5)', line: 'rgba(200,180,255,0.5)', sea: 'hsla(268,58%,38%,0.36)', deep: 'rgba(14,4,30,0.25)', glow: '#8ef0ff' },
+    ember: { land: ['rgba(22,16,18,0.98)', 'rgba(44,26,24,0.95)', 'rgba(92,44,28,0.78)', 'rgba(92,44,28,0)'], tuft: null, line: 'rgba(255,150,70,0.75)', sea: 'hsla(12,72%,17%,0.6)', deep: 'rgba(24,4,2,0.28)', glow: '#ff9a4c' },
+    frost: { land: ['rgba(214,228,240,0.97)', 'rgba(188,210,230,0.94)', 'rgba(160,196,224,0.75)', 'rgba(160,196,224,0)'], tuft: null, line: 'rgba(255,255,255,0.7)', sea: 'hsla(200,60%,70%,0.20)', deep: 'rgba(10,26,50,0.12)', glow: '#dff4ff' } };
+  const idOf = function (W) { return G.terrainOf ? G.terrainOf(W).id : 'reef'; };
+  /** the colours of the star being shown (50_render.js paints the sea and the shore with them) */
+  G.terrainLook = function (W) { return LOOK[idOf(W || G.W)] || LOOK.reef; };
+  const fr = function (v) { return v - Math.floor(v); };
+  function rnd(seed, i, k) { return fr(Math.sin(i * 127.1 + k * 311.7 + (seed % 9973) * 0.731) * 43758.5453); }
+
+  /** what stands on the land (called while the shore is being painted: world space) */
+  G.drawTerrainLand = function (ctx, W, sy) {
+    const id = idOf(W), L = LOOK[id] || LOOK.reef, seed = W.seed >>> 0, t = G.rt || 0, e = (G.sideEdge ? G.sideEdge(W) : 40) + 30, span = W.ww - 2 * e, top = 26, bot = Math.max(top + 20, sy - 54);
+    ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    const n = Math.round(10 + span / 190);
+    for (let i = 0; i < n; i++) { const x = e + rnd(seed, i, 1) * span, y = top + rnd(seed, i, 2) * (bot - top), s = 12 + rnd(seed, i, 3) * 26, v = rnd(seed, i, 4);
+      if (id === 'reef') { if (v < 0.5) { ctx.fillStyle = 'rgba(226,210,150,0.28)'; ctx.beginPath(); ctx.ellipse(x, y, s * 2.2, s * 0.5, 0, 0, 6.2832); ctx.fill(); } else { ctx.strokeStyle = v < 0.75 ? 'rgba(255,140,150,0.55)' : 'rgba(255,190,110,0.55)'; ctx.lineWidth = 2.4; for (let b = -2; b <= 2; b++) { ctx.beginPath(); ctx.moveTo(x, y + s * 0.5); ctx.quadraticCurveTo(x + b * s * 0.18, y, x + b * s * 0.36, y - s * (0.7 - Math.abs(b) * 0.12)); ctx.stroke(); } } }
+      else if (id === 'crag') { ctx.fillStyle = 'rgba(40,42,50,0.5)'; ctx.beginPath(); ctx.ellipse(x + s * 0.2, y + s * 0.45, s * 1.1, s * 0.22, 0, 0, 6.2832); ctx.fill(); ctx.fillStyle = v < 0.5 ? 'rgba(132,134,140,0.9)' : 'rgba(108,110,118,0.9)'; ctx.beginPath(); ctx.moveTo(x - s, y + s * 0.4); ctx.lineTo(x - s * 0.7, y - s * 0.3); ctx.lineTo(x - s * 0.1, y - s * (0.6 + v * 0.5)); ctx.lineTo(x + s * 0.6, y - s * 0.35); ctx.lineTo(x + s, y + s * 0.4); ctx.closePath(); ctx.fill(); ctx.fillStyle = 'rgba(210,212,216,0.35)'; ctx.beginPath(); ctx.moveTo(x - s * 0.7, y - s * 0.3); ctx.lineTo(x - s * 0.1, y - s * (0.6 + v * 0.5)); ctx.lineTo(x - s * 0.05, y - s * 0.1); ctx.closePath(); ctx.fill(); }
+      else if (id === 'marsh') { if (v < 0.45) { ctx.fillStyle = 'rgba(16,44,52,0.6)'; ctx.strokeStyle = 'rgba(150,200,150,0.3)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(x, y, s * 1.8, s * 0.55, 0, 0, 6.2832); ctx.fill(); ctx.stroke(); } else { ctx.strokeStyle = 'rgba(176,206,96,0.75)'; ctx.lineWidth = 2; for (let b = -3; b <= 3; b++) { const sw = Math.sin(t * 1.3 + i + b) * 3; ctx.beginPath(); ctx.moveTo(x + b * 4, y + s * 0.5); ctx.lineTo(x + b * 5 + sw, y - s * (0.9 - Math.abs(b) * 0.1)); ctx.stroke(); } ctx.fillStyle = 'rgba(120,84,48,0.85)'; for (let b = -1; b <= 1; b++) { ctx.beginPath(); ctx.ellipse(x + b * 9 + Math.sin(t * 1.3 + i + b * 2) * 3, y - s * 0.75, 2.2, 5, 0, 0, 6.2832); ctx.fill(); } } }
+      else if (id === 'crystal') { const g = 0.6 + 0.4 * Math.sin(t * 1.6 + i); ctx.fillStyle = 'rgba(140,240,255,' + (0.10 + 0.08 * g) + ')'; ctx.beginPath(); ctx.arc(x, y - s * 0.5, s * 1.3, 0, 6.2832); ctx.fill(); for (let b = -1; b <= 1; b++) { const hx = x + b * s * 0.42, hh = s * (1.5 - Math.abs(b) * 0.6 + v * 0.4), w = s * 0.24; ctx.fillStyle = b ? 'rgba(170,130,240,0.9)' : 'rgba(150,230,255,0.92)'; ctx.beginPath(); ctx.moveTo(hx, y - hh); ctx.lineTo(hx + w, y - hh * 0.25); ctx.lineTo(hx + w * 0.6, y + s * 0.35); ctx.lineTo(hx - w * 0.6, y + s * 0.35); ctx.lineTo(hx - w, y - hh * 0.25); ctx.closePath(); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.moveTo(hx, y - hh); ctx.lineTo(hx - w, y - hh * 0.25); ctx.lineTo(hx - w * 0.2, y - hh * 0.2); ctx.closePath(); ctx.fill(); } }
+      else if (id === 'ember') { const g = 0.55 + 0.45 * Math.sin(t * 2.2 + i * 1.7); if (v < 0.6) { ctx.strokeStyle = 'rgba(255,' + Math.round(120 + 70 * g) + ',50,' + (0.5 + 0.4 * g) + ')'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x - s * 1.6, y); for (let b = 1; b <= 6; b++) ctx.lineTo(x - s * 1.6 + b * s * 0.55, y + (rnd(seed, i * 7 + b, 5) - 0.5) * s * 0.8); ctx.stroke(); ctx.strokeStyle = 'rgba(255,220,150,' + 0.5 * g + ')'; ctx.lineWidth = 0.9; ctx.stroke(); }
+        else { ctx.fillStyle = 'rgba(255,130,50,' + (0.10 + 0.10 * g) + ')'; ctx.beginPath(); ctx.arc(x, y - s * 0.4, s * 1.2, 0, 6.2832); ctx.fill(); ctx.fillStyle = 'rgba(30,22,24,0.95)'; ctx.beginPath(); ctx.moveTo(x - s * 0.9, y + s * 0.4); ctx.lineTo(x - s * 0.3, y - s * 0.5); ctx.lineTo(x + s * 0.3, y - s * 0.5); ctx.lineTo(x + s * 0.9, y + s * 0.4); ctx.closePath(); ctx.fill(); ctx.fillStyle = 'rgba(255,' + Math.round(150 + 80 * g) + ',70,0.95)'; ctx.beginPath(); ctx.ellipse(x, y - s * 0.5, s * 0.3, s * 0.1, 0, 0, 6.2832); ctx.fill(); for (let b = 0; b < 3; b++) { const u = fr(t * 0.22 + b / 3 + i * 0.37); ctx.fillStyle = 'rgba(120,110,110,' + 0.28 * (1 - u) + ')'; ctx.beginPath(); ctx.arc(x + Math.sin(u * 5 + i) * 6, y - s * 0.6 - u * 46, 4 + u * 9, 0, 6.2832); ctx.fill(); } } }
+      else { if (v < 0.5) { ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(x, y, s * 2, s * 0.45, 0, 0, 6.2832); ctx.fill(); } else { for (let b = -1; b <= 1; b++) { const hx = x + b * s * 0.5, hh = s * (1.3 - Math.abs(b) * 0.5 + v * 0.3); ctx.fillStyle = b ? 'rgba(176,214,240,0.9)' : 'rgba(226,244,255,0.95)'; ctx.beginPath(); ctx.moveTo(hx, y - hh); ctx.lineTo(hx + s * 0.3, y + s * 0.35); ctx.lineTo(hx - s * 0.3, y + s * 0.35); ctx.closePath(); ctx.fill(); ctx.fillStyle = 'rgba(120,170,210,0.45)'; ctx.beginPath(); ctx.moveTo(hx, y - hh); ctx.lineTo(hx + s * 0.3, y + s * 0.35); ctx.lineTo(hx + s * 0.04, y + s * 0.35); ctx.closePath(); ctx.fill(); } } }
+    }
+    // the old beacons: thin pylons with a light, the same on every star
+    for (let i = 0; i < 3; i++) { const x = e + (0.14 + 0.36 * i + rnd(seed, i, 9) * 0.1) * span, y = top + 14 + rnd(seed, i, 10) * Math.max(10, bot - top - 30), on = Math.sin(t * 2.4 + i * 2.1) > 0.2;
+      ctx.fillStyle = 'rgba(8,14,24,0.45)'; ctx.beginPath(); ctx.ellipse(x, y + 1, 9, 2.6, 0, 0, 6.2832); ctx.fill();
+      ctx.strokeStyle = 'rgba(16,24,36,0.95)'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x, y - 30); ctx.lineTo(x + 5, y); ctx.moveTo(x - 3.2, y - 11); ctx.lineTo(x + 3.2, y - 11); ctx.stroke();
+      ctx.strokeStyle = 'rgba(170,190,210,0.9)'; ctx.lineWidth = 1.3; ctx.stroke();
+      if (on) { ctx.fillStyle = L.glow; ctx.globalAlpha = 0.28; ctx.beginPath(); ctx.arc(x, y - 32, 9, 0, 6.2832); ctx.fill(); ctx.globalAlpha = 1; } ctx.fillStyle = on ? L.glow : 'rgba(60,70,84,1)'; ctx.beginPath(); ctx.arc(x, y - 32, 2.6, 0, 6.2832); ctx.fill(); }
+    ctx.restore();
+  };
+
+  /** what stands on the floor of the sea (world space; under the creatures) */
+  G.drawTerrainSea = function (ctx, W) {
+    const id = idOf(W), L = LOOK[id] || LOOK.reef, seed = W.seed >>> 0, t = G.rt || 0, e = (G.sideEdge ? G.sideEdge(W) : 40) + 20, span = W.ww - 2 * e, fy = W.wh - 10;
+    ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    const n = Math.round(9 + span / 170);
+    for (let i = 0; i < n; i++) { const x = e + rnd(seed, i, 21) * span, y = fy - rnd(seed, i, 22) * 26, s = 14 + rnd(seed, i, 23) * 30, v = rnd(seed, i, 24);
+      if (id === 'reef') { ctx.fillStyle = v < 0.5 ? 'rgba(210,110,130,0.5)' : 'rgba(230,160,90,0.5)'; for (let b = -1; b <= 1; b++) { ctx.beginPath(); ctx.arc(x + b * s * 0.5, y - s * 0.25 * (1 - Math.abs(b) * 0.3), s * (0.5 - Math.abs(b) * 0.1), 3.1416, 0); ctx.fill(); } }
+      else if (id === 'crag') { ctx.fillStyle = 'rgba(54,60,74,0.8)'; ctx.beginPath(); ctx.moveTo(x - s * 0.8, y + 6); ctx.lineTo(x - s * 0.5, y - s * 0.9); ctx.lineTo(x - s * 0.1, y - s * (1.3 + v)); ctx.lineTo(x + s * 0.4, y - s * 0.8); ctx.lineTo(x + s * 0.8, y + 6); ctx.closePath(); ctx.fill(); ctx.fillStyle = 'rgba(120,130,150,0.25)'; ctx.beginPath(); ctx.moveTo(x - s * 0.5, y - s * 0.9); ctx.lineTo(x - s * 0.1, y - s * (1.3 + v)); ctx.lineTo(x - s * 0.05, y - s * 0.3); ctx.closePath(); ctx.fill(); }
+      else if (id === 'marsh') { ctx.strokeStyle = 'rgba(96,150,70,0.5)'; ctx.lineWidth = 3; for (let b = 0; b < 3; b++) { const hh = s * (3 + v * 2.5 - b * 0.6), bx = x + (b - 1) * 9; ctx.beginPath(); ctx.moveTo(bx, y + 6); for (let q = 1; q <= 6; q++) ctx.lineTo(bx + Math.sin(t * 0.9 + i + b + q * 0.8) * 7 * q / 6, y + 6 - hh * q / 6); ctx.stroke(); } }
+      else if (id === 'crystal') { const g = 0.6 + 0.4 * Math.sin(t * 1.4 + i); ctx.fillStyle = 'rgba(140,240,255,' + (0.08 + 0.08 * g) + ')'; ctx.beginPath(); ctx.arc(x, y - s * 0.6, s * 1.4, 0, 6.2832); ctx.fill(); for (let b = -1; b <= 1; b++) { const hx = x + b * s * 0.4, hh = s * (1.4 - Math.abs(b) * 0.5 + v * 0.5), w = s * 0.22; ctx.fillStyle = b ? 'rgba(150,110,230,0.75)' : 'rgba(140,220,255,0.8)'; ctx.beginPath(); ctx.moveTo(hx, y - hh); ctx.lineTo(hx + w, y - hh * 0.25); ctx.lineTo(hx + w * 0.6, y + 6); ctx.lineTo(hx - w * 0.6, y + 6); ctx.lineTo(hx - w, y - hh * 0.25); ctx.closePath(); ctx.fill(); } }
+      else if (id === 'ember') { const g = 0.55 + 0.45 * Math.sin(t * 2 + i * 1.3); ctx.fillStyle = 'rgba(255,120,40,' + (0.10 + 0.10 * g) + ')'; ctx.beginPath(); ctx.arc(x, y - s * 0.5, s * 1.3, 0, 6.2832); ctx.fill(); ctx.fillStyle = 'rgba(26,18,20,0.9)'; ctx.beginPath(); ctx.moveTo(x - s * 0.8, y + 6); ctx.lineTo(x - s * 0.25, y - s * 0.8); ctx.lineTo(x + s * 0.25, y - s * 0.8); ctx.lineTo(x + s * 0.8, y + 6); ctx.closePath(); ctx.fill(); ctx.fillStyle = 'rgba(255,' + Math.round(140 + 80 * g) + ',60,0.9)'; ctx.beginPath(); ctx.ellipse(x, y - s * 0.8, s * 0.25, s * 0.08, 0, 0, 6.2832); ctx.fill(); for (let b = 0; b < 4; b++) { const u = fr(t * 0.3 + b / 4 + i * 0.41); ctx.strokeStyle = 'rgba(255,210,170,' + 0.5 * (1 - u) + ')'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(x + Math.sin(u * 7 + b) * 8, y - s * 0.9 - u * 120, 2 + u * 3, 0, 6.2832); ctx.stroke(); } }
+      else { ctx.fillStyle = 'rgba(190,226,250,0.5)'; ctx.beginPath(); ctx.moveTo(x - s * 0.9, y + 6); ctx.lineTo(x - s * 0.7, y - s * 0.6); ctx.lineTo(x + s * 0.2, y - s * (0.9 + v * 0.5)); ctx.lineTo(x + s * 0.9, y - s * 0.3); ctx.lineTo(x + s * 0.8, y + 6); ctx.closePath(); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.moveTo(x - s * 0.7, y - s * 0.6); ctx.lineTo(x + s * 0.2, y - s * (0.9 + v * 0.5)); ctx.lineTo(x, y - s * 0.2); ctx.closePath(); ctx.fill(); }
+    }
+    ctx.restore();
+  };
+})();

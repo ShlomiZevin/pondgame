@@ -18,8 +18,9 @@
   const JOBS = G.JOBS = { g: { name: 'Gatherer', many: 'gatherers', doing: 'gathering', hue: 42 }, b: { name: 'Builder', many: 'builders', doing: 'building', hue: 28 }, f: { name: 'Fighter', many: 'fighters', doing: 'fighting', hue: 350 }, u: { name: 'Guard', many: 'guards', doing: 'standing guard', hue: 205 } };
   const RES = G.RES = ['stone', 'reed', 'shell', 'lumen'];
   /** the colony of a star: what is in its store, how many of each trade are wanted, where the fighters rally, what is waiting to be built */
-  const colony = G.colony = function (W) { W = W || G.W; return W.col || (W.col = { stock: [0, 0, 0, 0], got: [0, 0, 0, 0], want: { g: 0, b: 0, f: 0, u: 0 }, rally: null, queue: [], auto: true, nodes: null }); };
-  const mine = function (c) { return !c.team; };      // of your colony (an enemy has a team of its own)
+  const colony = G.colony = function (W) { W = W || G.W; return W.col || (W.col = { stock: [0, 0, 0, 0], got: [0, 0, 0, 0], want: W.farOf ? { g: 0, b: 0, f: 0, u: 0 } : { g: 4, b: 2, f: 0, u: 0 }, rally: null, queue: [], auto: true, nodes: null }); };      // (a colony organises itself a little from the start: a few gatherers and two builders; the rest is yours to say)
+  const mine = function (c) { return !c.team; };      // of your colony (team 1: an enemy; team 2: the people of another star, who are nobody's enemy)
+  const hostile = function (c) { return c.team === 1; };
   const shoreOf = function (W) { return G.shoreY ? G.shoreY(W) : W.wh * 0.25; };
   /** may this creature go to that height of the star? (one of the water stops at the shore; one of the land only paddles in the shallows) */
   const reach = G.canReach = function (W, c, y) { const sy = shoreOf(W); return c.ph.home ? y <= sy + (W.wh - sy) * 0.06 - c.ph.r : y >= sy + c.ph.r; };
@@ -73,7 +74,7 @@
   const strike = G.strike = function (W, a, b) {
     const ph = a.ph, dmg = (5 + 4 * Math.min(2, ph.spike || 0) + 2.5 * Math.min(2, ph.cnt ? ph.cnt[0] : 0) + ph.r * 0.25) * (0.55 + (ph.aggro || 0)) * (1 - Math.min(0.9, b.ph.defense || 0) * 0.8) * (a.job === 'f' ? 1.3 : a.job === 'u' ? 1.15 : 1) * (b.job === 'u' ? 0.6 : b.job === 'f' ? 0.72 : 1);      // (trained for it: a fighter hits harder, and it and a guard take a blow better)
     a.cool2 = 1.0; a.strike = 0.7; b.E -= dmg; b.flash = 1; a.E -= 2 * (b.ph.spike || 0); a.score = (a.score || 0) + dmg / 14; a.dealt = (a.dealt || 0) + dmg; W.stats.fights = (W.stats.fights || 0) + 1;
-    if (b.team && !a.team) b.foe = a;
+    if (b.team && !a.team) { b.foe = a; if (b.team === 2 && G.foeHeart && G.foeHeart(W)) { b.team = 1; b.job = 'f'; } }      // (one of a rival's people who is struck takes up arms)
     G.emit('fight', a, b);
     if (b.E <= 0) { a.score += 2; a.kills = (a.kills || 0) + 1; G.killCreature(b, 'fought', a); G.emit('slain', a, b); }
     if (a.E <= 0) G.killCreature(a, 'fought', b);
@@ -82,7 +83,9 @@
   function foeNear(foes, x, y, R) { let best = null, bd = R * R; for (let i = 0; i < foes.length; i++) { const o = foes[i]; if (o.dead || o.inShip) continue; const d = (o.x - x) * (o.x - x) + (o.y - y) * (o.y - y); if (d < bd) { bd = d; best = o; } } return best; }
   function fight(W, c, col, foes, dt, guard) {
     const hp = G.heartOf(W), post = c.post || (guard ? null : col.rally) || (hp ? { x: hp.x + (guard ? 0 : 120), y: (G.storeAt(W) || hp).y + (c.ph.home ? -30 : 70) } : { x: c.x, y: c.y });
-    let foe = c.foe && !c.foe.dead && W.cre.indexOf(c.foe) >= 0 ? c.foe : null; if (!foe) { c.foe = null; if (foes.length) foe = foeNear(foes, guard ? post.x : c.x, guard ? post.y : c.y, guard ? 230 : 330) || (guard ? null : foeNear(foes, post.x, post.y, 520)); }
+    let foe = c.foe && !c.foe.dead && W.cre.indexOf(c.foe) >= 0 ? c.foe : null; if (!foe) { c.foe = null; if (foes.length) foe = foeNear(foes, guard ? post.x : c.x, guard ? post.y : c.y, guard ? 230 : c.raze ? 150 : 330) || (guard || c.raze ? null : foeNear(foes, post.x, post.y, 520)); }
+    if (c.raze && !(foe && Math.hypot(foe.x - c.x, foe.y - c.y) < 150)) { const w = c.raze; if ((W.works || []).indexOf(w) < 0 || !w.enemy || !w.bp) c.raze = null; else { const sy = shoreOf(W), ty = clamp(w.y + w.bp.S * 0.45, c.ph.home ? 10 : sy + c.ph.r + 2, c.ph.home ? sy + (W.wh - sy) * 0.06 - c.ph.r : W.wh - 10);
+        c.tired = Math.min(c.tired || 0, 0.6); if (go(c, w.x + Math.cos(c.id * 1.7) * 46, ty, dt, 2.2) < 95 && !(c.cool2 > 0)) { c.cool2 = 1.2; c.strike = 0.7; c.score = (c.score || 0) + 0.3; G.damageWork(w, 2.4 + c.ph.r * 0.12 + 1.2 * Math.min(2, c.ph.spike || 0), c); } return; } }      /* (sent against a building of theirs: it is broken piece by piece) */
     if (foe && reach(W, c, foe.y)) { const d = go(c, foe.x, foe.y, dt, 2.5); c.tired = Math.min(c.tired || 0, 0.6); if (d < c.ph.r + foe.ph.r + 10 && !(c.cool2 > 0)) strike(W, c, foe); return; }
     const py = clamp(post.y, c.ph.home ? 10 : shoreOf(W) + c.ph.r + 2, c.ph.home ? shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r : W.wh - 10), d = Math.hypot(c.x - post.x, c.y - py), leash = guard ? 70 : 130;
     if (d > leash) go(c, post.x + Math.cos(c.id * 2.4) * leash * 0.6, py + Math.sin(c.id * 2.4) * leash * 0.4, dt, d > 400 ? 2.4 : 1.4); else if (guard) c.score = (c.score || 0) + dt * 0.02;
@@ -94,16 +97,22 @@
     const tgt = c.raidAt && (W.works || []).indexOf(c.raidAt) >= 0 ? c.raidAt : hp; if (!tgt) return; const ty = clamp(tgt.y + tgt.bp.S * 0.45, c.ph.home ? 10 : shoreOf(W) + c.ph.r + 2, c.ph.home ? shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r : W.wh - 10);
     if (go(c, tgt.x + Math.cos(c.id) * 40, ty, dt, 2) < 90 && !(c.cool2 > 0)) { c.cool2 = 1.2; c.strike = 0.7; G.damageWork(tgt, 2 + c.ph.r * 0.1 + Math.min(2, c.ph.spike || 0), c); }
   }
+  /** one of a rival colony at home: it goes for whoever struck it, and for any of yours that comes near its Heart; otherwise it lives as it likes */
+  function defend(W, c, h, yours, dt) {
+    let tgt = c.foe && !c.foe.dead && !c.foe.inShip && Math.hypot(c.foe.x - c.x, c.foe.y - c.y) < 300 ? c.foe : null; if (!tgt) { c.foe = null; const hy = h.y + h.bp.S * 0.45; if (Math.hypot(c.x - h.x, c.y - hy) < 520) tgt = foeNear(yours, h.x, hy, 270); }
+    if (tgt && reach(W, c, tgt.y)) { c.tired = Math.min(c.tired || 0, 0.6); if (go(c, tgt.x, tgt.y, dt, 2.4) < c.ph.r + tgt.ph.r + 10 && !(c.cool2 > 0)) strike(W, c, tgt); return; }
+    const hy = h.y + h.bp.S * 0.45, d = Math.hypot(c.x - h.x, c.y - hy); if (d > 240) go(c, h.x + Math.cos(c.id * 2.4) * 120, clamp(hy + Math.sin(c.id * 2.4) * 60, c.ph.home ? 10 : shoreOf(W) + c.ph.r + 2, c.ph.home ? shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r : W.wh - 10), dt, 1.4);      /* (it keeps near what it defends) */
+  }
   /** a building is struck: so much harm knocks a piece off it; one with no piece left is gone */
   G.damageWork = function (w, dmg, by) {
     const W = G.W; if (!w || !w.bp) return; w.harm = (w.harm || 0) + dmg; w.dmg = 1; w.hitGen = W.gen; w.hitT = W.t; G.emit('work-hit', w, by);
-    const tough = w.bp.type === 'heart' ? 110 : w.bp.type === 'wall' ? 90 : 60;      // (how much harm one piece takes)
+    const tough = w.bp.type === 'heart' ? (w.enemy ? 70 : 110) : w.bp.type === 'wall' ? 90 : 60;      // (how much harm one piece takes)
     while (w.harm >= tough) { w.harm -= tough; const P = w.bp.P; let k = -1; for (let i = P.length - 1; i >= 0; i--) if (P[i].st > 0) { k = i; break; } if (k < 0) break; P[k].st = 0; G.emit('build-fall', w, P[k]); }
-    if (G.buildCount && G.buildCount(w)[0] === 0) { const i = (W.works || []).indexOf(w); if (i >= 0) W.works.splice(i, 1); G.emit('work-gone', w, 'razed'); if (w.bp.type === 'heart') G.emit('heart-lost', w, by); }
+    if (G.buildCount && G.buildCount(w)[0] === 0) { const i = (W.works || []).indexOf(w); if (i >= 0) W.works.splice(i, 1); G.emit('work-gone', w, 'razed'); if (w.bp.type === 'heart') G.emit(w.enemy ? 'foe-heart-lost' : 'heart-lost', w, by); }
   };
 
   G.on('heart-lost', function (w, by) { const W = G.W, col = colony(W); col.fell = (col.fell || 0) + 1; col.taken = col.stock.slice(); col.stock = [0, 0, 0, 0]; const h = G.ensureHeart(W); if (h) { h.bp.P.forEach(function (p, i) { p.st = i < 2 ? 2 : 0; }); h.ruin = true; h.fellGen = W.gen; h.hitT = W.t; }
-    W.cre.forEach(function (c) { if (c.team && !c.dead) c.leave = 1; }); G.emit('heart-fell', h, by, col.taken); });
+    W.cre.forEach(function (c) { if (hostile(c) && !c.dead) c.leave = 1; }); G.emit('heart-fell', h, by, col.taken); });
   /** the Heart is mended by the builders, a piece at a time, out of the store (slowly, and from what they can scrape together, when it is empty) */
   function mend(W, col) { const h = G.heartOf(W); if (!h) return; if (W.t - (h.hitT === undefined ? -99 : h.hitT) < 8) { h.mendT = 0; return; } const P = h.bp.P; let k = -1; for (let i = 0; i < P.length; i++) if (P[i].st < 2) { k = i; break; }
     if (k < 0) { if (h.ruin || h.dmg) { h.ruin = false; h.dmg = 0; h.harm = 0; G.emit('heart-whole', h); } return; }
@@ -112,11 +121,11 @@
     P[k].st++; P[k].t0 = W.t; h.mendT = 0; G.emit('heart-mended', h, P[k]); }
   /** a finished tower strikes at the nearest raider in reach, every moment and a half */
   function towers(W, dt) { const Wk = W.works || []; for (let i = 0; i < Wk.length; i++) { const w = Wk[i]; if (!w.tower || !w.bp || w.enemy) continue; w.zapT = (w.zapT || 0) - dt; if (w.zapT > 0) continue; w.zapT = 0.5;
-      const n = G.buildCount(w); if (n[0] < n[2] * 0.7) continue; let best = null, bd = 300 * 300; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (!c.team || c.dead || c.inShip) continue; const d = (c.x - w.x) * (c.x - w.x) + (c.y - w.y) * (c.y - w.y); if (d < bd) { bd = d; best = c; } }
+      const n = G.buildCount(w); if (n[0] < n[2] * 0.7) continue; let best = null, bd = 300 * 300; for (let k = 0; k < W.cre.length; k++) { const c = W.cre[k]; if (c.team !== 1 || c.dead || c.inShip) continue; const d = (c.x - w.x) * (c.x - w.x) + (c.y - w.y) * (c.y - w.y); if (d < bd) { bd = d; best = c; } }
       if (!best) continue; w.zapT = 1.5; best.E -= 13; best.flash = 1; w.zaps = (w.zaps || 0) + 1; G.emit('tower-zap', w, best); if (best.E <= 0) { w.kills = (w.kills || 0) + 1; G.killCreature(best, 'fought', null); G.emit('tower-kill', w, best); } } }
   G.on('scored', function () { const W = G.W; if (!W || !W.col || !W.col.nodes || W.gen % 2) return; W.col.nodes.forEach(function (q) { if (q.n < q.n0) q.n++; }); });      // (lumen grows back, a piece every other year)
   // raiders are not the star's own: its winter does not choose among them (a raid that is not beaten wears itself out in three years)
-  G.on('winter', function () { const W = G.W; if (W) W.cre.forEach(function (c) { if (c.team && W.gen - c.born < 3) c.doomed = false; }); });
+  G.on('winter', function () { const W = G.W; if (W && !(G.foeHeart && G.foeHeart(W))) W.cre.forEach(function (c) { if (hostile(c) && W.gen - c.born < 3) c.doomed = false; }); });
 
   // ── who does what: your quotas are filled from those best made for the work ──
   const APT = { g: function (c) { return c.ph.speed * 0.02 + (c.ph.hands ? 0.6 : 0) + Math.min(4, c.ph.limbs || 0) * 0.1 + (c.g.s ? c.g.s[3] * 0.4 : 0); }, b: function (c) { return (c.ph.hands ? 0.8 : 0) + Math.min(4, c.ph.limbs || 0) * 0.12 + (c.g.s ? c.g.s[3] * 0.6 : 0) + c.ph.speed * 0.008; },
@@ -124,16 +133,16 @@
   G.jobFit = function (c, job) { return APT[job] ? APT[job](c) : 0; };
   /** how many of your colony have each trade (and how many are free) */
   G.jobCount = function (W) { W = W || G.W; const n = { g: 0, b: 0, f: 0, u: 0, free: 0, all: 0 }; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c)) continue; n.all++; if (c.job && n[c.job] !== undefined) n[c.job]++; else n.free++; } return n; };
-  const setJob = G.setJob = function (c, job, pinned) { if (c.job === job) { if (pinned) c.pin = true; return; } c.job = job || ''; c.pin = !!pinned && !!job; c.gj = null; if (c.haul >= 0 && !c.deedId) c.haul = -1; c.foe = null; if (!job) { c.post = null; c.area = null; } c.score = 0; G.emit('job', c, job); };
+  const setJob = G.setJob = function (c, job, pinned) { if (c.job === job) { if (pinned) c.pin = true; return; } c.job = job || ''; c.pin = !!pinned && !!job; c.gj = null; c.hungry = false; if (job !== 'f') c.raze = null; if (c.haul >= 0 && !c.deedId) c.haul = -1; c.foe = null; if (!job) { c.post = null; c.area = null; } c.score = 0; G.emit('job', c, job); };
   function staff(W, col) {
     const n = G.jobCount(W), keys = ['f', 'u', 'b', 'g'];
-    for (let q = 0; q < keys.length; q++) { const k = keys[q], want = Math.min(col.want[k] | 0, Math.max(0, n.all - 2));
-      if (n[k] < want) { let best = null, bs = -1e9; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c) || c.job || c.deedId || c.inShip || c.stranger !== undefined || c.age < 0) continue; const s = APT[k](c) + (c.E / c.ph.Emax) * 0.2; if (s > bs) { bs = s; best = c; } } if (best) { setJob(best, k, false); return; } }
+    for (let q = 0; q < keys.length; q++) { const k = keys[q], want = Math.min(col.want[k] | 0, Math.max(0, n.all - (n.all > 12 ? 2 : 0)));
+      if (n[k] < want) { let best = null, bs = -1e9; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c) || c.job || c.deedId || c.inShip || (c.stranger !== undefined && !W.farOf) || c.age < 0) continue; const s = APT[k](c) + (c.E / c.ph.Emax) * 0.2; if (s > bs) { bs = s; best = c; } } if (best) { setJob(best, k, false); return; } }
       else if (n[k] > want) { let worst = null, ws = 1e9; for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead || !mine(c) || c.job !== k || c.pin || c.deedId) continue; const s = (c.score || 0) + APT[k](c) * 0.3; if (s < ws) { ws = s; worst = c; } } if (worst) { setJob(worst, '', false); return; } }
     }
   }
   // a child is born into its parent's trade
-  G.on('birth', function (c, a, b) { const p = a && a.job && mine(a) ? a : b && b.job && mine(b) ? b : null; if (p && !c.team) { c.job = p.job; if (p.post) c.post = p.post; if (p.area) c.area = p.area; if (p.gk !== undefined) c.gk = p.gk; } if (a && a.team) c.team = a.team; });
+  G.on('birth', function (c, a, b) { const p = a && a.job && mine(a) ? a : b && b.job && mine(b) ? b : null; if (p && !c.team) { c.job = p.job; if (p.post) c.post = p.post; if (p.area) c.area = p.area; if (p.gk !== undefined) c.gk = p.gk; if (p.raze) c.raze = p.raze; if (p.pin && p.raze) c.pin = true; } if (a && a.team) c.team = a.team; });
   // a builder who sets a piece has done its work
   G.on('build-piece', function (d, pc, c) { if (c && c.job === 'b') { c.score = (c.score || 0) + 1; c.done = (c.done || 0) + 1; } });
 
@@ -192,20 +201,23 @@
   // ── the colony's moment: every step ──
   let acc = 0;
   { const s1 = G.step; G.step = function (dt) { s1(dt); const W = G.W; if (!W || W.title || W.extinct) return; const col = colony(W);
-      if (!W.farOf) G.ensureHeart(W);
+      if (!W.farOf || (G.starHeld && G.starHeld(W))) G.ensureHeart(W);
       acc += dt; if (acc >= 1.2) { acc = 0; for (let q = 0; q < 6; q++) staff(W, col); startBuild(W, col); mend(W, col); const h = G.heartOf(W); if (h) { h.x = clamp(h.x, 200, W.ww - 200); h.y = heartY(W, h.bp.S); } }
-      let foes = null, yours = null, gone = false, anyFoe = false; towers(W, dt); for (let i = 0; i < W.cre.length; i++) if (W.cre[i].team && !W.cre[i].dead) { anyFoe = true; break; }
+      let foes = null, yours = null, gone = false, anyFoe = false; towers(W, dt); for (let i = 0; i < W.cre.length; i++) if (W.cre[i].team === 1 && !W.cre[i].dead) { anyFoe = true; break; }
+      const theirs = G.foeHeart ? G.foeHeart(W) : null;
       for (let i = 0; i < W.cre.length; i++) { const c = W.cre[i]; if (c.dead) continue; if (c.cool2 > 0) c.cool2 -= dt;
+        if (c.team === 2) continue;      /* (the people of another star: they live as they like) */
+        if (c.team && theirs && !c.raid) { if (!yours) yours = W.cre.filter(function (o) { return !o.dead && !o.team && !o.inShip; }); if (!c.asleep) defend(W, c, theirs, yours, dt); continue; }
         if (c.team) { if (c.eKeep !== undefined && c.E < c.eKeep && c.E > 0) c.E += (c.eKeep - c.E) * 0.8;      /* (raiders came provisioned: living costs them little while the raid lasts) */
           if (c.leave) { const fx = c.from ? c.from.x : c.x < W.ww / 2 ? -40 : W.ww + 40, fy = c.from ? c.from.y : c.y; c.leave += dt; if (go(c, clamp(fx, 60, W.ww - 60), clamp(fy, c.ph.home ? 10 : shoreOf(W) + c.ph.r + 2, c.ph.home ? shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r : W.wh - 10), dt, 2.2) < 50 || c.leave > 22) { c.gone = 1; gone = true; } continue; }
           if (!yours) yours = W.cre.filter(function (o) { return !o.dead && !o.team && !o.inShip; }); if (!c.inShip && !c.asleep) raid(W, c, col, yours, dt); continue; }
         if (!c.job) continue;
         if (c.deedId || c.asleep || c.inShip || c.goTo) continue;
-        const fed = c.E / c.ph.Emax; if (c.hungry) { if (fed > (c.job === 'f' || c.job === 'u' ? 0.8 : 0.62) || ((c.job === 'f' || c.job === 'u') && anyFoe && fed > 0.2)) c.hungry = false; else { if (c.job === 'g' && c.haul >= 0 && !c.gj) c.haul = -1; continue; } } else if (fed < (c.job === 'f' || c.job === 'u' ? 0.5 : 0.33) && !((c.job === 'f' || c.job === 'u') && anyFoe)) { c.hungry = true; continue; }      /* (fighters and guards keep themselves better fed, to be fit when it comes to it; and nobody leaves a fight to eat) */
+        const fed = c.E / c.ph.Emax; if (c.hungry) { if (fed > (c.job === 'f' || c.job === 'u' ? 0.8 : 0.62) || ((c.job === 'f' || c.job === 'u') && (anyFoe || c.raze) && fed > 0.2)) c.hungry = false; else { if (c.job === 'g' && c.haul >= 0 && !c.gj) c.haul = -1; continue; } } else if (fed < (c.job === 'f' || c.job === 'u' ? 0.5 : 0.33) && !((c.job === 'f' || c.job === 'u') && (anyFoe || c.raze) && fed > 0.18)) { c.hungry = true; continue; }      /* (fighters and guards keep themselves better fed, to be fit when it comes to it; and nobody leaves a fight to eat) */
         if (c.job === 'g') gather(W, c, col, dt);
-        else if (c.job === 'f' || c.job === 'u') { if (!foes) foes = W.cre.filter(function (o) { return !o.dead && o.team; }); fight(W, c, col, foes, dt, c.job === 'u'); }
+        else if (c.job === 'f' || c.job === 'u') { if (!foes) foes = W.cre.filter(function (o) { return !o.dead && o.team === 1; }); fight(W, c, col, foes, dt, c.job === 'u'); }
       }
-      for (let i = W.cre.length - 1; i >= 0; i--) { const c = W.cre[i]; if (c.team) { c.eKeep = c.E; if (gone && c.gone) { W.cre.splice(i, 1); G.emit('foe-left', c); } } }
+      for (let i = W.cre.length - 1; i >= 0; i--) { const c = W.cre[i]; if (c.team === 1 && !theirs) { c.eKeep = c.E; if (gone && c.gone) { W.cre.splice(i, 1); G.emit('foe-left', c); } } }
     }; }
 
   // ── your orders ──
@@ -213,10 +225,11 @@
   G.order = function (list, o) {
     const W = G.W, col = colony(W); let n = 0;
     list.forEach(function (c) { if (!c || c.dead || c.team) return; n++;
-      if (o.foe) { if (c.job !== 'f' && c.job !== 'u') setJob(c, 'f', true); c.foe = o.foe; }
+      if (o.foe) { if (c.job !== 'f' && c.job !== 'u') setJob(c, 'f', true); c.foe = o.foe; c.raze = null; }
+      else if (o.work && o.work.enemy) { if (c.job !== 'f') setJob(c, 'f', true); c.raze = o.work; c.foe = null; c.post = { x: o.work.x, y: o.work.y + o.work.bp.S * 0.45 }; }
       else if (o.mat !== undefined) { if (c.job !== 'g') setJob(c, 'g', true); c.gk = o.mat; c.area = { x: o.x, y: o.y }; c.gj = null; }
       else if (o.work && (c.job === 'u' || c.job === 'f')) { setJob(c, 'u', true); c.post = { x: o.work.x, y: o.work.y + o.work.bp.S * 0.45 + 30 }; }
-      else if (c.job === 'f' || c.job === 'u') { c.post = { x: o.x, y: o.y }; c.foe = null; }
+      else if (c.job === 'f' || c.job === 'u') { c.post = { x: o.x, y: o.y }; c.foe = null; c.raze = null; }
       else if (c.job === 'g') { c.area = { x: o.x, y: o.y }; c.gk = undefined; c.gj = null; }
       else c.goTo = { x: o.x, y: reach(W, c, o.y) ? o.y : c.ph.home ? Math.min(o.y, shoreOf(W) + (W.wh - shoreOf(W)) * 0.06 - c.ph.r) : Math.max(o.y, shoreOf(W) + c.ph.r + 2), until: W.t + 25, order: 1 };      /* (as near as its body lets it come) */
     });

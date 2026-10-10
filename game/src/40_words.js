@@ -26,7 +26,7 @@
   grp('flower', { n: 0.5, tag: 2, l: 0.15, hue: 320, r: 70, v: 0.8 }, 'flower flowers rose tulip daisy lily orchid lotus sunflower violet lavender jasmine poppy daffodil marigold blossom bloom petal petals bouquet garden meadow grass lawn clover moss fern ivy vine bush shrub tree oak pine palm bamboo cactus leaf leaves branch forest jungle plant seedling sapling bonsai hay straw wildflower dandelion thistle');
   grp('animal', { n: 0.7, tag: 3, hue: 30, r: 75 }, 'cat dog bird fish cow pig sheep goat horse duck goose rabbit mouse rat hamster squirrel deer fox wolf bear lion tiger leopard cheetah elephant giraffe zebra monkey gorilla panda koala kangaroo camel llama alpaca donkey mule frog toad turtle tortoise lizard gecko crocodile alligator dolphin whale shark seal otter beaver hedgehog bat owl eagle hawk parrot crow pigeon sparrow chicken rooster swan flamingo penguin hamster ferret pony puppy kitten bunny lamb calf chick duckling cub fawn');
   grp('bug', { n: 0.5, tag: 1, hue: 90, r: 65, v: 0.5 }, 'ant bee ladybug butterfly moth fly mosquito beetle cricket grasshopper dragonfly caterpillar worm earthworm snail slug termite cockroach flea tick maggot larva centipede millipede cicada locust mantis aphid weevil bug bugs insect insects');
-  grp('water', { x: 0.3, n: 0.2, tag: 2, hue: 195, r: 100 }, 'rain river lake ocean sea stream brook waterfall puddle pond wave tide tsunami flood fountain spring well shower dew drizzle monsoon rainbow raindrop bubble bubbles foam splash mist waterdrop');
+  grp('water', { x: 0.3, n: 0.2, tag: 2, hue: 195, r: 100 }, 'rain river lake ocean sea stream brook waterfall puddle star wave tide tsunami flood fountain spring well shower dew drizzle monsoon rainbow raindrop bubble bubbles foam splash mist waterdrop');
   grp('tech', { p: 0.25, h: 0.25, l: 0.25, hue: 200, r: 75 }, 'computer laptop phone smartphone tablet robot android cyborg drone satellite rocket spaceship ufo radio television tv camera microphone speaker headphones keyboard mouse monitor server chip processor circuit wire cable battery charger engine motor machine gear cog turbine generator reactor internet wifi bluetooth cloud software code bug-report algorithm ai blockchain bitcoin pixel hacker virus-scan');
   grp('radio', { p: 0.8, h: 0.3, l: 0.6, hue: 95, r: 100 }, 'uranium plutonium radiation radioactive nuclear atomic fallout reactor-core isotope chernobyl nuke bomb warhead gamma xray x-ray neutron cesium radium fission fusion');
   grp('weapon', { p: 0.3, d: 0.4, h: 0.3, hue: 0, r: 70 }, 'sword knife dagger axe spear arrow bow crossbow gun pistol rifle cannon grenade dynamite tnt missile torpedo landmine mine bullet bullets ammo blade scythe sickle mace club hammer-war trident shuriken katana saber rapier bomb explosive explosion blast boom shotgun sniper tank-shell');
@@ -151,7 +151,7 @@
     if (p.moves > 0.3) bits.push('a wanderer');
     if (p.pull > 0.3) bits.push('a pull that draws creatures in'); else if (p.pull < -0.3) bits.push('a push that drives creatures away');
     if (!bits.length) bits.push('a faint stir');
-    return 'Gives the pond ' + bits.join(', ') + '.';
+    return 'Gives the star ' + bits.join(', ') + '.';
   }
 
   function combine(a, b) {
@@ -215,7 +215,7 @@
       props: acc.props, tag: acc.tag, hue: acc.hue, shape: h % 5, radius: acc.radius, life: acc.life, alive: acc.alive || 0,
       source: known ? 'table' : 'guess',
     };
-    out.note = (known ? '' : 'Never heard of it, so the pond improvised. ') + describe(clampThing(out));
+    out.note = (known ? '' : 'Never heard of it, so the star improvised. ') + describe(clampThing(out));
     return clampThing(out);
   }
 
@@ -343,7 +343,7 @@
     // every answer that came from a server is written down: what it was for, whether a model really ran, and what it cost
     ledger: [],          // this session, newest last: { at, kind, paid, usd }
     life: {},            // this pond since it began (kept in its save): { kind: { asked, fresh, usd } }
-    LABEL: { thing: 'Things you typed', event: 'World events you typed', nature: 'What the pond does by itself (invented events)', organ: 'New organs', story: 'Story chapters', ideas: 'Mutation ideas', judge: 'The eye for beauty: grading the creatures by looking at them', check: 'The eye for beauty: looking over new ideas', watch: 'The watcher: looking at living creatures and grading them', marvel: 'Rare marvels: inventing a gift for a lucky creature', design: 'New kinds of body part', plan: 'New shapes of body', paint: 'Painted creatures (Leonardo)', sound: 'Sounds (Leonardo)' },
+    LABEL: { thing: 'Things you typed', event: 'World events you typed', nature: 'What the star does by itself (invented events)', organ: 'New organs', story: 'Story chapters', ideas: 'Mutation ideas', judge: 'The eye for beauty: grading the creatures by looking at them', check: 'The eye for beauty: looking over new ideas', watch: 'The watcher: looking at living creatures and grading them', marvel: 'Rare marvels: inventing a gift for a lucky creature', design: 'New kinds of body part', plan: 'New shapes of body', paint: 'Painted creatures (Leonardo)', sound: 'Sounds (Leonardo)' },
     tally: function (kind, source, usd) {
       const c = G.ai.count[kind] || (G.ai.count[kind] = { asked: 0, fresh: 0, usd: 0 });
       c.asked++;

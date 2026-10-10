@@ -143,7 +143,7 @@
     let legs = 0, arms = 0, sideDsg = 0, organs = 0; const legOn = {}, seen = {};
     for (let i = 0; i < f.rules.length; i++) { const q = f.rules[i]; if (q.on >= 0) continue; has[q.k] = 1; if (q.k === 8) { const d = F._dsg(q); if (d && d.place === 'sides') sideDsg = 1; } if (q.k === 0) for (let m = q.a; m <= q.b && m < f.n; m += q.e) { if (gnd[m] && !legOn[m]) { legOn[m] = 1; legs = 1; } else arms = 1; } }
     // the kinds of organ it has: each counts once, however it is used
-    const org = [['legs', legs], ['arms or hands', arms], ['fins or wings', has[1]], ['tentacles', has[3]], ['a tail', f.tk ? 1 : 0], ['a shell', f.shell > 0.25 ? 1 : 0], ['ears, horns or feelers', bm.pairs || has[7] || has[4] || f.crest > 0.25 ? 1 : 0], ['a coat, markings or clothes', f.coat || f.pat || f.cl ? 1 : 0], ['a kind of part this pond invented', has[8] ? 1 : 0]];
+    const org = [['legs', legs], ['arms or hands', arms], ['fins or wings', has[1]], ['tentacles', has[3]], ['a tail', f.tk ? 1 : 0], ['a shell', f.shell > 0.25 ? 1 : 0], ['ears, horns or feelers', bm.pairs || has[7] || has[4] || f.crest > 0.25 ? 1 : 0], ['a coat, markings or clothes', f.coat || f.pat || f.cl ? 1 : 0], ['a kind of part this star invented', has[8] ? 1 : 0]];
     const got = [], lacks = []; for (let i = 0; i < org.length; i++) if (org[i][1]) { organs++; got.push(org[i][0]); }
     const side = f.bd.v ? 1 : 0, face = f.en >= 2 ? 1 : f.en === 1 ? (side ? 1 : 0.6) : 0;
     const mover = legs || has[1] || has[3] || f.tk || (side && M.length >= 3 && bm.cls === 'W') ? 1 : sideDsg ? 0.5 : 0;      // some way of getting about: legs, fins, tentacles, a tail, a long body
